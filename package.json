@@ -1,0 +1,24 @@
+{
+  "name": "archeon",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "scripts": {
+    "start": "node scripts/start",
+    "docker:dbs:up": "docker-compose -f ./docker/databases/docker-compose.yml up -d",
+    "prettier:write": "prettier --write \"**/*.{js,ts,css,scss,html,tsx,jsx}\"",
+    "prettier:check": "prettier --check \"**/*.{js,ts,css,scss,html,tsx,jsx}\"",
+    "lint:all": "cd apps/back && npm run lint"
+  },
+  "author": "",
+  "license": "ISC",
+  "keywords": [],
+  "workspaces": [
+    "apps/*"
+  ],
+  "devDependencies": {
+    "inquirer": "^8.0.0",
+    "prettier": "^3.2.5",
+    "pretty-quick": "^4.0.0"
+  }
+}
