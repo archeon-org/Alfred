@@ -36,16 +36,44 @@ jobs:
           fetch-depth: 0
 
       - name: 🔍 Check for changes
-        uses: dorny/paths-filter@v3
         id: changes
-        with:
-          filters: |
-            gate:
-              - 'apps/gate/**'
-              - 'packages/types/**'
-            scribe:
-              - 'apps/scribe/**'
-              - 'packages/types/**'
+        run: |
+          echo "Detecting changes..."
+
+          # Determine the commit range
+          BEFORE="${{ github.event.before }}"
+          SHA="${{ github.sha }}"
+
+          # Handle manual runs or new branches where 'before' might be empty or zero
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            RANGE="HEAD~1 HEAD"
+          else
+            RANGE="$BEFORE $SHA"
+          fi
+
+          echo "Checking changes in range: $RANGE"
+          CHANGED_FILES=$(git diff --name-only $RANGE)
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Check for Gate changes
+          if echo "$CHANGED_FILES" | grep -qE '^apps/gate/|^packages/types/'; then
+            echo "gate=true" >> $GITHUB_OUTPUT
+            echo "Gate changes detected."
+          else
+            echo "gate=false" >> $GITHUB_OUTPUT
+            echo "No Gate changes."
+          fi
+
+          # Check for Scribe changes
+          if echo "$CHANGED_FILES" | grep -qE '^apps/scribe/|^packages/types/'; then
+            echo "scribe=true" >> $GITHUB_OUTPUT
+            echo "Scribe changes detected."
+          else
+            echo "scribe=false" >> $GITHUB_OUTPUT
+            echo "No Scribe changes."
+          fi
 
       - name: 📊 Changes Summary
         run: |
