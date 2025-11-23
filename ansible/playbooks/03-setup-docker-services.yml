@@ -1,0 +1,275 @@
+---
+- name: Setup Docker Services (PostgreSQL & Redis for Archeon)
+  hosts: archeon-vps
+  become: true
+  gather_facts: true
+  
+  vars:
+    app_directory: "/opt/archeon"
+    
+  tasks:
+    - name: �� Install nginx and certbot (for future use)
+      apt:
+        name:
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+        state: present
+        update_cache: yes
+
+    - name: 🔍 Verify Docker is installed and running
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+      register: docker_service
+
+    - name: ✅ Docker service status
+      debug:
+        msg: "✅ Docker service is running and enabled"
+      when: docker_service is succeeded
+
+    - name: 📁 Ensure application directory exists
+      file:
+        path: "{{ app_directory }}"
+        state: directory
+        owner: "{{ vault_vps_user }}"
+        group: "{{ vault_vps_user }}"
+        mode: '0755'
+
+    - name: 📝 Create docker-compose.yml from template
+      template:
+        src: docker-compose.yml.j2
+        dest: "{{ app_directory }}/docker-compose.yml"
+        owner: "{{ vault_vps_user }}"
+        group: "{{ vault_vps_user }}"
+        mode: '0644'
+        backup: yes
+      register: compose_updated
+
+    - name: �� Docker compose file status
+      debug:
+        msg: |
+          {% if compose_updated.changed %}
+          🔄 docker-compose.yml has been updated
+          {% else %}
+          ✅ docker-compose.yml is up to date
+          {% endif %}
+
+    - name: 📁 Create PostgreSQL init scripts directory
+      file:
+        path: "{{ app_directory }}/init-scripts"
+        state: directory
+        owner: "{{ vault_vps_user }}"
+        group: "{{ vault_vps_user }}"
+        mode: '0755'
+
+    - name: 📜 Create PostgreSQL initialization script
+      copy:
+        content: |
+          -- Archeon Database Initialization
+          -- Created by Ansible on {{ ansible_date_time.iso8601 }}
+          
+          -- Create extensions if needed
+          CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+          CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+          
+          -- Set timezone
+          ALTER DATABASE {{ vault_db_name }} SET timezone TO 'UTC';
+          
+          -- Create application user with proper permissions
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '{{ vault_db_user }}') THEN
+              CREATE ROLE {{ vault_db_user }} WITH LOGIN PASSWORD '{{ vault_db_password }}';
+            END IF;
+          END
+          $$;
+          
+          -- Grant permissions
+          GRANT ALL PRIVILEGES ON DATABASE {{ vault_db_name }} TO {{ vault_db_user }};
+          GRANT ALL ON SCHEMA public TO {{ vault_db_user }};
+          
+          -- Log initialization
+          \echo 'Archeon database initialized successfully'
+        dest: "{{ app_directory }}/init-scripts/01-init-archeon.sql"
+        owner: "{{ vault_vps_user }}"
+        group: "{{ vault_vps_user }}"
+        mode: '0644'
+
+    - name: 🛑 Stop existing Docker containers (if running)
+      shell: |
+        cd {{ app_directory }}
+        docker compose down || true
+      ignore_errors: true
+
+    - name: 🧹 Clean up old containers and networks
+      shell: |
+        docker container prune -f
+        docker network prune -f
+      ignore_errors: true
+
+    - name: 🚀 Pull latest Docker images
+      shell: |
+        cd {{ app_directory }}
+        docker compose pull
+      ignore_errors: true
+
+    - name: 🚀 Start Docker Compose services
+      shell: |
+        cd {{ app_directory }}
+        docker compose up -d
+      register: docker_compose_result
+
+    - name: ⏳ Wait for PostgreSQL to be ready
+      wait_for:
+        host: "{{ vault_vps_ip }}"
+        port: 5432
+        delay: 10
+        timeout: 60
+        msg: "PostgreSQL is not responding"
+
+    - name: 🔥 Update UFW firewall for PostgreSQL
+      ufw:
+        rule: allow
+        port: "5432"
+        proto: tcp
+
+    - name: 🔍 Check container status
+      command: docker ps
+      register: container_status
+      changed_when: false
+
+    - name: 📊 Display container status
+      debug:
+        msg: |
+          🐳 Docker Containers Status:
+          {{ container_status.stdout }}
+
+    - name: 🧪 Test PostgreSQL connection
+      command: >
+        docker exec postgres-archeon 
+        psql -U {{ vault_db_user }} -d {{ vault_db_name }} 
+        -c "SELECT version();"
+      register: postgres_test
+      changed_when: false
+      failed_when: false
+
+    - name: 🧪 Test Redis connection
+      command: >
+        docker exec redis-archeon
+        redis-cli -a {{ vault_redis_password }} ping
+      register: redis_test
+      changed_when: false
+      failed_when: false
+
+    - name: ✅ Service verification results
+      debug:
+        msg: |
+          🎉 Archeon Docker Services Setup Complete!
+          
+          📊 Service Status:
+          {% if postgres_test.rc == 0 %}
+          ✅ PostgreSQL: Running and accessible
+             - Database: {{ vault_db_name }}
+             - User: {{ vault_db_user }}
+             - Port: 5432
+             - Container: postgres-archeon
+          {% else %}
+          ❌ PostgreSQL: Connection failed
+          {% endif %}
+          
+          {% if redis_test.rc == 0 %}
+          ✅ Redis: Running and accessible
+             - Port: 6379
+             - Container: redis-archeon
+          {% else %}
+          ❌ Redis: Connection failed
+          {% endif %}
+
+    - name: 📋 Service URLs and credentials
+      debug:
+        msg: |
+          🌐 Archeon Database Service Information:
+          
+          🐘 PostgreSQL Database:
+          - Host: {{ vault_vps_ip }}:5432
+          - Database: {{ vault_db_name }}
+          - Username: {{ vault_db_user }}
+          - Connection URL: postgres://{{ vault_db_user }}:******@{{ vault_vps_ip }}:5432/{{ vault_db_name }}
+          - Container: postgres-archeon
+          
+          🔧 Management Commands:
+          - View logs: docker compose -f {{ app_directory }}/docker-compose.yml logs -f
+          - Restart: docker compose -f {{ app_directory }}/docker-compose.yml restart
+          - Stop: docker compose -f {{ app_directory }}/docker-compose.yml stop
+          - Connect to DB: docker exec -it postgres-archeon psql -U {{ vault_db_user }} -d {{ vault_db_name }}
+          
+          📝 Note: Nginx and SSL will be configured separately using the 04-setup-subdomains-https.yml playbook
+
+    - name: 📝 Create service management script
+      copy:
+        content: |
+          #!/bin/bash
+          # Archeon Docker Services Management
+          # Generated by Ansible on {{ ansible_date_time.iso8601 }}
+          
+          cd {{ app_directory }}
+          
+          case "$1" in
+            start)
+              echo "🚀 Starting Archeon services..."
+              docker compose up -d
+              ;;
+            stop)
+              echo "🛑 Stopping Archeon services..."
+              docker compose stop
+              ;;
+            restart)
+              echo "🔄 Restarting Archeon services..."
+              docker compose restart
+              ;;
+            logs)
+              echo "📋 Showing service logs..."
+              docker compose logs -f
+              ;;
+            status)
+              echo "📊 Service status:"
+              docker compose ps
+              ;;
+            db)
+              echo "🐘 Connecting to PostgreSQL database..."
+              docker exec -it postgres-archeon psql -U {{ vault_db_user }} -d {{ vault_db_name }}
+              ;;
+            *)
+              echo "Usage: $0 {start|stop|restart|logs|status|db}"
+              exit 1
+              ;;
+          esac
+        dest: "{{ app_directory }}/manage-services.sh"
+        owner: "{{ vault_vps_user }}"
+        group: "{{ vault_vps_user }}"
+        mode: '0755'
+
+    - name: 🎯 Final success message
+      debug:
+        msg: |
+          🎉 SUCCESS! Archeon Database service is configured!
+          
+          🐘 PostgreSQL Database:
+          - Container: postgres-archeon
+          - Port: 5432
+          - Database: {{ vault_db_name }}
+          - User: {{ vault_db_user }}
+          
+          🔧 Quick Commands:
+          - Manage services: {{ app_directory }}/manage-services.sh {start|stop|restart|logs|status|db}
+          - Connect to DB: {{ app_directory }}/manage-services.sh db
+          
+          📝 Next Steps:
+          - Run 04-setup-subdomains-https.yml to configure nginx and SSL
+          - Deploy your gate application
+          
+          🚀 Database is ready for Archeon deployment!
+
+  handlers: []

@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { APP_GUARD } from '@nestjs/core';
 import { UserTypeGuard } from './auth/guards/user-type.guard';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { UserTypeGuard } from './auth/guards/user-type.guard';
     TypeOrmModule.forRoot(dataSourceOptions as TypeOrmModule),
     UserModule,
     AuthModule,
+    HealthModule,
   ],
   providers: [
     {

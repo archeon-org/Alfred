@@ -6,19 +6,19 @@ WORKDIR /app
 COPY package.json yarn.lock ./
 
 # Copy workspace package files
-COPY apps/gate/package.json apps/gate/
+COPY apps/scribe/package.json apps/scribe/
 COPY packages/types/package.json packages/types/
 
 # Install dependencies
 RUN yarn install --frozen-lockfile
 
 # Copy source code
-COPY apps/gate apps/gate
+COPY apps/scribe apps/scribe
 COPY packages/types packages/types
 
 # Build packages
 RUN yarn workspace @archeon-org/types build
-RUN yarn workspace gate build
+RUN yarn workspace scribe build
 
 # Production stage
 FROM node:22-alpine
@@ -29,21 +29,20 @@ WORKDIR /app
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/yarn.lock ./
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/gate/node_modules ./apps/gate/node_modules
-COPY --from=builder /app/apps/gate/dist ./apps/gate/dist
-COPY --from=builder /app/apps/gate/package.json ./apps/gate/
-COPY --from=builder /app/apps/gate/db ./apps/gate/db
-COPY --from=builder /app/apps/gate/tsconfig.json ./apps/gate/
+COPY --from=builder /app/apps/scribe/node_modules ./apps/scribe/node_modules
+COPY --from=builder /app/apps/scribe/dist ./apps/scribe/dist
+COPY --from=builder /app/apps/scribe/package.json ./apps/scribe/
+COPY --from=builder /app/apps/scribe/tsconfig.json ./apps/scribe/
 COPY --from=builder /app/packages/types/dist ./packages/types/dist
 COPY --from=builder /app/packages/types/package.json ./packages/types/
 
 # Set working directory to the app
-WORKDIR /app/apps/gate
+WORKDIR /app/apps/scribe
 
 # Add root node_modules to PATH
 ENV PATH=$PATH:/app/node_modules/.bin
 
-# Expose the port the app runs on (default NestJS is often 3000)
+# Expose the port the app runs on
 EXPOSE 3000
 
-CMD ["sh", "-c", "yarn migration:run && node dist/src/main"]
+CMD ["node", "dist/main"]

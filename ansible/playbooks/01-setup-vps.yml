@@ -1,0 +1,181 @@
+---
+- name: Setup VPS with essential packages and Docker
+  hosts: archeon-vps
+  become: true
+  gather_facts: true
+  
+  tasks:
+    - name: 📦 Update package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: 🛠️ Install essential system packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - vim
+          - nano
+          - htop
+          - unzip
+          - zip
+          - tree
+          - software-properties-common
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+          - build-essential
+          - python3-pip
+          - ufw
+          - fail2ban
+        state: present
+      register: packages_installed
+
+    - name: ✅ Essential packages installed
+      debug:
+        msg: "Essential system packages have been installed successfully"
+      when: packages_installed is succeeded
+
+    - name: 🐳 Remove old Docker installations
+      apt:
+        name:
+          - docker
+          - docker-engine
+          - docker.io
+          - containerd
+          - runc
+        state: absent
+
+    - name: 🔑 Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: 📋 Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        update_cache: yes
+
+    - name: 🐳 Install Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+      register: docker_installed
+
+    - name: 🚀 Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: 👤 Add users to docker group
+      user:
+        name: "{{ item }}"
+        groups: docker
+        append: true
+      loop:
+        - "{{ vault_vps_user }}"
+      register: docker_group_added
+
+    - name: 🔧 Configure Docker daemon
+      copy:
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "100m",
+              "max-file": "3"
+            },
+            "storage-driver": "overlay2",
+            "live-restore": true
+          }
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: '0644'
+      notify: restart docker
+
+    - name: 🔥 Configure UFW firewall
+      ufw:
+        rule: "{{ item.rule }}"
+        port: "{{ item.port }}"
+        proto: "{{ item.proto }}"
+      loop:
+        - { rule: "allow", port: "22", proto: "tcp" }    # SSH
+        - { rule: "allow", port: "80", proto: "tcp" }    # HTTP  
+        - { rule: "allow", port: "443", proto: "tcp" }   # HTTPS
+      register: firewall_configured
+
+    - name: 🛡️ Enable UFW firewall
+      ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    - name: 🧪 Test Docker installation
+      command: docker run --rm hello-world
+      register: docker_test
+      changed_when: false
+      become_user: "{{ vault_vps_user }}"
+
+    - name: ✅ Docker installation verification
+      debug:
+        msg: |
+          🎉 Setup Complete!
+          
+          ✅ Essential packages installed
+          ✅ Docker CE installed and running
+          ✅ Docker Compose available via plugin
+          ✅ User '{{ vault_vps_user }}' added to docker group
+          ✅ Firewall configured (SSH, HTTP, HTTPS)
+          ✅ Docker test successful
+          
+          🔄 You may need to logout/login to use docker without sudo
+      when: docker_test is succeeded
+
+    - name: 📊 Display system status
+      debug:
+        msg: |
+          System Information:
+          - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          - Kernel: {{ ansible_kernel }}
+          - Architecture: {{ ansible_architecture }}
+          - CPU Cores: {{ ansible_processor_vcpus }}
+          - Memory: {{ (ansible_memtotal_mb/1024)|round(1) }}GB
+          - Docker Version: {{ docker_version.stdout | default('Not detected') }}
+
+    - name: 🚨 Important Notes
+      debug:
+        msg: |
+          ⚠️  IMPORTANT REMINDERS:
+          
+          1. Logout and login again to use Docker without sudo
+          2. Firewall is enabled - only SSH, HTTP, HTTPS allowed
+          3. Docker daemon is configured with log rotation
+          4. fail2ban is installed for SSH protection
+          
+          Next Steps:
+          - Deploy your application
+          - Configure SSL certificates
+          - Set up monitoring
+
+  handlers:
+    - name: restart docker
+      systemd:
+        name: docker
+        state: restarted
+
+  post_tasks:
+    - name: 🔍 Get Docker version
+      command: docker --version
+      register: docker_version
+      changed_when: false
+      failed_when: false

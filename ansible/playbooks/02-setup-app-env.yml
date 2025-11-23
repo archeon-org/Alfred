@@ -1,0 +1,102 @@
+---
+- name: Setup Application Environment
+  hosts: archeon-vps
+  become: true
+  gather_facts: true
+  
+  vars:
+    app_directory: "/opt/archeon"
+    
+  tasks:
+    - name: 📁 Create application directory
+      file:
+        path: "{{ app_directory }}"
+        state: directory
+        owner: "{{ vault_vps_user }}"
+        group: "{{ vault_vps_user }}"
+        mode: '0755'
+
+    - name: 📁 Create env directory structure
+      file:
+        path: "{{ app_directory }}/env/{{ item }}"
+        state: directory
+        owner: "{{ vault_vps_user }}"
+        group: "{{ vault_vps_user }}"
+        mode: '0755'
+      loop:
+        - gate
+        - scribe
+
+    - name: 📝 Generate gate environment file from template
+      template:
+        src: templates/env/gate.env.j2
+        dest: "{{ app_directory }}/env/gate/.env"
+        owner: "{{ vault_vps_user }}"
+        group: "{{ vault_vps_user }}"
+        mode: '0600'
+        backup: yes
+
+    - name: 📝 Generate scribe environment file from template
+      template:
+        src: templates/env/scribe.env.j2
+        dest: "{{ app_directory }}/env/scribe/.env"
+        owner: "{{ vault_vps_user }}"
+        group: "{{ vault_vps_user }}"
+        mode: '0600'
+        backup: yes
+
+    - name: 📋 Create additional directories
+      file:
+        path: "{{ app_directory }}/{{ item }}"
+        state: directory
+        owner: "{{ vault_vps_user }}"
+        group: "{{ vault_vps_user }}"
+        mode: '0755'
+      loop:
+        - logs
+        - data
+        - backups
+        - uploads
+
+    - name: ✅ Verify environment files created
+      shell: |
+        echo "📁 Gate env file:"
+        ls -la {{ app_directory }}/env/gate/.env 2>/dev/null || echo "Not found"
+        echo "📁 Scribe env file:"  
+        ls -la {{ app_directory }}/env/scribe/.env 2>/dev/null || echo "Not found"
+        echo ""
+        echo "📄 Gate env content preview:"
+        head -5 {{ app_directory }}/env/gate/.env 2>/dev/null || echo "Cannot read"
+        echo ""
+        echo "📄 Scribe env content preview:"
+        head -5 {{ app_directory }}/env/scribe/.env 2>/dev/null || echo "Cannot read"
+      register: env_verification
+
+    - name: 📊 Display verification results
+      debug:
+        var: env_verification.stdout_lines
+
+    - name: 📢 Final status
+      debug:
+        msg: |
+          🎉 Application environment setup complete!
+          
+          📁 Directory structure:
+          {{ app_directory }}/
+          ├── env/
+          │   ├── gate/
+          │   │   └── .env (gate configuration from template)
+          │   └── scribe/
+          │       └── .env (scribe configuration from template)
+          ├── logs/ (application logs)
+          ├── data/ (application data)
+          ├── backups/ (backup files)
+          └── uploads/ (file uploads)
+          
+          🚀 Ready to deploy with separate environment files!
+          
+          📋 Next steps:
+          1. Update deployment playbook to use new env paths
+          2. Run playbook 03 to setup Docker services
+          3. Run playbook 04 to setup subdomains & HTTPS  
+          4. Run playbook 05 to deploy containers with separate .env files
