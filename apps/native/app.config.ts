@@ -19,6 +19,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: "com.soymusta.archeon",
     infoPlist: {
+      ITSAppUsesNonExemptEncryption: false,
       CFBundleURLTypes: [
         {
           CFBundleURLSchemes: [
@@ -26,6 +27,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           ],
         },
       ],
+    },
+    config: {
+      usesNonExemptEncryption: false,
     },
   },
   android: {
