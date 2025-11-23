@@ -6,7 +6,7 @@
 
   vars:
     registry: ghcr.io
-    repository_owner: soymustamahti
+    repository_owner: archeon-org
     gate_image: "{{ registry }}/{{ repository_owner }}/archeon-gate"
     scribe_image: "{{ registry }}/{{ repository_owner }}/archeon-scribe"
     image_tag: "{{ deployment_tag | default('latest') }}"
