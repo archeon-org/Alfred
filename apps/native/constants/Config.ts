@@ -1,10 +1,7 @@
 import { Platform } from "react-native";
 
-const API_URL = Platform.select({
-  ios: "https://7dd51c7b2c61.ngrok-free.app/api",
-  android: "https://7dd51c7b2c61.ngrok-free.app/api",
-  default: "https://7dd51c7b2c61.ngrok-free.app/api",
-});
+const API_URL =
+  process.env.EXPO_PUBLIC_API_URL || "https://gate-dev.mooo.com/api";
 
 const GOOGLE_CLIENT_IDS = {
   ios: "317862465448-5fhhcvu8gkb5nmannveetfn16tag143t.apps.googleusercontent.com",
