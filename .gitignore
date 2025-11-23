@@ -41,3 +41,4 @@ app/.yarn/*
 !app/.yarn/sdks
 !app/.yarn/versions
 *.code-workspace
+.npmrc
