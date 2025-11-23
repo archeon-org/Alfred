@@ -31,11 +31,16 @@ COPY --from=builder /app/yarn.lock ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/gate/dist ./apps/gate/dist
 COPY --from=builder /app/apps/gate/package.json ./apps/gate/
+COPY --from=builder /app/apps/gate/db ./apps/gate/db
+COPY --from=builder /app/apps/gate/tsconfig.json ./apps/gate/
 COPY --from=builder /app/packages/types/dist ./packages/types/dist
 COPY --from=builder /app/packages/types/package.json ./packages/types/
 
 # Set working directory to the app
 WORKDIR /app/apps/gate
+
+# Add root node_modules to PATH
+ENV PATH=$PATH:/app/node_modules/.bin
 
 # Expose the port the app runs on (default NestJS is often 3000)
 EXPOSE 3000
