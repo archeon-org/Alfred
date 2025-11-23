@@ -9,16 +9,18 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "bump": "node scripts/bump-version.js",
+    "release": "node scripts/release.js",
     "prebuild:ios": "expo prebuild --platform ios",
     "run:ios:device": "expo run:ios --device",
     "prebuild:android": "expo prebuild --platform android",
     "run:android:device": "expo run:android --device",
-    "build:ios:store": "eas build --platform ios --profile production",
-    "build:ios:local": "yarn bump && eas build --platform ios --profile production --local",
-    "submit:ios:store": "eas submit --platform ios --profile production",
-    "build:android:store": "eas build --platform android --profile production",
-    "build:android:local": "yarn bump && eas build --platform android --profile production --local",
-    "submit:android:store": "eas submit --platform android --profile production"
+    "build:ios:store:prev": "eas build --platform ios --profile preview",
+    "build:ios:store:prod": "eas build --platform ios --profile production",
+    "build:ios:local:prod": "node scripts/release.js --build --platform ios",
+    "submit:ios:store:prod": "eas submit --platform ios --profile production",
+    "build:android:store:prod": "eas build --platform android --profile production",
+    "build:android:local:prod": "node scripts/release.js --build --platform android",
+    "submit:android:store:prod": "eas submit --platform android --profile production"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -50,9 +52,12 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "autoprefixer": "^10.4.22",
+    "chalk": "^5.6.2",
+    "inquirer": "^13.0.1",
     "postcss": "^8.5.6",
     "prettier-plugin-tailwindcss": "^0.5.11",
     "react-test-renderer": "19.1.0",
+    "semver": "^7.7.3",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.9.2"
   },
