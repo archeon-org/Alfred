@@ -7,8 +7,8 @@ prompt([
   {
     name: "project",
     message: "Quel projet souhaitez-vous démarrer ?",
-    choices: ["gate", "archeon", "scribe"],
-    default: "archeon",
+    choices: ["gate", "native", "scribe"],
+    default: "native",
     type: "list",
   },
 ]).then(({ project }) => {
