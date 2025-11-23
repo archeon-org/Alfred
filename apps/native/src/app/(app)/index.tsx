@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Image, View, Text } from "react-native";
-import { Button } from "../../src/components/Button";
-import { Scanner } from "../../src/components/Scanner";
+import { Button } from "@/components/Button";
+import { Scanner } from "@/components/Scanner";
 
 export default () => {
   const [scannedImage, setScannedImage] = useState<string | undefined>();

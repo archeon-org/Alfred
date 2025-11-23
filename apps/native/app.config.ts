@@ -1,23 +1,25 @@
 import { ExpoConfig, ConfigContext } from "expo/config";
+import versionConfig from "./version.json";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Archeon",
   slug: "archeon",
-  version: "1.0.0",
+  version: versionConfig.version,
   orientation: "portrait",
-  icon: "./assets/images/icon.png",
+  icon: "./src/assets/images/icon.png",
   scheme: "archeon",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   splash: {
-    image: "./assets/images/splash-icon.png",
+    image: "./src/assets/images/splash-icon.png",
     resizeMode: "contain",
     backgroundColor: "#ffffff",
   },
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.soymusta.archeon",
+    buildNumber: versionConfig.iosBuildNumber,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       CFBundleURLTypes: [
@@ -34,17 +36,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/images/adaptive-icon.png",
+      foregroundImage: "./src/assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff",
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: "com.soymusta.archeon",
+    versionCode: versionConfig.androidVersionCode,
   },
   web: {
     bundler: "metro",
     output: "static",
-    favicon: "./assets/images/favicon.png",
+    favicon: "./src/assets/images/favicon.png",
   },
   plugins: [
     "expo-router",

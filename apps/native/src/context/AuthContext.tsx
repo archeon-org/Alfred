@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
+import * as SplashScreen from "expo-splash-screen";
 import { useRouter, useSegments } from "expo-router";
 import { getProfile } from "../services/api";
 
@@ -52,6 +53,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         console.error("Failed to load user", error);
       } finally {
         setIsLoading(false);
+        // Hide splash screen once we know if we are logged in or not
+        await SplashScreen.hideAsync();
       }
     };
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import axios from "axios";
 import { Alert } from "react-native";
 import Config from "../constants/Config";
@@ -59,8 +60,19 @@ export const useGoogleLogin = () => {
     }
   };
 
+  const handlePromptAsync = async () => {
+    if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+      Alert.alert(
+        "Not Supported in Expo Go",
+        "Google Login requires a development build or production build to work correctly with your configuration."
+      );
+      return;
+    }
+    await promptAsync();
+  };
+
   return {
-    promptAsync,
+    promptAsync: handlePromptAsync,
     request,
     isLoading,
   };

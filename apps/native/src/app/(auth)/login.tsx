@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Image } from "react-native";
-import { Button } from "../../src/components/Button";
-import { useGoogleLogin } from "../../src/hooks/useGoogleLogin";
+import { Button } from "@/components/Button";
+import { useGoogleLogin } from "@/hooks/useGoogleLogin";
 
 export default function Login() {
   const { promptAsync, request, isLoading } = useGoogleLogin();
