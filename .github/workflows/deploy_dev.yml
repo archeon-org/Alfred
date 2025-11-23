@@ -42,14 +42,10 @@ jobs:
           filters: |
             gate:
               - 'apps/gate/**'
-              - 'packages/**'
-              - 'package.json'
-              - 'yarn.lock'
+              - 'packages/types/**'
             scribe:
               - 'apps/scribe/**'
-              - 'packages/**'
-              - 'package.json'
-              - 'yarn.lock'
+              - 'packages/types/**'
 
       - name: 📊 Changes Summary
         run: |
