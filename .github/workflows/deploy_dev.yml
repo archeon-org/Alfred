@@ -28,6 +28,7 @@ jobs:
     outputs:
       gate: ${{ steps.changes.outputs.gate }}
       scribe: ${{ steps.changes.outputs.scribe }}
+      force_deploy: ${{ steps.changes.outputs.force_deploy }}
       any_changes: ${{ steps.changes.outputs.gate == 'true' || steps.changes.outputs.scribe == 'true' }}
     steps:
       - name: 🛎️ Checkout repository
@@ -53,9 +54,18 @@ jobs:
 
           echo "Checking changes in range: $RANGE"
           CHANGED_FILES=$(git diff --name-only $RANGE)
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
 
           echo "Changed files:"
           echo "$CHANGED_FILES"
+
+          # Check for [force deploy] in commit message
+          if echo "$COMMIT_MESSAGE" | grep -q "\[force deploy\]"; then
+            echo "force_deploy=true" >> $GITHUB_OUTPUT
+            echo "Force deploy flag detected in commit message."
+          else
+            echo "force_deploy=false" >> $GITHUB_OUTPUT
+          fi
 
           # Check for Gate changes
           if echo "$CHANGED_FILES" | grep -qE '^apps/gate/|^packages/types/'; then
@@ -81,7 +91,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Gate Changes:** ${{ steps.changes.outputs.gate == 'true' && '✅ Yes' || '❌ No' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Scribe Changes:** ${{ steps.changes.outputs.scribe == 'true' && '✅ Yes' || '❌ No' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Force Deploy:** ${{ github.event.inputs.force_deploy == 'true' && '✅ Yes' || '❌ No' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Force Deploy:** ${{ (github.event.inputs.force_deploy == 'true' || steps.changes.outputs.force_deploy == 'true') && '✅ Yes' || '❌ No' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
   # ============================================================================
@@ -90,7 +100,7 @@ jobs:
   build-gate:
     name: 🏗️ Build Gate
     needs: changes
-    if: needs.changes.outputs.gate == 'true' || github.event.inputs.force_deploy == 'true'
+    if: needs.changes.outputs.gate == 'true' || github.event.inputs.force_deploy == 'true' || needs.changes.outputs.force_deploy == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -147,7 +157,7 @@ jobs:
   build-scribe:
     name: ✍️ Build Scribe
     needs: changes
-    if: needs.changes.outputs.scribe == 'true' || github.event.inputs.force_deploy == 'true'
+    if: needs.changes.outputs.scribe == 'true' || github.event.inputs.force_deploy == 'true' || needs.changes.outputs.force_deploy == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -204,7 +214,7 @@ jobs:
   deploy:
     name: 🚀 Deploy to Server
     needs: [changes, build-gate, build-scribe]
-    if: always() && (needs.changes.outputs.gate == 'true' || needs.changes.outputs.scribe == 'true' || github.event.inputs.force_deploy == 'true') && !failure() && !cancelled()
+    if: always() && (needs.changes.outputs.gate == 'true' || needs.changes.outputs.scribe == 'true' || github.event.inputs.force_deploy == 'true' || needs.changes.outputs.force_deploy == 'true') && !failure() && !cancelled()
     runs-on: ubuntu-latest
     steps:
       - name: 🛎️ Checkout repository
@@ -286,13 +296,13 @@ jobs:
           echo "| Component | Changes Detected | Action Taken |" >> $GITHUB_STEP_SUMMARY
           echo "|-----------|------------------|--------------|" >> $GITHUB_STEP_SUMMARY
 
-          if [[ "${{ needs.changes.outputs.gate }}" == "true" || "${{ github.event.inputs.force_deploy }}" == "true" ]]; then
+          if [[ "${{ needs.changes.outputs.gate }}" == "true" || "${{ github.event.inputs.force_deploy }}" == "true" || "${{ needs.changes.outputs.force_deploy }}" == "true" ]]; then
             echo "| 🏗️ Gate | ✅ Yes | Built & Deployed |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| 🏗️ Gate | ❌ No | Skipped |" >> $GITHUB_STEP_SUMMARY
           fi
 
-          if [[ "${{ needs.changes.outputs.scribe }}" == "true" || "${{ github.event.inputs.force_deploy }}" == "true" ]]; then
+          if [[ "${{ needs.changes.outputs.scribe }}" == "true" || "${{ github.event.inputs.force_deploy }}" == "true" || "${{ needs.changes.outputs.force_deploy }}" == "true" ]]; then
             echo "| ✍️ Scribe | ✅ Yes | Built & Deployed |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| ✍️ Scribe | ❌ No | Skipped |" >> $GITHUB_STEP_SUMMARY
