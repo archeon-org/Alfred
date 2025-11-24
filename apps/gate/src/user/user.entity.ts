@@ -5,7 +5,9 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { DocumentEntity } from '../document/document.entity';
 
 @Entity('users')
 export class UserEntity implements User {
@@ -62,4 +64,7 @@ export class UserEntity implements User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => DocumentEntity, (document) => document.user)
+  documents: DocumentEntity[];
 }

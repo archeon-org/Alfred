@@ -4,3 +4,4 @@
  */
 
 export * from "./types/user.types";
+export * from "./types/document.types";

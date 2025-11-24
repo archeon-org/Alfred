@@ -1,3 +1,5 @@
+import { Document } from "./document.types";
+
 /**
  * User type enumeration
  */
@@ -51,6 +53,7 @@ export interface User {
   otpExpiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+  documents?: Document[];
 }
 
 /**

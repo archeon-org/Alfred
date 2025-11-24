@@ -8,6 +8,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { APP_GUARD } from '@nestjs/core';
 import { UserTypeGuard } from './auth/guards/user-type.guard';
 import { HealthModule } from './health/health.module';
+import { DocumentModule } from './document/document.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { HealthModule } from './health/health.module';
     UserModule,
     AuthModule,
     HealthModule,
+    DocumentModule,
   ],
   providers: [
     {
