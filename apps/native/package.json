@@ -3,16 +3,21 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
+    "build:packages": "cd ../.. && yarn build:packages",
+    "prestart:dev": "yarn build:packages",
     "start:dev": "expo start",
     "start:clean": "expo start --clear",
+    "preandroid": "yarn build:packages",
     "android": "expo run:android",
+    "preios": "yarn build:packages",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "bump": "node scripts/bump-version.js",
     "release": "node scripts/release.js",
-    "prebuild:ios": "expo prebuild --platform ios",
+    "prebuild:ios": "yarn build:packages && expo prebuild --platform ios",
+    "prerun:ios:device": "yarn build:packages",
     "run:ios:device": "expo run:ios --device",
-    "prebuild:android": "expo prebuild --platform android",
+    "prebuild:android": "yarn build:packages && expo prebuild --platform android",
+    "prerun:android:device": "yarn build:packages",
     "run:android:device": "expo run:android --device",
     "build:ios:store:prev": "eas build --platform ios --profile preview --local",
     "build:android:store:prev": "eas build --platform android --profile preview --local",
@@ -20,7 +25,7 @@
     "submit:ios:store:prod": "eas submit --platform ios --profile production",
     "build:android:local:prod": "node scripts/release.js --build --platform android --local",
     "submit:android:store:prod": "eas submit --platform android --profile production",
-    "eas-build-post-install": "cd ../.. && yarn build:packages"
+    "eas-build-post-install": "yarn build:packages"
   },
   "dependencies": {
     "@archeon-org/types": "*",
