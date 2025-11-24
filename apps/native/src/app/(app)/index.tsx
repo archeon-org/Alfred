@@ -3,7 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-black">
+    <SafeAreaView className="flex-1 bg-white dark:bg-black" edges={["bottom"]}>
       <ScrollView className="p-4">
         <Text className="text-2xl font-bold text-black dark:text-white mb-6">
           Good Morning

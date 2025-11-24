@@ -33,10 +33,10 @@ export default function ProfileScreen() {
   const menuItems = [
     {
       icon: "person-outline",
-      label: "Account Settings",
+      label: "Edit Profile",
       onPress: () => router.push("/(app)/profile/edit"),
     },
-    { icon: "notifications-outline", label: "Notifications" },
+    { icon: "settings-outline", label: "Settings" },
     { icon: "shield-checkmark-outline", label: "Privacy & Security" },
     { icon: "help-circle-outline", label: "Help & Support" },
   ];
@@ -50,12 +50,8 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-black">
+    <SafeAreaView className="flex-1 bg-white dark:bg-black" edges={["bottom"]}>
       <ScrollView className="p-4">
-        <Text className="text-2xl font-bold text-black dark:text-white mb-6">
-          Profile
-        </Text>
-
         <View className="items-center mb-8">
           <View className="w-24 h-24 bg-gray-200 dark:bg-gray-800 rounded-full items-center justify-center mb-4 overflow-hidden">
             {user?.profilePicture ? (

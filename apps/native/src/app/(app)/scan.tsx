@@ -8,7 +8,7 @@ export default function ScanScreen() {
   const [scannedImage, setScannedImage] = useState<string | undefined>();
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-black">
+    <SafeAreaView className="flex-1 bg-white dark:bg-black" edges={["bottom"]}>
       <View className="flex-1 items-center justify-center p-4">
         {scannedImage ? (
           <View className="w-full h-full items-center justify-center">

@@ -1,16 +1,41 @@
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useColorScheme } from "react-native";
+import { useColorScheme, TouchableOpacity } from "react-native";
 import colors from "tailwindcss/colors";
 
 export default function AppLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const router = useRouter();
 
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={() => router.push("/notifications")}
+            style={{ marginRight: 16 }}
+          >
+            <Ionicons
+              name="notifications-outline"
+              size={24}
+              color={isDark ? colors.white : colors.black}
+            />
+          </TouchableOpacity>
+        ),
+        headerStyle: {
+          backgroundColor: isDark ? colors.black : colors.white,
+          shadowOpacity: 0,
+          elevation: 0,
+          borderBottomWidth: 1,
+          borderBottomColor: isDark ? colors.gray[800] : colors.gray[100],
+        },
+        headerTitleStyle: {
+          color: isDark ? colors.white : colors.black,
+          fontWeight: "bold",
+          fontSize: 20,
+        },
         tabBarActiveTintColor: isDark ? colors.white : colors.black,
         tabBarInactiveTintColor: isDark ? colors.gray[500] : colors.gray[400],
         tabBarStyle: {
