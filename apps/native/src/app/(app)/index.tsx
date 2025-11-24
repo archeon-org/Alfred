@@ -1,13 +1,25 @@
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useAuth } from "../../context/AuthContext";
+import { Button } from "../../components/Button";
 
 export default function HomeScreen() {
+  const { signOut } = useAuth();
+
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-black" edges={["bottom"]}>
       <ScrollView className="p-4">
-        <Text className="text-2xl font-bold text-black dark:text-white mb-6">
-          Good Morning
-        </Text>
+        <View className="flex-row justify-between items-center mb-6">
+          <Text className="text-2xl font-bold text-black dark:text-white">
+            Good Morning
+          </Text>
+          <Button
+            title="Logout"
+            onPress={signOut}
+            variant="outline"
+            className="py-2 px-4"
+          />
+        </View>
 
         <View className="bg-gray-100 dark:bg-gray-900 p-6 rounded-2xl mb-6">
           <Text className="text-lg font-semibold text-black dark:text-white mb-2">

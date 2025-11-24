@@ -16,12 +16,11 @@
     "run:android:device": "expo run:android --device",
     "build:ios:store:prev": "eas build --platform ios --profile preview --local",
     "build:android:store:prev": "eas build --platform android --profile preview --local",
-    "build:ios:store:prod": "eas build --platform ios --profile production --local",
     "build:ios:local:prod": "node scripts/release.js --build --platform ios --local",
     "submit:ios:store:prod": "eas submit --platform ios --profile production",
-    "build:android:store:prod": "eas build --platform android --profile production --local",
     "build:android:local:prod": "node scripts/release.js --build --platform android --local",
-    "submit:android:store:prod": "eas submit --platform android --profile production"
+    "submit:android:store:prod": "eas submit --platform android --profile production",
+    "eas-build-post-install": "cd ../.. && yarn build:packages"
   },
   "dependencies": {
     "@archeon-org/types": "*",
