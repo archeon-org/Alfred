@@ -1,7 +1,28 @@
 import { Platform } from "react-native";
 
-const API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "https://gate-dev.mooo.com/api";
+const ENV = {
+  local: {
+    apiUrl: "https://23177b8cbecb.ngrok-free.app/api",
+  },
+  development: {
+    apiUrl: "https://gate-dev.mooo.com/api",
+  },
+  production: {
+    apiUrl: "https://gate-dev.mooo.com/api",
+  },
+};
+
+const getEnvVars = (env = process.env.EXPO_PUBLIC_ENV || "local") => {
+  if (env === "production") {
+    return ENV.production;
+  }
+  if (env === "development") {
+    return ENV.development;
+  }
+  return ENV.local;
+};
+
+const API_URL = getEnvVars().apiUrl;
 
 const GOOGLE_CLIENT_IDS = {
   ios: "317862465448-5fhhcvu8gkb5nmannveetfn16tag143t.apps.googleusercontent.com",

@@ -41,4 +41,30 @@ export class UserRepository extends BaseRepository {
       .update(userId, { lastLoginAt: new Date() })
       .then(() => {});
   }
+
+  public async updateOtp(
+    userId: string,
+    otpHash: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    await this.getRepository(UserEntity).update(userId, {
+      otpHash,
+      otpExpiresAt: expiresAt,
+    });
+  }
+
+  public async findByEmailWithOtp(email: string): Promise<UserEntity | null> {
+    return this.getRepository(UserEntity)
+      .createQueryBuilder('user')
+      .addSelect('user.otpHash')
+      .where('user.email = :email', { email })
+      .getOne();
+  }
+
+  public async clearOtp(userId: string): Promise<void> {
+    await this.getRepository(UserEntity).update(userId, {
+      otpHash: null,
+      otpExpiresAt: null,
+    });
+  }
 }

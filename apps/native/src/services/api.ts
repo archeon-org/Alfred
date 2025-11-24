@@ -40,6 +40,16 @@ export const verifyGoogleToken = async (
   return response.data;
 };
 
+export const requestOtp = async (email: string) => {
+  const response = await api.post("/auth/otp/request", { email });
+  return response.data;
+};
+
+export const verifyOtp = async (email: string, otp: string) => {
+  const response = await api.post("/auth/otp/verify", { email, otp });
+  return response.data;
+};
+
 export const getProfile = async () => {
   const response = await api.get("/auth/me");
   return response.data;

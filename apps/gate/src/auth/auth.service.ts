@@ -1,10 +1,11 @@
 // filepath: /Users/mustaphaelhachmimahti/Desktop/workspace/personal/archeon/archeon/apps/gate/src/auth/auth.service.ts
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { GoogleVerifyDto } from './dto/auth.dto';
+import { GoogleVerifyDto, RequestOtpDto, VerifyOtpDto } from './dto/auth.dto';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from 'src/user/user.service';
 import { JwtService } from '@nestjs/jwt';
 import { User } from '@archeon-org/types';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -139,5 +140,47 @@ export class AuthService {
       );
       throw error;
     }
+  }
+
+  public async requestOtp(dto: RequestOtpDto): Promise<void> {
+    const user = await this.userService.findByEmail(dto.email);
+    if (!user) {
+      this.logger.warn(`OTP requested for non-existent email: ${dto.email}`);
+      return;
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hash = crypto.createHash('sha256').update(otp).digest('hex');
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+    await this.userService.updateOtp(user.id, hash, expiresAt);
+
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.log(`================================================`);
+      this.logger.log(`OTP for ${dto.email}: ${otp}`);
+      this.logger.log(`================================================`);
+    }
+  }
+
+  public async verifyOtp(dto: VerifyOtpDto): Promise<{ accessToken: string }> {
+    const user = await this.userService.findByEmailWithOtp(dto.email);
+    if (!user || !user.otpHash || !user.otpExpiresAt) {
+      throw new UnauthorizedException('Invalid OTP');
+    }
+
+    if (user.otpExpiresAt < new Date()) {
+      throw new UnauthorizedException('OTP expired');
+    }
+
+    const hash = crypto.createHash('sha256').update(dto.otp).digest('hex');
+    if (hash !== user.otpHash) {
+      throw new UnauthorizedException('Invalid OTP');
+    }
+
+    await this.userService.clearOtp(user.id);
+    await this.userService.updateLastLogin(user.id);
+
+    const accessToken = await this.creationAccessToken(user);
+    return { accessToken };
   }
 }

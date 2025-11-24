@@ -39,6 +39,12 @@ export class UserEntity implements User {
   @Column({ type: 'timestamp', nullable: true })
   lastLoginAt: Date;
 
+  @Column({ nullable: true, select: false })
+  otpHash?: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  otpExpiresAt?: Date;
+
   @CreateDateColumn()
   createdAt: Date;
 

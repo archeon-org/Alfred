@@ -24,4 +24,20 @@ export class UserService {
   public updateLastLogin(userId: string): Promise<void> {
     return this.userRepository.updateLastLogin(userId);
   }
+
+  public updateOtp(
+    userId: string,
+    otpHash: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    return this.userRepository.updateOtp(userId, otpHash, expiresAt);
+  }
+
+  public findByEmailWithOtp(email: string): Promise<UserEntity | null> {
+    return this.userRepository.findByEmailWithOtp(email);
+  }
+
+  public clearOtp(userId: string): Promise<void> {
+    return this.userRepository.clearOtp(userId);
+  }
 }

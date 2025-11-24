@@ -33,3 +33,16 @@ export class GoogleVerifyDto {
   @IsString()
   googleAccessToken: string;
 }
+
+export class RequestOtpDto {
+  @IsEmail({}, { message: "The email isn't valid" })
+  email: string;
+}
+
+export class VerifyOtpDto {
+  @IsEmail({}, { message: "The email isn't valid" })
+  email: string;
+
+  @IsString()
+  otp: string;
+}
