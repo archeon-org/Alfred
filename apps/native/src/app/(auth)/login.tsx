@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Image } from "react-native";
-import { Button } from "@/components/Button";
-import { useGoogleLogin } from "@/hooks/useGoogleLogin";
+import { Button } from "../../components/Button";
+import { useGoogleLogin } from "../../hooks/useGoogleLogin";
 
 export default function Login() {
   const { promptAsync, request, isLoading } = useGoogleLogin();
@@ -13,7 +13,7 @@ export default function Login() {
         <Text className="text-gray-500 text-lg">Welcome back!</Text>
       </View>
 
-      <View className="w-full max-w-sm">
+      <View className="w-full max-w-sm gap-4">
         <Button
           title="Sign in with Google"
           onPress={() => promptAsync()}

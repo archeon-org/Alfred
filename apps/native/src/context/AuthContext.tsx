@@ -71,6 +71,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       router.replace("/(auth)/login");
     } else if (user && inAuthGroup) {
       // Redirect away from the sign-in page.
+      // Explicitly redirect to the index screen to avoid returning to the last visited tab (e.g. Scanner)
       router.replace("/(app)/");
     }
   }, [user, segments, isLoading]);

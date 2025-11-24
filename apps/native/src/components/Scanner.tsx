@@ -3,6 +3,7 @@ import { View, Text, Image, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { Button } from "./Button";
+import { useAuth } from "../context/AuthContext";
 
 // Conditionally import DocumentScanner only if not in Expo Go
 let DocumentScanner: any;
@@ -19,6 +20,7 @@ interface ScannerProps {
 }
 
 export const Scanner: React.FC<ScannerProps> = ({ onScan }) => {
+  const { signOut } = useAuth();
   const isExpoGo =
     Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
@@ -64,6 +66,12 @@ export const Scanner: React.FC<ScannerProps> = ({ onScan }) => {
           : "Document Scanner"}
       </Text>
       <Button title="Scan Document" onPress={handleScan} />
+      <Button
+        title="Logout"
+        onPress={signOut}
+        variant="secondary"
+        className="mt-4"
+      />
     </View>
   );
 };
