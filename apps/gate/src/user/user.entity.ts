@@ -24,6 +24,18 @@ export class UserEntity implements User {
   @Column({ nullable: true })
   phone?: string;
 
+  @Column({ nullable: true })
+  profilePicture?: string;
+
+  @Column({ type: 'bigint', default: 0 })
+  storageUsed: number;
+
+  @Column({ type: 'bigint', default: 2147483648 }) // 2GB default
+  storageLimit: number;
+
+  @Column({ default: 0 })
+  searchCount: number;
+
   @Column({ type: 'jsonb', nullable: true })
   address?: Address;
 

@@ -40,4 +40,11 @@ export class UserService {
   public clearOtp(userId: string): Promise<void> {
     return this.userRepository.clearOtp(userId);
   }
+
+  public update(
+    userId: string,
+    data: Partial<UserEntity>,
+  ): Promise<UserEntity> {
+    return this.userRepository.update(userId, data);
+  }
 }

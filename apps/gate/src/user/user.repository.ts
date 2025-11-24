@@ -67,4 +67,12 @@ export class UserRepository extends BaseRepository {
       otpExpiresAt: null,
     });
   }
+
+  public async update(
+    userId: string,
+    data: Partial<UserEntity>,
+  ): Promise<UserEntity> {
+    await this.getRepository(UserEntity).update(userId, data);
+    return this.findById(userId);
+  }
 }
