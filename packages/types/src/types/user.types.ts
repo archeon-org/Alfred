@@ -38,11 +38,17 @@ export interface User {
   firstName: string;
   lastName: string;
   phone?: string;
+  profilePicture?: string;
+  storageUsed: number;
+  storageLimit: number;
+  searchCount: number;
   address?: Address;
   role: UserType;
   refreshToken?: string;
   provider: AuthProvider;
   lastLoginAt?: Date;
+  otpHash?: string;
+  otpExpiresAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }

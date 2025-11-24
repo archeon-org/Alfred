@@ -1,5 +1,28 @@
-import { IsOptional, IsString, IsNumber, IsObject } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsObject,
+  ValidateNested,
+} from 'class-validator';
 import { Address } from '@archeon-org/types';
+import { Type } from 'class-transformer';
+
+export class AddressDto implements Address {
+  @IsString()
+  street: string;
+
+  @IsString()
+  city: string;
+
+  @IsString()
+  state: string;
+
+  @IsString()
+  zipCode: string;
+
+  @IsString()
+  country: string;
+}
 
 export class UpdateUserDto {
   @IsOptional()
@@ -19,6 +42,8 @@ export class UpdateUserDto {
   profilePicture?: string;
 
   @IsOptional()
+  @ValidateNested()
+  @Type(() => AddressDto)
   @IsObject()
-  address?: Address;
+  address?: AddressDto;
 }

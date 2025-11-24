@@ -9,9 +9,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useAuth } from "../../context/AuthContext";
-import { useUser } from "../../hooks/useUser";
+import { useAuth } from "../../../context/AuthContext";
+import { useUser } from "../../../hooks/useUser";
 import colors from "tailwindcss/colors";
+import { useRouter } from "expo-router";
 
 const formatBytes = (bytes: number, decimals = 2) => {
   if (!+bytes) return "0 Bytes";
@@ -27,9 +28,14 @@ export default function ProfileScreen() {
   const { data: user, isLoading } = useUser();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const router = useRouter();
 
   const menuItems = [
-    { icon: "person-outline", label: "Account Settings" },
+    {
+      icon: "person-outline",
+      label: "Account Settings",
+      onPress: () => router.push("/(app)/profile/edit"),
+    },
     { icon: "notifications-outline", label: "Notifications" },
     { icon: "shield-checkmark-outline", label: "Privacy & Security" },
     { icon: "help-circle-outline", label: "Help & Support" },
@@ -104,6 +110,7 @@ export default function ProfileScreen() {
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
+              onPress={item.onPress}
               className={`flex-row items-center p-4 ${index !== menuItems.length - 1 ? "border-b border-gray-200 dark:border-gray-800" : ""}`}
             >
               <Ionicons

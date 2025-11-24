@@ -2,15 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import * as SplashScreen from "expo-splash-screen";
 import { useRouter, useSegments } from "expo-router";
-import { getProfile } from "../services/api";
-
-type User = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  picture?: string;
-};
+import { getProfile, User } from "../services/api";
 
 type AuthContextType = {
   user: User | null;

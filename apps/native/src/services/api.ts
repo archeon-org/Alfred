@@ -1,6 +1,7 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 import Config from "../constants/Config";
+import { User, UpdateUserInput } from "@archeon-org/types";
 
 const api = axios.create({
   baseURL: Config.API_URL,
@@ -22,6 +23,9 @@ api.interceptors.request.use(
     return Promise.reject(error);
   }
 );
+
+export { User };
+export type UpdateUserDto = UpdateUserInput;
 
 export const verifyGoogleToken = async (
   email: string,
@@ -50,8 +54,13 @@ export const verifyOtp = async (email: string, otp: string) => {
   return response.data;
 };
 
-export const getProfile = async () => {
-  const response = await api.get("/auth/me");
+export const getProfile = async (): Promise<User> => {
+  const response = await api.get("/user/me");
+  return response.data;
+};
+
+export const updateUser = async (data: UpdateUserDto): Promise<User> => {
+  const response = await api.put("/user/me", data);
   return response.data;
 };
 

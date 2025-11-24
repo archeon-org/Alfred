@@ -11,7 +11,7 @@ export class UserOAuthCreateDto {
   lastName?: string;
 
   @IsOptional()
-  picture?: string;
+  profilePicture?: string;
 
   @IsString()
   googleId: string;

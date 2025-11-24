@@ -90,7 +90,7 @@ export class AuthService {
         email: googleVerifyDto.email,
         firstName: googleVerifyDto.firstName,
         lastName: googleVerifyDto.lastName,
-        picture: googleVerifyDto.picture,
+        profilePicture: googleVerifyDto.picture,
         googleId,
       };
       user = await this.userService.createGoogleOAuthUser(oauthDto);
