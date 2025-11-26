@@ -1,16 +1,33 @@
-import { MigrationInterface, QueryRunner } from "typeorm";
+import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class OrderSeeding1764023930354 implements MigrationInterface {
-    name = 'OrderSeeding1764023930354'
+  name = 'OrderSeeding1764023930354';
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "categories" ADD "order" integer NOT NULL DEFAULT '0'`);
-        await queryRunner.query(`ALTER TABLE "tags" ADD "order" integer NOT NULL DEFAULT '0'`);
-    }
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `ALTER TABLE "categories" ADD "order" integer NOT NULL DEFAULT '0'`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "tags" ADD "order" integer NOT NULL DEFAULT '0'`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "templates" ADD "order" integer NOT NULL DEFAULT '0'`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "template_categories" ADD "order" integer NOT NULL DEFAULT '0'`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "template_tags" ADD "order" integer NOT NULL DEFAULT '0'`,
+    );
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "tags" DROP COLUMN "order"`);
-        await queryRunner.query(`ALTER TABLE "categories" DROP COLUMN "order"`);
-    }
-
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`ALTER TABLE "template_tags" DROP COLUMN "order"`);
+    await queryRunner.query(
+      `ALTER TABLE "template_categories" DROP COLUMN "order"`,
+    );
+    await queryRunner.query(`ALTER TABLE "templates" DROP COLUMN "order"`);
+    await queryRunner.query(`ALTER TABLE "tags" DROP COLUMN "order"`);
+    await queryRunner.query(`ALTER TABLE "categories" DROP COLUMN "order"`);
+  }
 }
