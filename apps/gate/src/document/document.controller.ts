@@ -9,6 +9,8 @@ import {
   Patch,
   Delete,
   Body,
+  ParseFilePipeBuilder,
+  HttpStatus,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentService } from './document.service';
@@ -25,7 +27,19 @@ export class DocumentController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
     @Req() req: Request,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType: /(pdf|jpeg|png|jpg|heic|heif)$/i,
+        })
+        .addMaxSizeValidator({
+          maxSize: 20 * 1024 * 1024, // 20MB
+        })
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        }),
+    )
+    file: Express.Multer.File,
     @Body() body: { classificationSource?: 'AI' | 'MANUAL' },
   ) {
     const user = req.user as UserEntity;
