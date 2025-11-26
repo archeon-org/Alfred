@@ -21,6 +21,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundleIdentifier: "com.soymusta.archeon",
     buildNumber: versionConfig.iosBuildNumber,
     infoPlist: {
+      NSCameraUsageDescription:
+        "This app needs access to the camera to scan documents.",
+      NSPhotoLibraryUsageDescription:
+        "This app needs access to your photos to upload documents.",
+      NSMicrophoneUsageDescription:
+        "This app needs access to the microphone for video recording.",
       ITSAppUsesNonExemptEncryption: false,
       CFBundleURLTypes: [
         {
