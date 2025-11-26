@@ -61,6 +61,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: {
     typedRoutes: true,
   },
+  updates: {
+    url: "https://u.expo.dev/38f7fbb6-c5ed-4813-a677-d8786d8f9840",
+  },
+  runtimeVersion: {
+    policy: "appVersion",
+  },
   extra: {
     router: {},
     eas: {
