@@ -219,6 +219,27 @@ export class DocumentService {
       throw new ForbiddenException('Access denied');
     }
 
+    try {
+      await this.r2Service.deleteFile(document.path);
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete file from R2: ${error.message}`,
+        error.stack,
+      );
+      // We continue with the deletion process even if R2 deletion fails
+      // to avoid blocking the user action, but we log the error.
+    }
+
+    // Update user storage usage
+    const user = await this.userService.findById(userId);
+    if (user) {
+      const currentStorage = Number(user.storageUsed) || 0;
+      const newStorageUsed = Math.max(0, currentStorage - document.size);
+      await this.userService.update(userId, {
+        storageUsed: newStorageUsed,
+      });
+    }
+
     await this.documentRepository.softDelete(documentId);
   }
 

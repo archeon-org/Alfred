@@ -4,6 +4,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -65,6 +66,24 @@ export class R2Service {
     } catch (error) {
       this.logger.error(
         `Failed to generate signed URL: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  async deleteFile(key: string): Promise<void> {
+    try {
+      await this.s3Client.send(
+        new DeleteObjectCommand({
+          Bucket: this.bucketName,
+          Key: key,
+        }),
+      );
+      this.logger.log(`File deleted successfully from R2: ${key}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete file from R2: ${error.message}`,
         error.stack,
       );
       throw error;
