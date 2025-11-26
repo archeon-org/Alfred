@@ -95,3 +95,7 @@ export const triggerAiClassification = async (
   const response = await api.post(`/documents/${id}/classify`);
   return response.data;
 };
+
+export const deleteDocument = async (id: string): Promise<void> => {
+  await api.delete(`/documents/${id}`);
+};

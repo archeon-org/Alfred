@@ -157,6 +157,7 @@ export default function CategoriesScreen() {
         visible={modalVisible}
         onClose={handleCloseModal}
         onSave={handleSaveCategory}
+        onDelete={handleDeleteCategory}
         category={editingCategory}
       />
     </SafeAreaView>

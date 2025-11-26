@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   TextInput,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +15,7 @@ import { useRouter } from "expo-router";
 import { Document } from "@archeon-org/types";
 import { DocumentItem } from "../../../components/document/DocumentItem";
 import { useDocumentsList } from "../../../hooks/useDocumentsList";
+import { useDocumentMutations } from "../../../hooks/useDocuments";
 import { DocumentsEmptyState } from "../../../components/document/DocumentsEmptyState";
 import { Skeleton } from "../../../components/common/Skeleton";
 
@@ -29,11 +31,34 @@ export default function DocumentsScreen() {
     refetch,
     isRefetching,
   } = useDocumentsList(search);
+  const { deleteDocument } = useDocumentMutations();
+
+  const handleDeleteDocument = (document: Document) => {
+    Alert.alert(
+      "Delete Document",
+      `Are you sure you want to delete "${document.title || document.originalName}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteDocument(document.id);
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete document");
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const renderDocument = ({ item }: { item: Document }) => (
     <DocumentItem
       document={item}
       onPress={(doc) => router.push(`/(app)/documents/${doc.id}` as any)}
+      onLongPress={handleDeleteDocument}
     />
   );
 

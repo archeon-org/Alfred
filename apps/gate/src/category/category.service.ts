@@ -4,7 +4,7 @@ import { Repository } from 'typeorm';
 import { CategoryEntity } from './category.entity';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 import { paginate, PaginateQuery, Paginated } from 'nestjs-paginate';
-import { DocumentEntity } from '../document/document.entity';
+import { DocumentEntity, ProcessingStatus } from '../document/document.entity';
 
 @Injectable()
 export class CategoryService {
@@ -13,6 +13,8 @@ export class CategoryService {
   constructor(
     @InjectRepository(CategoryEntity)
     private readonly categoryRepository: Repository<CategoryEntity>,
+    @InjectRepository(DocumentEntity)
+    private readonly documentRepository: Repository<DocumentEntity>,
   ) {}
 
   async createCustom(
@@ -116,6 +118,13 @@ export class CategoryService {
   async remove(id: string, userId: string): Promise<void> {
     this.logger.log(`Removing category ${id} for user ${userId}`);
     const category = await this.findOne(id, userId);
+
+    // Update documents in this category to PENDING status
+    await this.documentRepository.update(
+      { categoryId: id, userId },
+      { processingStatus: ProcessingStatus.PENDING },
+    );
+
     await this.categoryRepository.remove(category);
   }
 }

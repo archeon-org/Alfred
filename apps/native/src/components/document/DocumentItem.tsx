@@ -8,6 +8,7 @@ import { shadows } from "../../constants/shadows";
 interface DocumentItemProps {
   document: Document;
   onPress: (document: Document) => void;
+  onLongPress?: (document: Document) => void;
 }
 
 const getFileIcon = (mimetype: string) => {
@@ -22,13 +23,18 @@ const getFileColor = (mimetype: string) => {
   return "#6366F1"; // primary (indigo)
 };
 
-export const DocumentItem = ({ document, onPress }: DocumentItemProps) => {
+export const DocumentItem = ({
+  document,
+  onPress,
+  onLongPress,
+}: DocumentItemProps) => {
   return (
     <TouchableOpacity
       className="flex-row items-center bg-surface dark:bg-surface-dark p-4 rounded-3xl border border-gray-100 dark:border-gray-800 mb-3 active:scale-[0.98] transition-transform"
       // Using native shadow instead of NativeWind to avoid React Navigation context conflicts
       style={shadows.sm}
       onPress={() => onPress(document)}
+      onLongPress={() => onLongPress && onLongPress(document)}
       activeOpacity={0.7}
     >
       <View className="w-14 h-14 bg-gray-50 dark:bg-gray-800 rounded-2xl items-center justify-center mr-4 border border-gray-100 dark:border-gray-700">

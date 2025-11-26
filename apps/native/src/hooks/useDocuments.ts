@@ -7,6 +7,7 @@ import {
   updateDocument,
   bulkUpdateDocuments,
   triggerAiClassification,
+  deleteDocument,
 } from "../services";
 import { Alert } from "react-native";
 import * as WebBrowser from "expo-web-browser";
@@ -99,6 +100,13 @@ export const useDocumentMutations = () => {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteDocument(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+    },
+  });
+
   return {
     updateDocument: updateMutation.mutateAsync,
     isUpdating: updateMutation.isPending,
@@ -106,5 +114,7 @@ export const useDocumentMutations = () => {
     isBulkUpdating: bulkUpdateMutation.isPending,
     triggerAiClassification: triggerAiMutation.mutateAsync,
     isTriggeringAi: triggerAiMutation.isPending,
+    deleteDocument: deleteMutation.mutateAsync,
+    isDeleting: deleteMutation.isPending,
   };
 };
