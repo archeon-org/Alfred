@@ -4,14 +4,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../../hooks/useUser";
 import {
   useRecentDocuments,
-  usePendingManualDocuments,
+  useActionRequiredDocuments,
 } from "../../hooks/useDocuments";
 import { useCategories } from "../../hooks/useCategories";
 import { HomeHeader } from "../../components/home/HomeHeader";
 import { StorageWidget } from "../../components/home/StorageWidget";
 import { QuickActions } from "../../components/home/QuickActions";
 import { RecentDocuments } from "../../components/home/RecentDocuments";
-import { PendingManualDocuments } from "../../components/home/PendingManualDocuments";
+import { ActionRequiredDocuments } from "../../components/home/ActionRequiredDocuments";
 import { CategoryList } from "../../components/home/CategoryList";
 
 export default function HomeScreen() {
@@ -22,10 +22,10 @@ export default function HomeScreen() {
     refetch: refetchDocs,
   } = useRecentDocuments(3);
   const {
-    data: pendingDocs,
-    isLoading: isLoadingPending,
-    refetch: refetchPending,
-  } = usePendingManualDocuments(3);
+    data: actionRequiredDocs,
+    isLoading: isLoadingActionRequired,
+    refetch: refetchActionRequired,
+  } = useActionRequiredDocuments(3);
   const {
     categories,
     isLoading: isLoadingCategories,
@@ -35,7 +35,7 @@ export default function HomeScreen() {
   const onRefresh = useCallback(() => {
     refetchUser();
     refetchDocs();
-    refetchPending();
+    refetchActionRequired();
     refetchCategories();
   }, []);
 
@@ -67,9 +67,9 @@ export default function HomeScreen() {
            simply closes the space between StorageWidget and QuickActions. 
            No overlap will occur.
         */}
-        <PendingManualDocuments
+        <ActionRequiredDocuments
           documents={
-            isLoadingPending
+            isLoadingActionRequired
               ? [
                   {
                     id: "loading",
@@ -83,7 +83,7 @@ export default function HomeScreen() {
                     status: "PENDING",
                   } as any,
                 ]
-              : pendingDocs?.data || []
+              : actionRequiredDocs?.data || []
           }
           isLoading={false}
         />

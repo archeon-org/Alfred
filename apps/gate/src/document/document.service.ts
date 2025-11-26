@@ -109,7 +109,7 @@ export class DocumentService {
       searchableColumns: ['title', 'originalName'],
       filterableColumns: {
         categoryId: [FilterOperator.EQ, FilterOperator.NULL],
-        processingStatus: [FilterOperator.EQ],
+        processingStatus: [FilterOperator.EQ, FilterOperator.IN],
         classificationSource: [FilterOperator.EQ],
       },
       where: { userId },

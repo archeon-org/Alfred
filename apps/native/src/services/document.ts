@@ -32,7 +32,7 @@ export const getDocuments = async (
   limit = 20,
   categoryId?: string,
   search?: string,
-  processingStatus?: string,
+  processingStatus?: string | string[],
   classificationSource?: string
 ): Promise<{ data: Document[]; meta: any }> => {
   const params = new URLSearchParams();
@@ -46,7 +46,11 @@ export const getDocuments = async (
     params.append("search", search);
   }
   if (processingStatus) {
-    params.append("filter.processingStatus", `$eq:${processingStatus}`);
+    if (Array.isArray(processingStatus)) {
+      params.append("filter.processingStatus", `$in:${processingStatus.join(",")}`);
+    } else {
+      params.append("filter.processingStatus", `$eq:${processingStatus}`);
+    }
   }
   if (classificationSource) {
     params.append("filter.classificationSource", `$eq:${classificationSource}`);
@@ -61,10 +65,17 @@ export const getRecentDocuments = async (limit = 5): Promise<Document[]> => {
   return response.data;
 };
 
-export const getPendingManualDocuments = async (
+export const getActionRequiredDocuments = async (
   limit = 3
 ): Promise<{ data: Document[]; meta: any }> => {
-  return getDocuments(1, limit, undefined, undefined, "PENDING", "MANUAL");
+  return getDocuments(
+    1,
+    limit,
+    undefined,
+    undefined,
+    ["PENDING", "FAILED"],
+    undefined
+  );
 };
 
 export const getDocumentUrl = async (

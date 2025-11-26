@@ -12,7 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Document } from "@archeon-org/types";
 import { DocumentItem } from "../../../components/document/DocumentItem";
-import { usePendingManualDocumentsList } from "../../../hooks/useDocumentsList";
+import { useActionRequiredDocumentsList } from "../../../hooks/useDocumentsList";
 import { DocumentsEmptyState } from "../../../components/document/DocumentsEmptyState";
 
 export default function PendingDocumentsScreen() {
@@ -25,7 +25,7 @@ export default function PendingDocumentsScreen() {
     isFetchingNextPage,
     refetch,
     isRefetching,
-  } = usePendingManualDocumentsList();
+  } = useActionRequiredDocumentsList();
 
   const renderDocument = ({ item }: { item: Document }) => (
     <DocumentItem
@@ -49,7 +49,7 @@ export default function PendingDocumentsScreen() {
           <Ionicons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-gray-900 dark:text-white">
-          Pending Manual Review
+          Action Required
         </Text>
       </View>
 

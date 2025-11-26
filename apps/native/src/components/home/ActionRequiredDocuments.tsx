@@ -1,27 +1,26 @@
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { Document } from "@archeon-org/types";
 import { useRouter } from "expo-router";
 import { DocumentItem } from "../document/DocumentItem";
 import { Skeleton } from "../common/Skeleton";
 
-interface PendingManualDocumentsProps {
+interface ActionRequiredDocumentsProps {
   documents: Document[];
   isLoading: boolean;
 }
 
-export const PendingManualDocuments = ({
+export const ActionRequiredDocuments = ({
   documents,
   isLoading,
-}: PendingManualDocumentsProps) => {
+}: ActionRequiredDocumentsProps) => {
   const router = useRouter();
 
   if (isLoading) {
     return (
       <View className="mb-6 w-full">
         <Text className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-          Pending Manual Review
+          Action Required
         </Text>
         <View className="gap-3">
           <Skeleton className="h-20 w-full" />
@@ -44,12 +43,12 @@ export const PendingManualDocuments = ({
     <View className="mb-8 w-full flex-col">
       <View className="flex-row justify-between items-center mb-4 px-1">
         <Text className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
-          Pending Manual Review
+          Action Required
         </Text>
         {hasMore && (
           <TouchableOpacity
             activeOpacity={0.7} // Better touch feedback
-            onPress={() => router.push("/(app)/documents/pending")}
+            onPress={() => router.push("/(app)/documents/action-required")}
             // Added hitSlop to make the link easier to press without overlapping UI
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >

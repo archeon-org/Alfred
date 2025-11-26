@@ -43,7 +43,7 @@ export const useDocumentsList = (search?: string) => {
   };
 };
 
-export const usePendingManualDocumentsList = () => {
+export const useActionRequiredDocumentsList = () => {
   const {
     data,
     isLoading,
@@ -53,9 +53,16 @@ export const usePendingManualDocumentsList = () => {
     refetch,
     isRefetching,
   } = useInfiniteQuery({
-    queryKey: ["documents", "pending-manual-list"],
+    queryKey: ["documents", "action-required-list"],
     queryFn: ({ pageParam = 1 }) =>
-      getDocuments(pageParam, 20, undefined, undefined, "PENDING", "MANUAL"),
+      getDocuments(
+        pageParam,
+        20,
+        undefined,
+        undefined,
+        ["PENDING", "FAILED"],
+        undefined
+      ),
     getNextPageParam: (lastPage) => {
       if (lastPage.meta.currentPage < lastPage.meta.totalPages) {
         return lastPage.meta.currentPage + 1;

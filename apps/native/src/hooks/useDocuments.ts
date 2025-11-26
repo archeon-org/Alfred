@@ -3,7 +3,7 @@ import {
   getDocuments,
   getDocumentUrl,
   getRecentDocuments,
-  getPendingManualDocuments,
+  getActionRequiredDocuments,
   updateDocument,
   bulkUpdateDocuments,
   triggerAiClassification,
@@ -34,10 +34,10 @@ export const useRecentDocuments = (limit = 5) => {
   });
 };
 
-export const usePendingManualDocuments = (limit = 3) => {
+export const useActionRequiredDocuments = (limit = 3) => {
   return useQuery({
-    queryKey: ["documents", "pending-manual", limit],
-    queryFn: () => getPendingManualDocuments(limit + 1),
+    queryKey: ["documents", "action-required", limit],
+    queryFn: () => getActionRequiredDocuments(limit + 1),
   });
 };
 
