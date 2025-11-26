@@ -18,10 +18,18 @@ import { useDocumentsList } from "../../../hooks/useDocumentsList";
 import { useDocumentMutations } from "../../../hooks/useDocuments";
 import { DocumentsEmptyState } from "../../../components/document/DocumentsEmptyState";
 import { Skeleton } from "../../../components/common/Skeleton";
+import { DocumentFilterModal } from "../../../components/document/DocumentFilterModal";
 
 export default function DocumentsScreen() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<{
+    processingStatus?: string;
+    classificationSource?: string;
+    tagId?: string;
+  }>({});
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+
   const {
     documents,
     isLoading,
@@ -30,8 +38,10 @@ export default function DocumentsScreen() {
     isFetchingNextPage,
     refetch,
     isRefetching,
-  } = useDocumentsList(search);
+  } = useDocumentsList(search, filters);
   const { deleteDocument } = useDocumentMutations();
+
+  const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
   const handleDeleteDocument = (document: Document) => {
     Alert.alert(
@@ -97,6 +107,27 @@ export default function DocumentsScreen() {
         <Text className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
           Documents
         </Text>
+        <TouchableOpacity
+          onPress={() => setFilterModalVisible(true)}
+          className={`w-10 h-10 rounded-full items-center justify-center border ${
+            activeFiltersCount > 0
+              ? "bg-primary border-primary"
+              : "bg-surface dark:bg-surface-dark border-gray-100 dark:border-gray-800"
+          }`}
+        >
+          <Ionicons
+            name="filter"
+            size={20}
+            color={activeFiltersCount > 0 ? "white" : "#6B7280"}
+          />
+          {activeFiltersCount > 0 && (
+            <View className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full items-center justify-center border border-white dark:border-black">
+              <Text className="text-[10px] font-bold text-white">
+                {activeFiltersCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       <View className="px-4 mb-4">
@@ -139,6 +170,14 @@ export default function DocumentsScreen() {
           ) : null
         }
         ListEmptyComponent={<DocumentsEmptyState />}
+      />
+
+      <DocumentFilterModal
+        visible={filterModalVisible}
+        onClose={() => setFilterModalVisible(false)}
+        filters={filters}
+        onApplyFilters={setFilters}
+        onResetFilters={() => setFilters({})}
       />
     </SafeAreaView>
   );

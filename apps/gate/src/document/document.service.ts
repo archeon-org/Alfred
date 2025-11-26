@@ -111,6 +111,7 @@ export class DocumentService {
         categoryId: [FilterOperator.EQ, FilterOperator.NULL],
         processingStatus: [FilterOperator.EQ, FilterOperator.IN],
         classificationSource: [FilterOperator.EQ],
+        'tags.id': [FilterOperator.EQ],
       },
       where: { userId },
     });

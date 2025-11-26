@@ -33,7 +33,8 @@ export const getDocuments = async (
   categoryId?: string,
   search?: string,
   processingStatus?: string | string[],
-  classificationSource?: string
+  classificationSource?: string,
+  tagId?: string
 ): Promise<{ data: Document[]; meta: any }> => {
   const params = new URLSearchParams();
   params.append("page", page.toString());
@@ -57,6 +58,9 @@ export const getDocuments = async (
   }
   if (classificationSource) {
     params.append("filter.classificationSource", `$eq:${classificationSource}`);
+  }
+  if (tagId) {
+    params.append("filter.tags.id", `$eq:${tagId}`);
   }
 
   const response = await api.get(`/documents?${params.toString()}`);
