@@ -36,6 +36,7 @@ COPY --from=builder /app/apps/gate/node_modules ./apps/gate/node_modules
 COPY --from=builder /app/apps/gate/dist ./apps/gate/dist
 COPY --from=builder /app/apps/gate/package.json ./apps/gate/
 COPY --from=builder /app/apps/gate/db ./apps/gate/db
+COPY --from=builder /app/apps/gate/src ./apps/gate/src
 COPY --from=builder /app/apps/gate/tsconfig.json ./apps/gate/
 COPY --from=builder /app/packages/types/dist ./packages/types/dist
 COPY --from=builder /app/packages/types/package.json ./packages/types/
