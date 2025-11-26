@@ -5,20 +5,35 @@
   "private": true,
   "scripts": {
     "start": "node scripts/start",
-    "docker:dbs:up": "docker-compose -f ./docker/databases/docker-compose.yml up -d",
+    "docker:up": "docker-compose -f ./docker/docker-compose.yml up -d",
     "prettier:write": "prettier --write \"**/*.{js,ts,css,scss,html,tsx,jsx}\"",
     "prettier:check": "prettier --check \"**/*.{js,ts,css,scss,html,tsx,jsx}\"",
-    "lint:all": "cd apps/back && npm run lint"
+    "lint:all": "cd apps/back && npm run lint",
+    "build:packages": "yarn workspace @archeon-org/types build",
+    "postinstall": "yarn build:packages",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "yarn build:packages && changeset publish",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "author": "",
   "license": "ISC",
   "keywords": [],
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "devDependencies": {
+    "@changesets/cli": "^2.29.7",
     "inquirer": "^8.0.0",
     "prettier": "^3.2.5",
     "pretty-quick": "^4.0.0"
+  },
+  "dependencies": {
+    "expo": "~54.0.25",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-reanimated": "^4.1.5"
   }
 }

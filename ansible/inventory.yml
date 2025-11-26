@@ -1,0 +1,18 @@
+---
+all:
+  children:
+    production:
+      hosts:
+        archeon-vps:
+          ansible_host: "{{ vault_vps_ip }}"
+          ansible_user: "{{ vault_vps_user }}"
+          ansible_password: "{{ vault_vps_password }}"
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+          ansible_python_interpreter: /usr/bin/python3
+
+  vars:
+    # Global variables for all hosts
+    ansible_ssh_port: 22
+    ansible_connection: ssh
+    ansible_ssh_timeout: 10
+    ansible_ssh_retries: 3

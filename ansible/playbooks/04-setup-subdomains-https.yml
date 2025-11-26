@@ -1,0 +1,130 @@
+---
+- name: Setup Gate and Scribe Subdomains with HTTPS
+  hosts: archeon-vps
+  become: true
+  gather_facts: true
+
+  vars:
+    gate_domain: "{{ vault_gate_domain | default('gate.archeon.com') }}"
+    scribe_domain: "{{ vault_scribe_domain | default('scribe.archeon.com') }}"
+    email: "{{ vault_email }}"
+
+  tasks:
+    - name: 🔧 Install nginx if not present
+      package:
+        name: nginx
+        state: present
+
+    - name: 🔧 Install certbot and nginx plugin
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - certbot
+        - python3-certbot-nginx
+
+    - name: 🚫 Stop nginx temporarily for certificate generation
+      systemd:
+        name: nginx
+        state: stopped
+
+    - name: 🔐 Generate SSL certificates for Gate
+      command: >
+        certbot certonly --standalone
+        --email {{ email }}
+        --agree-tos
+        --non-interactive
+        --domains {{ gate_domain }}
+      args:
+        creates: /etc/letsencrypt/live/{{ gate_domain }}/fullchain.pem
+
+    - name: 🔐 Generate SSL certificates for Scribe
+      command: >
+        certbot certonly --standalone
+        --email {{ email }}
+        --agree-tos
+        --non-interactive
+        --domains {{ scribe_domain }}
+      args:
+        creates: /etc/letsencrypt/live/{{ scribe_domain }}/fullchain.pem
+
+    - name: 📝 Create Gate nginx configuration
+      template:
+        src: ../templates/nginx-gate.conf.j2
+        dest: /etc/nginx/sites-available/archeon-gate
+        backup: yes
+      notify: reload nginx
+
+    - name: 📝 Create Scribe nginx configuration
+      template:
+        src: ../templates/nginx-scribe.conf.j2
+        dest: /etc/nginx/sites-available/archeon-scribe
+        backup: yes
+      notify: reload nginx
+
+    - name: 🔗 Enable Gate site
+      file:
+        src: /etc/nginx/sites-available/archeon-gate
+        dest: /etc/nginx/sites-enabled/archeon-gate
+        state: link
+      notify: reload nginx
+
+    - name: 🔗 Enable Scribe site
+      file:
+        src: /etc/nginx/sites-available/archeon-scribe
+        dest: /etc/nginx/sites-enabled/archeon-scribe
+        state: link
+      notify: reload nginx
+
+    - name: 🚫 Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: reload nginx
+
+    - name: ✅ Test nginx configuration
+      command: nginx -t
+      changed_when: false
+
+    - name: 🚀 Start and enable nginx
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: 🔄 Setup certificate auto-renewal
+      cron:
+        name: "Certbot renewal"
+        minute: "0"
+        hour: "12"
+        day: "*"
+        month: "*"
+        weekday: "*"
+        job: "/usr/bin/certbot renew --quiet && /usr/bin/systemctl reload nginx"
+
+    - name: 🔥 Configure firewall for HTTPS
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "80"
+        - "443"
+
+    - name: ℹ️ Display setup information
+      debug:
+        msg: |
+          🎉 HTTPS setup completed successfully!
+          
+          Gate: https://{{ gate_domain }}
+          Scribe: https://{{ scribe_domain }}
+          
+          Make sure your DNS points to this server: {{ ansible_default_ipv4.address }}
+          
+          SSL certificates will auto-renew via cron job.
+
+  handlers:
+    - name: reload nginx
+      systemd:
+        name: nginx
+        state: reloaded

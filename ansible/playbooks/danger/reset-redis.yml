@@ -1,0 +1,43 @@
+---
+- name: ⚠️ DANGER - Reset Redis Database (Wipe Data)
+  hosts: archeon-vps
+  become: true
+  gather_facts: false
+
+  vars:
+    app_directory: "/opt/archeon"
+
+  tasks:
+    - name: ⚠️ Confirmation Check
+      pause:
+        prompt: "⚠️  WARNING: This will COMPLETELY WIPE the Redis database (volumes, data). Are you sure you want to proceed? Press Enter to continue or Ctrl+C to abort."
+
+    - name: 🛑 Stop Redis container
+      shell: docker stop redis-archeon || true
+      ignore_errors: true
+
+    - name: 🗑️ Remove Redis container
+      shell: docker rm redis-archeon || true
+      ignore_errors: true
+
+    - name: 🗑️ Remove Redis volume (Wiping Data)
+      shell: docker volume rm archeon-redis-data || true
+      ignore_errors: true
+
+    - name: 🚀 Start Redis service (Fresh Start)
+      shell: |
+        cd {{ app_directory }}
+        docker compose up -d redis-archeon
+      register: docker_up_result
+
+    - name: ⏳ Wait for Redis to be ready
+      wait_for:
+        host: "127.0.0.1"
+        port: 6379
+        delay: 2
+        timeout: 30
+        msg: "Redis is not responding after reset"
+
+    - name: ✅ Reset Complete
+      debug:
+        msg: "✅ Redis has been reset. All data was wiped and the service was restarted."

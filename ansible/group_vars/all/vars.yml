@@ -1,0 +1,36 @@
+---
+# General variables for all hosts
+
+# System configuration
+timezone: "UTC"
+locale: "en_US.UTF-8"
+
+# User configuration  
+deploy_user: "deploy"
+deploy_user_shell: "/bin/bash"
+
+# Application directories
+app_directory: "/opt/archeon"
+backup_directory: "/opt/backups"
+log_directory: "/var/log/archeon"
+
+# Docker configuration
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-compose-plugin
+
+docker_users:
+  - "{{ deploy_user }}"
+  - "{{ vault_vps_user }}"
+
+# Firewall rules
+ufw_rules:
+  - { rule: "allow", port: "22", proto: "tcp" }    # SSH
+  - { rule: "allow", port: "80", proto: "tcp" }    # HTTP
+  - { rule: "allow", port: "443", proto: "tcp" }   # HTTPS
+  - { rule: "allow", port: "3000", proto: "tcp" }  # App (if needed)
+
+# SSH configuration
+ssh_port: 22

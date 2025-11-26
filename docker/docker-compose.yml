@@ -1,0 +1,53 @@
+services:
+  postgres-archeon:
+    container_name: postgres-archeon
+    image: ankane/pgvector:latest
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-archeon-storage:/var/lib/postgresql/data/
+    networks:
+      - archeon-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  redis-archeon:
+    container_name: redis-archeon
+    image: redis:alpine
+    ports:
+      - "6378:6379"
+    volumes:
+      - redis-archeon-storage:/data
+    command: redis-server --appendonly yes --requirepass RedisPassword123
+    networks:
+      - archeon-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "--no-auth-warning",
+          "-a",
+          "RedisPassword123",
+          "ping",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  archeon-net:
+    driver: bridge
+
+volumes:
+  postgres-archeon-storage: {}
+  minio-archeon-storage: {}
+  redis-archeon-storage: {}
