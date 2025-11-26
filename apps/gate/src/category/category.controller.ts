@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
@@ -29,8 +30,9 @@ export class CategoryController {
   findAll(
     @CurrentUser() user: Partial<UserEntity>,
     @Paginate() query: PaginateQuery,
+    @Query('hideEmpty') hideEmpty?: string,
   ) {
-    return this.categoryService.findAll(user.id, query);
+    return this.categoryService.findAll(user.id, query, hideEmpty === 'true');
   }
 
   @Get(':id')

@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
+  Switch,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,6 +32,10 @@ export default function CategoriesScreen() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    search,
+    setSearch,
+    hideEmpty,
+    setHideEmpty,
   } = useCategoryScreenLogic();
 
   if (isLoading) {
@@ -73,6 +79,36 @@ export default function CategoriesScreen() {
         >
           <Ionicons name="add" size={24} color="white" />
         </TouchableOpacity>
+      </View>
+
+      <View className="px-4 mb-4 gap-4">
+        <View className="flex-row items-center bg-surface dark:bg-surface-dark px-4 py-3 rounded-xl border border-gray-100 dark:border-gray-800">
+          <Ionicons name="search" size={20} color="#9CA3AF" />
+          <TextInput
+            className="flex-1 ml-3 text-base text-gray-900 dark:text-white"
+            placeholder="Search categories..."
+            placeholderTextColor="#9CA3AF"
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch("")}>
+              <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View className="flex-row items-center justify-between">
+          <Text className="text-gray-600 dark:text-gray-300 font-medium">
+            Hide empty folders
+          </Text>
+          <Switch
+            value={hideEmpty}
+            onValueChange={setHideEmpty}
+            trackColor={{ false: "#767577", true: "#4F46E5" }}
+            thumbColor={hideEmpty ? "#fff" : "#f4f3f4"}
+          />
+        </View>
       </View>
 
       <FlatList

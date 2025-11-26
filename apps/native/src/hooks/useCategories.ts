@@ -12,7 +12,7 @@ import {
   deleteCategory,
 } from "../services";
 
-export const useCategories = () => {
+export const useCategories = (search?: string, hideEmpty?: boolean) => {
   const queryClient = useQueryClient();
 
   const {
@@ -24,8 +24,9 @@ export const useCategories = () => {
     isFetchingNextPage,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ["categories"],
-    queryFn: ({ pageParam = 1 }) => getCategories(pageParam, 10),
+    queryKey: ["categories", search, hideEmpty],
+    queryFn: ({ pageParam = 1 }) =>
+      getCategories(pageParam, 10, search, hideEmpty),
     getNextPageParam: (lastPage) => {
       if (lastPage.meta.currentPage < lastPage.meta.totalPages) {
         return lastPage.meta.currentPage + 1;

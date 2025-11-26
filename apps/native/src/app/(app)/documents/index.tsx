@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,6 +19,7 @@ import { Skeleton } from "../../../components/common/Skeleton";
 
 export default function DocumentsScreen() {
   const router = useRouter();
+  const [search, setSearch] = useState("");
   const {
     documents,
     isLoading,
@@ -26,7 +28,7 @@ export default function DocumentsScreen() {
     isFetchingNextPage,
     refetch,
     isRefetching,
-  } = useDocumentsList();
+  } = useDocumentsList(search);
 
   const renderDocument = ({ item }: { item: Document }) => (
     <DocumentItem
@@ -42,9 +44,6 @@ export default function DocumentsScreen() {
           <Text className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
             Documents
           </Text>
-          <View className="w-12 h-12 rounded-full bg-surface dark:bg-surface-dark items-center justify-center border border-gray-100 dark:border-gray-800">
-            <Ionicons name="search-outline" size={24} color="#6B7280" />
-          </View>
         </View>
         <View className="px-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
@@ -73,12 +72,24 @@ export default function DocumentsScreen() {
         <Text className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
           Documents
         </Text>
-        <TouchableOpacity
-          onPress={() => router.push("/(app)/documents/search")}
-          className="w-12 h-12 rounded-full bg-surface dark:bg-surface-dark items-center justify-center shadow-sm border border-gray-100 dark:border-gray-800"
-        >
-          <Ionicons name="search-outline" size={24} color="#6B7280" />
-        </TouchableOpacity>
+      </View>
+
+      <View className="px-4 mb-4">
+        <View className="flex-row items-center bg-surface dark:bg-surface-dark px-4 py-3 rounded-xl border border-gray-100 dark:border-gray-800">
+          <Ionicons name="search" size={20} color="#9CA3AF" />
+          <TextInput
+            className="flex-1 ml-3 text-base text-gray-900 dark:text-white"
+            placeholder="Search documents..."
+            placeholderTextColor="#9CA3AF"
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch("")}>
+              <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <FlatList

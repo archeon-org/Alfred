@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { CategoryEntity } from './category.entity';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 import { paginate, PaginateQuery, Paginated } from 'nestjs-paginate';
+import { DocumentEntity } from '../document/document.entity';
 
 @Injectable()
 export class CategoryService {
@@ -60,14 +61,32 @@ export class CategoryService {
   async findAll(
     userId: string,
     query: PaginateQuery,
+    hideEmpty: boolean = false,
   ): Promise<Paginated<CategoryEntity>> {
-    this.logger.debug(`Finding all categories for user ${userId}`);
-    return paginate<CategoryEntity>(query, this.categoryRepository as any, {
+    this.logger.debug(
+      `Finding all categories for user ${userId} (hideEmpty: ${hideEmpty})`,
+    );
+
+    const queryBuilder = this.categoryRepository.createQueryBuilder('category');
+    queryBuilder.where('category.userId = :userId', { userId });
+
+    if (hideEmpty) {
+      queryBuilder.andWhere((qb) => {
+        const subQuery = qb
+          .subQuery()
+          .select('1')
+          .from(DocumentEntity, 'document')
+          .where('document.categoryId = category.id')
+          .getQuery();
+        return `EXISTS ${subQuery}`;
+      });
+    }
+
+    return paginate<CategoryEntity>(query, queryBuilder as any, {
       sortableColumns: ['id', 'name', 'createdAt'],
       nullSort: 'last',
       defaultSortBy: [['createdAt', 'DESC']],
       searchableColumns: ['name'],
-      where: { userId },
     });
   }
 

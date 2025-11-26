@@ -5,6 +5,9 @@ import { useCategories } from "./useCategories";
 import { showError } from "../utils/apiError";
 
 export const useCategoryScreenLogic = () => {
+  const [search, setSearch] = useState("");
+  const [hideEmpty, setHideEmpty] = useState(true);
+
   const {
     categories,
     isLoading,
@@ -15,7 +18,7 @@ export const useCategoryScreenLogic = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useCategories();
+  } = useCategories(search, hideEmpty);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -76,5 +79,9 @@ export const useCategoryScreenLogic = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    search,
+    setSearch,
+    hideEmpty,
+    setHideEmpty,
   };
 };

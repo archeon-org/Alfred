@@ -2,7 +2,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { getDocuments } from "../services";
 
-export const useDocumentsList = () => {
+export const useDocumentsList = (search?: string) => {
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
 
   const {
@@ -14,8 +14,9 @@ export const useDocumentsList = () => {
     refetch,
     isRefetching,
   } = useInfiniteQuery({
-    queryKey: ["documents", "all", categoryId],
-    queryFn: ({ pageParam = 1 }) => getDocuments(pageParam, 20, categoryId),
+    queryKey: ["documents", "all", categoryId, search],
+    queryFn: ({ pageParam = 1 }) =>
+      getDocuments(pageParam, 20, categoryId, search),
     getNextPageParam: (lastPage) => {
       if (lastPage.meta.currentPage < lastPage.meta.totalPages) {
         return lastPage.meta.currentPage + 1;
