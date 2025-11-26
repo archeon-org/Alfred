@@ -47,7 +47,10 @@ export const getDocuments = async (
   }
   if (processingStatus) {
     if (Array.isArray(processingStatus)) {
-      params.append("filter.processingStatus", `$in:${processingStatus.join(",")}`);
+      params.append(
+        "filter.processingStatus",
+        `$in:${processingStatus.join(",")}`
+      );
     } else {
       params.append("filter.processingStatus", `$eq:${processingStatus}`);
     }
