@@ -42,7 +42,7 @@ export default function DocumentsScreen() {
           <Text className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
             Documents
           </Text>
-          <View className="w-12 h-12 rounded-full bg-surface dark:bg-surface-dark items-center justify-center shadow-sm border border-gray-100 dark:border-gray-800">
+          <View className="w-12 h-12 rounded-full bg-surface dark:bg-surface-dark items-center justify-center border border-gray-100 dark:border-gray-800">
             <Ionicons name="search-outline" size={24} color="#6B7280" />
           </View>
         </View>

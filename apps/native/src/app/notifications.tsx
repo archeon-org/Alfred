@@ -35,33 +35,45 @@ export default function NotificationsScreen() {
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-black">
-      <View className="flex-row items-center p-4 border-b border-gray-100 dark:border-gray-900">
-        <TouchableOpacity onPress={() => router.back()} className="mr-4">
+    <SafeAreaView
+      className="flex-1 bg-background dark:bg-background-dark"
+      edges={["top"]}
+    >
+      <View className="flex-row items-center px-4 py-2 mb-2">
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="mr-4 p-2 -ml-2 rounded-full active:bg-gray-100 dark:active:bg-gray-800"
+        >
           <Ionicons
             name="arrow-back"
             size={24}
             color={isDark ? colors.white : colors.black}
           />
         </TouchableOpacity>
-        <Text className="text-xl font-bold text-black dark:text-white">
+        <Text className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
           Notifications
         </Text>
       </View>
 
-      <ScrollView className="flex-1">
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="px-4 pb-10"
+        showsVerticalScrollIndicator={false}
+      >
         {notifications.map((notification) => (
           <TouchableOpacity
             key={notification.id}
-            className={`p-4 border-b border-gray-100 dark:border-gray-900 ${
-              !notification.read ? "bg-blue-50 dark:bg-blue-900/10" : ""
+            className={`p-4 mb-3 rounded-2xl border ${
+              !notification.read
+                ? "bg-primary/5 border-primary/20"
+                : "bg-surface dark:bg-surface-dark border-transparent"
             }`}
           >
             <View className="flex-row justify-between mb-1">
               <Text
                 className={`text-base ${
                   !notification.read ? "font-bold" : "font-semibold"
-                } text-black dark:text-white`}
+                } text-gray-900 dark:text-white`}
               >
                 {notification.title}
               </Text>
@@ -69,9 +81,12 @@ export default function NotificationsScreen() {
                 {notification.time}
               </Text>
             </View>
-            <Text className="text-gray-600 dark:text-gray-300">
+            <Text className="text-gray-600 dark:text-gray-300 leading-5">
               {notification.message}
             </Text>
+            {!notification.read && (
+              <View className="absolute top-4 right-4 w-2 h-2 rounded-full bg-primary" />
+            )}
           </TouchableOpacity>
         ))}
       </ScrollView>

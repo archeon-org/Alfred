@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Document } from "@archeon-org/types";
 import { formatDistanceToNow } from "date-fns";
+import { shadows } from "../../constants/shadows";
 
 interface DocumentItemProps {
   document: Document;
@@ -24,7 +25,9 @@ const getFileColor = (mimetype: string) => {
 export const DocumentItem = ({ document, onPress }: DocumentItemProps) => {
   return (
     <TouchableOpacity
-      className="flex-row items-center bg-surface dark:bg-surface-dark p-4 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm shadow-gray-100 dark:shadow-none mb-3 active:scale-[0.98] transition-transform"
+      className="flex-row items-center bg-surface dark:bg-surface-dark p-4 rounded-3xl border border-gray-100 dark:border-gray-800 mb-3 active:scale-[0.98] transition-transform"
+      // Using native shadow instead of NativeWind to avoid React Navigation context conflicts
+      style={shadows.sm}
       onPress={() => onPress(document)}
       activeOpacity={0.7}
     >

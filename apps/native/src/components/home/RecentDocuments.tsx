@@ -38,7 +38,7 @@ export const RecentDocuments = ({
         <Text className="text-xl font-bold text-gray-900 dark:text-white mb-4 tracking-tight">
           Recent Documents
         </Text>
-        <View className="bg-surface dark:bg-surface-dark p-8 rounded-3xl items-center justify-center border border-dashed border-gray-200 dark:border-gray-700 shadow-sm">
+        <View className="bg-surface dark:bg-surface-dark p-8 rounded-3xl items-center justify-center border border-dashed border-gray-200 dark:border-gray-700">
           <View className="w-16 h-16 bg-gray-50 dark:bg-gray-800 rounded-full items-center justify-center mb-3">
             <Ionicons name="document-text-outline" size={32} color="#9CA3AF" />
           </View>

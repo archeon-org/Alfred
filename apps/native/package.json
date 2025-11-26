@@ -31,7 +31,6 @@
     "@archeon-org/types": "*",
     "@expo/vector-icons": "^15.0.3",
     "@hookform/resolvers": "^5.2.2",
-    "@react-navigation/native": "^7.1.8",
     "@tanstack/react-query": "^5.90.10",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",

@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Category } from "@archeon-org/types";
+import { shadows } from "../../constants/shadows";
 
 interface CategoryItemProps {
   item: Category;
@@ -17,7 +18,9 @@ export const CategoryItem = ({
   <TouchableOpacity
     onPress={() => onPress(item)}
     onLongPress={() => onLongPress(item)}
-    className="flex-row items-center p-4 bg-surface dark:bg-surface-dark rounded-3xl mb-3 shadow-sm border border-gray-100 dark:border-gray-800"
+    className="flex-row items-center p-4 bg-surface dark:bg-surface-dark rounded-3xl mb-3 border border-gray-100 dark:border-gray-800"
+    // Using native shadow instead of NativeWind to avoid React Navigation context conflicts
+    style={shadows.sm}
   >
     <View
       className="p-4 rounded-2xl mr-4"

@@ -7,6 +7,7 @@ import {
   type PressableProps,
 } from "react-native";
 import { cn } from "../utils/cn";
+import { shadows } from "../constants/shadows";
 
 interface ButtonProps extends PressableProps {
   title?: string;
@@ -31,8 +32,8 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const variants = {
-    primary: "bg-primary active:bg-primary-700 shadow-sm shadow-primary/30",
-    secondary: "bg-surface border border-gray-200 active:bg-gray-50 shadow-sm",
+    primary: "bg-primary active:bg-primary-700",
+    secondary: "bg-surface border border-gray-200 active:bg-gray-50",
     outline: "bg-transparent border border-primary active:bg-primary-50",
     ghost: "bg-transparent active:bg-gray-100",
   };
@@ -54,6 +55,14 @@ export const Button: React.FC<ButtonProps> = ({
         (isLoading || disabled) && "opacity-60",
         className
       )}
+      // Using native shadows instead of NativeWind to avoid React Navigation context conflicts
+      style={
+        variant === "primary"
+          ? shadows.primary
+          : variant === "secondary"
+            ? shadows.sm
+            : undefined
+      }
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityState={{ busy: isLoading, disabled: disabled || isLoading }}

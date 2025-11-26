@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 export const DocumentsEmptyState = () => {
   return (
     <View className="items-center justify-center py-20">
-      <View className="bg-surface dark:bg-surface-dark p-8 rounded-full mb-6 shadow-sm">
+      <View className="bg-surface dark:bg-surface-dark p-8 rounded-full mb-6">
         <Ionicons name="document-text-outline" size={64} color="#9CA3AF" />
       </View>
       <Text className="text-gray-500 dark:text-gray-400 text-xl font-bold">

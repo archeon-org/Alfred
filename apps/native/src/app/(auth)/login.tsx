@@ -26,23 +26,22 @@ export default function Login() {
           className="w-full"
         />
 
-        {isExpoGo ||
-          (Platform.OS === "android" && (
-            <>
-              <View className="flex-row items-center my-2">
-                <View className="flex-1 h-px bg-gray-200" />
-                <Text className="mx-4 text-gray-400">OR</Text>
-                <View className="flex-1 h-px bg-gray-200" />
-              </View>
+        {(Platform.OS === "android" || (isExpoGo && Platform.OS === "ios")) && (
+          <>
+            <View className="flex-row items-center my-2">
+              <View className="flex-1 h-px bg-gray-200" />
+              <Text className="mx-4 text-gray-400">OR</Text>
+              <View className="flex-1 h-px bg-gray-200" />
+            </View>
 
-              <Button
-                title="Continue with Email"
-                onPress={() => router.push("/(auth)/otp")}
-                variant="outline"
-                className="w-full"
-              />
-            </>
-          ))}
+            <Button
+              title="Continue with Email"
+              onPress={() => router.push("/(auth)/otp")}
+              variant="outline"
+              className="w-full"
+            />
+          </>
+        )}
       </View>
     </View>
   );

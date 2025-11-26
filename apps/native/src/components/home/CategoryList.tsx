@@ -61,7 +61,7 @@ export const CategoryList = ({ categories, isLoading }: CategoryListProps) => {
             activeOpacity={0.7}
           >
             <View
-              className="w-20 h-20 rounded-3xl items-center justify-center mb-2 shadow-sm shadow-gray-100 dark:shadow-none"
+              className="w-20 h-20 rounded-3xl items-center justify-center mb-2"
               style={{ backgroundColor: category.color + "20" }} // Slightly more opaque
             >
               <Ionicons
@@ -80,7 +80,7 @@ export const CategoryList = ({ categories, isLoading }: CategoryListProps) => {
           onPress={() => router.push("/(app)/categories")}
           activeOpacity={0.7}
         >
-          <View className="w-20 h-20 rounded-3xl bg-surface dark:bg-surface-dark items-center justify-center mb-2 border border-dashed border-gray-300 dark:border-gray-700 shadow-sm">
+          <View className="w-20 h-20 rounded-3xl bg-surface dark:bg-surface-dark items-center justify-center mb-2 border border-dashed border-gray-300 dark:border-gray-700">
             <Ionicons name="grid-outline" size={28} color="#9CA3AF" />
           </View>
           <Text className="text-xs font-bold text-gray-500 dark:text-gray-400">
