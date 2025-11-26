@@ -11,9 +11,6 @@
     "lint:all": "cd apps/back && npm run lint",
     "build:packages": "yarn workspace @archeon-org/types build",
     "postinstall": "yarn build:packages",
-    "changeset": "changeset",
-    "version-packages": "changeset version",
-    "release": "yarn build:packages && changeset publish",
     "android": "expo run:android",
     "ios": "expo run:ios"
   },
