@@ -30,7 +30,7 @@ env:
 
 jobs:
   check-changes:
-    name: Check for archeon app changes
+    name: Check for native app changes
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.check_files.outputs.any_changed }}
@@ -40,22 +40,22 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Check for file changes in archeon directory
+      - name: Check for file changes in native directory
         id: check_files
         uses: tj-actions/changed-files@v42
         with:
-          files: apps/archeon/**
+          files: apps/native/**
 
       - name: List changed files
         if: steps.check_files.outputs.any_changed == 'true'
         run: |
-          echo "Archeon app files changed, publish will proceed"
+          echo "native app files changed, publish will proceed"
           echo "Changed files:"
           echo "${{ steps.check_files.outputs.all_changed_files }}"
 
       - name: No changes detected
         if: steps.check_files.outputs.any_changed != 'true'
-        run: echo "No Archeon app files changed, publish will be skipped"
+        run: echo "No native app files changed, publish will be skipped"
 
   eas-update-publish:
     name: EAS Update - Publish to Expo Go
@@ -92,12 +92,12 @@ jobs:
 
       # - name: Create env file for EAS
       #   run: |
-      #       cd apps/archeon
+      #       cd apps/native
       #       echo "API_URL=${{ env.API_URL }}" > .env
       #       echo "API_TIMEOUT=${{ env.API_TIMEOUT }}" >> .env
       #       cat .env
 
       - name: Publish to Expo Go
         run: |
-          cd apps/archeon
+          cd apps/native
           eas update --auto --non-interactive
