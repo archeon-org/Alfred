@@ -9,6 +9,9 @@ COPY package.json yarn.lock ./
 COPY apps/scribe/package.json apps/scribe/
 COPY packages/types/package.json packages/types/
 
+# Remove postinstall script to prevent premature build
+RUN sed -i '/"postinstall":/d' package.json
+
 # Install dependencies
 RUN yarn install --frozen-lockfile
 
