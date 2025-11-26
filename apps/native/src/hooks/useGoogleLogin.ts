@@ -6,7 +6,8 @@ import axios from "axios";
 import { Alert } from "react-native";
 import Config from "../constants/Config";
 import { useAuth } from "../context/AuthContext";
-import { verifyGoogleToken } from "../services/api";
+import { verifyGoogleToken } from "../services";
+import { showError } from "../utils/apiError";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -54,7 +55,7 @@ export const useGoogleLogin = () => {
       await signIn(accessToken);
     } catch (error) {
       console.error("Login failed:", error);
-      Alert.alert("Login Failed", "Please try again.");
+      showError(error, "Login Failed");
     } finally {
       setIsLoading(false);
     }

@@ -1,3 +1,4 @@
+import React, { useCallback } from "react";
 import {
   View,
   Text,
@@ -6,6 +7,7 @@ import {
   useColorScheme,
   ActivityIndicator,
   Image,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,22 +15,18 @@ import { useAuth } from "../../../context/AuthContext";
 import { useUser } from "../../../hooks/useUser";
 import colors from "tailwindcss/colors";
 import { useRouter } from "expo-router";
-
-const formatBytes = (bytes: number, decimals = 2) => {
-  if (!+bytes) return "0 Bytes";
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-};
+import { StorageProgress } from "../../../components/common/StorageProgress";
 
 export default function ProfileScreen() {
   const { signOut } = useAuth();
-  const { data: user, isLoading } = useUser();
+  const { data: user, isLoading, refetch } = useUser();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();
+
+  const onRefresh = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   const menuItems = [
     {
@@ -43,17 +41,22 @@ export default function ProfileScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-white dark:bg-black justify-center items-center">
-        <ActivityIndicator size="large" color={colors.blue[500]} />
+      <SafeAreaView className="flex-1 bg-background dark:bg-background-dark justify-center items-center">
+        <ActivityIndicator size="large" color="#6366F1" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-black" edges={["bottom"]}>
-      <ScrollView className="p-4">
-        <View className="items-center mb-8">
-          <View className="w-24 h-24 bg-gray-200 dark:bg-gray-800 rounded-full items-center justify-center mb-4 overflow-hidden">
+    <SafeAreaView className="flex-1 bg-background dark:bg-background-dark">
+      <ScrollView
+        className="p-4"
+        refreshControl={
+          <RefreshControl refreshing={false} onRefresh={onRefresh} />
+        }
+      >
+        <View className="items-center mb-8 mt-4">
+          <View className="w-28 h-28 bg-primary-50 dark:bg-primary-900/20 rounded-full items-center justify-center mb-4 overflow-hidden border-4 border-white dark:border-gray-800 shadow-sm">
             {user?.profilePicture ? (
               <Image
                 source={{ uri: user.profilePicture }}
@@ -62,60 +65,46 @@ export default function ProfileScreen() {
             ) : (
               <Ionicons
                 name="person"
-                size={40}
-                color={isDark ? colors.gray[400] : colors.gray[500]}
+                size={48}
+                color={isDark ? "#9CA3AF" : "#6366F1"}
               />
             )}
           </View>
-          <Text className="text-xl font-semibold text-black dark:text-white">
+          <Text className="text-2xl font-bold text-gray-900 dark:text-white">
             {user?.firstName} {user?.lastName}
           </Text>
-          <Text className="text-gray-500 dark:text-gray-400">
+          <Text className="text-gray-500 dark:text-gray-400 text-base">
             {user?.email}
           </Text>
         </View>
 
         {/* Storage Usage Section */}
-        <View className="bg-gray-50 dark:bg-gray-900 rounded-xl p-4 mb-6">
-          <View className="flex-row justify-between mb-2">
-            <Text className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Storage Used
-            </Text>
-            <Text className="text-sm text-gray-500 dark:text-gray-400">
-              {formatBytes(user?.storageUsed || 0)} /{" "}
-              {formatBytes(user?.storageLimit || 0)}
-            </Text>
-          </View>
-          <View className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <View
-              className="h-full bg-blue-500"
-              style={{
-                width: `${Math.min(
-                  ((user?.storageUsed || 0) / (user?.storageLimit || 1)) * 100,
-                  100
-                )}%`,
-              }}
-            />
-          </View>
-          <Text className="text-xs text-gray-400 mt-2">
+        <View className="bg-surface dark:bg-surface-dark rounded-3xl p-5 mb-6 shadow-sm border border-gray-100 dark:border-gray-800">
+          <StorageProgress
+            used={user?.storageUsed || 0}
+            limit={user?.storageLimit || 0}
+            variant="default"
+          />
+          <Text className="text-xs text-gray-400 mt-3 font-medium">
             {user?.searchCount || 0} searches performed
           </Text>
         </View>
 
-        <View className="bg-gray-50 dark:bg-gray-900 rounded-xl overflow-hidden mb-6">
+        <View className="bg-surface dark:bg-surface-dark rounded-3xl overflow-hidden mb-6 shadow-sm border border-gray-100 dark:border-gray-800">
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
               onPress={item.onPress}
-              className={`flex-row items-center p-4 ${index !== menuItems.length - 1 ? "border-b border-gray-200 dark:border-gray-800" : ""}`}
+              className={`flex-row items-center p-5 ${index !== menuItems.length - 1 ? "border-b border-gray-100 dark:border-gray-800" : ""}`}
             >
-              <Ionicons
-                name={item.icon as any}
-                size={24}
-                color={isDark ? colors.gray[300] : colors.gray[700]}
-                style={{ marginRight: 16 }}
-              />
-              <Text className="flex-1 text-base text-black dark:text-white">
+              <View className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center mr-4">
+                <Ionicons
+                  name={item.icon as any}
+                  size={20}
+                  color={isDark ? "#D1D5DB" : "#4B5563"}
+                />
+              </View>
+              <Text className="flex-1 text-base font-medium text-gray-900 dark:text-white">
                 {item.label}
               </Text>
               <Ionicons
@@ -129,7 +118,7 @@ export default function ProfileScreen() {
 
         <TouchableOpacity
           onPress={signOut}
-          className="flex-row items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 rounded-xl"
+          className="flex-row items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 rounded-3xl mb-8"
         >
           <Ionicons
             name="log-out-outline"
@@ -137,7 +126,7 @@ export default function ProfileScreen() {
             color={isDark ? colors.red[400] : colors.red[600]}
             style={{ marginRight: 8 }}
           />
-          <Text className="text-red-600 dark:text-red-400 font-semibold text-base">
+          <Text className="text-red-600 dark:text-red-400 font-bold text-base">
             Sign Out
           </Text>
         </TouchableOpacity>

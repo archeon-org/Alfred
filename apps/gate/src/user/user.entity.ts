@@ -8,6 +8,8 @@ import {
   OneToMany,
 } from 'typeorm';
 import { DocumentEntity } from '../document/document.entity';
+import { CategoryEntity } from '../category/category.entity';
+import { TagEntity } from '../tag/tag.entity';
 
 @Entity('users')
 export class UserEntity implements User {
@@ -29,11 +31,17 @@ export class UserEntity implements User {
   @Column({ nullable: true })
   profilePicture?: string;
 
+  @Column({ nullable: true })
+  pushToken?: string;
+
   @Column({ type: 'bigint', default: 0 })
   storageUsed: number;
 
-  @Column({ type: 'bigint', default: 2147483648 }) // 2GB default
+  @Column({ type: 'bigint', default: 2147483648 })
   storageLimit: number;
+
+  @Column({ type: 'jsonb', default: {} })
+  preferences: Record<string, any>;
 
   @Column({ default: 0 })
   searchCount: number;
@@ -42,7 +50,7 @@ export class UserEntity implements User {
   address?: Address;
 
   @Column({ type: 'enum', enum: UserType, default: UserType.USER })
-  role: UserType; // USER or ADMIN
+  role: UserType;
 
   @Column({ nullable: true, select: false })
   refreshToken?: string;
@@ -59,6 +67,9 @@ export class UserEntity implements User {
   @Column({ type: 'timestamp', nullable: true })
   otpExpiresAt?: Date;
 
+  @Column({ default: false })
+  isOnboarded: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -67,4 +78,10 @@ export class UserEntity implements User {
 
   @OneToMany(() => DocumentEntity, (document) => document.user)
   documents: DocumentEntity[];
+
+  @OneToMany(() => CategoryEntity, (category) => category.user)
+  categories: CategoryEntity[];
+
+  @OneToMany(() => TagEntity, (tag) => tag.user)
+  tags: TagEntity[];
 }

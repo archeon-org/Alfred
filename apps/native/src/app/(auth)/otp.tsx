@@ -1,55 +1,20 @@
-import React, { useState } from "react";
-import { View, Text, TextInput, Alert, TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
+import React from "react";
+import { View, Text, Pressable } from "react-native";
 import { Button } from "../../components/Button";
-import { requestOtp, verifyOtp } from "../../services/api";
-import { useAuth } from "../../context/AuthContext";
+import { ControlledInput } from "../../components/ControlledInput";
+import { useOtpLogin } from "../../hooks/useOtpLogin";
 
 export default function OtpLogin() {
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-
-  const [step, setStep] = useState<"email" | "otp">("email");
-  const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
-  const { signIn } = useAuth();
-
-  const handleRequestOtp = async () => {
-    if (!email) {
-      Alert.alert("Error", "Please enter your email address");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await requestOtp(email);
-      setStep("otp");
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Failed to request OTP. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otp || otp.length !== 6) {
-      Alert.alert("Error", "Please enter the complete 6-digit OTP code");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const { accessToken } = await verifyOtp(email, otp);
-      await signIn(accessToken);
-      // Navigation is handled by AuthContext
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Invalid OTP. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const {
+    control,
+    step,
+    isLoading,
+    handleRequestOtp,
+    handleVerifyOtp,
+    reset,
+    router,
+    email,
+  } = useOtpLogin();
 
   return (
     <View className="flex-1 justify-center items-center bg-white p-6">
@@ -67,23 +32,17 @@ export default function OtpLogin() {
 
         {step === "email" ? (
           <View className="gap-4">
-            <View>
-              <Text className="text-sm font-medium text-gray-700 mb-1">
-                Email Address
-              </Text>
-              <TextInput
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-3 text-gray-900"
-                placeholder="name@example.com"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                // Keyboard & Autofill Config
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                autoComplete="email"
-                autoCorrect={false}
-              />
-            </View>
+            <ControlledInput
+              control={control}
+              name="email"
+              label="Email Address"
+              placeholder="name@example.com"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
+              autoCorrect={false}
+            />
             <Button
               title="Send Code"
               onPress={handleRequestOtp}
@@ -92,50 +51,33 @@ export default function OtpLogin() {
           </View>
         ) : (
           <View className="gap-4">
-            <View>
-              <Text className="text-sm font-medium text-gray-700 mb-1">
-                Verification Code
-              </Text>
-              <TextInput
-                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-3 text-gray
-
--900 text-center text-2xl tracking-widest"
-                placeholder="000000"
-                value={otp}
-                // Force numeric input only
-                onChangeText={(text) => setOtp(text.replace(/[^0-9]/g, ""))}
-                keyboardType="number-pad"
-                maxLength={6}
-                // Autofill Config
-                textContentType="oneTimeCode" // iOS SMS Autofill
-                autoComplete="sms-otp" // Android SMS Autofill
-              />
-            </View>
+            <ControlledInput
+              control={control}
+              name="otp"
+              label="Verification Code"
+              placeholder="000000"
+              keyboardType="number-pad"
+              maxLength={6}
+              textContentType="oneTimeCode"
+              autoComplete="sms-otp"
+              className="text-center text-2xl tracking-widest"
+            />
             <Button
               title="Verify & Sign In"
               onPress={handleVerifyOtp}
               isLoading={isLoading}
             />
-            <TouchableOpacity
-              onPress={() => {
-                setStep("email");
-                setOtp(""); // Clear OTP when going back
-              }}
-              className="items-center mt-2"
-            >
+            <Pressable onPress={reset} className="items-center mt-2">
               <Text className="text-blue-600 font-medium">
                 Change email address
               </Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         )}
 
-        <TouchableOpacity
-          onPress={() => router.back()}
-          className="items-center mt-8"
-        >
+        <Pressable onPress={() => router.back()} className="items-center mt-8">
           <Text className="text-gray-500">Back to login options</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
     </View>
   );

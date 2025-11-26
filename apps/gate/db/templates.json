@@ -1,0 +1,5097 @@
+[
+  {
+    "name": "General",
+    "description": "Just the essentials. Clean and simple organization.",
+    "icon": "scan-outline",
+    "categories": [
+      {
+        "name": "Inbox",
+        "icon": "file-tray-outline",
+        "color": "#64748B",
+        "order": 1
+      },
+      {
+        "name": "Finance",
+        "icon": "cash-outline",
+        "color": "#10B981",
+        "order": 2
+      },
+      {
+        "name": "Personal",
+        "icon": "person-outline",
+        "color": "#3B82F6",
+        "order": 3
+      },
+      {
+        "name": "Work",
+        "icon": "briefcase-outline",
+        "color": "#F59E0B",
+        "order": 4
+      },
+      {
+        "name": "Archive",
+        "icon": "archive-outline",
+        "color": "#94A3B8",
+        "order": 5
+      },
+      {
+        "name": "Important",
+        "icon": "star-outline",
+        "color": "#EF4444",
+        "order": 6
+      },
+      {
+        "name": "Read Later",
+        "icon": "book-outline",
+        "color": "#8B5CF6",
+        "order": 7
+      },
+      {
+        "name": "Reference",
+        "icon": "library-outline",
+        "color": "#475569",
+        "order": 8
+      },
+      {
+        "name": "Legal",
+        "icon": "gavel-outline",
+        "color": "#111827",
+        "order": 9
+      },
+      {
+        "name": "Health",
+        "icon": "medkit-outline",
+        "color": "#EC4899",
+        "order": 10
+      },
+      {
+        "name": "Home",
+        "icon": "home-outline",
+        "color": "#06B6D4",
+        "order": 11
+      },
+      {
+        "name": "Car",
+        "icon": "car-outline",
+        "color": "#57534E",
+        "order": 12
+      },
+      {
+        "name": "Travel",
+        "icon": "airplane-outline",
+        "color": "#0EA5E9",
+        "order": 13
+      },
+      {
+        "name": "Receipts",
+        "icon": "receipt-outline",
+        "color": "#15803D",
+        "order": 14
+      },
+      {
+        "name": "Tax",
+        "icon": "calculator-outline",
+        "color": "#DC2626",
+        "order": 15
+      },
+      {
+        "name": "Family",
+        "icon": "people-outline",
+        "color": "#F97316",
+        "order": 16
+      },
+      {
+        "name": "Friends",
+        "icon": "cafe-outline",
+        "color": "#F43F5E",
+        "order": 17
+      },
+      {
+        "name": "Shopping",
+        "icon": "cart-outline",
+        "color": "#EAB308",
+        "order": 18
+      },
+      {
+        "name": "Education",
+        "icon": "school-outline",
+        "color": "#4F46E5",
+        "order": 19
+      },
+      {
+        "name": "Hobbies",
+        "icon": "game-controller-outline",
+        "color": "#A855F7",
+        "order": 20
+      },
+      {
+        "name": "Projects",
+        "icon": "construct-outline",
+        "color": "#D946EF",
+        "order": 21
+      },
+      {
+        "name": "Ideas",
+        "icon": "bulb-outline",
+        "color": "#FACC15",
+        "order": 22
+      },
+      {
+        "name": "Journal",
+        "icon": "create-outline",
+        "color": "#9CA3AF",
+        "order": 23
+      },
+      {
+        "name": "Logins",
+        "icon": "key-outline",
+        "color": "#1E293B",
+        "order": 24
+      },
+      {
+        "name": "Photos",
+        "icon": "image-outline",
+        "color": "#FB7185",
+        "order": 25
+      },
+      {
+        "name": "Music",
+        "icon": "musical-notes-outline",
+        "color": "#6366F1",
+        "order": 26
+      },
+      {
+        "name": "Movies/Books",
+        "icon": "film-outline",
+        "color": "#14B8A6",
+        "order": 27
+      },
+      {
+        "name": "Events",
+        "icon": "calendar-outline",
+        "color": "#BE123C",
+        "order": 28
+      },
+      {
+        "name": "Trash",
+        "icon": "trash-outline",
+        "color": "#000000",
+        "order": 29
+      },
+      {
+        "name": "Miscellaneous",
+        "icon": "grid-outline",
+        "color": "#71717A",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "To Do",
+        "color": "#EF4444",
+        "order": 1
+      },
+      {
+        "name": "Done",
+        "color": "#10B981",
+        "order": 2
+      },
+      {
+        "name": "Waiting",
+        "color": "#F59E0B",
+        "order": 3
+      },
+      {
+        "name": "Urgent",
+        "color": "#DC2626",
+        "order": 4
+      },
+      {
+        "name": "Later",
+        "color": "#94A3B8",
+        "order": 5
+      },
+      {
+        "name": "Someday",
+        "color": "#64748B",
+        "order": 6
+      },
+      {
+        "name": "In Process",
+        "color": "#3B82F6",
+        "order": 7
+      },
+      {
+        "name": "Review",
+        "color": "#8B5CF6",
+        "order": 8
+      },
+      {
+        "name": "Paid",
+        "color": "#16A34A",
+        "order": 9
+      },
+      {
+        "name": "Unpaid",
+        "color": "#B91C1C",
+        "order": 10
+      },
+      {
+        "name": "Sent",
+        "color": "#0EA5E9",
+        "order": 11
+      },
+      {
+        "name": "Received",
+        "color": "#06B6D4",
+        "order": 12
+      },
+      {
+        "name": "Keep",
+        "color": "#059669",
+        "order": 13
+      },
+      {
+        "name": "Discard",
+        "color": "#374151",
+        "order": 14
+      },
+      {
+        "name": "Work",
+        "color": "#1E40AF",
+        "order": 15
+      },
+      {
+        "name": "Personal",
+        "color": "#EC4899",
+        "order": 16
+      },
+      {
+        "name": "Home",
+        "color": "#F97316",
+        "order": 17
+      },
+      {
+        "name": "Finances",
+        "color": "#15803D",
+        "order": 18
+      },
+      {
+        "name": "Important",
+        "color": "#FACC15",
+        "order": 19
+      },
+      {
+        "name": "Draft",
+        "color": "#D946EF",
+        "order": 20
+      },
+      {
+        "name": "Confidential",
+        "color": "#111827",
+        "order": 21
+      },
+      {
+        "name": "Shared",
+        "color": "#4F46E5",
+        "order": 22
+      },
+      {
+        "name": "Printed",
+        "color": "#57534E",
+        "order": 23
+      },
+      {
+        "name": "Digital",
+        "color": "#A855F7",
+        "order": 24
+      },
+      {
+        "name": "Scan",
+        "color": "#F43F5E",
+        "order": 25
+      },
+      {
+        "name": "Action",
+        "color": "#EAB308",
+        "order": 26
+      },
+      {
+        "name": "Reference",
+        "color": "#CBD5E1",
+        "order": 27
+      },
+      {
+        "name": "Archive",
+        "color": "#9CA3AF",
+        "order": 28
+      },
+      {
+        "name": "Tax",
+        "color": "#7F1D1D",
+        "order": 29
+      },
+      {
+        "name": "Goal",
+        "color": "#14B8A6",
+        "order": 30
+      }
+    ],
+    "order": 1
+  },
+  {
+    "name": "Freelancer Pro",
+    "description": "Complete setup for contractors, consultants, and solo-preneurs.",
+    "icon": "briefcase-outline",
+    "categories": [
+      {
+        "name": "Invoices Issued",
+        "icon": "paper-plane-outline",
+        "color": "#4F46E5",
+        "order": 1
+      },
+      {
+        "name": "Incoming Bills",
+        "icon": "file-tray-full-outline",
+        "color": "#EF4444",
+        "order": 2
+      },
+      {
+        "name": "Client Contracts",
+        "icon": "document-text-outline",
+        "color": "#0F766E",
+        "order": 3
+      },
+      {
+        "name": "Tax/VAT Documents",
+        "icon": "calculator-outline",
+        "color": "#DC2626",
+        "order": 4
+      },
+      {
+        "name": "Bank Statements",
+        "icon": "library-outline",
+        "color": "#475569",
+        "order": 5
+      },
+      {
+        "name": "Software Subscriptions",
+        "icon": "cloud-outline",
+        "color": "#0EA5E9",
+        "order": 6
+      },
+      {
+        "name": "Travel Expenses",
+        "icon": "airplane-outline",
+        "color": "#F59E0B",
+        "order": 7
+      },
+      {
+        "name": "Hardware/Equipment",
+        "icon": "laptop-outline",
+        "color": "#334155",
+        "order": 8
+      },
+      {
+        "name": "Legal & Insurance",
+        "icon": "shield-checkmark-outline",
+        "color": "#7C3AED",
+        "order": 9
+      },
+      {
+        "name": "Brand Assets/Logos",
+        "icon": "image-outline",
+        "color": "#EC4899",
+        "order": 10
+      },
+      {
+        "name": "Project Proposals",
+        "icon": "bulb-outline",
+        "color": "#8B5CF6",
+        "order": 11
+      },
+      {
+        "name": "Meeting Minutes",
+        "icon": "chatbubbles-outline",
+        "color": "#64748B",
+        "order": 12
+      },
+      {
+        "name": "Time Tracking Logs",
+        "icon": "timer-outline",
+        "color": "#F97316",
+        "order": 13
+      },
+      {
+        "name": "Subcontractor Docs",
+        "icon": "people-outline",
+        "color": "#14B8A6",
+        "order": 14
+      },
+      {
+        "name": "Portfolio Pieces",
+        "icon": "star-outline",
+        "color": "#EAB308",
+        "order": 15
+      },
+      {
+        "name": "Marketing Materials",
+        "icon": "megaphone-outline",
+        "color": "#F43F5E",
+        "order": 16
+      },
+      {
+        "name": "Web Hosting Info",
+        "icon": "server-outline",
+        "color": "#3B82F6",
+        "order": 17
+      },
+      {
+        "name": "License Keys",
+        "icon": "key-outline",
+        "color": "#A855F7",
+        "order": 18
+      },
+      {
+        "name": "Networking Contacts",
+        "icon": "id-card-outline",
+        "color": "#10B981",
+        "order": 19
+      },
+      {
+        "name": "NDAs",
+        "icon": "lock-closed-outline",
+        "color": "#9F1239",
+        "order": 20
+      },
+      {
+        "name": "Client Onboarding",
+        "icon": "enter-outline",
+        "color": "#22C55E",
+        "order": 21
+      },
+      {
+        "name": "Business Registration",
+        "icon": "business-outline",
+        "color": "#1E293B",
+        "order": 22
+      },
+      {
+        "name": "Audit Reports",
+        "icon": "search-outline",
+        "color": "#B45309",
+        "order": 23
+      },
+      {
+        "name": "Affiliate Links",
+        "icon": "link-outline",
+        "color": "#06B6D4",
+        "order": 24
+      },
+      {
+        "name": "Training/Courses",
+        "icon": "school-outline",
+        "color": "#6366F1",
+        "order": 25
+      },
+      {
+        "name": "Conferences/Events",
+        "icon": "ticket-outline",
+        "color": "#D946EF",
+        "order": 26
+      },
+      {
+        "name": "Office Rent/Lease",
+        "icon": "home-outline",
+        "color": "#57534E",
+        "order": 27
+      },
+      {
+        "name": "Pension/Retirement",
+        "icon": "leaf-outline",
+        "color": "#15803D",
+        "order": 28
+      },
+      {
+        "name": "Banking Correspond.",
+        "icon": "mail-outline",
+        "color": "#4338CA",
+        "order": 29
+      },
+      {
+        "name": "Archive 2023",
+        "icon": "archive-outline",
+        "color": "#94A3B8",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Paid",
+        "color": "#16A34A",
+        "order": 1
+      },
+      {
+        "name": "Unpaid",
+        "color": "#DC2626",
+        "order": 2
+      },
+      {
+        "name": "Pending",
+        "color": "#CA8A04",
+        "order": 3
+      },
+      {
+        "name": "Reimbursable",
+        "color": "#06B6D4",
+        "order": 4
+      },
+      {
+        "name": "Tax Deductible",
+        "color": "#7C3AED",
+        "order": 5
+      },
+      {
+        "name": "Q1",
+        "color": "#64748B",
+        "order": 6
+      },
+      {
+        "name": "Q2",
+        "color": "#64748B",
+        "order": 7
+      },
+      {
+        "name": "Q3",
+        "color": "#64748B",
+        "order": 8
+      },
+      {
+        "name": "Q4",
+        "color": "#64748B",
+        "order": 9
+      },
+      {
+        "name": "High Priority",
+        "color": "#BE123C",
+        "order": 10
+      },
+      {
+        "name": "Low Priority",
+        "color": "#94A3B8",
+        "order": 11
+      },
+      {
+        "name": "Draft",
+        "color": "#F59E0B",
+        "order": 12
+      },
+      {
+        "name": "Signed",
+        "color": "#059669",
+        "order": 13
+      },
+      {
+        "name": "To Print",
+        "color": "#4B5563",
+        "order": 14
+      },
+      {
+        "name": "To Email",
+        "color": "#3B82F6",
+        "order": 15
+      },
+      {
+        "name": "Recurring",
+        "color": "#8B5CF6",
+        "order": 16
+      },
+      {
+        "name": "One-off",
+        "color": "#EC4899",
+        "order": 17
+      },
+      {
+        "name": "Client A",
+        "color": "#14B8A6",
+        "order": 18
+      },
+      {
+        "name": "Client B",
+        "color": "#F43F5E",
+        "order": 19
+      },
+      {
+        "name": "Client C",
+        "color": "#EAB308",
+        "order": 20
+      },
+      {
+        "name": "Fiscal 2024",
+        "color": "#1E293B",
+        "order": 21
+      },
+      {
+        "name": "Fiscal 2025",
+        "color": "#334155",
+        "order": 22
+      },
+      {
+        "name": "Personal",
+        "color": "#A855F7",
+        "order": 23
+      },
+      {
+        "name": "Business",
+        "color": "#0F766E",
+        "order": 24
+      },
+      {
+        "name": "Review Needed",
+        "color": "#D946EF",
+        "order": 25
+      },
+      {
+        "name": "Approved",
+        "color": "#22C55E",
+        "order": 26
+      },
+      {
+        "name": "Rejected",
+        "color": "#EF4444",
+        "order": 27
+      },
+      {
+        "name": "Archive",
+        "color": "#CBD5E1",
+        "order": 28
+      },
+      {
+        "name": "Confidential",
+        "color": "#000000",
+        "order": 29
+      },
+      {
+        "name": "Public",
+        "color": "#60A5FA",
+        "order": 30
+      }
+    ],
+    "order": 2
+  },
+  {
+    "name": "Family Manager",
+    "description": "Master household chaos: kids, pets, health, and home.",
+    "icon": "people-outline",
+    "categories": [
+      {
+        "name": "Medical Records",
+        "icon": "medkit-outline",
+        "color": "#E11D48",
+        "order": 1
+      },
+      {
+        "name": "School/Education",
+        "icon": "school-outline",
+        "color": "#2563EB",
+        "order": 2
+      },
+      {
+        "name": "Housing/Rent/Mortgage",
+        "icon": "home-outline",
+        "color": "#D97706",
+        "order": 3
+      },
+      {
+        "name": "Utilities (Water/Elec)",
+        "icon": "flash-outline",
+        "color": "#EAB308",
+        "order": 4
+      },
+      {
+        "name": "Car/Vehicle Info",
+        "icon": "car-outline",
+        "color": "#4B5563",
+        "order": 5
+      },
+      {
+        "name": "Pet Care/Vet",
+        "icon": "paw-outline",
+        "color": "#8B5CF6",
+        "order": 6
+      },
+      {
+        "name": "Insurance Policies",
+        "icon": "shield-outline",
+        "color": "#059669",
+        "order": 7
+      },
+      {
+        "name": "Warranties & Manuals",
+        "icon": "construct-outline",
+        "color": "#64748B",
+        "order": 8
+      },
+      {
+        "name": "Identity IDs/Passports",
+        "icon": "card-outline",
+        "color": "#111827",
+        "order": 9
+      },
+      {
+        "name": "Vacation/Travel",
+        "icon": "map-outline",
+        "color": "#06B6D4",
+        "order": 10
+      },
+      {
+        "name": "Birth Certificates",
+        "icon": "ribbon-outline",
+        "color": "#F472B6",
+        "order": 11
+      },
+      {
+        "name": "Marriage/Legal",
+        "icon": "heart-circle-outline",
+        "color": "#BE123C",
+        "order": 12
+      },
+      {
+        "name": "Tax Returns",
+        "icon": "file-tray-full-outline",
+        "color": "#EF4444",
+        "order": 13
+      },
+      {
+        "name": "Grocery Lists",
+        "icon": "cart-outline",
+        "color": "#10B981",
+        "order": 14
+      },
+      {
+        "name": "Recipes/Cookbook",
+        "icon": "restaurant-outline",
+        "color": "#F59E0B",
+        "order": 15
+      },
+      {
+        "name": "Gift Ideas",
+        "icon": "gift-outline",
+        "color": "#A855F7",
+        "order": 16
+      },
+      {
+        "name": "Emergency Contacts",
+        "icon": "call-outline",
+        "color": "#B91C1C",
+        "order": 17
+      },
+      {
+        "name": "Babysitter Info",
+        "icon": "happy-outline",
+        "color": "#FBBF24",
+        "order": 18
+      },
+      {
+        "name": "Extracurriculars",
+        "icon": "basketball-outline",
+        "color": "#EA580C",
+        "order": 19
+      },
+      {
+        "name": "Home Maintenance",
+        "icon": "hammer-outline",
+        "color": "#57534E",
+        "order": 20
+      },
+      {
+        "name": "Garden/Landscaping",
+        "icon": "flower-outline",
+        "color": "#15803D",
+        "order": 21
+      },
+      {
+        "name": "Subscriptions",
+        "icon": "tv-outline",
+        "color": "#6366F1",
+        "order": 22
+      },
+      {
+        "name": "Tech/Electronics",
+        "icon": "phone-portrait-outline",
+        "color": "#334155",
+        "order": 23
+      },
+      {
+        "name": "Family Photos",
+        "icon": "images-outline",
+        "color": "#EC4899",
+        "order": 24
+      },
+      {
+        "name": "Investments",
+        "icon": "trending-up-outline",
+        "color": "#0F766E",
+        "order": 25
+      },
+      {
+        "name": "Wills/Estate",
+        "icon": "document-lock-outline",
+        "color": "#4C1D95",
+        "order": 26
+      },
+      {
+        "name": "Loans/Debt",
+        "icon": "wallet-outline",
+        "color": "#9F1239",
+        "order": 27
+      },
+      {
+        "name": "Party Planning",
+        "icon": "balloon-outline",
+        "color": "#D946EF",
+        "order": 28
+      },
+      {
+        "name": "Donations/Charity",
+        "icon": "hand-left-outline",
+        "color": "#34D399",
+        "order": 29
+      },
+      {
+        "name": "Mail/Post",
+        "icon": "mail-open-outline",
+        "color": "#60A5FA",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Mom",
+        "color": "#EC4899",
+        "order": 1
+      },
+      {
+        "name": "Dad",
+        "color": "#3B82F6",
+        "order": 2
+      },
+      {
+        "name": "Kids",
+        "color": "#F59E0B",
+        "order": 3
+      },
+      {
+        "name": "Urgent",
+        "color": "#EF4444",
+        "order": 4
+      },
+      {
+        "name": "To Renew",
+        "color": "#84CC16",
+        "order": 5
+      },
+      {
+        "name": "Tax Info",
+        "color": "#6366F1",
+        "order": 6
+      },
+      {
+        "name": "Archive",
+        "color": "#94A3B8",
+        "order": 7
+      },
+      {
+        "name": "Pet",
+        "color": "#A855F7",
+        "order": 8
+      },
+      {
+        "name": "House",
+        "color": "#10B981",
+        "order": 9
+      },
+      {
+        "name": "Car",
+        "color": "#64748B",
+        "order": 10
+      },
+      {
+        "name": "Summer",
+        "color": "#FBBF24",
+        "order": 11
+      },
+      {
+        "name": "Winter",
+        "color": "#0EA5E9",
+        "order": 12
+      },
+      {
+        "name": "School",
+        "color": "#F43F5E",
+        "order": 13
+      },
+      {
+        "name": "Medical",
+        "color": "#BE123C",
+        "order": 14
+      },
+      {
+        "name": "Dental",
+        "color": "#14B8A6",
+        "order": 15
+      },
+      {
+        "name": "Vision",
+        "color": "#60A5FA",
+        "order": 16
+      },
+      {
+        "name": "Paid",
+        "color": "#22C55E",
+        "order": 17
+      },
+      {
+        "name": "To Pay",
+        "color": "#B91C1C",
+        "order": 18
+      },
+      {
+        "name": "Monthly",
+        "color": "#D946EF",
+        "order": 19
+      },
+      {
+        "name": "Yearly",
+        "color": "#FB923C",
+        "order": 20
+      },
+      {
+        "name": "Important",
+        "color": "#4338CA",
+        "order": 21
+      },
+      {
+        "name": "Reference",
+        "color": "#9CA3AF",
+        "order": 22
+      },
+      {
+        "name": "Shopping",
+        "color": "#EAB308",
+        "order": 23
+      },
+      {
+        "name": "Holiday",
+        "color": "#1E293B",
+        "order": 24
+      },
+      {
+        "name": "Birthday",
+        "color": "#F472B6",
+        "order": 25
+      },
+      {
+        "name": "Travel",
+        "color": "#06B6D4",
+        "order": 26
+      },
+      {
+        "name": "Warranty",
+        "color": "#57534E",
+        "order": 27
+      },
+      {
+        "name": "Contract",
+        "color": "#334155",
+        "order": 28
+      },
+      {
+        "name": "Login Info",
+        "color": "#000000",
+        "order": 29
+      },
+      {
+        "name": "Receipt",
+        "color": "#15803D",
+        "order": 30
+      }
+    ],
+    "order": 3
+  },
+  {
+    "name": "University Student",
+    "description": "Keep your grades up and your paperwork down.",
+    "icon": "book-outline",
+    "categories": [
+      {
+        "name": "Course Syllabus",
+        "icon": "list-outline",
+        "color": "#2563EB",
+        "order": 1
+      },
+      {
+        "name": "Lecture Notes",
+        "icon": "pencil-outline",
+        "color": "#4F46E5",
+        "order": 2
+      },
+      {
+        "name": "Assignments/Essays",
+        "icon": "document-outline",
+        "color": "#D97706",
+        "order": 3
+      },
+      {
+        "name": "Exam Results",
+        "icon": "trophy-outline",
+        "color": "#EAB308",
+        "order": 4
+      },
+      {
+        "name": "Tuition & Fees",
+        "icon": "cash-outline",
+        "color": "#16A34A",
+        "order": 5
+      },
+      {
+        "name": "Housing/Dorm",
+        "icon": "bed-outline",
+        "color": "#F97316",
+        "order": 6
+      },
+      {
+        "name": "Scholarships/Grants",
+        "icon": "ribbon-outline",
+        "color": "#9333EA",
+        "order": 7
+      },
+      {
+        "name": "Internship Apps",
+        "icon": "briefcase-outline",
+        "color": "#0891B2",
+        "order": 8
+      },
+      {
+        "name": "Student ID/Admin",
+        "icon": "id-card-outline",
+        "color": "#475569",
+        "order": 9
+      },
+      {
+        "name": "Textbooks (PDF)",
+        "icon": "library-outline",
+        "color": "#8B5CF6",
+        "order": 10
+      },
+      {
+        "name": "Research Papers",
+        "icon": "search-outline",
+        "color": "#10B981",
+        "order": 11
+      },
+      {
+        "name": "Group Projects",
+        "icon": "people-outline",
+        "color": "#EC4899",
+        "order": 12
+      },
+      {
+        "name": "Thesis/Dissertation",
+        "icon": "book-outline",
+        "color": "#BE123C",
+        "order": 13
+      },
+      {
+        "name": "Library Fines",
+        "icon": "alert-circle-outline",
+        "color": "#EF4444",
+        "order": 14
+      },
+      {
+        "name": "Campus Events",
+        "icon": "calendar-outline",
+        "color": "#F59E0B",
+        "order": 15
+      },
+      {
+        "name": "Clubs/Societies",
+        "icon": "beer-outline",
+        "color": "#14B8A6",
+        "order": 16
+      },
+      {
+        "name": "Part-time Job",
+        "icon": "wallet-outline",
+        "color": "#059669",
+        "order": 17
+      },
+      {
+        "name": "Transport/Bus Pass",
+        "icon": "bus-outline",
+        "color": "#64748B",
+        "order": 18
+      },
+      {
+        "name": "Software Licenses",
+        "icon": "key-outline",
+        "color": "#3B82F6",
+        "order": 19
+      },
+      {
+        "name": "Lab Reports",
+        "icon": "flask-outline",
+        "color": "#06B6D4",
+        "order": 20
+      },
+      {
+        "name": "Presentations",
+        "icon": "easel-outline",
+        "color": "#A855F7",
+        "order": 21
+      },
+      {
+        "name": "References/CV",
+        "icon": "person-circle-outline",
+        "color": "#334155",
+        "order": 22
+      },
+      {
+        "name": "Study Guides",
+        "icon": "bookmark-outline",
+        "color": "#F43F5E",
+        "order": 23
+      },
+      {
+        "name": "Online Course Logins",
+        "icon": "log-in-outline",
+        "color": "#1E293B",
+        "order": 24
+      },
+      {
+        "name": "Graduation Info",
+        "icon": "school-outline",
+        "color": "#D946EF",
+        "order": 25
+      },
+      {
+        "name": "Health/Gym",
+        "icon": "barbell-outline",
+        "color": "#FB923C",
+        "order": 26
+      },
+      {
+        "name": "Meal Plan",
+        "icon": "pizza-outline",
+        "color": "#FACC15",
+        "order": 27
+      },
+      {
+        "name": "Parent/Guardian Info",
+        "icon": "home-outline",
+        "color": "#57534E",
+        "order": 28
+      },
+      {
+        "name": "Study Abroad",
+        "icon": "airplane-outline",
+        "color": "#2563EB",
+        "order": 29
+      },
+      {
+        "name": "Alumni Network",
+        "icon": "globe-outline",
+        "color": "#111827",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Semester 1",
+        "color": "#64748B",
+        "order": 1
+      },
+      {
+        "name": "Semester 2",
+        "color": "#64748B",
+        "order": 2
+      },
+      {
+        "name": "Due Soon",
+        "color": "#DC2626",
+        "order": 3
+      },
+      {
+        "name": "Submitted",
+        "color": "#10B981",
+        "order": 4
+      },
+      {
+        "name": "Draft",
+        "color": "#F59E0B",
+        "order": 5
+      },
+      {
+        "name": "Important",
+        "color": "#7C3AED",
+        "order": 6
+      },
+      {
+        "name": "Freshman",
+        "color": "#3B82F6",
+        "order": 7
+      },
+      {
+        "name": "Sophomore",
+        "color": "#0EA5E9",
+        "order": 8
+      },
+      {
+        "name": "Junior",
+        "color": "#8B5CF6",
+        "order": 9
+      },
+      {
+        "name": "Senior",
+        "color": "#4F46E5",
+        "order": 10
+      },
+      {
+        "name": "Physics",
+        "color": "#A855F7",
+        "order": 11
+      },
+      {
+        "name": "Math",
+        "color": "#EC4899",
+        "order": 12
+      },
+      {
+        "name": "History",
+        "color": "#D97706",
+        "order": 13
+      },
+      {
+        "name": "Literature",
+        "color": "#14B8A6",
+        "order": 14
+      },
+      {
+        "name": "Biology",
+        "color": "#22C55E",
+        "order": 15
+      },
+      {
+        "name": "Grade A",
+        "color": "#16A34A",
+        "order": 16
+      },
+      {
+        "name": "Grade B",
+        "color": "#84CC16",
+        "order": 17
+      },
+      {
+        "name": "Grade C",
+        "color": "#FACC15",
+        "order": 18
+      },
+      {
+        "name": "To Read",
+        "color": "#06B6D4",
+        "order": 19
+      },
+      {
+        "name": "Reference",
+        "color": "#94A3B8",
+        "order": 20
+      },
+      {
+        "name": "Financial Aid",
+        "color": "#BE123C",
+        "order": 21
+      },
+      {
+        "name": "Extracurricular",
+        "color": "#F97316",
+        "order": 22
+      },
+      {
+        "name": "Admin",
+        "color": "#334155",
+        "order": 23
+      },
+      {
+        "name": "Housing",
+        "color": "#57534E",
+        "order": 24
+      },
+      {
+        "name": "PDF",
+        "color": "#EF4444",
+        "order": 25
+      },
+      {
+        "name": "Word Doc",
+        "color": "#2563EB",
+        "order": 26
+      },
+      {
+        "name": "Presentation",
+        "color": "#EAB308",
+        "order": 27
+      },
+      {
+        "name": "Exam",
+        "color": "#DC2626",
+        "order": 28
+      },
+      {
+        "name": "Quiz",
+        "color": "#F59E0B",
+        "order": 29
+      },
+      {
+        "name": "Group Work",
+        "color": "#6366F1",
+        "order": 30
+      }
+    ],
+    "order": 4
+  },
+  {
+    "name": "Landlord / Real Estate",
+    "description": "Manage properties, tenants, and maintenance.",
+    "icon": "business-outline",
+    "categories": [
+      {
+        "name": "Lease Agreements",
+        "icon": "key-outline",
+        "color": "#4F46E5",
+        "order": 1
+      },
+      {
+        "name": "Tenant Info",
+        "icon": "people-circle-outline",
+        "color": "#0EA5E9",
+        "order": 2
+      },
+      {
+        "name": "Property Tax",
+        "icon": "receipt-outline",
+        "color": "#DC2626",
+        "order": 3
+      },
+      {
+        "name": "Maintenance/Repairs",
+        "icon": "hammer-outline",
+        "color": "#EA580C",
+        "order": 4
+      },
+      {
+        "name": "Mortgage Docs",
+        "icon": "home-outline",
+        "color": "#059669",
+        "order": 5
+      },
+      {
+        "name": "HOA/Strata Fees",
+        "icon": "wallet-outline",
+        "color": "#64748B",
+        "order": 6
+      },
+      {
+        "name": "Utilities Setup",
+        "icon": "flash-outline",
+        "color": "#EAB308",
+        "order": 7
+      },
+      {
+        "name": "Legal/Evictions",
+        "icon": "gavel-outline",
+        "color": "#111827",
+        "order": 8
+      },
+      {
+        "name": "Background Checks",
+        "icon": "search-outline",
+        "color": "#475569",
+        "order": 9
+      },
+      {
+        "name": "Move-in Inspection",
+        "icon": "checkmark-done-outline",
+        "color": "#16A34A",
+        "order": 10
+      },
+      {
+        "name": "Move-out Inspection",
+        "icon": "log-out-outline",
+        "color": "#B91C1C",
+        "order": 11
+      },
+      {
+        "name": "Security Deposits",
+        "icon": "lock-closed-outline",
+        "color": "#F59E0B",
+        "order": 12
+      },
+      {
+        "name": "Contractor Invoices",
+        "icon": "construct-outline",
+        "color": "#A855F7",
+        "order": 13
+      },
+      {
+        "name": "Insurance Policies",
+        "icon": "shield-checkmark-outline",
+        "color": "#0891B2",
+        "order": 14
+      },
+      {
+        "name": "Appliance Manuals",
+        "icon": "book-outline",
+        "color": "#64748B",
+        "order": 15
+      },
+      {
+        "name": "Marketing Photos",
+        "icon": "camera-outline",
+        "color": "#EC4899",
+        "order": 16
+      },
+      {
+        "name": "Listing Descriptions",
+        "icon": "create-outline",
+        "color": "#3B82F6",
+        "order": 17
+      },
+      {
+        "name": "Key Logs",
+        "icon": "keypad-outline",
+        "color": "#F43F5E",
+        "order": 18
+      },
+      {
+        "name": "Pest Control",
+        "icon": "bug-outline",
+        "color": "#1E293B",
+        "order": 19
+      },
+      {
+        "name": "Landscaping",
+        "icon": "leaf-outline",
+        "color": "#15803D",
+        "order": 20
+      },
+      {
+        "name": "Safety Certs",
+        "icon": "alert-circle-outline",
+        "color": "#EF4444",
+        "order": 21
+      },
+      {
+        "name": "Rent Ledger",
+        "icon": "cash-outline",
+        "color": "#10B981",
+        "order": 22
+      },
+      {
+        "name": "Notices to Entry",
+        "icon": "notifications-outline",
+        "color": "#F97316",
+        "order": 23
+      },
+      {
+        "name": "Purchase Documents",
+        "icon": "document-text-outline",
+        "color": "#334155",
+        "order": 24
+      },
+      {
+        "name": "Title Deeds",
+        "icon": "ribbon-outline",
+        "color": "#D946EF",
+        "order": 25
+      },
+      {
+        "name": "Renovation Plans",
+        "icon": "map-outline",
+        "color": "#6366F1",
+        "order": 26
+      },
+      {
+        "name": "Appraisals",
+        "icon": "trending-up-outline",
+        "color": "#84CC16",
+        "order": 27
+      },
+      {
+        "name": "Correspondence",
+        "icon": "mail-outline",
+        "color": "#06B6D4",
+        "order": 28
+      },
+      {
+        "name": "Parking Permits",
+        "icon": "car-outline",
+        "color": "#57534E",
+        "order": 29
+      },
+      {
+        "name": "Trash/Recycling",
+        "icon": "trash-outline",
+        "color": "#71717A",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Property A",
+        "color": "#3B82F6",
+        "order": 1
+      },
+      {
+        "name": "Property B",
+        "color": "#10B981",
+        "order": 2
+      },
+      {
+        "name": "Occupied",
+        "color": "#22C55E",
+        "order": 3
+      },
+      {
+        "name": "Vacant",
+        "color": "#EF4444",
+        "order": 4
+      },
+      {
+        "name": "Maintenance Req",
+        "color": "#F59E0B",
+        "order": 5
+      },
+      {
+        "name": "Expiring",
+        "color": "#A855F7",
+        "order": 6
+      },
+      {
+        "name": "Unit 101",
+        "color": "#0EA5E9",
+        "order": 7
+      },
+      {
+        "name": "Unit 102",
+        "color": "#6366F1",
+        "order": 8
+      },
+      {
+        "name": "Unit 201",
+        "color": "#EC4899",
+        "order": 9
+      },
+      {
+        "name": "Commercial",
+        "color": "#1E293B",
+        "order": 10
+      },
+      {
+        "name": "Residential",
+        "color": "#059669",
+        "order": 11
+      },
+      {
+        "name": "Late Rent",
+        "color": "#B91C1C",
+        "order": 12
+      },
+      {
+        "name": "Paid Rent",
+        "color": "#84CC16",
+        "order": 13
+      },
+      {
+        "name": "Plumbing",
+        "color": "#06B6D4",
+        "order": 14
+      },
+      {
+        "name": "Electrical",
+        "color": "#EAB308",
+        "order": 15
+      },
+      {
+        "name": "HVAC",
+        "color": "#475569",
+        "order": 16
+      },
+      {
+        "name": "Roofing",
+        "color": "#57534E",
+        "order": 17
+      },
+      {
+        "name": "Flooring",
+        "color": "#D97706",
+        "order": 18
+      },
+      {
+        "name": "Painting",
+        "color": "#F43F5E",
+        "order": 19
+      },
+      {
+        "name": "Urgent",
+        "color": "#DC2626",
+        "order": 20
+      },
+      {
+        "name": "Routine",
+        "color": "#94A3B8",
+        "order": 21
+      },
+      {
+        "name": "To Bill",
+        "color": "#4F46E5",
+        "order": 22
+      },
+      {
+        "name": "To Scan",
+        "color": "#64748B",
+        "order": 23
+      },
+      {
+        "name": "To Archive",
+        "color": "#CBD5E1",
+        "order": 24
+      },
+      {
+        "name": "Legal",
+        "color": "#111827",
+        "order": 25
+      },
+      {
+        "name": "Tax 2024",
+        "color": "#3730A3",
+        "order": 26
+      },
+      {
+        "name": "Tax 2025",
+        "color": "#312E81",
+        "order": 27
+      },
+      {
+        "name": "Deposit Held",
+        "color": "#15803D",
+        "order": 28
+      },
+      {
+        "name": "Refunded",
+        "color": "#F87171",
+        "order": 29
+      },
+      {
+        "name": "Eviction",
+        "color": "#9F1239",
+        "order": 30
+      }
+    ],
+    "order": 5
+  },
+  {
+    "name": "Vehicle & Garage",
+    "description": "Keep track of maintenance, mods, and paperwork.",
+    "icon": "car-sport-outline",
+    "categories": [
+      {
+        "name": "Registration/Title",
+        "icon": "document-text-outline",
+        "color": "#2563EB",
+        "order": 1
+      },
+      {
+        "name": "Insurance Policy",
+        "icon": "shield-checkmark-outline",
+        "color": "#16A34A",
+        "order": 2
+      },
+      {
+        "name": "Repairs/Service",
+        "icon": "construct-outline",
+        "color": "#DC2626",
+        "order": 3
+      },
+      {
+        "name": "Parts & Mods",
+        "icon": "cog-outline",
+        "color": "#EA580C",
+        "order": 4
+      },
+      {
+        "name": "Traffic Tickets",
+        "icon": "alert-circle-outline",
+        "color": "#EF4444",
+        "order": 5
+      },
+      {
+        "name": "Fuel Logs",
+        "icon": "water-outline",
+        "color": "#0EA5E9",
+        "order": 6
+      },
+      {
+        "name": "Purchase/Sale Docs",
+        "icon": "cash-outline",
+        "color": "#10B981",
+        "order": 7
+      },
+      {
+        "name": "Tire Rotation/Swap",
+        "icon": "disc-outline",
+        "color": "#1E293B",
+        "order": 8
+      },
+      {
+        "name": "Oil Changes",
+        "icon": "color-fill-outline",
+        "color": "#111827",
+        "order": 9
+      },
+      {
+        "name": "Battery Warranty",
+        "icon": "battery-charging-outline",
+        "color": "#EAB308",
+        "order": 10
+      },
+      {
+        "name": "Car Wash/Detailing",
+        "icon": "sparkles-outline",
+        "color": "#06B6D4",
+        "order": 11
+      },
+      {
+        "name": "Parking Permits",
+        "icon": "location-outline",
+        "color": "#8B5CF6",
+        "order": 12
+      },
+      {
+        "name": "Toll Tags/Passes",
+        "icon": "card-outline",
+        "color": "#F59E0B",
+        "order": 13
+      },
+      {
+        "name": "Driver's License",
+        "icon": "id-card-outline",
+        "color": "#64748B",
+        "order": 14
+      },
+      {
+        "name": "Loan Agreement",
+        "icon": "wallet-outline",
+        "color": "#9F1239",
+        "order": 15
+      },
+      {
+        "name": "Accident Reports",
+        "icon": "bandage-outline",
+        "color": "#B91C1C",
+        "order": 16
+      },
+      {
+        "name": "Owner's Manual",
+        "icon": "book-outline",
+        "color": "#334155",
+        "order": 17
+      },
+      {
+        "name": "Emission Tests",
+        "icon": "cloud-circle-outline",
+        "color": "#15803D",
+        "order": 18
+      },
+      {
+        "name": "Roadside Assist",
+        "icon": "call-outline",
+        "color": "#F43F5E",
+        "order": 19
+      },
+      {
+        "name": "Lease Docs",
+        "icon": "contract-outline",
+        "color": "#4F46E5",
+        "order": 20
+      },
+      {
+        "name": "Dyno Sheets",
+        "icon": "speedometer-outline",
+        "color": "#EC4899",
+        "order": 21
+      },
+      {
+        "name": "Track Day Logs",
+        "icon": "flag-outline",
+        "color": "#000000",
+        "order": 22
+      },
+      {
+        "name": "Spare Key Code",
+        "icon": "key-outline",
+        "color": "#9CA3AF",
+        "order": 23
+      },
+      {
+        "name": "Audio System",
+        "icon": "musical-notes-outline",
+        "color": "#6366F1",
+        "order": 24
+      },
+      {
+        "name": "Winter Storage",
+        "icon": "snow-outline",
+        "color": "#A5F3FC",
+        "order": 25
+      },
+      {
+        "name": "Tool Inventory",
+        "icon": "build-outline",
+        "color": "#57534E",
+        "order": 26
+      },
+      {
+        "name": "Fluid Checks",
+        "icon": "funnel-outline",
+        "color": "#D946EF",
+        "order": 27
+      },
+      {
+        "name": "Import Docs",
+        "icon": "boat-outline",
+        "color": "#0F766E",
+        "order": 28
+      },
+      {
+        "name": "Dashcam Footage",
+        "icon": "videocam-outline",
+        "color": "#374151",
+        "order": 29
+      },
+      {
+        "name": "Inspection Reports",
+        "icon": "checkbox-outline",
+        "color": "#22C55E",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Car",
+        "color": "#3B82F6",
+        "order": 1
+      },
+      {
+        "name": "Motorcycle",
+        "color": "#F59E0B",
+        "order": 2
+      },
+      {
+        "name": "Urgent Repair",
+        "color": "#DC2626",
+        "order": 3
+      },
+      {
+        "name": "Scheduled",
+        "color": "#64748B",
+        "order": 4
+      },
+      {
+        "name": "Winter",
+        "color": "#06B6D4",
+        "order": 5
+      },
+      {
+        "name": "Summer",
+        "color": "#EAB308",
+        "order": 6
+      },
+      {
+        "name": "Maintenance",
+        "color": "#10B981",
+        "order": 7
+      },
+      {
+        "name": "Upgrade",
+        "color": "#8B5CF6",
+        "order": 8
+      },
+      {
+        "name": "Cosmetic",
+        "color": "#EC4899",
+        "order": 9
+      },
+      {
+        "name": "Paid",
+        "color": "#16A34A",
+        "order": 10
+      },
+      {
+        "name": "To Pay",
+        "color": "#B91C1C",
+        "order": 11
+      },
+      {
+        "name": "DIY",
+        "color": "#F97316",
+        "order": 12
+      },
+      {
+        "name": "Mechanic",
+        "color": "#475569",
+        "order": 13
+      },
+      {
+        "name": "Warranty",
+        "color": "#059669",
+        "order": 14
+      },
+      {
+        "name": "Insurance",
+        "color": "#4F46E5",
+        "order": 15
+      },
+      {
+        "name": "Ticket",
+        "color": "#EF4444",
+        "order": 16
+      },
+      {
+        "name": "Truck",
+        "color": "#57534E",
+        "order": 17
+      },
+      {
+        "name": "Boat",
+        "color": "#0EA5E9",
+        "order": 18
+      },
+      {
+        "name": "RV/Camper",
+        "color": "#D946EF",
+        "order": 19
+      },
+      {
+        "name": "Receipt",
+        "color": "#9CA3AF",
+        "order": 20
+      },
+      {
+        "name": "Manual",
+        "color": "#334155",
+        "order": 21
+      },
+      {
+        "name": "Title",
+        "color": "#F43F5E",
+        "order": 22
+      },
+      {
+        "name": "Loan",
+        "color": "#881337",
+        "order": 23
+      },
+      {
+        "name": "Lease",
+        "color": "#1E40AF",
+        "order": 24
+      },
+      {
+        "name": "Fuel",
+        "color": "#FACC15",
+        "order": 25
+      },
+      {
+        "name": "Toll",
+        "color": "#A855F7",
+        "order": 26
+      },
+      {
+        "name": "Sold",
+        "color": "#1F2937",
+        "order": 27
+      },
+      {
+        "name": "Purchased",
+        "color": "#15803D",
+        "order": 28
+      },
+      {
+        "name": "Pending",
+        "color": "#FDE047",
+        "order": 29
+      },
+      {
+        "name": "Archived",
+        "color": "#CBD5E1",
+        "order": 30
+      }
+    ],
+    "order": 6
+  },
+  {
+    "name": "Health Vault",
+    "description": "Securely organize medical history for you and your family.",
+    "icon": "heart-outline",
+    "categories": [
+      {
+        "name": "Prescriptions",
+        "icon": "flask-outline",
+        "color": "#0EA5E9",
+        "order": 1
+      },
+      {
+        "name": "Lab Results",
+        "icon": "analytics-outline",
+        "color": "#4F46E5",
+        "order": 2
+      },
+      {
+        "name": "Vaccination Records",
+        "icon": "shield-outline",
+        "color": "#10B981",
+        "order": 3
+      },
+      {
+        "name": "Dental Records",
+        "icon": "happy-outline",
+        "color": "#F59E0B",
+        "order": 4
+      },
+      {
+        "name": "Vision/Glasses",
+        "icon": "eye-outline",
+        "color": "#8B5CF6",
+        "order": 5
+      },
+      {
+        "name": "Insurance Claims",
+        "icon": "cash-outline",
+        "color": "#DC2626",
+        "order": 6
+      },
+      {
+        "name": "Doctor Contacts",
+        "icon": "call-outline",
+        "color": "#475569",
+        "order": 7
+      },
+      {
+        "name": "Allergies info",
+        "icon": "alert-outline",
+        "color": "#EF4444",
+        "order": 8
+      },
+      {
+        "name": "Surgery Records",
+        "icon": "cut-outline",
+        "color": "#BE123C",
+        "order": 9
+      },
+      {
+        "name": "X-Rays/MRI",
+        "icon": "scan-outline",
+        "color": "#334155",
+        "order": 10
+      },
+      {
+        "name": "Diet Plans",
+        "icon": "nutrition-outline",
+        "color": "#15803D",
+        "order": 11
+      },
+      {
+        "name": "Fitness Logs",
+        "icon": "barbell-outline",
+        "color": "#F97316",
+        "order": 12
+      },
+      {
+        "name": "Mental Health",
+        "icon": "leaf-outline",
+        "color": "#6366F1",
+        "order": 13
+      },
+      {
+        "name": "Appointment Cards",
+        "icon": "calendar-outline",
+        "color": "#06B6D4",
+        "order": 14
+      },
+      {
+        "name": "Physiotherapy",
+        "icon": "body-outline",
+        "color": "#D946EF",
+        "order": 15
+      },
+      {
+        "name": "Insurance Cards",
+        "icon": "card-outline",
+        "color": "#1E293B",
+        "order": 16
+      },
+      {
+        "name": "Hospital Bills",
+        "icon": "receipt-outline",
+        "color": "#B91C1C",
+        "order": 17
+      },
+      {
+        "name": "Referral Letters",
+        "icon": "document-text-outline",
+        "color": "#64748B",
+        "order": 18
+      },
+      {
+        "name": "Family History",
+        "icon": "people-outline",
+        "color": "#EC4899",
+        "order": 19
+      },
+      {
+        "name": "Blood Type Info",
+        "icon": "water-outline",
+        "color": "#9F1239",
+        "order": 20
+      },
+      {
+        "name": "COVID-19 Docs",
+        "icon": "virus-outline",
+        "color": "#5EEAD4",
+        "order": 21
+      },
+      {
+        "name": "Pediatric Records",
+        "icon": "accessibility-outline",
+        "color": "#FACC15",
+        "order": 22
+      },
+      {
+        "name": "Dermatology",
+        "icon": "hand-left-outline",
+        "color": "#F43F5E",
+        "order": 23
+      },
+      {
+        "name": "Cardiology",
+        "icon": "pulse-outline",
+        "color": "#7F1D1D",
+        "order": 24
+      },
+      {
+        "name": "Genetic Testing",
+        "icon": "git-network-outline",
+        "color": "#4338CA",
+        "order": 25
+      },
+      {
+        "name": "Living Will",
+        "icon": "document-lock-outline",
+        "color": "#57534E",
+        "order": 26
+      },
+      {
+        "name": "Discharge Papers",
+        "icon": "log-out-outline",
+        "color": "#0F766E",
+        "order": 27
+      },
+      {
+        "name": "Alternative Med",
+        "icon": "flower-outline",
+        "color": "#84CC16",
+        "order": 28
+      },
+      {
+        "name": "Symptom Journal",
+        "icon": "journal-outline",
+        "color": "#A855F7",
+        "order": 29
+      },
+      {
+        "name": "Emergency Data",
+        "icon": "medkit-outline",
+        "color": "#E11D48",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Check-up",
+        "color": "#22C55E",
+        "order": 1
+      },
+      {
+        "name": "Surgery",
+        "color": "#BE123C",
+        "order": 2
+      },
+      {
+        "name": "Ongoing",
+        "color": "#EAB308",
+        "order": 3
+      },
+      {
+        "name": "Reimbursed",
+        "color": "#06B6D4",
+        "order": 4
+      },
+      {
+        "name": "Pending",
+        "color": "#94A3B8",
+        "order": 5
+      },
+      {
+        "name": "General GP",
+        "color": "#3B82F6",
+        "order": 6
+      },
+      {
+        "name": "Specialist",
+        "color": "#8B5CF6",
+        "order": 7
+      },
+      {
+        "name": "Urgent",
+        "color": "#EF4444",
+        "order": 8
+      },
+      {
+        "name": "Prescription",
+        "color": "#14B8A6",
+        "order": 9
+      },
+      {
+        "name": "Receipt",
+        "color": "#64748B",
+        "order": 10
+      },
+      {
+        "name": "Dental",
+        "color": "#F59E0B",
+        "order": 11
+      },
+      {
+        "name": "Vision",
+        "color": "#6366F1",
+        "order": 12
+      },
+      {
+        "name": "Kids",
+        "color": "#EC4899",
+        "order": 13
+      },
+      {
+        "name": "Adult",
+        "color": "#1E293B",
+        "order": 14
+      },
+      {
+        "name": "Vaccine",
+        "color": "#10B981",
+        "order": 15
+      },
+      {
+        "name": "Allergy",
+        "color": "#B91C1C",
+        "order": 16
+      },
+      {
+        "name": "Chronic",
+        "color": "#57534E",
+        "order": 17
+      },
+      {
+        "name": "Acute",
+        "color": "#F97316",
+        "order": 18
+      },
+      {
+        "name": "Insurance",
+        "color": "#059669",
+        "order": 19
+      },
+      {
+        "name": "Paid out of pocket",
+        "color": "#D946EF",
+        "order": 20
+      },
+      {
+        "name": "Annual",
+        "color": "#0EA5E9",
+        "order": 21
+      },
+      {
+        "name": "Report",
+        "color": "#334155",
+        "order": 22
+      },
+      {
+        "name": "X-Ray",
+        "color": "#111827",
+        "order": 23
+      },
+      {
+        "name": "Bloodwork",
+        "color": "#9F1239",
+        "order": 24
+      },
+      {
+        "name": "Scan",
+        "color": "#475569",
+        "order": 25
+      },
+      {
+        "name": "Therapy",
+        "color": "#A855F7",
+        "order": 26
+      },
+      {
+        "name": "Gym",
+        "color": "#84CC16",
+        "order": 27
+      },
+      {
+        "name": "Diet",
+        "color": "#FACC15",
+        "order": 28
+      },
+      {
+        "name": "Sleep",
+        "color": "#4F46E5",
+        "order": 29
+      },
+      {
+        "name": "Travel",
+        "color": "#06B6D4",
+        "order": 30
+      }
+    ],
+    "order": 7
+  },
+  {
+    "name": "Small Business (Retail)",
+    "description": "Inventory, suppliers, and daily operations for shop owners.",
+    "icon": "storefront-outline",
+    "categories": [
+      {
+        "name": "Supplier Invoices",
+        "icon": "receipt-outline",
+        "color": "#F59E0B",
+        "order": 1
+      },
+      {
+        "name": "Purchase Orders",
+        "icon": "cart-outline",
+        "color": "#10B981",
+        "order": 2
+      },
+      {
+        "name": "Employee Payroll",
+        "icon": "people-circle-outline",
+        "color": "#3B82F6",
+        "order": 3
+      },
+      {
+        "name": "Business Licenses",
+        "icon": "ribbon-outline",
+        "color": "#8B5CF6",
+        "order": 4
+      },
+      {
+        "name": "Lease/Rent",
+        "icon": "key-outline",
+        "color": "#EC4899",
+        "order": 5
+      },
+      {
+        "name": "Marketing/Ads",
+        "icon": "megaphone-outline",
+        "color": "#EF4444",
+        "order": 6
+      },
+      {
+        "name": "Tax Filings",
+        "icon": "file-tray-full-outline",
+        "color": "#DC2626",
+        "order": 7
+      },
+      {
+        "name": "Shipping/Logistics",
+        "icon": "cube-outline",
+        "color": "#64748B",
+        "order": 8
+      },
+      {
+        "name": "Utilities",
+        "icon": "flash-outline",
+        "color": "#EAB308",
+        "order": 9
+      },
+      {
+        "name": "Insurance",
+        "icon": "shield-checkmark-outline",
+        "color": "#059669",
+        "order": 10
+      },
+      {
+        "name": "POS System Reports",
+        "icon": "desktop-outline",
+        "color": "#4F46E5",
+        "order": 11
+      },
+      {
+        "name": "Customer Refunds",
+        "icon": "arrow-undo-outline",
+        "color": "#F43F5E",
+        "order": 12
+      },
+      {
+        "name": "Bank Statements",
+        "icon": "library-outline",
+        "color": "#334155",
+        "order": 13
+      },
+      {
+        "name": "Petty Cash Logs",
+        "icon": "wallet-outline",
+        "color": "#15803D",
+        "order": 14
+      },
+      {
+        "name": "Maintenance/Repairs",
+        "icon": "hammer-outline",
+        "color": "#57534E",
+        "order": 15
+      },
+      {
+        "name": "Security/Alarm",
+        "icon": "lock-closed-outline",
+        "color": "#000000",
+        "order": 16
+      },
+      {
+        "name": "Cleaning Services",
+        "icon": "sparkles-outline",
+        "color": "#06B6D4",
+        "order": 17
+      },
+      {
+        "name": "Web/Domain Costs",
+        "icon": "globe-outline",
+        "color": "#2563EB",
+        "order": 18
+      },
+      {
+        "name": "Social Media",
+        "icon": "share-social-outline",
+        "color": "#D946EF",
+        "order": 19
+      },
+      {
+        "name": "Contractor Agreements",
+        "icon": "document-text-outline",
+        "color": "#94A3B8",
+        "order": 20
+      },
+      {
+        "name": "Loan/Credit Info",
+        "icon": "card-outline",
+        "color": "#9F1239",
+        "order": 21
+      },
+      {
+        "name": "Sales Permits",
+        "icon": "checkmark-circle-outline",
+        "color": "#22C55E",
+        "order": 22
+      },
+      {
+        "name": "Training Manuals",
+        "icon": "book-outline",
+        "color": "#F97316",
+        "order": 23
+      },
+      {
+        "name": "Shift Schedules",
+        "icon": "calendar-outline",
+        "color": "#6366F1",
+        "order": 24
+      },
+      {
+        "name": "Inventory Audits",
+        "icon": "clipboard-outline",
+        "color": "#A855F7",
+        "order": 25
+      },
+      {
+        "name": "Customer List",
+        "icon": "people-outline",
+        "color": "#1E293B",
+        "order": 26
+      },
+      {
+        "name": "Vehicle Expenses",
+        "icon": "car-outline",
+        "color": "#71717A",
+        "order": 27
+      },
+      {
+        "name": "Packaging Supplies",
+        "icon": "gift-outline",
+        "color": "#B45309",
+        "order": 28
+      },
+      {
+        "name": "Events/Pop-ups",
+        "icon": "storefront-outline",
+        "color": "#FACC15",
+        "order": 29
+      },
+      {
+        "name": "Dispute Resolution",
+        "icon": "gavel-outline",
+        "color": "#7F1D1D",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Q1",
+        "color": "#9CA3AF",
+        "order": 1
+      },
+      {
+        "name": "Q2",
+        "color": "#9CA3AF",
+        "order": 2
+      },
+      {
+        "name": "Q3",
+        "color": "#9CA3AF",
+        "order": 3
+      },
+      {
+        "name": "Q4",
+        "color": "#9CA3AF",
+        "order": 4
+      },
+      {
+        "name": "Inventory",
+        "color": "#F59E0B",
+        "order": 5
+      },
+      {
+        "name": "Urgent",
+        "color": "#EF4444",
+        "order": 6
+      },
+      {
+        "name": "Staff",
+        "color": "#3B82F6",
+        "order": 7
+      },
+      {
+        "name": "Paid",
+        "color": "#16A34A",
+        "order": 8
+      },
+      {
+        "name": "Unpaid",
+        "color": "#B91C1C",
+        "order": 9
+      },
+      {
+        "name": "Pending",
+        "color": "#FACC15",
+        "order": 10
+      },
+      {
+        "name": "Tax",
+        "color": "#DC2626",
+        "order": 11
+      },
+      {
+        "name": "Payroll",
+        "color": "#4F46E5",
+        "order": 12
+      },
+      {
+        "name": "Legal",
+        "color": "#1E293B",
+        "order": 13
+      },
+      {
+        "name": "Marketing",
+        "color": "#EC4899",
+        "order": 14
+      },
+      {
+        "name": "Operations",
+        "color": "#64748B",
+        "order": 15
+      },
+      {
+        "name": "Monthly",
+        "color": "#8B5CF6",
+        "order": 16
+      },
+      {
+        "name": "Yearly",
+        "color": "#10B981",
+        "order": 17
+      },
+      {
+        "name": "One-off",
+        "color": "#06B6D4",
+        "order": 18
+      },
+      {
+        "name": "Refund",
+        "color": "#F43F5E",
+        "order": 19
+      },
+      {
+        "name": "Supplier A",
+        "color": "#059669",
+        "order": 20
+      },
+      {
+        "name": "Supplier B",
+        "color": "#D97706",
+        "order": 21
+      },
+      {
+        "name": "Online Sales",
+        "color": "#2563EB",
+        "order": 22
+      },
+      {
+        "name": "In-Store",
+        "color": "#57534E",
+        "order": 23
+      },
+      {
+        "name": "Bank",
+        "color": "#111827",
+        "order": 24
+      },
+      {
+        "name": "Cash",
+        "color": "#15803D",
+        "order": 25
+      },
+      {
+        "name": "Credit Card",
+        "color": "#A855F7",
+        "order": 26
+      },
+      {
+        "name": "Loan",
+        "color": "#BE123C",
+        "order": 27
+      },
+      {
+        "name": "Profit",
+        "color": "#22C55E",
+        "order": 28
+      },
+      {
+        "name": "Loss",
+        "color": "#991B1B",
+        "order": 29
+      },
+      {
+        "name": "Audit",
+        "color": "#F97316",
+        "order": 30
+      }
+    ],
+    "order": 8
+  },
+  {
+    "name": "Expat / Immigration",
+    "description": "Manage visas, passports, and international paperwork.",
+    "icon": "airplane-outline",
+    "categories": [
+      {
+        "name": "Visas & Permits",
+        "icon": "earth-outline",
+        "color": "#0EA5E9",
+        "order": 1
+      },
+      {
+        "name": "Passport Copies",
+        "icon": "id-card-outline",
+        "color": "#1E293B",
+        "order": 2
+      },
+      {
+        "name": "Work Contracts",
+        "icon": "briefcase-outline",
+        "color": "#10B981",
+        "order": 3
+      },
+      {
+        "name": "Gov. Correspondance",
+        "icon": "mail-outline",
+        "color": "#EF4444",
+        "order": 4
+      },
+      {
+        "name": "Housing Contracts",
+        "icon": "home-outline",
+        "color": "#F97316",
+        "order": 5
+      },
+      {
+        "name": "Bank/Tax (Home)",
+        "icon": "library-outline",
+        "color": "#64748B",
+        "order": 6
+      },
+      {
+        "name": "Language Certs",
+        "icon": "language-outline",
+        "color": "#8B5CF6",
+        "order": 7
+      },
+      {
+        "name": "Translations",
+        "icon": "swap-horizontal-outline",
+        "color": "#F59E0B",
+        "order": 8
+      },
+      {
+        "name": "Health Insurance",
+        "icon": "medkit-outline",
+        "color": "#E11D48",
+        "order": 9
+      },
+      {
+        "name": "Police Clearance",
+        "icon": "shield-outline",
+        "color": "#334155",
+        "order": 10
+      },
+      {
+        "name": "Biometrics Data",
+        "icon": "finger-print-outline",
+        "color": "#4F46E5",
+        "order": 11
+      },
+      {
+        "name": "Embassy Appointments",
+        "icon": "calendar-outline",
+        "color": "#D946EF",
+        "order": 12
+      },
+      {
+        "name": "Flight Tickets",
+        "icon": "ticket-outline",
+        "color": "#06B6D4",
+        "order": 13
+      },
+      {
+        "name": "Shipping/Movers",
+        "icon": "boat-outline",
+        "color": "#0F766E",
+        "order": 14
+      },
+      {
+        "name": "Tax (Host Country)",
+        "icon": "calculator-outline",
+        "color": "#B91C1C",
+        "order": 15
+      },
+      {
+        "name": "Driving License",
+        "icon": "car-outline",
+        "color": "#57534E",
+        "order": 16
+      },
+      {
+        "name": "School Records",
+        "icon": "school-outline",
+        "color": "#2563EB",
+        "order": 17
+      },
+      {
+        "name": "Pet Transport",
+        "icon": "paw-outline",
+        "color": "#A855F7",
+        "order": 18
+      },
+      {
+        "name": "SIM/Phone Contracts",
+        "icon": "call-outline",
+        "color": "#15803D",
+        "order": 19
+      },
+      {
+        "name": "Utility Setup",
+        "icon": "flash-outline",
+        "color": "#FACC15",
+        "order": 20
+      },
+      {
+        "name": "Marriage/Birth Certs",
+        "icon": "ribbon-outline",
+        "color": "#EC4899",
+        "order": 21
+      },
+      {
+        "name": "Legal Representation",
+        "icon": "gavel-outline",
+        "color": "#111827",
+        "order": 22
+      },
+      {
+        "name": "Currency Exchange",
+        "icon": "cash-outline",
+        "color": "#22C55E",
+        "order": 23
+      },
+      {
+        "name": "Social Security",
+        "icon": "people-circle-outline",
+        "color": "#3B82F6",
+        "order": 24
+      },
+      {
+        "name": "Voting Docs",
+        "icon": "archive-outline",
+        "color": "#9CA3AF",
+        "order": 25
+      },
+      {
+        "name": "Storage Units",
+        "icon": "cube-outline",
+        "color": "#71717A",
+        "order": 26
+      },
+      {
+        "name": "Vaccine Proof",
+        "icon": "fitness-outline",
+        "color": "#14B8A6",
+        "order": 27
+      },
+      {
+        "name": "Exit Permits",
+        "icon": "log-out-outline",
+        "color": "#9F1239",
+        "order": 28
+      },
+      {
+        "name": "Cultural Guides",
+        "icon": "book-outline",
+        "color": "#EA580C",
+        "order": 29
+      },
+      {
+        "name": "Emergency Contacts",
+        "icon": "alert-circle-outline",
+        "color": "#DC2626",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Approved",
+        "color": "#10B981",
+        "order": 1
+      },
+      {
+        "name": "Pending",
+        "color": "#F59E0B",
+        "order": 2
+      },
+      {
+        "name": "Apostilled",
+        "color": "#6366F1",
+        "order": 3
+      },
+      {
+        "name": "Original",
+        "color": "#DC2626",
+        "order": 4
+      },
+      {
+        "name": "Copy",
+        "color": "#94A3B8",
+        "order": 5
+      },
+      {
+        "name": "Home Country",
+        "color": "#3B82F6",
+        "order": 6
+      },
+      {
+        "name": "Host Country",
+        "color": "#15803D",
+        "order": 7
+      },
+      {
+        "name": "Urgent",
+        "color": "#EF4444",
+        "order": 8
+      },
+      {
+        "name": "Translation Needed",
+        "color": "#A855F7",
+        "order": 9
+      },
+      {
+        "name": "Notarized",
+        "color": "#0EA5E9",
+        "order": 10
+      },
+      {
+        "name": "Submitted",
+        "color": "#06B6D4",
+        "order": 11
+      },
+      {
+        "name": "Rejected",
+        "color": "#991B1B",
+        "order": 12
+      },
+      {
+        "name": "Appeal",
+        "color": "#F97316",
+        "order": 13
+      },
+      {
+        "name": "Embassy",
+        "color": "#1E293B",
+        "order": 14
+      },
+      {
+        "name": "Work",
+        "color": "#475569",
+        "order": 15
+      },
+      {
+        "name": "Residency",
+        "color": "#4F46E5",
+        "order": 16
+      },
+      {
+        "name": "Citizenship",
+        "color": "#EC4899",
+        "order": 17
+      },
+      {
+        "name": "Travel",
+        "color": "#EAB308",
+        "order": 18
+      },
+      {
+        "name": "Customs",
+        "color": "#57534E",
+        "order": 19
+      },
+      {
+        "name": "Tax",
+        "color": "#B91C1C",
+        "order": 20
+      },
+      {
+        "name": "Housing",
+        "color": "#D97706",
+        "order": 21
+      },
+      {
+        "name": "Banking",
+        "color": "#0F766E",
+        "order": 22
+      },
+      {
+        "name": "Insurance",
+        "color": "#BE123C",
+        "order": 23
+      },
+      {
+        "name": "Valid",
+        "color": "#22C55E",
+        "order": 24
+      },
+      {
+        "name": "Expired",
+        "color": "#000000",
+        "order": 25
+      },
+      {
+        "name": "Renewing",
+        "color": "#FACC15",
+        "order": 26
+      },
+      {
+        "name": "Digital",
+        "color": "#64748B",
+        "order": 27
+      },
+      {
+        "name": "Paper",
+        "color": "#D1D5DB",
+        "order": 28
+      },
+      {
+        "name": "Family",
+        "color": "#F472B6",
+        "order": 29
+      },
+      {
+        "name": "Solo",
+        "color": "#374151",
+        "order": 30
+      }
+    ],
+    "order": 9
+  },
+  {
+    "name": "Developer / Tech Lead",
+    "description": "Contracts, IP, server costs, and freelance gigs.",
+    "icon": "code-slash-outline",
+    "categories": [
+      {
+        "name": "AWS/Cloud Bills",
+        "icon": "cloud-outline",
+        "color": "#F97316",
+        "order": 1
+      },
+      {
+        "name": "SaaS Subscriptions",
+        "icon": "card-outline",
+        "color": "#3B82F6",
+        "order": 2
+      },
+      {
+        "name": "Consulting Agreements",
+        "icon": "document-text-outline",
+        "color": "#10B981",
+        "order": 3
+      },
+      {
+        "name": "NDAs / Legal",
+        "icon": "lock-closed-outline",
+        "color": "#DC2626",
+        "order": 4
+      },
+      {
+        "name": "Hardware Expenses",
+        "icon": "desktop-outline",
+        "color": "#64748B",
+        "order": 5
+      },
+      {
+        "name": "Domain Names",
+        "icon": "globe-outline",
+        "color": "#8B5CF6",
+        "order": 6
+      },
+      {
+        "name": "Certifications",
+        "icon": "ribbon-outline",
+        "color": "#EAB308",
+        "order": 7
+      },
+      {
+        "name": "Software Licenses",
+        "icon": "key-outline",
+        "color": "#06B6D4",
+        "order": 8
+      },
+      {
+        "name": "Invoices Sent",
+        "icon": "paper-plane-outline",
+        "color": "#4F46E5",
+        "order": 9
+      },
+      {
+        "name": "Client Requirements",
+        "icon": "list-outline",
+        "color": "#EC4899",
+        "order": 10
+      },
+      {
+        "name": "API Keys/Secrets",
+        "icon": "shield-outline",
+        "color": "#1E293B",
+        "order": 11
+      },
+      {
+        "name": "Database Backups",
+        "icon": "server-outline",
+        "color": "#15803D",
+        "order": 12
+      },
+      {
+        "name": "Code Snippets",
+        "icon": "terminal-outline",
+        "color": "#334155",
+        "order": 13
+      },
+      {
+        "name": "UI/UX Designs",
+        "icon": "color-palette-outline",
+        "color": "#D946EF",
+        "order": 14
+      },
+      {
+        "name": "User Testing Logs",
+        "icon": "bug-outline",
+        "color": "#EF4444",
+        "order": 15
+      },
+      {
+        "name": "Project Roadmaps",
+        "icon": "map-outline",
+        "color": "#14B8A6",
+        "order": 16
+      },
+      {
+        "name": "Meeting Notes",
+        "icon": "mic-outline",
+        "color": "#94A3B8",
+        "order": 17
+      },
+      {
+        "name": "Tax Write-offs",
+        "icon": "calculator-outline",
+        "color": "#B91C1C",
+        "order": 18
+      },
+      {
+        "name": "Conference Tickets",
+        "icon": "ticket-outline",
+        "color": "#F43F5E",
+        "order": 19
+      },
+      {
+        "name": "Job Offers",
+        "icon": "briefcase-outline",
+        "color": "#059669",
+        "order": 20
+      },
+      {
+        "name": "Equity/Stock Options",
+        "icon": "trending-up-outline",
+        "color": "#22C55E",
+        "order": 21
+      },
+      {
+        "name": "Internet/ISP",
+        "icon": "wifi-outline",
+        "color": "#0EA5E9",
+        "order": 22
+      },
+      {
+        "name": "VPN Services",
+        "icon": "eye-off-outline",
+        "color": "#57534E",
+        "order": 23
+      },
+      {
+        "name": "Office Setup",
+        "icon": "construct-outline",
+        "color": "#71717A",
+        "order": 24
+      },
+      {
+        "name": "Code Reviews",
+        "icon": "glasses-outline",
+        "color": "#6366F1",
+        "order": 25
+      },
+      {
+        "name": "Whitepapers",
+        "icon": "journal-outline",
+        "color": "#A855F7",
+        "order": 26
+      },
+      {
+        "name": "Github/Gitlab Billing",
+        "icon": "git-branch-outline",
+        "color": "#111827",
+        "order": 27
+      },
+      {
+        "name": "App Store Reviews",
+        "icon": "star-half-outline",
+        "color": "#FACC15",
+        "order": 28
+      },
+      {
+        "name": "Privacy Policies",
+        "icon": "finger-print-outline",
+        "color": "#9F1239",
+        "order": 29
+      },
+      {
+        "name": "Tech Books",
+        "icon": "book-outline",
+        "color": "#D97706",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Tax Deductible",
+        "color": "#10B981",
+        "order": 1
+      },
+      {
+        "name": "Recurring",
+        "color": "#3B82F6",
+        "order": 2
+      },
+      {
+        "name": "Client A",
+        "color": "#F59E0B",
+        "order": 3
+      },
+      {
+        "name": "Client B",
+        "color": "#8B5CF6",
+        "order": 4
+      },
+      {
+        "name": "Personal Project",
+        "color": "#EC4899",
+        "order": 5
+      },
+      {
+        "name": "Frontend",
+        "color": "#06B6D4",
+        "order": 6
+      },
+      {
+        "name": "Backend",
+        "color": "#1E293B",
+        "order": 7
+      },
+      {
+        "name": "DevOps",
+        "color": "#F97316",
+        "order": 8
+      },
+      {
+        "name": "Security",
+        "color": "#EF4444",
+        "order": 9
+      },
+      {
+        "name": "Mobile",
+        "color": "#14B8A6",
+        "order": 10
+      },
+      {
+        "name": "Web",
+        "color": "#6366F1",
+        "order": 11
+      },
+      {
+        "name": "Paid",
+        "color": "#22C55E",
+        "order": 12
+      },
+      {
+        "name": "Unpaid",
+        "color": "#B91C1C",
+        "order": 13
+      },
+      {
+        "name": "Subscription",
+        "color": "#4F46E5",
+        "order": 14
+      },
+      {
+        "name": "One-time",
+        "color": "#64748B",
+        "order": 15
+      },
+      {
+        "name": "License",
+        "color": "#A855F7",
+        "order": 16
+      },
+      {
+        "name": "Hardware",
+        "color": "#57534E",
+        "order": 17
+      },
+      {
+        "name": "Software",
+        "color": "#0EA5E9",
+        "order": 18
+      },
+      {
+        "name": "Contract",
+        "color": "#059669",
+        "order": 19
+      },
+      {
+        "name": "Urgent",
+        "color": "#DC2626",
+        "order": 20
+      },
+      {
+        "name": "Legal",
+        "color": "#111827",
+        "order": 21
+      },
+      {
+        "name": "Draft",
+        "color": "#FACC15",
+        "order": 22
+      },
+      {
+        "name": "Production",
+        "color": "#15803D",
+        "order": 23
+      },
+      {
+        "name": "Staging",
+        "color": "#9CA3AF",
+        "order": 24
+      },
+      {
+        "name": "Q1",
+        "color": "#D1D5DB",
+        "order": 25
+      },
+      {
+        "name": "Q2",
+        "color": "#D1D5DB",
+        "order": 26
+      },
+      {
+        "name": "Q3",
+        "color": "#D1D5DB",
+        "order": 27
+      },
+      {
+        "name": "Q4",
+        "color": "#D1D5DB",
+        "order": 28
+      },
+      {
+        "name": "Cloud",
+        "color": "#F472B6",
+        "order": 29
+      },
+      {
+        "name": "Local",
+        "color": "#374151",
+        "order": 30
+      }
+    ],
+    "order": 10
+  },
+  {
+    "name": "Event Planner",
+    "description": "Vendors, contracts, schedules, and client invoices.",
+    "icon": "calendar-outline",
+    "categories": [
+      {
+        "name": "Vendor Contracts",
+        "icon": "people-outline",
+        "color": "#8B5CF6",
+        "order": 1
+      },
+      {
+        "name": "Venue Bookings",
+        "icon": "location-outline",
+        "color": "#EC4899",
+        "order": 2
+      },
+      {
+        "name": "Catering Menus/Bills",
+        "icon": "restaurant-outline",
+        "color": "#F59E0B",
+        "order": 3
+      },
+      {
+        "name": "Client Invoices",
+        "icon": "receipt-outline",
+        "color": "#10B981",
+        "order": 4
+      },
+      {
+        "name": "Permits/Insurance",
+        "icon": "shield-checkmark-outline",
+        "color": "#3B82F6",
+        "order": 5
+      },
+      {
+        "name": "Floor Plans",
+        "icon": "map-outline",
+        "color": "#64748B",
+        "order": 6
+      },
+      {
+        "name": "Schedules/Run-of-show",
+        "icon": "time-outline",
+        "color": "#EF4444",
+        "order": 7
+      },
+      {
+        "name": "Guest Lists",
+        "icon": "list-outline",
+        "color": "#0EA5E9",
+        "order": 8
+      },
+      {
+        "name": "Decor Invoices",
+        "icon": "color-fill-outline",
+        "color": "#D946EF",
+        "order": 9
+      },
+      {
+        "name": "AV/Tech Requirements",
+        "icon": "mic-outline",
+        "color": "#111827",
+        "order": 10
+      },
+      {
+        "name": "Staffing/Payroll",
+        "icon": "id-card-outline",
+        "color": "#15803D",
+        "order": 11
+      },
+      {
+        "name": "Transportation/Logistics",
+        "icon": "bus-outline",
+        "color": "#F97316",
+        "order": 12
+      },
+      {
+        "name": "Hotel Room Blocks",
+        "icon": "bed-outline",
+        "color": "#4F46E5",
+        "order": 13
+      },
+      {
+        "name": "Marketing/Invitations",
+        "icon": "mail-open-outline",
+        "color": "#F43F5E",
+        "order": 14
+      },
+      {
+        "name": "Photographer Contracts",
+        "icon": "camera-outline",
+        "color": "#334155",
+        "order": 15
+      },
+      {
+        "name": "Entertainment/Band",
+        "icon": "musical-notes-outline",
+        "color": "#EAB308",
+        "order": 16
+      },
+      {
+        "name": "Budget Spreadsheets",
+        "icon": "calculator-outline",
+        "color": "#0F766E",
+        "order": 17
+      },
+      {
+        "name": "Safety Plans",
+        "icon": "medkit-outline",
+        "color": "#DC2626",
+        "order": 18
+      },
+      {
+        "name": "Gift Bags/Merch",
+        "icon": "gift-outline",
+        "color": "#A855F7",
+        "order": 19
+      },
+      {
+        "name": "Client Briefs",
+        "icon": "document-text-outline",
+        "color": "#57534E",
+        "order": 20
+      },
+      {
+        "name": "Refunds/Cancellations",
+        "icon": "alert-circle-outline",
+        "color": "#9F1239",
+        "order": 21
+      },
+      {
+        "name": "Weather Contingency",
+        "icon": "rainy-outline",
+        "color": "#60A5FA",
+        "order": 22
+      },
+      {
+        "name": "Signage Designs",
+        "icon": "easel-outline",
+        "color": "#14B8A6",
+        "order": 23
+      },
+      {
+        "name": "Cleanup/Waste",
+        "icon": "trash-outline",
+        "color": "#71717A",
+        "order": 24
+      },
+      {
+        "name": "Post-Event Reports",
+        "icon": "stats-chart-outline",
+        "color": "#22C55E",
+        "order": 25
+      },
+      {
+        "name": "Deposit Receipts",
+        "icon": "cash-outline",
+        "color": "#84CC16",
+        "order": 26
+      },
+      {
+        "name": "Florist Orders",
+        "icon": "rose-outline",
+        "color": "#FB7185",
+        "order": 27
+      },
+      {
+        "name": "Speaker Releases",
+        "icon": "videocam-outline",
+        "color": "#374151",
+        "order": 28
+      },
+      {
+        "name": "Ticket Sales",
+        "icon": "ticket-outline",
+        "color": "#6366F1",
+        "order": 29
+      },
+      {
+        "name": "Mood Boards",
+        "icon": "image-outline",
+        "color": "#FDBA74",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Wedding",
+        "color": "#EC4899",
+        "order": 1
+      },
+      {
+        "name": "Corporate",
+        "color": "#3B82F6",
+        "order": 2
+      },
+      {
+        "name": "Deposit Paid",
+        "color": "#10B981",
+        "order": 3
+      },
+      {
+        "name": "Balance Due",
+        "color": "#DC2626",
+        "order": 4
+      },
+      {
+        "name": "Signed",
+        "color": "#F59E0B",
+        "order": 5
+      },
+      {
+        "name": "Vendor",
+        "color": "#8B5CF6",
+        "order": 6
+      },
+      {
+        "name": "Client",
+        "color": "#06B6D4",
+        "order": 7
+      },
+      {
+        "name": "Pending",
+        "color": "#FACC15",
+        "order": 8
+      },
+      {
+        "name": "Urgent",
+        "color": "#EF4444",
+        "order": 9
+      },
+      {
+        "name": "Completed",
+        "color": "#22C55E",
+        "order": 10
+      },
+      {
+        "name": "Draft",
+        "color": "#94A3B8",
+        "order": 11
+      },
+      {
+        "name": "Internal",
+        "color": "#475569",
+        "order": 12
+      },
+      {
+        "name": "External",
+        "color": "#0EA5E9",
+        "order": 13
+      },
+      {
+        "name": "Catering",
+        "color": "#F97316",
+        "order": 14
+      },
+      {
+        "name": "Venue",
+        "color": "#1E293B",
+        "order": 15
+      },
+      {
+        "name": "AV",
+        "color": "#111827",
+        "order": 16
+      },
+      {
+        "name": "Decor",
+        "color": "#D946EF",
+        "order": 17
+      },
+      {
+        "name": "Music",
+        "color": "#EAB308",
+        "order": 18
+      },
+      {
+        "name": "Photo/Video",
+        "color": "#334155",
+        "order": 19
+      },
+      {
+        "name": "Transport",
+        "color": "#64748B",
+        "order": 20
+      },
+      {
+        "name": "Hotel",
+        "color": "#4F46E5",
+        "order": 21
+      },
+      {
+        "name": "Staff",
+        "color": "#15803D",
+        "order": 22
+      },
+      {
+        "name": "Budget",
+        "color": "#0F766E",
+        "order": 23
+      },
+      {
+        "name": "Legal",
+        "color": "#9F1239",
+        "order": 24
+      },
+      {
+        "name": "Birthday",
+        "color": "#F43F5E",
+        "order": 25
+      },
+      {
+        "name": "Fundraiser",
+        "color": "#14B8A6",
+        "order": 26
+      },
+      {
+        "name": "Social",
+        "color": "#F472B6",
+        "order": 27
+      },
+      {
+        "name": "Conference",
+        "color": "#3730A3",
+        "order": 28
+      },
+      {
+        "name": "Winter",
+        "color": "#A5F3FC",
+        "order": 29
+      },
+      {
+        "name": "Summer",
+        "color": "#FDE047",
+        "order": 30
+      }
+    ],
+    "order": 11
+  },
+  {
+    "name": "Home Renovator",
+    "description": "Track plans, contractors, permits, and design ideas.",
+    "icon": "hammer-outline",
+    "categories": [
+      {
+        "name": "Blueprints/Plans",
+        "icon": "map-outline",
+        "color": "#2563EB",
+        "order": 1
+      },
+      {
+        "name": "Permits/City Docs",
+        "icon": "business-outline",
+        "color": "#DC2626",
+        "order": 2
+      },
+      {
+        "name": "Contractor Bids",
+        "icon": "people-outline",
+        "color": "#F59E0B",
+        "order": 3
+      },
+      {
+        "name": "Invoices Paid",
+        "icon": "checkmark-circle-outline",
+        "color": "#16A34A",
+        "order": 4
+      },
+      {
+        "name": "Invoices Due",
+        "icon": "alert-circle-outline",
+        "color": "#EF4444",
+        "order": 5
+      },
+      {
+        "name": "Material Receipts",
+        "icon": "receipt-outline",
+        "color": "#64748B",
+        "order": 6
+      },
+      {
+        "name": "Paint Samples",
+        "icon": "color-palette-outline",
+        "color": "#EC4899",
+        "order": 7
+      },
+      {
+        "name": "Inspiration/Ideas",
+        "icon": "bulb-outline",
+        "color": "#FACC15",
+        "order": 8
+      },
+      {
+        "name": "Kitchen Design",
+        "icon": "restaurant-outline",
+        "color": "#0EA5E9",
+        "order": 9
+      },
+      {
+        "name": "Bathroom Design",
+        "icon": "water-outline",
+        "color": "#06B6D4",
+        "order": 10
+      },
+      {
+        "name": "Flooring Samples",
+        "icon": "layers-outline",
+        "color": "#8B5CF6",
+        "order": 11
+      },
+      {
+        "name": "Lighting Fixtures",
+        "icon": "flash-outline",
+        "color": "#EAB308",
+        "order": 12
+      },
+      {
+        "name": "Tool Inventory",
+        "icon": "construct-outline",
+        "color": "#57534E",
+        "order": 13
+      },
+      {
+        "name": "Rental Agreements",
+        "icon": "document-text-outline",
+        "color": "#475569",
+        "order": 14
+      },
+      {
+        "name": "Warranty Docs",
+        "icon": "shield-checkmark-outline",
+        "color": "#10B981",
+        "order": 15
+      },
+      {
+        "name": "Appliance Manuals",
+        "icon": "book-outline",
+        "color": "#334155",
+        "order": 16
+      },
+      {
+        "name": "Landscaping Plans",
+        "icon": "leaf-outline",
+        "color": "#15803D",
+        "order": 17
+      },
+      {
+        "name": "Before Photos",
+        "icon": "image-outline",
+        "color": "#71717A",
+        "order": 18
+      },
+      {
+        "name": "After Photos",
+        "icon": "camera-outline",
+        "color": "#22C55E",
+        "order": 19
+      },
+      {
+        "name": "Safety Inspections",
+        "icon": "shield-outline",
+        "color": "#B91C1C",
+        "order": 20
+      },
+      {
+        "name": "HOA Approvals",
+        "icon": "thumbs-up-outline",
+        "color": "#4F46E5",
+        "order": 21
+      },
+      {
+        "name": "Budget Tracker",
+        "icon": "calculator-outline",
+        "color": "#0F766E",
+        "order": 22
+      },
+      {
+        "name": "Plumbing Diagrams",
+        "icon": "git-network-outline",
+        "color": "#0891B2",
+        "order": 23
+      },
+      {
+        "name": "Electrical Schematics",
+        "icon": "flash-off-outline",
+        "color": "#F97316",
+        "order": 24
+      },
+      {
+        "name": "Waste Disposal",
+        "icon": "trash-outline",
+        "color": "#78350F",
+        "order": 25
+      },
+      {
+        "name": "Delivery Slips",
+        "icon": "truck-outline",
+        "color": "#D946EF",
+        "order": 26
+      },
+      {
+        "name": "Subcontractor List",
+        "icon": "id-card-outline",
+        "color": "#374151",
+        "order": 27
+      },
+      {
+        "name": "Lien Waivers",
+        "icon": "document-lock-outline",
+        "color": "#9F1239",
+        "order": 28
+      },
+      {
+        "name": "Insurance Claims",
+        "icon": "umbrella-outline",
+        "color": "#6366F1",
+        "order": 29
+      },
+      {
+        "name": "Timeline/Schedule",
+        "icon": "calendar-outline",
+        "color": "#111827",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Kitchen",
+        "color": "#F59E0B",
+        "order": 1
+      },
+      {
+        "name": "Bath",
+        "color": "#06B6D4",
+        "order": 2
+      },
+      {
+        "name": "Living Room",
+        "color": "#10B981",
+        "order": 3
+      },
+      {
+        "name": "Bedroom",
+        "color": "#8B5CF6",
+        "order": 4
+      },
+      {
+        "name": "Exterior",
+        "color": "#15803D",
+        "order": 5
+      },
+      {
+        "name": "Plumbing",
+        "color": "#3B82F6",
+        "order": 6
+      },
+      {
+        "name": "Electrical",
+        "color": "#FACC15",
+        "order": 7
+      },
+      {
+        "name": "Framing",
+        "color": "#854D0E",
+        "order": 8
+      },
+      {
+        "name": "Drywall",
+        "color": "#E5E7EB",
+        "order": 9
+      },
+      {
+        "name": "Painting",
+        "color": "#EC4899",
+        "order": 10
+      },
+      {
+        "name": "Paid",
+        "color": "#16A34A",
+        "order": 11
+      },
+      {
+        "name": "Unpaid",
+        "color": "#DC2626",
+        "order": 12
+      },
+      {
+        "name": "Quote",
+        "color": "#64748B",
+        "order": 13
+      },
+      {
+        "name": "Contract",
+        "color": "#1E293B",
+        "order": 14
+      },
+      {
+        "name": "Permit",
+        "color": "#EF4444",
+        "order": 15
+      },
+      {
+        "name": "Urgent",
+        "color": "#B91C1C",
+        "order": 16
+      },
+      {
+        "name": "Delayed",
+        "color": "#F97316",
+        "order": 17
+      },
+      {
+        "name": "Completed",
+        "color": "#22C55E",
+        "order": 18
+      },
+      {
+        "name": "In Progress",
+        "color": "#0EA5E9",
+        "order": 19
+      },
+      {
+        "name": "DIY",
+        "color": "#A855F7",
+        "order": 20
+      },
+      {
+        "name": "Contractor",
+        "color": "#475569",
+        "order": 21
+      },
+      {
+        "name": "Receipt",
+        "color": "#9CA3AF",
+        "order": 22
+      },
+      {
+        "name": "Return",
+        "color": "#F43F5E",
+        "order": 23
+      },
+      {
+        "name": "Warranty",
+        "color": "#059669",
+        "order": 24
+      },
+      {
+        "name": "Inspiration",
+        "color": "#D946EF",
+        "order": 25
+      },
+      {
+        "name": "Structural",
+        "color": "#000000",
+        "order": 26
+      },
+      {
+        "name": "Cosmetic",
+        "color": "#FB7185",
+        "order": 27
+      },
+      {
+        "name": "Tools",
+        "color": "#57534E",
+        "order": 28
+      },
+      {
+        "name": "Materials",
+        "color": "#0F766E",
+        "order": 29
+      },
+      {
+        "name": "Delivery",
+        "color": "#6366F1",
+        "order": 30
+      }
+    ],
+    "order": 12
+  },
+  {
+    "name": "Content Creator",
+    "description": "Manage sponsors, scripts, analytics, and social platforms.",
+    "icon": "videocam-outline",
+    "categories": [
+      {
+        "name": "Sponsorship Contracts",
+        "icon": "document-text-outline",
+        "color": "#10B981",
+        "order": 1
+      },
+      {
+        "name": "Script Drafts",
+        "icon": "pencil-outline",
+        "color": "#64748B",
+        "order": 2
+      },
+      {
+        "name": "AdSense/Revenue",
+        "icon": "cash-outline",
+        "color": "#22C55E",
+        "order": 3
+      },
+      {
+        "name": "Brand Assets",
+        "icon": "image-outline",
+        "color": "#EC4899",
+        "order": 4
+      },
+      {
+        "name": "Raw Footage Logs",
+        "icon": "film-outline",
+        "color": "#334155",
+        "order": 5
+      },
+      {
+        "name": "Music Licenses",
+        "icon": "musical-notes-outline",
+        "color": "#8B5CF6",
+        "order": 6
+      },
+      {
+        "name": "Collab Agreements",
+        "icon": "people-outline",
+        "color": "#F59E0B",
+        "order": 7
+      },
+      {
+        "name": "Affiliate Programs",
+        "icon": "link-outline",
+        "color": "#0EA5E9",
+        "order": 8
+      },
+      {
+        "name": "Analytics Reports",
+        "icon": "stats-chart-outline",
+        "color": "#4F46E5",
+        "order": 9
+      },
+      {
+        "name": "Equipment Warranties",
+        "icon": "shield-outline",
+        "color": "#57534E",
+        "order": 10
+      },
+      {
+        "name": "Software Subs",
+        "icon": "cloud-outline",
+        "color": "#06B6D4",
+        "order": 11
+      },
+      {
+        "name": "Merch Designs",
+        "icon": "shirt-outline",
+        "color": "#F43F5E",
+        "order": 12
+      },
+      {
+        "name": "Shipping Labels",
+        "icon": "barcode-outline",
+        "color": "#1E293B",
+        "order": 13
+      },
+      {
+        "name": "Fan Mail",
+        "icon": "mail-open-outline",
+        "color": "#D946EF",
+        "order": 14
+      },
+      {
+        "name": "Event Tickets/Passes",
+        "icon": "ticket-outline",
+        "color": "#F97316",
+        "order": 15
+      },
+      {
+        "name": "Travel Vouchers",
+        "icon": "airplane-outline",
+        "color": "#14B8A6",
+        "order": 16
+      },
+      {
+        "name": "Login Credentials",
+        "icon": "key-outline",
+        "color": "#111827",
+        "order": 17
+      },
+      {
+        "name": "Editor Notes",
+        "icon": "chatbubble-ellipses-outline",
+        "color": "#9CA3AF",
+        "order": 18
+      },
+      {
+        "name": "Thumbnail Drafts",
+        "icon": "images-outline",
+        "color": "#EF4444",
+        "order": 19
+      },
+      {
+        "name": "SEO Research",
+        "icon": "search-outline",
+        "color": "#FACC15",
+        "order": 20
+      },
+      {
+        "name": "Competitor Analysis",
+        "icon": "telescope-outline",
+        "color": "#6366F1",
+        "order": 21
+      },
+      {
+        "name": "Platform Policies",
+        "icon": "alert-circle-outline",
+        "color": "#DC2626",
+        "order": 22
+      },
+      {
+        "name": "Copyright Strikes",
+        "icon": "warning-outline",
+        "color": "#991B1B",
+        "order": 23
+      },
+      {
+        "name": "Income Streams",
+        "icon": "wallet-outline",
+        "color": "#059669",
+        "order": 24
+      },
+      {
+        "name": "Prop Expenses",
+        "icon": "glasses-outline",
+        "color": "#A855F7",
+        "order": 25
+      },
+      {
+        "name": "Tech Expenses",
+        "icon": "desktop-outline",
+        "color": "#1F2937",
+        "order": 26
+      },
+      {
+        "name": "Studio Rent",
+        "icon": "home-outline",
+        "color": "#B45309",
+        "order": 27
+      },
+      {
+        "name": "Internet/Data Bills",
+        "icon": "wifi-outline",
+        "color": "#3B82F6",
+        "order": 28
+      },
+      {
+        "name": "Giveaway Legal",
+        "icon": "gift-outline",
+        "color": "#FB7185",
+        "order": 29
+      },
+      {
+        "name": "Patreon/Member Data",
+        "icon": "heart-outline",
+        "color": "#BE123C",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "YouTube",
+        "color": "#EF4444",
+        "order": 1
+      },
+      {
+        "name": "Twitch",
+        "color": "#9333EA",
+        "order": 2
+      },
+      {
+        "name": "TikTok",
+        "color": "#000000",
+        "order": 3
+      },
+      {
+        "name": "Instagram",
+        "color": "#EC4899",
+        "order": 4
+      },
+      {
+        "name": "Twitter/X",
+        "color": "#0EA5E9",
+        "order": 5
+      },
+      {
+        "name": "Sponsored",
+        "color": "#10B981",
+        "order": 6
+      },
+      {
+        "name": "Organic",
+        "color": "#64748B",
+        "order": 7
+      },
+      {
+        "name": "Draft",
+        "color": "#F59E0B",
+        "order": 8
+      },
+      {
+        "name": "Published",
+        "color": "#22C55E",
+        "order": 9
+      },
+      {
+        "name": "Editing",
+        "color": "#3B82F6",
+        "order": 10
+      },
+      {
+        "name": "Filming",
+        "color": "#F97316",
+        "order": 11
+      },
+      {
+        "name": "In Review",
+        "color": "#8B5CF6",
+        "order": 12
+      },
+      {
+        "name": "Paid",
+        "color": "#16A34A",
+        "order": 13
+      },
+      {
+        "name": "Invoice Sent",
+        "color": "#06B6D4",
+        "order": 14
+      },
+      {
+        "name": "Legal",
+        "color": "#1E293B",
+        "order": 15
+      },
+      {
+        "name": "Urgent",
+        "color": "#DC2626",
+        "order": 16
+      },
+      {
+        "name": "Idea",
+        "color": "#FACC15",
+        "order": 17
+      },
+      {
+        "name": "Collab",
+        "color": "#D946EF",
+        "order": 18
+      },
+      {
+        "name": "Live Stream",
+        "color": "#B91C1C",
+        "order": 19
+      },
+      {
+        "name": "Vlog",
+        "color": "#14B8A6",
+        "order": 20
+      },
+      {
+        "name": "Tutorial",
+        "color": "#4F46E5",
+        "order": 21
+      },
+      {
+        "name": "Shorts/Reels",
+        "color": "#F43F5E",
+        "order": 22
+      },
+      {
+        "name": "Tax",
+        "color": "#7F1D1D",
+        "order": 23
+      },
+      {
+        "name": "Expense",
+        "color": "#57534E",
+        "order": 24
+      },
+      {
+        "name": "Contract",
+        "color": "#374151",
+        "order": 25
+      },
+      {
+        "name": "Q1",
+        "color": "#D1D5DB",
+        "order": 26
+      },
+      {
+        "name": "Q2",
+        "color": "#D1D5DB",
+        "order": 27
+      },
+      {
+        "name": "Q3",
+        "color": "#D1D5DB",
+        "order": 28
+      },
+      {
+        "name": "Q4",
+        "color": "#D1D5DB",
+        "order": 29
+      }
+    ],
+    "order": 13
+  },
+  {
+    "name": "Teacher / Educator",
+    "description": "Lesson plans, grading, student records, and admin.",
+    "icon": "school-outline",
+    "categories": [
+      {
+        "name": "Lesson Plans",
+        "icon": "book-outline",
+        "color": "#2563EB",
+        "order": 1
+      },
+      {
+        "name": "Gradebooks",
+        "icon": "stats-chart-outline",
+        "color": "#10B981",
+        "order": 2
+      },
+      {
+        "name": "Student Rosters",
+        "icon": "people-outline",
+        "color": "#F59E0B",
+        "order": 3
+      },
+      {
+        "name": "Parent Emails",
+        "icon": "mail-outline",
+        "color": "#EC4899",
+        "order": 4
+      },
+      {
+        "name": "Attendance Logs",
+        "icon": "calendar-outline",
+        "color": "#64748B",
+        "order": 5
+      },
+      {
+        "name": "IEP/504 Plans",
+        "icon": "document-text-outline",
+        "color": "#8B5CF6",
+        "order": 6
+      },
+      {
+        "name": "Curriculum Standards",
+        "icon": "list-outline",
+        "color": "#111827",
+        "order": 7
+      },
+      {
+        "name": "Worksheets/Handouts",
+        "icon": "document-outline",
+        "color": "#06B6D4",
+        "order": 8
+      },
+      {
+        "name": "Exams/Quizzes",
+        "icon": "pencil-outline",
+        "color": "#EF4444",
+        "order": 9
+      },
+      {
+        "name": "Answer Keys",
+        "icon": "key-outline",
+        "color": "#DC2626",
+        "order": 10
+      },
+      {
+        "name": "Professional Dev",
+        "icon": "ribbon-outline",
+        "color": "#3B82F6",
+        "order": 11
+      },
+      {
+        "name": "Payroll/Contracts",
+        "icon": "cash-outline",
+        "color": "#16A34A",
+        "order": 12
+      },
+      {
+        "name": "Union Info",
+        "icon": "shield-outline",
+        "color": "#9F1239",
+        "order": 13
+      },
+      {
+        "name": "Supply Receipts",
+        "icon": "receipt-outline",
+        "color": "#EAB308",
+        "order": 14
+      },
+      {
+        "name": "Grant Applications",
+        "icon": "gift-outline",
+        "color": "#0F766E",
+        "order": 15
+      },
+      {
+        "name": "Field Trip Forms",
+        "icon": "bus-outline",
+        "color": "#F97316",
+        "order": 16
+      },
+      {
+        "name": "Emergency Procedures",
+        "icon": "medkit-outline",
+        "color": "#B91C1C",
+        "order": 17
+      },
+      {
+        "name": "Meeting Minutes",
+        "icon": "chatbubbles-outline",
+        "color": "#57534E",
+        "order": 18
+      },
+      {
+        "name": "Evaluations",
+        "icon": "eye-outline",
+        "color": "#4F46E5",
+        "order": 19
+      },
+      {
+        "name": "Certification Docs",
+        "icon": "id-card-outline",
+        "color": "#D946EF",
+        "order": 20
+      },
+      {
+        "name": "Substitute Plans",
+        "icon": "clipboard-outline",
+        "color": "#1E293B",
+        "order": 21
+      },
+      {
+        "name": "Classroom Decor",
+        "icon": "color-palette-outline",
+        "color": "#F43F5E",
+        "order": 22
+      },
+      {
+        "name": "Textbook Inventory",
+        "icon": "library-outline",
+        "color": "#334155",
+        "order": 23
+      },
+      {
+        "name": "Software Logins",
+        "icon": "laptop-outline",
+        "color": "#0EA5E9",
+        "order": 24
+      },
+      {
+        "name": "Behavior Logs",
+        "icon": "alert-circle-outline",
+        "color": "#71717A",
+        "order": 25
+      },
+      {
+        "name": "Report Cards",
+        "icon": "star-outline",
+        "color": "#FACC15",
+        "order": 26
+      },
+      {
+        "name": "District Policies",
+        "icon": "gavel-outline",
+        "color": "#15803D",
+        "order": 27
+      },
+      {
+        "name": "Tax Forms",
+        "icon": "file-tray-full-outline",
+        "color": "#7F1D1D",
+        "order": 28
+      },
+      {
+        "name": "Reference Letters",
+        "icon": "person-add-outline",
+        "color": "#A855F7",
+        "order": 29
+      },
+      {
+        "name": "Seating Charts",
+        "icon": "grid-outline",
+        "color": "#94A3B8",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Grading",
+        "color": "#EF4444",
+        "order": 1
+      },
+      {
+        "name": "Planning",
+        "color": "#2563EB",
+        "order": 2
+      },
+      {
+        "name": "Admin",
+        "color": "#334155",
+        "order": 3
+      },
+      {
+        "name": "Parent Contact",
+        "color": "#EC4899",
+        "order": 4
+      },
+      {
+        "name": "Meeting",
+        "color": "#64748B",
+        "order": 5
+      },
+      {
+        "name": "Urgent",
+        "color": "#DC2626",
+        "order": 6
+      },
+      {
+        "name": "Completed",
+        "color": "#10B981",
+        "order": 7
+      },
+      {
+        "name": "Semester 1",
+        "color": "#0EA5E9",
+        "order": 8
+      },
+      {
+        "name": "Semester 2",
+        "color": "#06B6D4",
+        "order": 9
+      },
+      {
+        "name": "Student A",
+        "color": "#F59E0B",
+        "order": 10
+      },
+      {
+        "name": "Student B",
+        "color": "#8B5CF6",
+        "order": 11
+      },
+      {
+        "name": "IEP",
+        "color": "#D946EF",
+        "order": 12
+      },
+      {
+        "name": "504 Plan",
+        "color": "#A855F7",
+        "order": 13
+      },
+      {
+        "name": "Field Trip",
+        "color": "#F97316",
+        "order": 14
+      },
+      {
+        "name": "Professional Dev",
+        "color": "#15803D",
+        "order": 15
+      },
+      {
+        "name": "Sick Leave",
+        "color": "#9F1239",
+        "order": 16
+      },
+      {
+        "name": "Budget",
+        "color": "#16A34A",
+        "order": 17
+      },
+      {
+        "name": "Receipt",
+        "color": "#EAB308",
+        "order": 18
+      },
+      {
+        "name": "To Print",
+        "color": "#1E293B",
+        "order": 19
+      },
+      {
+        "name": "To Email",
+        "color": "#4F46E5",
+        "order": 20
+      },
+      {
+        "name": "Archive",
+        "color": "#9CA3AF",
+        "order": 21
+      },
+      {
+        "name": "Confidential",
+        "color": "#000000",
+        "order": 22
+      },
+      {
+        "name": "Math",
+        "color": "#3B82F6",
+        "order": 23
+      },
+      {
+        "name": "English",
+        "color": "#F43F5E",
+        "order": 24
+      },
+      {
+        "name": "Science",
+        "color": "#22C55E",
+        "order": 25
+      },
+      {
+        "name": "History",
+        "color": "#B45309",
+        "order": 26
+      },
+      {
+        "name": "Art",
+        "color": "#FB7185",
+        "order": 27
+      },
+      {
+        "name": "Exam",
+        "color": "#7F1D1D",
+        "order": 28
+      },
+      {
+        "name": "Homework",
+        "color": "#4B5563",
+        "order": 29
+      },
+      {
+        "name": "Project",
+        "color": "#6366F1",
+        "order": 30
+      }
+    ],
+    "order": 14
+  },
+  {
+    "name": "Fitness & Wellness",
+    "description": "Tracking workouts, nutrition, coaching, and progress.",
+    "icon": "barbell-outline",
+    "categories": [
+      {
+        "name": "Workout Logs",
+        "icon": "fitness-outline",
+        "color": "#EF4444",
+        "order": 1
+      },
+      {
+        "name": "Meal Plans",
+        "icon": "nutrition-outline",
+        "color": "#10B981",
+        "order": 2
+      },
+      {
+        "name": "Coach Agreements",
+        "icon": "people-outline",
+        "color": "#3B82F6",
+        "order": 3
+      },
+      {
+        "name": "Gym Membership",
+        "icon": "card-outline",
+        "color": "#111827",
+        "order": 4
+      },
+      {
+        "name": "Progress Photos",
+        "icon": "camera-outline",
+        "color": "#F59E0B",
+        "order": 5
+      },
+      {
+        "name": "Body Measurements",
+        "icon": "resize-outline",
+        "color": "#64748B",
+        "order": 6
+      },
+      {
+        "name": "Supplement Orders",
+        "icon": "flask-outline",
+        "color": "#8B5CF6",
+        "order": 7
+      },
+      {
+        "name": "Lab/Blood Work",
+        "icon": "water-outline",
+        "color": "#DC2626",
+        "order": 8
+      },
+      {
+        "name": "Race Registrations",
+        "icon": "flag-outline",
+        "color": "#EAB308",
+        "order": 9
+      },
+      {
+        "name": "Physio/Chiro Bills",
+        "icon": "body-outline",
+        "color": "#0EA5E9",
+        "order": 10
+      },
+      {
+        "name": "Equipment Warranty",
+        "icon": "shield-outline",
+        "color": "#57534E",
+        "order": 11
+      },
+      {
+        "name": "Training Programs",
+        "icon": "list-outline",
+        "color": "#4F46E5",
+        "order": 12
+      },
+      {
+        "name": "Recipe Collection",
+        "icon": "restaurant-outline",
+        "color": "#F97316",
+        "order": 13
+      },
+      {
+        "name": "Sleep Data",
+        "icon": "moon-outline",
+        "color": "#3730A3",
+        "order": 14
+      },
+      {
+        "name": "App Subscriptions",
+        "icon": "phone-portrait-outline",
+        "color": "#EC4899",
+        "order": 15
+      },
+      {
+        "name": "Personal Records",
+        "icon": "trophy-outline",
+        "color": "#FACC15",
+        "order": 16
+      },
+      {
+        "name": "Yoga/Class Schedules",
+        "icon": "calendar-outline",
+        "color": "#14B8A6",
+        "order": 17
+      },
+      {
+        "name": "Mindfulness/Journal",
+        "icon": "happy-outline",
+        "color": "#06B6D4",
+        "order": 18
+      },
+      {
+        "name": "Gear Receipts",
+        "icon": "receipt-outline",
+        "color": "#94A3B8",
+        "order": 19
+      },
+      {
+        "name": "Injuries/Rehab",
+        "icon": "bandage-outline",
+        "color": "#9F1239",
+        "order": 20
+      },
+      {
+        "name": "Hydration Logs",
+        "icon": "water-outline",
+        "color": "#60A5FA",
+        "order": 21
+      },
+      {
+        "name": "Wearable Data",
+        "icon": "watch-outline",
+        "color": "#1E293B",
+        "order": 22
+      },
+      {
+        "name": "Calorie Tracking",
+        "icon": "calculator-outline",
+        "color": "#FB7185",
+        "order": 23
+      },
+      {
+        "name": "Macro Splits",
+        "icon": "pie-chart-outline",
+        "color": "#22C55E",
+        "order": 24
+      },
+      {
+        "name": "Online Coaching",
+        "icon": "videocam-outline",
+        "color": "#A855F7",
+        "order": 25
+      },
+      {
+        "name": "Goal Setting",
+        "icon": "rocket-outline",
+        "color": "#D946EF",
+        "order": 26
+      },
+      {
+        "name": "Competitor Research",
+        "icon": "search-outline",
+        "color": "#334155",
+        "order": 27
+      },
+      {
+        "name": "Travel Workouts",
+        "icon": "airplane-outline",
+        "color": "#0F766E",
+        "order": 28
+      },
+      {
+        "name": "Music Playlists",
+        "icon": "musical-notes-outline",
+        "color": "#15803D",
+        "order": 29
+      },
+      {
+        "name": "Certification Docs",
+        "icon": "ribbon-outline",
+        "color": "#B45309",
+        "order": 30
+      }
+    ],
+    "tags": [
+      {
+        "name": "Cardio",
+        "color": "#EF4444",
+        "order": 1
+      },
+      {
+        "name": "Strength",
+        "color": "#111827",
+        "order": 2
+      },
+      {
+        "name": "Flexibility",
+        "color": "#10B981",
+        "order": 3
+      },
+      {
+        "name": "Rest Day",
+        "color": "#64748B",
+        "order": 4
+      },
+      {
+        "name": "Leg Day",
+        "color": "#3B82F6",
+        "order": 5
+      },
+      {
+        "name": "Arm Day",
+        "color": "#F59E0B",
+        "order": 6
+      },
+      {
+        "name": "Back Day",
+        "color": "#8B5CF6",
+        "order": 7
+      },
+      {
+        "name": "Chest Day",
+        "color": "#0EA5E9",
+        "order": 8
+      },
+      {
+        "name": "Meal Prep",
+        "color": "#15803D",
+        "order": 9
+      },
+      {
+        "name": "Supplement",
+        "color": "#A855F7",
+        "order": 10
+      },
+      {
+        "name": "Paid",
+        "color": "#22C55E",
+        "order": 11
+      },
+      {
+        "name": "Subscription",
+        "color": "#EC4899",
+        "order": 12
+      },
+      {
+        "name": "PR",
+        "color": "#FACC15",
+        "order": 13
+      },
+      {
+        "name": "Injury",
+        "color": "#9F1239",
+        "order": 14
+      },
+      {
+        "name": "Rehab",
+        "color": "#F97316",
+        "order": 15
+      },
+      {
+        "name": "Bulking",
+        "color": "#1E293B",
+        "order": 16
+      },
+      {
+        "name": "Cutting",
+        "color": "#06B6D4",
+        "order": 17
+      },
+      {
+        "name": "Maintenance",
+        "color": "#94A3B8",
+        "order": 18
+      },
+      {
+        "name": "Coach",
+        "color": "#4F46E5",
+        "order": 19
+      },
+      {
+        "name": "Doctor",
+        "color": "#DC2626",
+        "order": 20
+      },
+      {
+        "name": "Receipt",
+        "color": "#57534E",
+        "order": 21
+      },
+      {
+        "name": "Warranty",
+        "color": "#334155",
+        "order": 22
+      },
+      {
+        "name": "Goal Met",
+        "color": "#84CC16",
+        "order": 23
+      },
+      {
+        "name": "Competition",
+        "color": "#EAB308",
+        "order": 24
+      },
+      {
+        "name": "Video",
+        "color": "#D946EF",
+        "order": 25
+      },
+      {
+        "name": "Photo",
+        "color": "#FB7185",
+        "order": 26
+      },
+      {
+        "name": "Data",
+        "color": "#374151",
+        "order": 27
+      },
+      {
+        "name": "Morning",
+        "color": "#FDBA74",
+        "order": 28
+      },
+      {
+        "name": "Evening",
+        "color": "#818CF8",
+        "order": 29
+      },
+      {
+        "name": "High Priority",
+        "color": "#B91C1C",
+        "order": 30
+      }
+    ],
+    "order": 15
+  }
+]

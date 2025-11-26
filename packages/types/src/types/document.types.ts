@@ -1,3 +1,13 @@
+import { Category } from "./category.types";
+import { Tag } from "./tag.types";
+
+export enum ProcessingStatus {
+  PENDING = "PENDING",
+  PROCESSING = "PROCESSING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+}
+
 /**
  * Document interface
  */
@@ -12,10 +22,17 @@ export interface Document {
   title?: string;
   description?: string;
   content?: string;
+  metadata?: Record<string, any>;
   isProcessed: boolean;
+  processingStatus: ProcessingStatus;
+  classificationSource?: "AI" | "MANUAL";
   createdAt: Date;
   updatedAt: Date;
+  deletedAt?: Date;
   userId: string;
+  categoryId?: string;
+  category?: Category;
+  tags?: Tag[];
 }
 
 /**
@@ -23,12 +40,28 @@ export interface Document {
  */
 export type CreateDocumentInput = Omit<
   Document,
-  "id" | "createdAt" | "updatedAt" | "isProcessed"
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "deletedAt"
+  | "isProcessed"
+  | "processingStatus"
+  | "category"
+  | "tags"
 >;
 
 /**
  * Document update input type
  */
 export type UpdateDocumentInput = Partial<
-  Omit<Document, "id" | "userId" | "createdAt" | "updatedAt">
+  Omit<
+    Document,
+    | "id"
+    | "userId"
+    | "createdAt"
+    | "updatedAt"
+    | "deletedAt"
+    | "category"
+    | "tags"
+  >
 >;

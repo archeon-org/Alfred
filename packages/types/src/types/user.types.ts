@@ -41,8 +41,10 @@ export interface User {
   lastName: string;
   phone?: string;
   profilePicture?: string;
+  pushToken?: string;
   storageUsed: number;
   storageLimit: number;
+  preferences: Record<string, any>;
   searchCount: number;
   address?: Address;
   role: UserType;
@@ -51,6 +53,7 @@ export interface User {
   lastLoginAt?: Date;
   otpHash?: string;
   otpExpiresAt?: Date;
+  isOnboarded: boolean;
   createdAt: Date;
   updatedAt: Date;
   documents?: Document[];

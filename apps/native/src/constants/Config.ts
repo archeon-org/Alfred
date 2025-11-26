@@ -2,13 +2,13 @@ import { Platform } from "react-native";
 
 const ENV = {
   local: {
-    apiUrl: "https://23177b8cbecb.ngrok-free.app/api",
+    apiUrl: process.env.EXPO_PUBLIC_API_URL,
   },
   development: {
-    apiUrl: "https://gate-dev.mooo.com/api",
+    apiUrl: process.env.EXPO_PUBLIC_API_URL || "https://gate-dev.mooo.com/api",
   },
   production: {
-    apiUrl: "https://gate-dev.mooo.com/api",
+    apiUrl: process.env.EXPO_PUBLIC_API_URL || "https://gate-dev.mooo.com/api",
   },
 };
 
@@ -27,7 +27,7 @@ const API_URL = getEnvVars().apiUrl;
 const GOOGLE_CLIENT_IDS = {
   ios: "317862465448-5fhhcvu8gkb5nmannveetfn16tag143t.apps.googleusercontent.com",
   android:
-    "317862465448-0kq5cf8jda50m22d558lh6k7p0qafjj4.apps.googleusercontent.com",
+    "317862465448-p8o2csa8492ljut4dracmvdgiahv3shl.apps.googleusercontent.com",
   web: "317862465448-nvaig0d87ogeem6ju3qttfvcgd6fp5f6.apps.googleusercontent.com",
 };
 

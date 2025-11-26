@@ -56,7 +56,7 @@ export class AuthService {
     }
 
     const googleUserInfo = await response.json();
-    console.log(googleUserInfo);
+
     this.logger.debug(
       `Google user info retrieved: ${googleUserInfo.email} (ID: ${googleUserInfo.id})`,
     );
@@ -104,7 +104,7 @@ export class AuthService {
 
   public async verifyGoogleToken(
     googleVerifyDto: GoogleVerifyDto,
-  ): Promise<{ accessToken: string }> {
+  ): Promise<{ accessToken: string; isOnboarded: boolean }> {
     this.logger.debug(
       `Verifying Google token for email: ${googleVerifyDto.email}`,
     );
@@ -132,7 +132,7 @@ export class AuthService {
 
       await this.userService.updateLastLogin(user.id);
 
-      return { accessToken };
+      return { accessToken, isOnboarded: user.isOnboarded };
     } catch (error) {
       this.logger.error(
         `Google token verification failed: ${error.message}`,
@@ -162,7 +162,9 @@ export class AuthService {
     }
   }
 
-  public async verifyOtp(dto: VerifyOtpDto): Promise<{ accessToken: string }> {
+  public async verifyOtp(
+    dto: VerifyOtpDto,
+  ): Promise<{ accessToken: string; isOnboarded: boolean }> {
     const user = await this.userService.findByEmailWithOtp(dto.email);
     if (!user || !user.otpHash || !user.otpExpiresAt) {
       throw new UnauthorizedException('Invalid OTP');
@@ -181,6 +183,6 @@ export class AuthService {
     await this.userService.updateLastLogin(user.id);
 
     const accessToken = await this.creationAccessToken(user);
-    return { accessToken };
+    return { accessToken, isOnboarded: user.isOnboarded };
   }
 }

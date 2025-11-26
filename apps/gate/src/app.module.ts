@@ -9,6 +9,10 @@ import { APP_GUARD } from '@nestjs/core';
 import { UserTypeGuard } from './auth/guards/user-type.guard';
 import { HealthModule } from './health/health.module';
 import { DocumentModule } from './document/document.module';
+import { CategoryModule } from './category/category.module';
+import { TagModule } from './tag/tag.module';
+import { TemplateModule } from './template/template.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -20,6 +24,11 @@ import { DocumentModule } from './document/document.module';
     AuthModule,
     HealthModule,
     DocumentModule,
+    CategoryModule,
+    TagModule,
+    TemplateModule,
+
+    NotificationModule,
   ],
   providers: [
     {

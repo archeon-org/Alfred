@@ -1,7 +1,8 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
+import { Alert } from "react-native";
 import Config from "../constants/Config";
-import { User, UpdateUserInput } from "@archeon-org/types";
+import { parseApiError } from "../utils/apiError";
 
 const api = axios.create({
   baseURL: Config.API_URL,
@@ -24,44 +25,25 @@ api.interceptors.request.use(
   }
 );
 
-export { User };
-export type UpdateUserDto = UpdateUserInput;
+// Add a response interceptor to handle errors globally
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const appError = parseApiError(error);
 
-export const verifyGoogleToken = async (
-  email: string,
-  firstName: string | null,
-  lastName: string | null,
-  picture: string | null,
-  googleAccessToken: string
-) => {
-  const response = await api.post("/auth/google/verify", {
-    email,
-    firstName,
-    lastName,
-    picture,
-    googleAccessToken,
-  });
-  return response.data;
-};
+    // Handle 401 Unauthorized globally (optional: redirect to login)
+    // We let the AuthContext handle the state change, but we can clear the token here if needed.
+    if (appError.statusCode === 401) {
+      await SecureStore.deleteItemAsync("auth_token");
+    }
 
-export const requestOtp = async (email: string) => {
-  const response = await api.post("/auth/otp/request", { email });
-  return response.data;
-};
+    // Show Alert for critical errors (Network or Server errors)
+    if (appError.statusCode === 0 || appError.statusCode >= 500) {
+      Alert.alert("Error", appError.message);
+    }
 
-export const verifyOtp = async (email: string, otp: string) => {
-  const response = await api.post("/auth/otp/verify", { email, otp });
-  return response.data;
-};
-
-export const getProfile = async (): Promise<User> => {
-  const response = await api.get("/user/me");
-  return response.data;
-};
-
-export const updateUser = async (data: UpdateUserDto): Promise<User> => {
-  const response = await api.put("/user/me", data);
-  return response.data;
-};
+    return Promise.reject(appError);
+  }
+);
 
 export default api;

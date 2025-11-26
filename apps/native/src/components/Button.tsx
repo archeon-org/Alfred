@@ -1,12 +1,21 @@
 import React from "react";
-import { TouchableOpacity, Text, ActivityIndicator } from "react-native";
+import {
+  Pressable,
+  Text,
+  ActivityIndicator,
+  View,
+  type PressableProps,
+} from "react-native";
+import { cn } from "../utils/cn";
 
-interface ButtonProps {
-  title: string;
-  onPress: () => void;
+interface ButtonProps extends PressableProps {
+  title?: string;
   isLoading?: boolean;
-  variant?: "primary" | "secondary" | "outline";
+  variant?: "primary" | "secondary" | "outline" | "ghost";
   className?: string;
+  textClassName?: string;
+  icon?: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -14,36 +23,62 @@ export const Button: React.FC<ButtonProps> = ({
   onPress,
   isLoading = false,
   variant = "primary",
-  className = "",
+  className,
+  textClassName,
+  icon,
+  children,
+  disabled,
+  ...props
 }) => {
-  const baseStyles =
-    "py-3 px-6 rounded-lg flex-row justify-center items-center";
-
   const variants = {
-    primary: "bg-blue-600",
-    secondary: "bg-gray-600",
-    outline: "bg-transparent border border-gray-300",
+    primary: "bg-primary active:bg-primary-700 shadow-sm shadow-primary/30",
+    secondary: "bg-surface border border-gray-200 active:bg-gray-50 shadow-sm",
+    outline: "bg-transparent border border-primary active:bg-primary-50",
+    ghost: "bg-transparent active:bg-gray-100",
   };
 
   const textVariants = {
-    primary: "text-white font-semibold",
-    secondary: "text-white font-semibold",
-    outline: "text-gray-700 font-semibold",
+    primary: "text-white font-bold",
+    secondary: "text-gray-900 font-semibold",
+    outline: "text-primary font-semibold",
+    ghost: "text-gray-600 font-medium",
   };
 
   return (
-    <TouchableOpacity
+    <Pressable
       onPress={onPress}
-      disabled={isLoading}
-      className={`${baseStyles} ${variants[variant]} ${className} ${isLoading ? "opacity-70" : ""}`}
+      disabled={isLoading || disabled}
+      className={cn(
+        "flex-row items-center justify-center rounded-2xl px-6 py-4",
+        variants[variant],
+        (isLoading || disabled) && "opacity-60",
+        className
+      )}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ busy: isLoading, disabled: disabled || isLoading }}
+      {...props}
     >
       {isLoading ? (
         <ActivityIndicator
-          color={variant === "outline" ? "#374151" : "#ffffff"}
+          color={
+            variant === "outline" || variant === "ghost" ? "#374151" : "#ffffff"
+          }
         />
       ) : (
-        <Text className={`${textVariants[variant]} text-base`}>{title}</Text>
+        <>
+          {icon && <View className="mr-2">{icon}</View>}
+          {title ? (
+            <Text
+              className={cn("text-base", textVariants[variant], textClassName)}
+            >
+              {title}
+            </Text>
+          ) : (
+            children
+          )}
+        </>
       )}
-    </TouchableOpacity>
+    </Pressable>
   );
 };

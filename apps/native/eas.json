@@ -8,7 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_ENV": "local"
+        "EXPO_PUBLIC_ENV": "development"
       }
     },
     "preview": {

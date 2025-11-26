@@ -46,4 +46,8 @@ export class UpdateUserDto {
   @Type(() => AddressDto)
   @IsObject()
   address?: AddressDto;
+
+  @IsOptional()
+  @IsObject()
+  preferences?: Record<string, any>;
 }

@@ -21,7 +21,17 @@ export class DocumentRepository extends BaseRepository {
   }
 
   public async findById(id: string): Promise<DocumentEntity | null> {
-    return this.getRepository(DocumentEntity).findOne({ where: { id } });
+    return this.getRepository(DocumentEntity).findOne({
+      where: { id },
+      relations: ['category', 'tags'],
+    });
+  }
+
+  public async findByIds(ids: string[]): Promise<DocumentEntity[]> {
+    return this.getRepository(DocumentEntity)
+      .createQueryBuilder('document')
+      .where('document.id IN (:...ids)', { ids })
+      .getMany();
   }
 
   public async findByUserId(userId: string): Promise<DocumentEntity[]> {
@@ -29,5 +39,42 @@ export class DocumentRepository extends BaseRepository {
       where: { userId },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  public async update(
+    id: string,
+    data: Partial<DocumentEntity> & { tagIds?: string[] },
+  ): Promise<DocumentEntity> {
+    const { tagIds, ...updateData } = data;
+
+    if (Object.keys(updateData).length > 0) {
+      await this.getRepository(DocumentEntity).update(id, updateData);
+    }
+
+    if (tagIds) {
+      const document = await this.findById(id);
+      if (document) {
+        document.tags = tagIds.map((tagId) => ({ id: tagId }) as any);
+        await this.getRepository(DocumentEntity).save(document);
+      }
+    }
+
+    return this.findById(id);
+  }
+
+  public async updateMany(
+    ids: string[],
+    data: Partial<DocumentEntity>,
+  ): Promise<void> {
+    await this.getRepository(DocumentEntity)
+      .createQueryBuilder()
+      .update(DocumentEntity)
+      .set(data)
+      .where('id IN (:...ids)', { ids })
+      .execute();
+  }
+
+  public async softDelete(id: string): Promise<void> {
+    await this.getRepository(DocumentEntity).softDelete(id);
   }
 }

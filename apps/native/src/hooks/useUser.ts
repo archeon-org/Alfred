@@ -1,6 +1,6 @@
 // src/hooks/useUser.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getProfile, updateUser, UpdateUserDto, User } from "../services/api";
+import { getProfile, updateUser, UpdateUserDto, User } from "../services";
 
 export const USER_QUERY_KEY = ["user"];
 

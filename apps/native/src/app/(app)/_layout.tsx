@@ -11,36 +11,18 @@ export default function AppLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: true,
-        headerRight: () => (
-          <TouchableOpacity
-            onPress={() => router.push("/notifications")}
-            style={{ marginRight: 16 }}
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={24}
-              color={isDark ? colors.white : colors.black}
-            />
-          </TouchableOpacity>
-        ),
-        headerStyle: {
-          backgroundColor: isDark ? colors.black : colors.white,
-          shadowOpacity: 0,
-          elevation: 0,
-          borderBottomWidth: 1,
-          borderBottomColor: isDark ? colors.gray[800] : colors.gray[100],
-        },
-        headerTitleStyle: {
-          color: isDark ? colors.white : colors.black,
-          fontWeight: "bold",
-          fontSize: 20,
-        },
-        tabBarActiveTintColor: isDark ? colors.white : colors.black,
-        tabBarInactiveTintColor: isDark ? colors.gray[500] : colors.gray[400],
+        headerShown: false,
+        tabBarActiveTintColor: "#6366F1",
+        tabBarInactiveTintColor: isDark ? "#9CA3AF" : "#9CA3AF",
         tabBarStyle: {
-          backgroundColor: isDark ? colors.black : colors.white,
-          borderTopColor: isDark ? colors.gray[800] : colors.gray[200],
+          backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
+          borderTopColor: isDark ? "#374151" : "#F3F4F6",
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "600",
+          marginBottom: 4,
         },
       }}
     >
@@ -48,15 +30,17 @@ export default function AppLayout() {
         name="index"
         options={{
           title: "Home",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="documents"
+        name="categories"
         options={{
-          title: "Documents",
+          title: "Categories",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="folder-open-outline" size={size} color={color} />
           ),
@@ -66,6 +50,7 @@ export default function AppLayout() {
         name="scan"
         options={{
           title: "Scan",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons
               name="scan-circle-outline"
@@ -76,11 +61,12 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="search"
+        name="documents"
         options={{
-          title: "Search",
+          title: "Documents",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search-outline" size={size} color={color} />
+            <Ionicons name="document-text-outline" size={size} color={color} />
           ),
         }}
       />
@@ -88,6 +74,7 @@ export default function AppLayout() {
         name="profile"
         options={{
           title: "Profile",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),

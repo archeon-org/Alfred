@@ -30,9 +30,11 @@
   "dependencies": {
     "@archeon-org/types": "*",
     "@expo/vector-icons": "^15.0.3",
+    "@hookform/resolvers": "^5.2.2",
     "@react-navigation/native": "^7.1.8",
     "@tanstack/react-query": "^5.90.10",
     "axios": "^1.13.2",
+    "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "expo": "~54.0.25",
     "expo-auth-session": "^7.0.9",
@@ -54,12 +56,17 @@
     "nativewind": "^4.2.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-hook-form": "^7.66.1",
     "react-native": "0.81.5",
+    "react-native-blob-util": "^0.24.4",
     "react-native-document-scanner-plugin": "^2.0.2",
-    "react-native-safe-area-context": "5.4.0",
+    "react-native-pdf": "^7.0.3",
+    "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.5.1"
+    "react-native-worklets": "0.5.1",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
