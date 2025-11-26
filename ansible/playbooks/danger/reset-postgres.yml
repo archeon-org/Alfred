@@ -1,0 +1,43 @@
+---
+- name: ⚠️ DANGER - Reset PostgreSQL Database (Wipe Data)
+  hosts: archeon-vps
+  become: true
+  gather_facts: false
+
+  vars:
+    app_directory: "/opt/archeon"
+
+  tasks:
+    - name: ⚠️ Confirmation Check
+      pause:
+        prompt: "⚠️  WARNING: This will COMPLETELY WIPE the PostgreSQL database (volumes, data, tables). Are you sure you want to proceed? Press Enter to continue or Ctrl+C to abort."
+
+    - name: 🛑 Stop PostgreSQL container
+      shell: docker stop postgres-archeon || true
+      ignore_errors: true
+
+    - name: 🗑️ Remove PostgreSQL container
+      shell: docker rm postgres-archeon || true
+      ignore_errors: true
+
+    - name: 🗑️ Remove PostgreSQL volume (Wiping Data)
+      shell: docker volume rm archeon-postgres-data || true
+      ignore_errors: true
+
+    - name: 🚀 Start PostgreSQL service (Fresh Start)
+      shell: |
+        cd {{ app_directory }}
+        docker compose up -d postgres-archeon
+      register: docker_up_result
+
+    - name: ⏳ Wait for PostgreSQL to be ready
+      wait_for:
+        host: "127.0.0.1"
+        port: 5432
+        delay: 5
+        timeout: 60
+        msg: "PostgreSQL is not responding after reset"
+
+    - name: ✅ Reset Complete
+      debug:
+        msg: "✅ PostgreSQL has been reset. All data was wiped and the service was restarted."
