@@ -12,6 +12,12 @@ export interface GenerateTitleJobData {
   originalName?: string;
 }
 
+export interface GenerateEmbeddingJobData {
+  documentId: string;
+  userId: string;
+  key: string;
+}
+
 export interface DeleteEmbeddingJobData {
   documentId: string;
 }

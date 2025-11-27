@@ -4,6 +4,7 @@ import { Queue } from 'bull';
 import {
   ProcessDocumentJobData,
   GenerateTitleJobData,
+  GenerateEmbeddingJobData,
   DeleteEmbeddingJobData,
 } from '@archeon-org/types';
 
@@ -45,6 +46,24 @@ export class QueueService {
     } catch (error) {
       this.logger.error(
         `Failed to add title generation job for document ${data.documentId}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  async addEmbeddingGenerationJob(data: GenerateEmbeddingJobData) {
+    try {
+      await this.documentsQueue.add('generate-embedding', data, {
+        attempts: 1,
+        removeOnComplete: true,
+      });
+      this.logger.log(
+        `Added embedding generation job for document ${data.documentId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to add embedding generation job for document ${data.documentId}`,
         error.stack,
       );
       throw error;

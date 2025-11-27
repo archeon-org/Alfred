@@ -4,6 +4,7 @@ import { Repository, In } from 'typeorm';
 import {
   ProcessDocumentJobData,
   GenerateTitleJobData,
+  GenerateEmbeddingJobData,
 } from '@archeon-org/types';
 import {
   DocumentEntity,
@@ -273,6 +274,86 @@ export class DocumentService {
         userId: data.userId,
         title: 'Title Generation Failed',
         message: 'There was an error generating a title for your document.',
+        redirect: `/(app)/documents/${data.documentId}`,
+        data: { documentId: data.documentId },
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Generate only an embedding for a document (no classification)
+   * Used for manually classified documents where user wants to enable semantic search
+   */
+  async generateDocumentEmbedding(
+    data: GenerateEmbeddingJobData,
+  ): Promise<void> {
+    this.logger.log(
+      `Starting embedding generation for document: ${data.documentId}`,
+    );
+
+    try {
+      // 1. Get document to check if it has content already
+      const document = await this.documentRepository.findOne({
+        where: { id: data.documentId },
+        select: ['id', 'content', 'title'],
+      });
+
+      if (!document) {
+        throw new Error(`Document ${data.documentId} not found`);
+      }
+
+      let text = document.content;
+
+      // 2. If no content exists, perform OCR
+      if (!text) {
+        this.logger.log(
+          `No content found, performing OCR for document: ${data.documentId}`,
+        );
+        const fileBuffer = await this.r2Service.getFile(data.key);
+        text = await this.ocrService.recognize(fileBuffer);
+
+        // Save the extracted content
+        await this.documentRepository.update(data.documentId, {
+          content: text,
+        });
+      }
+
+      // 3. Generate embedding for semantic search
+      this.logger.log(`Generating embedding for document: ${data.documentId}`);
+      await this.embeddingService.createOrUpdateEmbedding(
+        data.documentId,
+        data.userId,
+        text,
+      );
+
+      this.logger.log(
+        `Successfully generated embedding for document ${data.documentId}`,
+      );
+
+      // 4. Send success notification
+      await this.notificationService.create({
+        userId: data.userId,
+        title: 'Search Enabled',
+        message: `"${document.title || 'Your document'}" can now be found through search.`,
+        redirect: `/(app)/documents/${data.documentId}`,
+        data: {
+          documentId: data.documentId,
+          url: `/(app)/documents/${data.documentId}`,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate embedding for document ${data.documentId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+
+      // Send failure notification
+      await this.notificationService.create({
+        userId: data.userId,
+        title: 'Search Enabling Failed',
+        message: 'There was an error enabling search for your document.',
         redirect: `/(app)/documents/${data.documentId}`,
         data: { documentId: data.documentId },
       });

@@ -8,6 +8,7 @@ import {
   bulkUpdateDocuments,
   triggerAiClassification,
   triggerAiTitleGeneration,
+  triggerEmbedding,
   deleteDocument,
 } from "../services";
 import * as WebBrowser from "expo-web-browser";
@@ -107,6 +108,14 @@ export const useDocumentMutations = () => {
     },
   });
 
+  const triggerEmbeddingMutation = useMutation({
+    mutationFn: (id: string) => triggerEmbedding(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.invalidateQueries({ queryKey: ["document"] });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteDocument(id),
     onSuccess: () => {
@@ -123,6 +132,8 @@ export const useDocumentMutations = () => {
     isTriggeringAi: triggerAiMutation.isPending,
     generateAiTitle: generateTitleMutation.mutateAsync,
     isGeneratingTitle: generateTitleMutation.isPending,
+    triggerEmbedding: triggerEmbeddingMutation.mutateAsync,
+    isTriggeringEmbedding: triggerEmbeddingMutation.isPending,
     deleteDocument: deleteMutation.mutateAsync,
     isDeleting: deleteMutation.isPending,
   };

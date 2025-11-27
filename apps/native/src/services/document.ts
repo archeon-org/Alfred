@@ -126,6 +126,11 @@ export const triggerAiTitleGeneration = async (
   return response.data;
 };
 
+export const triggerEmbedding = async (id: string): Promise<Document> => {
+  const response = await api.post(`/documents/${id}/embed`);
+  return response.data;
+};
+
 export const deleteDocument = async (id: string): Promise<void> => {
   await api.delete(`/documents/${id}`);
 };

@@ -101,6 +101,8 @@ export default function DocumentDetails() {
     handleOpenTitleModal,
     handleSaveTitle,
     handleGenerateAiTitle,
+    handleTriggerEmbedding,
+    isTriggeringEmbedding,
     isUpdating,
     isGeneratingTitle,
     fetchNextPage,
@@ -315,6 +317,43 @@ export default function DocumentDetails() {
             </View>
           </View>
         )}
+
+        {/* Enable Search Alert - Show for manually classified documents without embedding */}
+        {document.classificationSource === "MANUAL" &&
+          document.processingStatus === "COMPLETED" &&
+          !document.hasEmbedding && (
+            <View className="mx-5 mb-6 bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-800">
+              <View className="flex-row items-start gap-3 mb-4">
+                <View className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl items-center justify-center">
+                  <Ionicons name="search" size={20} color="#6366F1" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-indigo-900 dark:text-indigo-100 font-bold text-base mb-0.5">
+                    Enable Search
+                  </Text>
+                  <Text className="text-indigo-700 dark:text-indigo-300 text-sm">
+                    Make this document findable through search
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={handleTriggerEmbedding}
+                disabled={isTriggeringEmbedding}
+                className="bg-indigo-600 py-3 rounded-xl items-center flex-row justify-center gap-2"
+              >
+                {isTriggeringEmbedding ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="flash" size={16} color="white" />
+                    <Text className="text-white font-bold text-sm">
+                      Enable Search
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
 
         {/* Quick Info Grid */}
         <View className="px-5 mb-6">

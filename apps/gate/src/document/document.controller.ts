@@ -123,4 +123,10 @@ export class DocumentController {
     const user = req.user as UserEntity;
     return this.documentService.triggerAiTitleGeneration(user.id, id);
   }
+
+  @Post(':id/embed')
+  async triggerEmbedding(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as UserEntity;
+    return this.documentService.triggerEmbedding(user.id, id);
+  }
 }

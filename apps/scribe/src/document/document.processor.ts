@@ -5,6 +5,7 @@ import { DocumentService } from './document.service';
 import {
   ProcessDocumentJobData,
   GenerateTitleJobData,
+  GenerateEmbeddingJobData,
   DeleteEmbeddingJobData,
 } from '@archeon-org/types';
 import { EmbeddingService } from '../embedding/embedding.service';
@@ -54,6 +55,25 @@ export class DocumentProcessor {
     } catch (error) {
       this.logger.error(
         `Title generation job ${job.id} failed for document ${job.data.documentId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+  }
+
+  @Process('generate-embedding')
+  async handleGenerateEmbedding(job: Job<GenerateEmbeddingJobData>) {
+    this.logger.log(
+      `Received job ${job.id} to generate embedding for document ${job.data.documentId}`,
+    );
+
+    try {
+      await this.documentService.generateDocumentEmbedding(job.data);
+      this.logger.log(
+        `Successfully completed embedding generation job ${job.id} for document ${job.data.documentId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Embedding generation job ${job.id} failed for document ${job.data.documentId}`,
         error instanceof Error ? error.stack : String(error),
       );
     }

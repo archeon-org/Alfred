@@ -295,43 +295,47 @@ If the document truly doesn't fit ANY existing category even with creative match
       this.logger.log('Starting AI title generation...');
 
       // Limit content - we need less context for title generation
+      // Only use first 2000 chars as that's usually enough for title inference
       const truncatedContent =
-        content.length > 4000
-          ? content.substring(0, 2000) +
-            '\n...\n' +
-            content.substring(content.length - 2000)
-          : content;
+        content.length > 2000 ? content.substring(0, 2000) : content;
 
       const TitleSchema = z.object({
         title: z
           .string()
+          .max(60)
           .describe(
-            'A concise, descriptive title for the document (max 60 characters).',
+            'A concise, descriptive title for the document. MAXIMUM 60 characters. Must be short and human-readable.',
           ),
-        reasoning: z
-          .string()
-          .describe('Brief explanation of why you chose this title.'),
       });
 
-      const prompt = `You are a document naming assistant. Your task is to generate a clear, descriptive title for a document.
+      const prompt = `You are a document naming assistant. Generate a SHORT, descriptive title for this document.
 
 ${originalFileName ? `Original filename: "${originalFileName}"` : ''}
 
-## Title Generation Rules:
-- Create a concise, human-readable title (max 60 characters)
-- The title should describe WHAT the document is about
-- Examples of good titles:
-  - "Electricity Bill - January 2024"
-  - "Apartment Lease Agreement"
-  - "Car Insurance Policy - Renewal"
-  - "Medical Test Results - Blood Work"
-  - "Restaurant Receipt - 15 Nov 2024"
-- Include relevant details like dates, company names, or key identifiers when available
-- Use the document's language for the title (if document is in French, title should be in French)
-- Do NOT use the original filename unless it's already descriptive
-- Do NOT include file extensions (.pdf, .jpg, etc.)
-- Do NOT use generic titles like "Document" or "File"
-`;
+## CRITICAL RULES:
+- Title MUST be 60 characters or less
+- Title must be SHORT and CONCISE
+- DO NOT include document content in the title
+- DO NOT summarize the document - just NAME it
+
+## Good title examples:
+- "Train Ticket - Toulouse to Marseille"
+- "Electricity Bill - January 2024"
+- "Apartment Lease Agreement"
+- "Car Insurance Policy"
+- "Medical Test Results"
+- "Restaurant Receipt - 15 Nov 2024"
+
+## What to include:
+- Document type (bill, ticket, contract, etc.)
+- Key identifier (company name, date, location)
+- Use the document's language
+
+## What NOT to include:
+- File extensions (.pdf, .jpg)
+- Generic words like "Document" or "File"
+- The actual content of the document
+- Long descriptions or summaries`;
 
       const response = await this.client.chat.completions.create({
         model: 'accounts/fireworks/models/deepseek-v3p1-terminus',
@@ -340,7 +344,8 @@ ${originalFileName ? `Original filename: "${originalFileName}"` : ''}
           { role: 'user', content: `Document Content:\n${truncatedContent}` },
         ],
         response_format: zodResponseFormat(TitleSchema, 'title_generation'),
-        temperature: 0.2,
+        temperature: 0.1,
+        max_tokens: 150, // Limit response to prevent runaway generation
       });
 
       const result = response.choices[0].message.content;
@@ -352,13 +357,15 @@ ${originalFileName ? `Original filename: "${originalFileName}"` : ''}
 
       const parsed = JSON.parse(result);
 
-      this.logger.log(
-        `AI Title Generation - Title: "${parsed.title}", Reasoning: ${parsed.reasoning}`,
-      );
+      // Ensure title is not too long (extra safety)
+      let title = parsed.title || originalFileName || 'Untitled Document';
+      if (title.length > 60) {
+        title = title.substring(0, 57) + '...';
+      }
 
-      return {
-        title: parsed.title || originalFileName || 'Untitled Document',
-      };
+      this.logger.log(`AI Title Generation - Title: "${title}"`);
+
+      return { title };
     } catch (error) {
       this.logger.error('AI Title generation failed', error);
       return {

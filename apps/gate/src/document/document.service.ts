@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { DocumentRepository } from './document.repository';
-import { DocumentEntity } from '@archeon-org/database';
+import { DocumentEntity, DocumentEmbeddingEntity } from '@archeon-org/database';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import { R2Service } from '@archeon-org/module';
@@ -31,6 +31,8 @@ export class DocumentService {
   constructor(
     @InjectRepository(DocumentEntity)
     private readonly documentRepo: Repository<DocumentEntity>,
+    @InjectRepository(DocumentEmbeddingEntity)
+    private readonly embeddingRepo: Repository<DocumentEmbeddingEntity>,
     private readonly documentRepository: DocumentRepository,
     private readonly r2Service: R2Service,
     private readonly userService: UserService,
@@ -159,7 +161,10 @@ export class DocumentService {
   async getDocumentWithUrl(
     userId: string,
     documentId: string,
-  ): Promise<{ document: DocumentEntity; url: string }> {
+  ): Promise<{
+    document: DocumentEntity & { hasEmbedding: boolean };
+    url: string;
+  }> {
     this.logger.debug(
       `Fetching document with URL: ${documentId} for user ${userId}`,
     );
@@ -177,8 +182,16 @@ export class DocumentService {
       throw new ForbiddenException('Access denied');
     }
 
+    // Check if document has an embedding
+    const embeddingExists = await this.embeddingRepo.exists({
+      where: { documentId },
+    });
+
     const url = await this.r2Service.getSignedUrl(document.path);
-    return { document, url };
+    return {
+      document: { ...document, hasEmbedding: embeddingExists },
+      url,
+    };
   }
 
   async update(
@@ -341,6 +354,42 @@ export class DocumentService {
       userId: document.userId,
       key: document.path,
       originalName: document.originalName,
+    });
+
+    return document;
+  }
+
+  async triggerEmbedding(
+    userId: string,
+    documentId: string,
+  ): Promise<DocumentEntity> {
+    this.logger.log(
+      `Triggering embedding generation for document ${documentId} for user ${userId}`,
+    );
+    const document = await this.documentRepository.findById(documentId);
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    if (document.userId !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Check if embedding already exists
+    const embeddingExists = await this.embeddingRepo.exists({
+      where: { documentId },
+    });
+
+    if (embeddingExists) {
+      throw new BadRequestException('Document already has an embedding');
+    }
+
+    // Add job to queue for embedding generation
+    await this.queueService.addEmbeddingGenerationJob({
+      documentId: document.id,
+      userId: document.userId,
+      key: document.path,
     });
 
     return document;

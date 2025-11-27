@@ -25,6 +25,8 @@ export const useDocumentDetailsLogic = () => {
     isTriggeringAi,
     generateAiTitle,
     isGeneratingTitle,
+    triggerEmbedding,
+    isTriggeringEmbedding,
   } = useDocumentMutations();
   const { tags: allTags } = useTags();
   const { createTag, isCreating: isCreatingTag } = useTagMutations();
@@ -183,6 +185,17 @@ export const useDocumentDetailsLogic = () => {
     }
   };
 
+  const handleTriggerEmbedding = async () => {
+    if (!data?.document) return;
+    try {
+      await triggerEmbedding(data.document.id);
+      info("Search Enabling Started", "You'll be notified when it's ready");
+    } catch (err) {
+      const appError = parseApiError(err);
+      showError("Failed to enable search", appError.message);
+    }
+  };
+
   return {
     document: data?.document,
     isLoading,
@@ -215,6 +228,8 @@ export const useDocumentDetailsLogic = () => {
     handleOpenTitleModal,
     handleSaveTitle,
     handleGenerateAiTitle,
+    handleTriggerEmbedding,
+    isTriggeringEmbedding,
     isUpdating,
     isGeneratingTitle,
     fetchNextPage,
