@@ -68,7 +68,7 @@ jobs:
           fi
 
           # Check for Gate changes
-          if echo "$CHANGED_FILES" | grep -qE '^apps/gate/|^packages/types/'; then
+          if echo "$CHANGED_FILES" | grep -qE '^apps/gate/|^packages/'; then
             echo "gate=true" >> $GITHUB_OUTPUT
             echo "Gate changes detected."
           else
@@ -77,7 +77,7 @@ jobs:
           fi
 
           # Check for Scribe changes
-          if echo "$CHANGED_FILES" | grep -qE '^apps/scribe/|^packages/types/'; then
+          if echo "$CHANGED_FILES" | grep -qE '^apps/scribe/|^packages/'; then
             echo "scribe=true" >> $GITHUB_OUTPUT
             echo "Scribe changes detected."
           else
