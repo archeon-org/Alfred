@@ -19,6 +19,7 @@ import { useDocumentMutations } from "../../../hooks/useDocuments";
 import { DocumentsEmptyState } from "../../../components/document/DocumentsEmptyState";
 import { Skeleton } from "../../../components/common/Skeleton";
 import { DocumentFilterModal } from "../../../components/document/DocumentFilterModal";
+import { AISearchBottomSheet } from "../../../components/search/AISearchBottomSheet";
 import { useDebounce } from "../../../hooks/useDebounce";
 
 export default function DocumentsScreen() {
@@ -31,6 +32,7 @@ export default function DocumentsScreen() {
     tagId?: string;
   }>({});
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [aiSearchVisible, setAiSearchVisible] = useState(false);
 
   const {
     documents,
@@ -113,27 +115,35 @@ export default function DocumentsScreen() {
         <Text className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
           Documents
         </Text>
-        <TouchableOpacity
-          onPress={() => setFilterModalVisible(true)}
-          className={`w-10 h-10 rounded-full items-center justify-center border ${
-            activeFiltersCount > 0
-              ? "bg-primary border-primary"
-              : "bg-surface dark:bg-surface-dark border-gray-100 dark:border-gray-800"
-          }`}
-        >
-          <Ionicons
-            name="filter"
-            size={20}
-            color={activeFiltersCount > 0 ? "white" : "#6B7280"}
-          />
-          {activeFiltersCount > 0 && (
-            <View className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full items-center justify-center border border-white dark:border-black">
-              <Text className="text-[10px] font-bold text-white">
-                {activeFiltersCount}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-2">
+          <TouchableOpacity
+            onPress={() => setAiSearchVisible(true)}
+            className="w-10 h-10 rounded-full items-center justify-center bg-primary/10 dark:bg-primary/20 border border-primary/20"
+          >
+            <Ionicons name="sparkles" size={18} color="#6366F1" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setFilterModalVisible(true)}
+            className={`w-10 h-10 rounded-full items-center justify-center border ${
+              activeFiltersCount > 0
+                ? "bg-primary border-primary"
+                : "bg-surface dark:bg-surface-dark border-gray-100 dark:border-gray-800"
+            }`}
+          >
+            <Ionicons
+              name="filter"
+              size={20}
+              color={activeFiltersCount > 0 ? "white" : "#6B7280"}
+            />
+            {activeFiltersCount > 0 && (
+              <View className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full items-center justify-center border border-white dark:border-black">
+                <Text className="text-[10px] font-bold text-white">
+                  {activeFiltersCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View className="px-4 mb-4">
@@ -184,6 +194,11 @@ export default function DocumentsScreen() {
         filters={filters}
         onApplyFilters={setFilters}
         onResetFilters={() => setFilters({})}
+      />
+
+      <AISearchBottomSheet
+        visible={aiSearchVisible}
+        onClose={() => setAiSearchVisible(false)}
       />
     </SafeAreaView>
   );

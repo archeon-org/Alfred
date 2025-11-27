@@ -15,6 +15,7 @@ import {
 import { OCRService } from '../ocr/ocr.service';
 import { NotificationService, R2Service } from '@archeon-org/module';
 import { ClassificationService } from '../classification/classification.service';
+import { EmbeddingService } from '../embedding/embedding.service';
 
 @Injectable()
 export class DocumentService {
@@ -30,6 +31,7 @@ export class DocumentService {
     private readonly r2Service: R2Service,
     private readonly ocrService: OCRService,
     private readonly classificationService: ClassificationService,
+    private readonly embeddingService: EmbeddingService,
     private notificationService: NotificationService,
   ) {}
 
@@ -139,11 +141,32 @@ export class DocumentService {
         await this.documentRepository.update(data.documentId, updateData);
       }
 
+      // 5. Generate embedding for semantic search
+      this.logger.log(`Generating embedding for document: ${data.documentId}`);
+      try {
+        await this.embeddingService.createOrUpdateEmbedding(
+          data.documentId,
+          data.userId,
+          text,
+        );
+        this.logger.log(
+          `Successfully generated embedding for document: ${data.documentId}`,
+        );
+      } catch (embeddingError) {
+        // Log but don't fail the entire process if embedding fails
+        this.logger.error(
+          `Failed to generate embedding for document ${data.documentId}`,
+          embeddingError instanceof Error
+            ? embeddingError.stack
+            : String(embeddingError),
+        );
+      }
+
       this.logger.log(
         `Successfully processed and classified document: ${data.documentId}`,
       );
 
-      // 5. Send success notification
+      // 6. Send success notification
       await this.notificationService.create({
         userId: data.userId,
         title: 'Document Processed',
@@ -164,7 +187,7 @@ export class DocumentService {
         processingStatus: ProcessingStatus.FAILED,
       });
 
-      // 6. Send failure notification
+      // 7. Send failure notification
       await this.notificationService.create({
         userId: data.userId,
         title: 'Document Processing Failed',

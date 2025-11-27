@@ -146,7 +146,7 @@ export default function DocumentDetails() {
       {/* Header */}
       <View className="flex-row items-center px-4 py-3 border-b border-gray-100 dark:border-gray-800">
         <TouchableOpacity
-          onPress={() => router.replace("/(app)/documents")}
+          onPress={() => router.back()}
           className="mr-4 p-2 -ml-2"
         >
           <Ionicons name="arrow-back" size={24} color="#374151" />

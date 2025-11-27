@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import { ScrollView, RefreshControl, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useUser } from "../../hooks/useUser";
@@ -14,10 +14,12 @@ import { QuickActions } from "../../components/home/QuickActions";
 import { RecentDocuments } from "../../components/home/RecentDocuments";
 import { ActionRequiredDocuments } from "../../components/home/ActionRequiredDocuments";
 import { CategoryList } from "../../components/home/CategoryList";
+import { AISearchBottomSheet } from "../../components/search/AISearchBottomSheet";
 
 export default function HomeScreen() {
   const { data: user, refetch: refetchUser } = useUser();
   const { refetch: refetchNotifications } = useNotifications();
+  const [aiSearchVisible, setAiSearchVisible] = useState(false);
   const {
     data: recentDocs,
     isLoading: isLoadingDocs,
@@ -97,7 +99,7 @@ export default function HomeScreen() {
           isLoading={false}
         />
 
-        <QuickActions />
+        <QuickActions onSearchPress={() => setAiSearchVisible(true)} />
 
         <CategoryList categories={categories} isLoading={isLoadingCategories} />
 
@@ -106,6 +108,11 @@ export default function HomeScreen() {
           isLoading={isLoadingDocs}
         />
       </ScrollView>
+
+      <AISearchBottomSheet
+        visible={aiSearchVisible}
+        onClose={() => setAiSearchVisible(false)}
+      />
     </SafeAreaView>
   );
 }

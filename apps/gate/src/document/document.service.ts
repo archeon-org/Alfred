@@ -270,6 +270,9 @@ export class DocumentService {
       // to avoid blocking the user action, but we log the error.
     }
 
+    // Delete the document's embedding asynchronously
+    await this.queueService.addDeleteEmbeddingJob({ documentId });
+
     // Update user storage usage
     const user = await this.userService.findById(userId);
     if (user) {

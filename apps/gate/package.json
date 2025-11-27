@@ -26,8 +26,8 @@
     "seed": "ts-node -r tsconfig-paths/register db/seed.ts"
   },
   "dependencies": {
-    "@archeon-org/module": "*",
     "@archeon-org/database": "*",
+    "@archeon-org/module": "*",
     "@archeon-org/types": "*",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/common": "^10.0.0",
@@ -44,13 +44,15 @@
     "class-validator": "^0.14.2",
     "google-auth-library": "^10.5.0",
     "nestjs-paginate": "^12.8.3",
+    "openai": "^6.9.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.27"
+    "typeorm": "^0.3.27",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

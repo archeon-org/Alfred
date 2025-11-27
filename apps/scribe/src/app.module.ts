@@ -5,6 +5,7 @@ import { HealthModule } from './health/health.module';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { DocumentModule } from './document/document.module';
+import { EmbeddingModule } from './embedding/embedding.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { dataSourceOptions } from '../db/datasource';
 
@@ -35,6 +36,7 @@ import { dataSourceOptions } from '../db/datasource';
     }),
     HealthModule,
     DocumentModule,
+    EmbeddingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

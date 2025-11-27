@@ -15,6 +15,7 @@ import { TemplateModule } from './template/template.module';
 import { NotificationModule } from './notification/notification.module';
 import { BullModule } from '@nestjs/bull';
 import { QueueModule } from './queue/queue.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { QueueModule } from './queue/queue.module';
     TemplateModule,
     QueueModule,
     NotificationModule,
+    SearchModule,
   ],
   providers: [
     {

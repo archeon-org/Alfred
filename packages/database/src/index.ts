@@ -1,5 +1,6 @@
 export * from "./entities/user.entity";
 export * from "./entities/document.entity";
+export * from "./entities/document-embedding.entity";
 export * from "./entities/category.entity";
 export * from "./entities/tag.entity";
 export * from "./entities/template.entity";

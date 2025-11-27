@@ -7,7 +7,13 @@ import { uploadDocument } from "../../services/document";
 import { Alert } from "react-native";
 import { showError } from "../../utils/apiError";
 
-export const QuickActions = () => {
+interface QuickActionsProps {
+  onSearchPress?: () => void;
+}
+
+export const QuickActions: React.FC<QuickActionsProps> = ({
+  onSearchPress,
+}) => {
   const router = useRouter();
 
   const handleUpload = async () => {
@@ -50,9 +56,9 @@ export const QuickActions = () => {
     },
     {
       label: "Search",
-      icon: "search",
+      icon: "sparkles",
       color: "bg-accent",
-      onPress: () => router.push("/(app)/documents"),
+      onPress: onSearchPress || (() => router.push("/(app)/documents")),
     },
     {
       label: "Categories",
