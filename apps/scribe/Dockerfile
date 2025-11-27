@@ -63,4 +63,4 @@ ENV PATH=$PATH:/app/node_modules/.bin
 # Expose the port the app runs on
 EXPOSE 3000
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]
