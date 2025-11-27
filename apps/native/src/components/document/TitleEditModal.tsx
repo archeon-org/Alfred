@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -32,6 +33,8 @@ export const TitleEditModal = ({
   isSaving,
   isGenerating,
 }: TitleEditModalProps) => {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
   const isDisabled = isSaving || isGenerating;
 
   return (
@@ -43,101 +46,146 @@ export const TitleEditModal = ({
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        className="flex-1"
+        className="flex-1 justify-end"
       >
-        <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white dark:bg-gray-900 rounded-t-3xl">
-            {/* Header */}
-            <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 dark:border-gray-800">
-              <TouchableOpacity
-                onPress={onClose}
-                disabled={isDisabled}
-                className="p-2 -ml-2"
-              >
-                <Text className="text-gray-500 dark:text-gray-400 font-medium">
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-              <Text className="text-lg font-bold text-gray-900 dark:text-white">
-                Edit Title
-              </Text>
-              <TouchableOpacity
-                onPress={onSave}
-                disabled={isDisabled || !title.trim()}
-                className="p-2 -mr-2"
-              >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="#4F46E5" />
-                ) : (
-                  <Text
-                    className={`font-bold ${
-                      title.trim()
-                        ? "text-indigo-600 dark:text-indigo-400"
-                        : "text-gray-300 dark:text-gray-600"
-                    }`}
-                  >
-                    Save
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
+        {/* Backdrop */}
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={onClose}
+          className="absolute inset-0 bg-black/60"
+        />
 
-            {/* Content */}
-            <View className="p-4 space-y-4">
-              {/* Title Input */}
-              <View>
-                <Text className="text-gray-500 dark:text-gray-400 text-xs uppercase font-bold tracking-wider mb-2">
-                  Document Title
+        {/* Modal Content */}
+        <View
+          className="bg-background dark:bg-background-dark rounded-t-3xl"
+          style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 20,
+            elevation: 20,
+          }}
+        >
+          {/* Handle */}
+          <View className="items-center pt-3 pb-2">
+            <View className="w-10 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+          </View>
+
+          {/* Header */}
+          <View className="flex-row items-center justify-between px-5 pb-4">
+            <TouchableOpacity
+              onPress={onClose}
+              disabled={isDisabled}
+              className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center"
+            >
+              <Ionicons
+                name="close"
+                size={18}
+                color={isDark ? "#9CA3AF" : "#6B7280"}
+              />
+            </TouchableOpacity>
+            <Text className="text-xl font-bold text-gray-900 dark:text-white">
+              Edit Title
+            </Text>
+            <TouchableOpacity
+              onPress={onSave}
+              disabled={isDisabled || !title.trim()}
+              className={`px-4 py-2 rounded-xl ${
+                title.trim() && !isDisabled
+                  ? "bg-primary"
+                  : "bg-gray-200 dark:bg-gray-700"
+              }`}
+            >
+              {isSaving ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text
+                  className={`font-bold ${
+                    title.trim() && !isDisabled
+                      ? "text-white"
+                      : "text-gray-400 dark:text-gray-500"
+                  }`}
+                >
+                  Save
                 </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Content */}
+          <View className="px-5 pb-6">
+            {/* Title Input */}
+            <View className="mb-5">
+              <Text className="text-gray-500 dark:text-gray-400 text-xs uppercase font-bold tracking-wider mb-2">
+                Document Title
+              </Text>
+              <View className="bg-surface dark:bg-surface-dark border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3">
                 <TextInput
                   value={title}
                   onChangeText={onTitleChange}
                   placeholder="Enter a descriptive title..."
-                  placeholderTextColor="#9CA3AF"
-                  className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-gray-900 dark:text-white text-base"
+                  placeholderTextColor={isDark ? "#6B7280" : "#9CA3AF"}
+                  className="text-gray-900 dark:text-white text-base"
                   editable={!isDisabled}
                   maxLength={60}
                   autoFocus
                 />
-                <Text className="text-gray-400 dark:text-gray-500 text-xs mt-1 text-right">
-                  {title.length}/60
-                </Text>
               </View>
-
-              {/* AI Generate Button */}
-              <View className="pt-2">
-                <Text className="text-gray-500 dark:text-gray-400 text-xs uppercase font-bold tracking-wider mb-2">
-                  Or let AI help
-                </Text>
-                <TouchableOpacity
-                  onPress={onGenerateAi}
-                  disabled={isDisabled}
-                  className={`flex-row items-center justify-center gap-2 py-3 rounded-xl border ${
-                    isDisabled
-                      ? "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                      : "bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800"
-                  }`}
-                >
-                  {isGenerating ? (
-                    <ActivityIndicator size="small" color="#4F46E5" />
-                  ) : (
-                    <>
-                      <Ionicons name="sparkles" size={18} color="#4F46E5" />
-                      <Text className="text-indigo-600 dark:text-indigo-400 font-bold">
-                        Generate Title with AI
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-                <Text className="text-gray-400 dark:text-gray-500 text-xs mt-2 text-center">
-                  AI will analyze your document and suggest a descriptive title
-                </Text>
-              </View>
+              <Text className="text-gray-400 dark:text-gray-500 text-xs mt-2 text-right">
+                {title.length}/60
+              </Text>
             </View>
 
-            {/* Bottom spacing for home indicator */}
-            <View className="h-8" />
+            {/* Divider */}
+            <View className="flex-row items-center mb-5">
+              <View className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+              <Text className="text-gray-400 dark:text-gray-500 text-xs mx-3">
+                OR
+              </Text>
+              <View className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+            </View>
+
+            {/* AI Generate Button */}
+            <TouchableOpacity
+              onPress={onGenerateAi}
+              disabled={isDisabled}
+              className={`flex-row items-center justify-center gap-3 py-4 rounded-2xl ${
+                isDisabled
+                  ? "bg-gray-100 dark:bg-gray-800"
+                  : "bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/30 dark:to-purple-900/30 border border-indigo-100 dark:border-indigo-800"
+              }`}
+              style={{
+                backgroundColor: isDisabled
+                  ? isDark
+                    ? "#1F2937"
+                    : "#F3F4F6"
+                  : isDark
+                    ? "rgba(99, 102, 241, 0.15)"
+                    : "#EEF2FF",
+              }}
+            >
+              {isGenerating ? (
+                <ActivityIndicator size="small" color="#6366F1" />
+              ) : (
+                <>
+                  <View className="w-10 h-10 rounded-xl bg-primary/20 items-center justify-center">
+                    <Ionicons name="sparkles" size={20} color="#6366F1" />
+                  </View>
+                  <View>
+                    <Text className="text-primary dark:text-primary font-bold text-base">
+                      Generate with AI
+                    </Text>
+                    <Text className="text-gray-500 dark:text-gray-400 text-xs">
+                      Analyze document & suggest title
+                    </Text>
+                  </View>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
+
+          {/* Bottom spacing for home indicator */}
+          <View className="h-6" />
         </View>
       </KeyboardAvoidingView>
     </Modal>
