@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { zodResponseFormat } from 'openai/helpers/zod';
+import { encode as toonEncode } from '@toon-format/toon';
 
 export interface ClassificationResult {
   categoryId: string | null;
@@ -105,26 +106,37 @@ export class ClassificationService {
           ),
       });
 
-      // Format categories and tags for clearer presentation
+      // Format categories and tags using TOON format for token efficiency
+      // TOON is optimized for uniform arrays of objects - exactly what we have here
+      // Using tab delimiter for additional token savings (tabs tokenize more efficiently than commas)
+      // Example output: categories[3\t]{id\tname}:\n  uuid1\tFinance\n  uuid2\tMedical
       const formattedCategories =
         categories.length > 0
-          ? categories.map((c) => `- "${c.name}" (ID: ${c.id})`).join('\n')
+          ? toonEncode({ categories }, { delimiter: '\t' }).trim()
           : '(No categories defined yet)';
 
       const formattedTags =
         tags.length > 0
-          ? tags.map((t) => `- "${t.name}" (ID: ${t.id})`).join('\n')
+          ? toonEncode({ tags }, { delimiter: '\t' }).trim()
           : '(No tags defined yet)';
+
+      this.logger.debug(
+        `Formatted categories (TOON): ${formattedCategories.substring(0, 200)}...`,
+      );
 
       const prompt = `You are a document classifier for a personal document management system. Your job is to categorize documents into the user's existing folder structure, or suggest a new category when truly necessary.
 
 ${originalFileName ? `Original filename: "${originalFileName}"` : ''}
 
-## USER'S EXISTING CATEGORIES:
+## USER'S EXISTING CATEGORIES (TOON format, tab-separated - [count]{fields}: then data rows):
+\`\`\`toon
 ${formattedCategories}
+\`\`\`
 
-## USER'S TAGS:
+## USER'S TAGS (TOON format, tab-separated):
+\`\`\`toon
 ${formattedTags}
+\`\`\`
 
 ---
 
