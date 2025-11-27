@@ -18,25 +18,25 @@ const toastConfig = {
   success: {
     icon: "checkmark-circle" as const,
     color: "#10B981",
-    bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+    bgColor: "bg-emerald-50 dark:bg-emerald-950",
     borderColor: "border-emerald-200 dark:border-emerald-800",
   },
   error: {
     icon: "alert-circle" as const,
     color: "#EF4444",
-    bgColor: "bg-red-50 dark:bg-red-900/20",
+    bgColor: "bg-red-50 dark:bg-red-950",
     borderColor: "border-red-200 dark:border-red-800",
   },
   info: {
     icon: "information-circle" as const,
     color: "#6366F1",
-    bgColor: "bg-indigo-50 dark:bg-indigo-900/20",
+    bgColor: "bg-indigo-50 dark:bg-indigo-950",
     borderColor: "border-indigo-200 dark:border-indigo-800",
   },
   warning: {
     icon: "warning" as const,
     color: "#F59E0B",
-    bgColor: "bg-amber-50 dark:bg-amber-900/20",
+    bgColor: "bg-amber-50 dark:bg-amber-950",
     borderColor: "border-amber-200 dark:border-amber-800",
   },
 };
