@@ -62,20 +62,9 @@ export class UserService {
     if (data.preferences) {
       const currentUser = await this.userRepository.findById(userId);
       if (currentUser) {
-        this.logger.log(
-          `Current preferences: ${JSON.stringify(currentUser.preferences)}`,
-        );
-        this.logger.log(
-          `Incoming preferences update: ${JSON.stringify(data.preferences)}`,
-        );
-
         const mergedPreferences = mergePreferences(
           currentUser.preferences,
           data.preferences,
-        );
-
-        this.logger.log(
-          `Merged preferences: ${JSON.stringify(mergedPreferences)}`,
         );
 
         return this.userRepository.update(userId, {

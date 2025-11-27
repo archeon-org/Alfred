@@ -4,6 +4,10 @@ import { Repository } from "typeorm";
 import { Expo, ExpoPushMessage } from "expo-server-sdk";
 import { NotificationEntity, UserEntity } from "@archeon-org/database";
 import { paginate, PaginateQuery, Paginated } from "nestjs-paginate";
+import {
+  NotificationType,
+  shouldSendPushNotification,
+} from "@archeon-org/types";
 
 export interface CreateNotificationDto {
   title: string;
@@ -11,6 +15,8 @@ export interface CreateNotificationDto {
   userId: string;
   redirect?: string;
   data?: any;
+  /** Type of notification for preference checking */
+  type?: NotificationType;
 }
 
 @Injectable()
@@ -27,11 +33,40 @@ export class NotificationService {
 
   async create(
     createNotificationDto: CreateNotificationDto
-  ): Promise<NotificationEntity> {
+  ): Promise<NotificationEntity | null> {
+    const notificationType =
+      createNotificationDto.type || NotificationType.SYSTEM;
+
     this.logger.log(
-      `Creating notification for user ${createNotificationDto.userId}`
+      `Creating notification for user ${createNotificationDto.userId} (type: ${notificationType})`
     );
 
+    // Fetch user to check preferences
+    const user = await this.userRepository.findOne({
+      where: { id: createNotificationDto.userId },
+    });
+
+    if (!user) {
+      this.logger.warn(
+        `User ${createNotificationDto.userId} not found. Notification skipped.`
+      );
+      return null;
+    }
+
+    // Check if notification should be sent based on user preferences
+    const shouldSend = shouldSendPushNotification(
+      user.preferences,
+      notificationType
+    );
+
+    if (!shouldSend) {
+      this.logger.log(
+        `User ${createNotificationDto.userId} has disabled ${notificationType} notifications. Skipping.`
+      );
+      return null;
+    }
+
+    // Create notification in database
     const notification = this.notificationRepository.create({
       title: createNotificationDto.title,
       message: createNotificationDto.message,
@@ -44,7 +79,7 @@ export class NotificationService {
 
     // Send push notification
     await this.sendPushNotification(
-      createNotificationDto.userId,
+      user,
       createNotificationDto.title,
       createNotificationDto.message,
       { ...createNotificationDto.data, notificationId: notification.id }
@@ -53,24 +88,40 @@ export class NotificationService {
     return notification;
   }
 
+  /**
+   * Send push notification to a user
+   * Can accept either a UserEntity (to avoid extra DB lookup) or a userId string
+   */
   async sendPushNotification(
-    userId: string,
+    userOrUserId: UserEntity | string,
     title: string,
     message: string,
     data?: any
   ) {
-    this.logger.log(`Attempting to send push notification to user ${userId}`);
+    let user: UserEntity | null;
 
-    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (typeof userOrUserId === "string") {
+      this.logger.log(
+        `Attempting to send push notification to user ${userOrUserId}`
+      );
+      user = await this.userRepository.findOne({
+        where: { id: userOrUserId },
+      });
+    } else {
+      user = userOrUserId;
+      this.logger.log(
+        `Attempting to send push notification to user ${user.id}`
+      );
+    }
 
     if (!user || !user.pushToken) {
       this.logger.warn(
-        `User ${userId} does not have a push token. Push notification skipped.`
+        `User ${typeof userOrUserId === "string" ? userOrUserId : userOrUserId.id} does not have a push token. Push notification skipped.`
       );
       return;
     }
 
-    this.logger.log(`Found push token for user ${userId}: ${user.pushToken}`);
+    this.logger.log(`Found push token for user ${user.id}: ${user.pushToken}`);
 
     if (!Expo.isExpoPushToken(user.pushToken)) {
       this.logger.error(
@@ -100,7 +151,7 @@ export class NotificationService {
         this.logger.log(`Sending push notification chunk...`);
         const ticketChunk = await this.expo.sendPushNotificationsAsync(chunk);
         tickets.push(...ticketChunk);
-        this.logger.log(`Push notification sent to user ${userId}`);
+        this.logger.log(`Push notification sent to user ${user.id}`);
         this.logger.log(
           `Ticket response: ${JSON.stringify(ticketChunk, null, 2)}`
         );

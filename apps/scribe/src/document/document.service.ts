@@ -5,6 +5,7 @@ import {
   ProcessDocumentJobData,
   GenerateTitleJobData,
   GenerateEmbeddingJobData,
+  NotificationType,
 } from '@archeon-org/types';
 import {
   DocumentEntity,
@@ -167,12 +168,13 @@ export class DocumentService {
         `Successfully processed and classified document: ${data.documentId}`,
       );
 
-      // 6. Send success notification
+      // 6. Send success notification (respects user preferences)
       await this.notificationService.create({
         userId: data.userId,
         title: 'Document Processed',
         message: `"${classificationResult.title}" has been successfully processed and classified.`,
         redirect: `/(app)/documents/${data.documentId}`,
+        type: NotificationType.DOCUMENT_CLASSIFIED,
         data: {
           documentId: data.documentId,
           url: `/(app)/documents/${data.documentId}`,
@@ -188,12 +190,13 @@ export class DocumentService {
         processingStatus: ProcessingStatus.FAILED,
       });
 
-      // 7. Send failure notification
+      // 7. Send failure notification (respects user preferences)
       await this.notificationService.create({
         userId: data.userId,
         title: 'Document Processing Failed',
         message: 'There was an error processing your document.',
         redirect: `/(app)/documents/${data.documentId}`,
+        type: NotificationType.DOCUMENT_ERROR,
         data: { documentId: data.documentId },
       });
 
@@ -252,12 +255,13 @@ export class DocumentService {
         `Successfully generated title for document ${data.documentId}: "${titleResult.title}"`,
       );
 
-      // 5. Send success notification
+      // 5. Send success notification (respects user preferences)
       await this.notificationService.create({
         userId: data.userId,
         title: 'Title Generated',
         message: `Your document has been renamed to "${titleResult.title}".`,
         redirect: `/(app)/documents/${data.documentId}`,
+        type: NotificationType.TITLE_GENERATED,
         data: {
           documentId: data.documentId,
           url: `/(app)/documents/${data.documentId}`,
@@ -269,12 +273,13 @@ export class DocumentService {
         error instanceof Error ? error.stack : String(error),
       );
 
-      // Send failure notification
+      // Send failure notification (respects user preferences)
       await this.notificationService.create({
         userId: data.userId,
         title: 'Title Generation Failed',
         message: 'There was an error generating a title for your document.',
         redirect: `/(app)/documents/${data.documentId}`,
+        type: NotificationType.DOCUMENT_ERROR,
         data: { documentId: data.documentId },
       });
 
@@ -332,12 +337,13 @@ export class DocumentService {
         `Successfully generated embedding for document ${data.documentId}`,
       );
 
-      // 4. Send success notification
+      // 4. Send success notification (respects user preferences)
       await this.notificationService.create({
         userId: data.userId,
         title: 'Search Enabled',
         message: `"${document.title || 'Your document'}" can now be found through search.`,
         redirect: `/(app)/documents/${data.documentId}`,
+        type: NotificationType.SEARCH_ENABLED,
         data: {
           documentId: data.documentId,
           url: `/(app)/documents/${data.documentId}`,
@@ -349,12 +355,13 @@ export class DocumentService {
         error instanceof Error ? error.stack : String(error),
       );
 
-      // Send failure notification
+      // Send failure notification (respects user preferences)
       await this.notificationService.create({
         userId: data.userId,
         title: 'Search Enabling Failed',
         message: 'There was an error enabling search for your document.',
         redirect: `/(app)/documents/${data.documentId}`,
+        type: NotificationType.DOCUMENT_ERROR,
         data: { documentId: data.documentId },
       });
 

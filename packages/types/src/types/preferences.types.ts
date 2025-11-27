@@ -4,6 +4,23 @@
  */
 
 /**
+ * Notification types for categorizing notifications
+ * Used to check against user preferences
+ */
+export enum NotificationType {
+  /** Document successfully classified/processed */
+  DOCUMENT_CLASSIFIED = "document_classified",
+  /** Document processing error */
+  DOCUMENT_ERROR = "document_error",
+  /** Title generated for document */
+  TITLE_GENERATED = "title_generated",
+  /** Embedding/search enabled for document */
+  SEARCH_ENABLED = "search_enabled",
+  /** General system notification */
+  SYSTEM = "system",
+}
+
+/**
  * Home screen preferences
  */
 export interface HomePreferences {
@@ -111,4 +128,40 @@ export function getPreferencesWithDefaults(
   preferences: Partial<UserPreferences> | undefined
 ): UserPreferences {
   return mergePreferences(preferences, {});
+}
+
+/**
+ * Check if a push notification should be sent based on user preferences
+ * @param preferences - User's preferences (can be partial)
+ * @param notificationType - The type of notification to check
+ * @returns Whether the notification should be sent
+ */
+export function shouldSendPushNotification(
+  preferences: Partial<UserPreferences> | undefined,
+  notificationType: NotificationType
+): boolean {
+  const prefs = getPreferencesWithDefaults(preferences);
+
+  // First check if push notifications are globally enabled
+  if (!prefs.notifications.pushEnabled) {
+    return false;
+  }
+
+  // Then check specific notification type preferences
+  switch (notificationType) {
+    case NotificationType.DOCUMENT_CLASSIFIED:
+    case NotificationType.TITLE_GENERATED:
+    case NotificationType.SEARCH_ENABLED:
+      return prefs.notifications.onDocumentClassified;
+
+    case NotificationType.DOCUMENT_ERROR:
+      return prefs.notifications.onDocumentError;
+
+    case NotificationType.SYSTEM:
+      // System notifications are always sent if push is enabled
+      return true;
+
+    default:
+      return true;
+  }
 }
