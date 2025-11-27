@@ -4,7 +4,7 @@ import { View, Text } from "react-native";
 interface StorageProgressProps {
   used: number;
   limit: number;
-  variant?: "card" | "default";
+  variant?: "card" | "default" | "light";
 }
 
 const formatBytes = (bytes: number, decimals = 1) => {
@@ -26,23 +26,24 @@ export const StorageProgress = ({
 
   // Variant Styles
   const isCard = variant === "card";
+  const isLight = variant === "light";
 
-  const labelColor = isCard
-    ? "text-primary-100"
-    : "text-gray-700 dark:text-gray-300";
-  const valueColor = isCard
-    ? "text-primary-200"
-    : "text-gray-500 dark:text-gray-400";
-  const trackColor = isCard ? "bg-black/20" : "bg-gray-100 dark:bg-gray-800";
+  const labelColor =
+    isCard || isLight ? "text-white/90" : "text-gray-700 dark:text-gray-300";
+  const valueColor =
+    isCard || isLight ? "text-white/70" : "text-gray-500 dark:text-gray-400";
+  const trackColor =
+    isCard || isLight ? "bg-white/20" : "bg-gray-100 dark:bg-gray-800";
 
-  // For card: secondary color (teal) or red if full. For default: primary.
-  const progressColor = isCard
-    ? isNearLimit
-      ? "bg-red-400"
-      : "bg-secondary" // Use secondary (Teal) on the dark primary card for pop
-    : isNearLimit
-      ? "bg-red-500"
-      : "bg-primary";
+  // For card/light: white progress or red if full. For default: primary.
+  const progressColor =
+    isCard || isLight
+      ? isNearLimit
+        ? "bg-red-400"
+        : "bg-white"
+      : isNearLimit
+        ? "bg-red-500"
+        : "bg-primary";
 
   return (
     <View className="w-full">

@@ -82,7 +82,10 @@ export default function DocumentsScreen() {
 
   if (showSkeleton) {
     return (
-      <SafeAreaView className="flex-1 bg-background dark:bg-background-dark">
+      <SafeAreaView
+        className="flex-1 bg-background dark:bg-background-dark"
+        edges={["top"]}
+      >
         <View className="flex-row justify-between items-center px-4 py-3 mb-2">
           <Text className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
             Documents
@@ -110,7 +113,10 @@ export default function DocumentsScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background dark:bg-background-dark">
+    <SafeAreaView
+      className="flex-1 bg-background dark:bg-background-dark"
+      edges={["top"]}
+    >
       <View className="flex-row justify-between items-center px-4 py-3 mb-2">
         <Text className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
           Documents

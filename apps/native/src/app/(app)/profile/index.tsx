@@ -13,16 +13,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../../context/AuthContext";
 import { useUser } from "../../../hooks/useUser";
-
-import colors from "tailwindcss/colors";
-import { RelativePathString, useRouter } from "expo-router";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useRouter } from "expo-router";
 import { StorageProgress } from "@/components/common/StorageProgress";
+import { Skeleton } from "@/components/common/Skeleton";
 
 export default function ProfileScreen() {
   const { signOut } = useAuth();
   const { data: user, isLoading, refetch } = useUser();
-  const { unreadCount } = useNotifications();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();
@@ -35,104 +32,185 @@ export default function ProfileScreen() {
     {
       icon: "person-outline",
       label: "Edit Profile",
+      description: "Update your personal information",
+      color: "#6366F1",
+      bgColor: "bg-indigo-50 dark:bg-indigo-900/20",
       onPress: () => router.push("/(app)/profile/edit"),
     },
-    { icon: "settings-outline", label: "Settings" },
-    { icon: "shield-checkmark-outline", label: "Privacy & Security" },
-    { icon: "help-circle-outline", label: "Help & Support" },
+    {
+      icon: "notifications-outline",
+      label: "Notifications",
+      description: "Manage your alerts",
+      color: "#F59E0B",
+      bgColor: "bg-amber-50 dark:bg-amber-900/20",
+    },
+    {
+      icon: "shield-checkmark-outline",
+      label: "Privacy & Security",
+      description: "Protect your account",
+      color: "#10B981",
+      bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+    },
+    {
+      icon: "help-circle-outline",
+      label: "Help & Support",
+      description: "Get assistance",
+      color: "#8B5CF6",
+      bgColor: "bg-purple-50 dark:bg-purple-900/20",
+    },
   ];
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-background dark:bg-background-dark justify-center items-center">
-        <ActivityIndicator size="large" color="#6366F1" />
+      <SafeAreaView
+        className="flex-1 bg-background dark:bg-background-dark"
+        edges={["top"]}
+      >
+        <View className="px-5 pt-4">
+          {/* Header skeleton */}
+          <View className="items-center mb-6">
+            <Skeleton className="w-24 h-24 rounded-full mb-4" />
+            <Skeleton className="h-7 w-40 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </View>
+          {/* Storage skeleton */}
+          <Skeleton className="h-24 w-full rounded-2xl mb-6" />
+          {/* Menu skeleton */}
+          <View className="gap-3">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-2xl" />
+            ))}
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-background dark:bg-background-dark">
+    <SafeAreaView
+      className="flex-1 bg-background dark:bg-background-dark"
+      edges={["top"]}
+    >
       <ScrollView
-        className="p-4"
+        className="flex-1"
+        contentContainerStyle={{ paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={false} onRefresh={onRefresh} />
         }
       >
-        <View className="items-center mb-8 mt-4">
-          <View className="w-28 h-28 bg-primary-50 dark:bg-primary-900/20 rounded-full items-center justify-center mb-4 overflow-hidden border-4 border-white dark:border-gray-800 shadow-sm">
-            {user?.profilePicture ? (
-              <Image
-                source={{ uri: user.profilePicture }}
-                className="w-full h-full"
-              />
-            ) : (
-              <Ionicons
-                name="person"
-                size={48}
-                color={isDark ? "#9CA3AF" : "#6366F1"}
-              />
-            )}
+        {/* Profile Header */}
+        <View className="items-center pt-6 pb-6 px-5">
+          <View className="relative mb-4">
+            <View className="w-24 h-24 bg-indigo-100 dark:bg-indigo-900/30 rounded-full items-center justify-center overflow-hidden border-4 border-white dark:border-gray-800 shadow-lg">
+              {user?.profilePicture ? (
+                <Image
+                  source={{ uri: user.profilePicture }}
+                  className="w-full h-full"
+                />
+              ) : (
+                <Text className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                  {user?.firstName?.[0]}
+                  {user?.lastName?.[0]}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity
+              onPress={() => router.push("/(app)/profile/edit")}
+              className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 rounded-full items-center justify-center border-2 border-white dark:border-gray-900"
+            >
+              <Ionicons name="pencil" size={14} color="white" />
+            </TouchableOpacity>
           </View>
-          <Text className="text-2xl font-bold text-gray-900 dark:text-white">
+
+          <Text className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
             {user?.firstName} {user?.lastName}
           </Text>
-          <Text className="text-gray-500 dark:text-gray-400 text-base">
+          <Text className="text-gray-500 dark:text-gray-400 text-sm">
             {user?.email}
           </Text>
         </View>
 
-        {/* Storage Usage Section */}
-        <View className="bg-surface dark:bg-surface-dark rounded-3xl p-5 mb-6 shadow-sm border border-gray-100 dark:border-gray-800">
-          <StorageProgress
-            used={user?.storageUsed || 0}
-            limit={user?.storageLimit || 0}
-            variant="default"
-          />
-          <Text className="text-xs text-gray-400 mt-3 font-medium">
-            {user?.searchCount || 0} searches performed
-          </Text>
+        {/* Storage Card */}
+        <View className="px-5 mb-6">
+          <View className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 shadow-lg">
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="flex-row items-center gap-2">
+                <View className="w-10 h-10 bg-white/20 rounded-xl items-center justify-center">
+                  <Ionicons name="cloud" size={20} color="white" />
+                </View>
+                <Text className="text-white font-bold text-lg">Storage</Text>
+              </View>
+              <View className="bg-white/20 px-3 py-1 rounded-full">
+                <Text className="text-white text-xs font-semibold">
+                  {user?.searchCount || 0} searches
+                </Text>
+              </View>
+            </View>
+            <StorageProgress
+              used={user?.storageUsed || 0}
+              limit={user?.storageLimit || 0}
+              variant="light"
+            />
+          </View>
         </View>
 
-        <View className="bg-surface dark:bg-surface-dark rounded-3xl overflow-hidden mb-6 shadow-sm border border-gray-100 dark:border-gray-800">
+        {/* Menu Items */}
+        <View className="px-5 gap-3">
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
               onPress={item.onPress}
-              className={`flex-row items-center p-5 ${index !== menuItems.length - 1 ? "border-b border-gray-100 dark:border-gray-800" : ""}`}
+              activeOpacity={0.7}
+              className="flex-row items-center p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800"
             >
-              <View className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center mr-4">
+              <View
+                className={`w-12 h-12 rounded-xl items-center justify-center mr-4 ${item.bgColor}`}
+              >
                 <Ionicons
                   name={item.icon as any}
-                  size={20}
-                  color={isDark ? "#D1D5DB" : "#4B5563"}
+                  size={22}
+                  color={item.color}
                 />
               </View>
-              <Text className="flex-1 text-base font-medium text-gray-900 dark:text-white">
-                {item.label}
-              </Text>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={colors.gray[400]}
-              />
+              <View className="flex-1">
+                <Text className="text-base font-bold text-gray-900 dark:text-white">
+                  {item.label}
+                </Text>
+                <Text className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {item.description}
+                </Text>
+              </View>
+              <View className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full items-center justify-center">
+                <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+              </View>
             </TouchableOpacity>
           ))}
         </View>
 
-        <TouchableOpacity
-          onPress={signOut}
-          className="flex-row items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 rounded-3xl mb-8"
-        >
-          <Ionicons
-            name="log-out-outline"
-            size={24}
-            color={isDark ? colors.red[400] : colors.red[600]}
-            style={{ marginRight: 8 }}
-          />
-          <Text className="text-red-600 dark:text-red-400 font-bold text-base">
-            Sign Out
+        {/* Sign Out Button */}
+        <View className="px-5 mt-6">
+          <TouchableOpacity
+            onPress={signOut}
+            className="flex-row items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-900/30"
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={20}
+              color={isDark ? "#F87171" : "#DC2626"}
+            />
+            <Text className="text-red-600 dark:text-red-400 font-bold text-sm ml-2">
+              Sign Out
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* App Version */}
+        <View className="items-center mt-6">
+          <Text className="text-gray-400 dark:text-gray-600 text-xs">
+            Archeon v1.0.0
           </Text>
-        </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
