@@ -16,6 +16,7 @@ import { DocumentStatusBadge } from "../../../components/document/DocumentStatus
 import { useDocumentDetailsLogic } from "../../../hooks/useDocumentDetailsLogic";
 import { CategorySelectionModal } from "../../../components/document/CategorySelectionModal";
 import { TagSelectionModal } from "../../../components/document/TagSelectionModal";
+import { TitleEditModal } from "../../../components/document/TitleEditModal";
 
 import { Skeleton } from "../../../components/common/Skeleton";
 
@@ -33,10 +34,14 @@ export default function DocumentDetails() {
     setCategoryModalVisible,
     tagModalVisible,
     setTagModalVisible,
+    titleModalVisible,
+    setTitleModalVisible,
     tagSearch,
     setTagSearch,
     categorySearch,
     setCategorySearch,
+    editingTitle,
+    setEditingTitle,
     filteredTags,
     filteredCategories,
     handleUpdateCategory,
@@ -45,6 +50,11 @@ export default function DocumentDetails() {
     handleQuickCreateCategory,
     handleTriggerAi,
     isTriggeringAi,
+    handleOpenTitleModal,
+    handleSaveTitle,
+    handleGenerateAiTitle,
+    isUpdating,
+    isGeneratingTitle,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -175,7 +185,16 @@ export default function DocumentDetails() {
             <Text className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-2 px-4 leading-tight">
               {document.title}
             </Text>
-            <Text className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+            <TouchableOpacity
+              onPress={handleOpenTitleModal}
+              className="flex-row items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-full"
+            >
+              <Ionicons name="pencil" size={12} color="#6B7280" />
+              <Text className="text-gray-500 dark:text-gray-400 text-xs font-medium">
+                Edit title
+              </Text>
+            </TouchableOpacity>
+            <Text className="text-gray-500 dark:text-gray-400 text-sm font-medium mt-2">
               Added on {format(new Date(document.createdAt), "MMMM d, yyyy")}
             </Text>
           </View>
@@ -405,6 +424,17 @@ export default function DocumentDetails() {
         onSelect={handleAddTag}
         onCreate={handleCreateTag}
         currentTagIds={document.tags?.map((t) => t.id)}
+      />
+
+      <TitleEditModal
+        visible={titleModalVisible}
+        onClose={() => setTitleModalVisible(false)}
+        title={editingTitle}
+        onTitleChange={setEditingTitle}
+        onSave={handleSaveTitle}
+        onGenerateAi={handleGenerateAiTitle}
+        isSaving={isUpdating}
+        isGenerating={isGeneratingTitle}
       />
     </SafeAreaView>
   );

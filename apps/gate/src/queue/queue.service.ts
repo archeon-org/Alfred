@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
-import { ProcessDocumentJobData } from '@archeon-org/types';
+import {
+  ProcessDocumentJobData,
+  GenerateTitleJobData,
+} from '@archeon-org/types';
 
 @Injectable()
 export class QueueService {
@@ -14,11 +17,7 @@ export class QueueService {
   async addDocumentProcessingJob(data: ProcessDocumentJobData) {
     try {
       await this.documentsQueue.add('process-document', data, {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 1000,
-        },
+        attempts: 1,
         removeOnComplete: true,
       });
       this.logger.log(
@@ -27,6 +26,24 @@ export class QueueService {
     } catch (error) {
       this.logger.error(
         `Failed to add document processing job for document ${data.documentId}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  async addTitleGenerationJob(data: GenerateTitleJobData) {
+    try {
+      await this.documentsQueue.add('generate-title', data, {
+        attempts: 1,
+        removeOnComplete: true,
+      });
+      this.logger.log(
+        `Added title generation job for document ${data.documentId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to add title generation job for document ${data.documentId}`,
         error.stack,
       );
       throw error;

@@ -4,6 +4,16 @@ import OpenAI from 'openai';
 import { z } from 'zod';
 import { zodResponseFormat } from 'openai/helpers/zod';
 
+export interface ClassificationResult {
+  categoryId: string | null;
+  tagIds: string[];
+  title: string;
+}
+
+export interface TitleGenerationResult {
+  title: string;
+}
+
 @Injectable()
 export class ClassificationService {
   private readonly logger = new Logger(ClassificationService.name);
@@ -27,7 +37,8 @@ export class ClassificationService {
     content: string,
     categories: { id: string; name: string }[],
     tags: { id: string; name: string }[],
-  ): Promise<{ categoryId: string | null; tagIds: string[] }> {
+    originalFileName?: string,
+  ): Promise<ClassificationResult> {
     try {
       this.logger.log('Starting AI classification...');
 
@@ -52,6 +63,11 @@ export class ClassificationService {
             'The ID of the most relevant category, or null if none match.',
           ),
         tagIds: z.array(z.string()).describe('Array of IDs of relevant tags.'),
+        title: z
+          .string()
+          .describe(
+            'A concise, descriptive title for the document (max 60 characters). Should be human-readable and describe what the document is about.',
+          ),
         confidence: z
           .enum(['high', 'medium', 'low'])
           .describe('Your confidence level in the classification.'),
@@ -72,7 +88,11 @@ export class ClassificationService {
           : '(No tags defined yet)';
 
       const prompt = `You are an intelligent document classifier for a personal document management system.
-Your task is to analyze the document content and assign the most appropriate category and tags from the user's existing lists.
+Your task is to analyze the document content and:
+1. Assign the most appropriate category and tags from the user's existing lists
+2. Generate a clear, descriptive title for the document
+
+${originalFileName ? `Original filename: "${originalFileName}"` : ''}
 
 ## Available Categories:
 ${formattedCategories}
@@ -81,6 +101,14 @@ ${formattedCategories}
 ${formattedTags}
 
 ## Classification Guidelines:
+
+### Title Generation:
+- Create a concise, human-readable title (max 60 characters)
+- The title should describe WHAT the document is (e.g., "Electricity Bill - January 2024", "Apartment Lease Agreement", "Car Insurance Policy")
+- Include relevant details like dates, company names, or key identifiers when available
+- Use the document's language for the title (if document is in French, title should be in French)
+- Do NOT use the filename as the title unless it's already descriptive
+- Do NOT include file extensions in the title
 
 ### Category Selection:
 - Select the ONE category that best matches the document's primary purpose or type
@@ -167,17 +195,106 @@ ${formattedTags}
       }
 
       this.logger.log(
-        `Validated Classification result: categoryId=${validatedCategoryId}, tagIds=${JSON.stringify(validatedTagIds)}`,
+        `Validated Classification result: categoryId=${validatedCategoryId}, tagIds=${JSON.stringify(validatedTagIds)}, title="${parsed.title}"`,
       );
 
       return {
         categoryId: validatedCategoryId,
         tagIds: validatedTagIds,
+        title: parsed.title || originalFileName || 'Untitled Document',
       };
     } catch (error) {
       this.logger.error('AI Classification failed', error);
       // Return neutral result on failure so processing can continue
-      return { categoryId: null, tagIds: [] };
+      return {
+        categoryId: null,
+        tagIds: [],
+        title: originalFileName || 'Untitled Document',
+      };
+    }
+  }
+
+  /**
+   * Generate only a title for a document (lighter than full classification)
+   * Used for manual uploads where user wants AI-generated title without classification
+   */
+  async generateTitle(
+    content: string,
+    originalFileName?: string,
+  ): Promise<TitleGenerationResult> {
+    try {
+      this.logger.log('Starting AI title generation...');
+
+      // Limit content - we need less context for title generation
+      const truncatedContent =
+        content.length > 4000
+          ? content.substring(0, 2000) +
+            '\n...\n' +
+            content.substring(content.length - 2000)
+          : content;
+
+      const TitleSchema = z.object({
+        title: z
+          .string()
+          .describe(
+            'A concise, descriptive title for the document (max 60 characters).',
+          ),
+        reasoning: z
+          .string()
+          .describe('Brief explanation of why you chose this title.'),
+      });
+
+      const prompt = `You are a document naming assistant. Your task is to generate a clear, descriptive title for a document.
+
+${originalFileName ? `Original filename: "${originalFileName}"` : ''}
+
+## Title Generation Rules:
+- Create a concise, human-readable title (max 60 characters)
+- The title should describe WHAT the document is about
+- Examples of good titles:
+  - "Electricity Bill - January 2024"
+  - "Apartment Lease Agreement"
+  - "Car Insurance Policy - Renewal"
+  - "Medical Test Results - Blood Work"
+  - "Restaurant Receipt - 15 Nov 2024"
+- Include relevant details like dates, company names, or key identifiers when available
+- Use the document's language for the title (if document is in French, title should be in French)
+- Do NOT use the original filename unless it's already descriptive
+- Do NOT include file extensions (.pdf, .jpg, etc.)
+- Do NOT use generic titles like "Document" or "File"
+`;
+
+      const response = await this.client.chat.completions.create({
+        model: 'accounts/fireworks/models/deepseek-v3p1-terminus',
+        messages: [
+          { role: 'system', content: prompt },
+          { role: 'user', content: `Document Content:\n${truncatedContent}` },
+        ],
+        response_format: zodResponseFormat(TitleSchema, 'title_generation'),
+        temperature: 0.2,
+      });
+
+      const result = response.choices[0].message.content;
+      if (!result) {
+        throw new Error('Empty response from AI model');
+      }
+
+      this.logger.debug(`Raw AI title response: ${result}`);
+
+      const parsed = JSON.parse(result);
+
+      this.logger.log(
+        `AI Title Generation - Title: "${parsed.title}", Reasoning: ${parsed.reasoning}`,
+      );
+
+      return {
+        title: parsed.title || originalFileName || 'Untitled Document',
+      };
+    } catch (error) {
+      this.logger.error('AI Title generation failed', error);
+      return {
+        title: originalFileName || 'Untitled Document',
+      };
     }
   }
 }

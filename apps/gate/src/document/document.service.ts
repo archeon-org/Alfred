@@ -48,6 +48,7 @@ export class DocumentService {
       documentId: document.id,
       userId: document.userId,
       key: document.path,
+      originalName: document.originalName,
     });
     this.logger.log(`Document queued for AI processing: ${document.id}`);
 
@@ -296,6 +297,7 @@ export class DocumentService {
       documentId: document.id,
       userId: document.userId,
       key: document.path,
+      originalName: document.originalName,
     });
 
     return this.documentRepository.update(documentId, {
@@ -303,5 +305,33 @@ export class DocumentService {
       processingStatus: ProcessingStatus.PENDING,
       categoryId: null,
     });
+  }
+
+  async triggerAiTitleGeneration(
+    userId: string,
+    documentId: string,
+  ): Promise<DocumentEntity> {
+    this.logger.log(
+      `Triggering AI title generation for document ${documentId} for user ${userId}`,
+    );
+    const document = await this.documentRepository.findById(documentId);
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    if (document.userId !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    // Add job to queue for title generation
+    await this.queueService.addTitleGenerationJob({
+      documentId: document.id,
+      userId: document.userId,
+      key: document.path,
+      originalName: document.originalName,
+    });
+
+    return document;
   }
 }

@@ -117,4 +117,10 @@ export class DocumentController {
     const user = req.user as UserEntity;
     return this.documentService.triggerAiClassification(user.id, id);
   }
+
+  @Post(':id/generate-title')
+  async triggerAiTitleGeneration(@Req() req: Request, @Param('id') id: string) {
+    const user = req.user as UserEntity;
+    return this.documentService.triggerAiTitleGeneration(user.id, id);
+  }
 }

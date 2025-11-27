@@ -117,6 +117,13 @@ export const triggerAiClassification = async (
   return response.data;
 };
 
+export const triggerAiTitleGeneration = async (
+  id: string
+): Promise<Document> => {
+  const response = await api.post(`/documents/${id}/generate-title`);
+  return response.data;
+};
+
 export const deleteDocument = async (id: string): Promise<void> => {
   await api.delete(`/documents/${id}`);
 };

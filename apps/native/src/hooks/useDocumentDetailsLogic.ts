@@ -23,6 +23,8 @@ export const useDocumentDetailsLogic = () => {
     isUpdating,
     triggerAiClassification,
     isTriggeringAi,
+    generateAiTitle,
+    isGeneratingTitle,
   } = useDocumentMutations();
   const { tags: allTags } = useTags();
   const { createTag, isCreating: isCreatingTag } = useTagMutations();
@@ -37,8 +39,10 @@ export const useDocumentDetailsLogic = () => {
 
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [tagModalVisible, setTagModalVisible] = useState(false);
+  const [titleModalVisible, setTitleModalVisible] = useState(false);
   const [tagSearch, setTagSearch] = useState("");
   const [categorySearch, setCategorySearch] = useState("");
+  const [editingTitle, setEditingTitle] = useState("");
 
   useEffect(() => {
     if (openCategoryModal === "true") {
@@ -141,6 +145,42 @@ export const useDocumentDetailsLogic = () => {
     }
   };
 
+  const handleOpenTitleModal = () => {
+    if (data?.document) {
+      setEditingTitle(data.document.title || "");
+      setTitleModalVisible(true);
+    }
+  };
+
+  const handleSaveTitle = async () => {
+    if (!data?.document || !editingTitle.trim()) return;
+    try {
+      await updateDocument({
+        id: data.document.id,
+        data: { title: editingTitle.trim() },
+      });
+      setTitleModalVisible(false);
+      refetch();
+      Alert.alert("Success", "Title updated successfully");
+    } catch (error) {
+      showError(error, "Failed to update title");
+    }
+  };
+
+  const handleGenerateAiTitle = async () => {
+    if (!data?.document) return;
+    try {
+      await generateAiTitle(data.document.id);
+      setTitleModalVisible(false);
+      Alert.alert(
+        "Title Generation Started",
+        "AI is generating a title for your document. You'll receive a notification when it's ready."
+      );
+    } catch (error) {
+      showError(error, "Failed to trigger AI title generation");
+    }
+  };
+
   return {
     document: data?.document,
     isLoading,
@@ -154,10 +194,14 @@ export const useDocumentDetailsLogic = () => {
     setCategoryModalVisible,
     tagModalVisible,
     setTagModalVisible,
+    titleModalVisible,
+    setTitleModalVisible,
     tagSearch,
     setTagSearch,
     categorySearch,
     setCategorySearch,
+    editingTitle,
+    setEditingTitle,
     filteredTags,
     filteredCategories,
     handleUpdateCategory,
@@ -166,6 +210,11 @@ export const useDocumentDetailsLogic = () => {
     handleQuickCreateCategory,
     handleTriggerAi,
     isTriggeringAi,
+    handleOpenTitleModal,
+    handleSaveTitle,
+    handleGenerateAiTitle,
+    isUpdating,
+    isGeneratingTitle,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,

@@ -7,6 +7,7 @@ import {
   updateDocument,
   bulkUpdateDocuments,
   triggerAiClassification,
+  triggerAiTitleGeneration,
   deleteDocument,
 } from "../services";
 import { Alert } from "react-native";
@@ -100,6 +101,14 @@ export const useDocumentMutations = () => {
     },
   });
 
+  const generateTitleMutation = useMutation({
+    mutationFn: (id: string) => triggerAiTitleGeneration(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["documents"] });
+      queryClient.invalidateQueries({ queryKey: ["document"] });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteDocument(id),
     onSuccess: () => {
@@ -114,6 +123,8 @@ export const useDocumentMutations = () => {
     isBulkUpdating: bulkUpdateMutation.isPending,
     triggerAiClassification: triggerAiMutation.mutateAsync,
     isTriggeringAi: triggerAiMutation.isPending,
+    generateAiTitle: generateTitleMutation.mutateAsync,
+    isGeneratingTitle: generateTitleMutation.isPending,
     deleteDocument: deleteMutation.mutateAsync,
     isDeleting: deleteMutation.isPending,
   };

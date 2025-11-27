@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { ProcessDocumentJobData } from '@archeon-org/types';
+import {
+  ProcessDocumentJobData,
+  GenerateTitleJobData,
+} from '@archeon-org/types';
 import {
   DocumentEntity,
   ProcessingStatus,
@@ -72,6 +75,7 @@ export class DocumentService {
           text,
           categories.map((c) => ({ id: c.id, name: c.name })),
           tags.map((t) => ({ id: t.id, name: t.name })),
+          data.originalName,
         );
 
       // Prepare update data
@@ -80,6 +84,7 @@ export class DocumentService {
         processingStatus: ProcessingStatus.COMPLETED,
         isProcessed: true,
         classificationSource: 'AI',
+        title: classificationResult.title,
       };
 
       if (classificationResult.categoryId) {
@@ -121,8 +126,7 @@ export class DocumentService {
       await this.notificationService.create({
         userId: data.userId,
         title: 'Document Processed',
-        message:
-          'Your document has been successfully processed and classified.',
+        message: `"${classificationResult.title}" has been successfully processed and classified.`,
         data: {
           documentId: data.documentId,
           url: `/(app)/documents/${data.documentId}`,
@@ -143,6 +147,85 @@ export class DocumentService {
         userId: data.userId,
         title: 'Document Processing Failed',
         message: 'There was an error processing your document.',
+        data: { documentId: data.documentId },
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Generate only a title for a document using AI
+   * Used for manual uploads where user wants AI-generated title
+   */
+  async generateDocumentTitle(data: GenerateTitleJobData): Promise<void> {
+    this.logger.log(
+      `Starting title generation for document: ${data.documentId}`,
+    );
+
+    try {
+      // 1. Get document to check if it has content already
+      const document = await this.documentRepository.findOne({
+        where: { id: data.documentId },
+        select: ['id', 'content', 'originalName'],
+      });
+
+      if (!document) {
+        throw new Error(`Document ${data.documentId} not found`);
+      }
+
+      let text = document.content;
+
+      // 2. If no content exists, perform OCR
+      if (!text) {
+        this.logger.log(
+          `No content found, performing OCR for document: ${data.documentId}`,
+        );
+        const fileBuffer = await this.r2Service.getFile(data.key);
+        text = await this.ocrService.recognize(fileBuffer);
+
+        // Save the extracted content
+        await this.documentRepository.update(data.documentId, {
+          content: text,
+        });
+      }
+
+      // 3. Generate title using AI
+      const titleResult = await this.classificationService.generateTitle(
+        text,
+        data.originalName || document.originalName,
+      );
+
+      // 4. Update document with the new title
+      await this.documentRepository.update(data.documentId, {
+        title: titleResult.title,
+      });
+
+      this.logger.log(
+        `Successfully generated title for document ${data.documentId}: "${titleResult.title}"`,
+      );
+
+      // 5. Send success notification
+      await this.notificationService.create({
+        userId: data.userId,
+        title: 'Title Generated',
+        message: `Your document has been renamed to "${titleResult.title}".`,
+        data: {
+          documentId: data.documentId,
+          url: `/(app)/documents/${data.documentId}`,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate title for document ${data.documentId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+
+      // Send failure notification
+      await this.notificationService.create({
+        userId: data.userId,
+        title: 'Title Generation Failed',
+        message: 'There was an error generating a title for your document.',
         data: { documentId: data.documentId },
       });
 
