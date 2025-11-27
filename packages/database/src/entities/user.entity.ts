@@ -1,4 +1,4 @@
-import { Address, AuthProvider, User, UserType } from '@archeon-org/types';
+import { Address, AuthProvider, User, UserType } from "@archeon-org/types";
 import {
   Entity,
   Column,
@@ -6,14 +6,14 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
-} from 'typeorm';
-import { DocumentEntity } from '../document/document.entity';
-import { CategoryEntity } from '../category/category.entity';
-import { TagEntity } from '../tag/tag.entity';
+} from "typeorm";
+import { DocumentEntity } from "./document.entity";
+import { CategoryEntity } from "./category.entity";
+import { TagEntity } from "./tag.entity";
 
-@Entity('users')
+@Entity("users")
 export class UserEntity implements User {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ unique: true })
@@ -34,37 +34,37 @@ export class UserEntity implements User {
   @Column({ nullable: true })
   pushToken?: string;
 
-  @Column({ type: 'bigint', default: 0 })
+  @Column({ type: "bigint", default: 0 })
   storageUsed: number;
 
-  @Column({ type: 'bigint', default: 2147483648 })
+  @Column({ type: "bigint", default: 2147483648 })
   storageLimit: number;
 
-  @Column({ type: 'jsonb', default: {} })
+  @Column({ type: "jsonb", default: {} })
   preferences: Record<string, any>;
 
   @Column({ default: 0 })
   searchCount: number;
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: "jsonb", nullable: true })
   address?: Address;
 
-  @Column({ type: 'enum', enum: UserType, default: UserType.USER })
+  @Column({ type: "enum", enum: UserType, default: UserType.USER })
   role: UserType;
 
   @Column({ nullable: true, select: false })
   refreshToken?: string;
 
-  @Column({ type: 'enum', enum: AuthProvider })
+  @Column({ type: "enum", enum: AuthProvider })
   provider: AuthProvider;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   lastLoginAt: Date;
 
   @Column({ nullable: true, select: false })
   otpHash?: string;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   otpExpiresAt?: Date;
 
   @Column({ default: false })

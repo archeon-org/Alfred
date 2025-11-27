@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
 import { UserRepository } from './user.repository';
-import { UserEntity } from './user.entity';
+import { UserEntity } from '@archeon-org/database';
 
 @Module({
   imports: [TypeOrmModule.forFeature([UserEntity])],

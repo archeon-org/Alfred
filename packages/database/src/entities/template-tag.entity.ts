@@ -1,4 +1,4 @@
-import { TemplateTag } from '@archeon-org/types';
+import { TemplateTag } from "@archeon-org/types";
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -7,12 +7,12 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
-} from 'typeorm';
-import { TemplateEntity } from './template.entity';
+} from "typeorm";
+import { TemplateEntity } from "./template.entity";
 
-@Entity('template_tags')
+@Entity("template_tags")
 export class TemplateTagEntity implements TemplateTag {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -21,11 +21,11 @@ export class TemplateTagEntity implements TemplateTag {
   @Column()
   color: string;
 
-  @Column({ type: 'integer' })
+  @Column({ type: "integer" })
   order: number;
 
-  @ManyToOne(() => TemplateEntity, (t) => t.tags, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'templateId' })
+  @ManyToOne(() => TemplateEntity, (t) => t.tags, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "templateId" })
   template: TemplateEntity;
 
   @CreateDateColumn()

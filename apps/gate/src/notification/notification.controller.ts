@@ -1,8 +1,8 @@
 import { Controller, Get, Param, Req, Patch } from '@nestjs/common';
-import { NotificationService } from './notification.service';
+import { NotificationService } from '@archeon-org/module';
 
 import { Request } from 'express';
-import { UserEntity } from '../user/user.entity';
+import { UserEntity } from '@archeon-org/database';
 import { Paginate, PaginateQuery } from 'nestjs-paginate';
 
 @Controller('notifications')

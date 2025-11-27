@@ -2,11 +2,12 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentController } from './document.controller';
 import { DocumentService } from './document.service';
-import { DocumentEntity } from './document.entity';
+import { DocumentEntity } from '@archeon-org/database';
 import { DocumentRepository } from './document.repository';
 import { ConfigModule } from '@nestjs/config';
-import { R2Module } from '../common/modules/r2/r2.module';
+import { R2Module } from '@archeon-org/module';
 import { UserModule } from '../user/user.module';
+import { QueueModule } from '../queue/queue.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { UserModule } from '../user/user.module';
     ConfigModule,
     R2Module,
     UserModule,
+    QueueModule,
   ],
   controllers: [DocumentController],
   providers: [DocumentService, DocumentRepository],

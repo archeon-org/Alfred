@@ -1,5 +1,5 @@
 {
-  "name": "archeon",
+  "name": "native",
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
@@ -41,11 +41,13 @@
     "expo-constants": "~18.0.10",
     "expo-crypto": "^15.0.7",
     "expo-dev-client": "~6.0.18",
+    "expo-device": "^8.0.9",
     "expo-document-picker": "^14.0.7",
     "expo-file-system": "^19.0.19",
     "expo-font": "~14.0.9",
     "expo-image-picker": "~17.0.8",
     "expo-linking": "~8.0.9",
+    "expo-notifications": "^0.32.13",
     "expo-print": "^15.0.7",
     "expo-router": "~6.0.15",
     "expo-secure-store": "^15.0.7",
@@ -80,5 +82,6 @@
     "tailwindcss": "^3.4.17",
     "typescript": "~5.9.2"
   },
-  "private": true
+  "private": true,
+  "license": "UNLICENSED"
 }

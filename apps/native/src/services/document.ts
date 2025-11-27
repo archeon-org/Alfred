@@ -17,9 +17,12 @@ export const uploadDocument = async (
     type,
   } as any);
 
-  formData.append("classificationSource", classificationSource);
+  const endpoint =
+    classificationSource === "AI"
+      ? "/documents/upload/ai"
+      : "/documents/upload/manual";
 
-  const response = await api.post("/documents/upload", formData, {
+  const response = await api.post(endpoint, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },

@@ -117,7 +117,7 @@ export default function DocumentDetails() {
           Failed to load document
         </Text>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => router.replace("/(app)/documents")}
           className="bg-indigo-600 px-4 py-2 rounded-lg"
         >
           <Text className="text-white font-medium">Go Back</Text>
@@ -136,7 +136,7 @@ export default function DocumentDetails() {
       {/* Header */}
       <View className="flex-row items-center px-4 py-3 border-b border-gray-100 dark:border-gray-800">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => router.replace("/(app)/documents")}
           className="mr-4 p-2 -ml-2"
         >
           <Ionicons name="arrow-back" size={24} color="#374151" />
@@ -210,52 +210,53 @@ export default function DocumentDetails() {
 
         <View className="px-4 space-y-8">
           {/* Classification Needed Section */}
-          {document.processingStatus === "PENDING" &&
-            (document as any).classificationSource === "MANUAL" && (
-              <View className="bg-orange-50 dark:bg-orange-900/20 p-5 rounded-2xl border border-orange-200 dark:border-orange-800">
-                <View className="flex-row items-start gap-3 mb-3">
-                  <View className="bg-orange-100 dark:bg-orange-900/40 p-2 rounded-full">
-                    <Ionicons name="alert" size={20} color="#F97316" />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-orange-900 dark:text-orange-100 font-bold text-lg mb-1">
-                      Action Required
-                    </Text>
-                    <Text className="text-orange-700 dark:text-orange-300 text-sm leading-5">
-                      This document needs classification. You can do it manually
-                      or let our AI handle it for you.
-                    </Text>
-                  </View>
+          {((document.processingStatus === "PENDING" &&
+            document.classificationSource === "MANUAL") ||
+            document.processingStatus === "FAILED") && (
+            <View className="bg-orange-50 dark:bg-orange-900/20 p-5 rounded-2xl border border-orange-200 dark:border-orange-800">
+              <View className="flex-row items-start gap-3 mb-3">
+                <View className="bg-orange-100 dark:bg-orange-900/40 p-2 rounded-full">
+                  <Ionicons name="alert" size={20} color="#F97316" />
                 </View>
-
-                <View className="flex-row gap-3 mt-2">
-                  <TouchableOpacity
-                    onPress={() => setCategoryModalVisible(true)}
-                    className="flex-1 bg-white dark:bg-black border border-orange-200 dark:border-orange-800 py-3 rounded-xl items-center shadow-sm"
-                  >
-                    <Text className="text-orange-700 dark:text-orange-300 font-bold">
-                      Classify Manually
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleTriggerAi}
-                    disabled={isTriggeringAi}
-                    className="flex-1 bg-orange-500 py-3 rounded-xl items-center flex-row justify-center gap-2 shadow-sm"
-                  >
-                    {isTriggeringAi ? (
-                      <ActivityIndicator color="white" size="small" />
-                    ) : (
-                      <>
-                        <Ionicons name="sparkles" size={16} color="white" />
-                        <Text className="text-white font-bold">
-                          Auto-Classify
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                <View className="flex-1">
+                  <Text className="text-orange-900 dark:text-orange-100 font-bold text-lg mb-1">
+                    Action Required
+                  </Text>
+                  <Text className="text-orange-700 dark:text-orange-300 text-sm leading-5">
+                    This document needs classification. You can do it manually
+                    or let our AI handle it for you.
+                  </Text>
                 </View>
               </View>
-            )}
+
+              <View className="flex-row gap-3 mt-2">
+                <TouchableOpacity
+                  onPress={() => setCategoryModalVisible(true)}
+                  className="flex-1 bg-white dark:bg-black border border-orange-200 dark:border-orange-800 py-3 rounded-xl items-center shadow-sm"
+                >
+                  <Text className="text-orange-700 dark:text-orange-300 font-bold">
+                    Classify Manually
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleTriggerAi}
+                  disabled={isTriggeringAi}
+                  className="flex-1 bg-orange-500 py-3 rounded-xl items-center flex-row justify-center gap-2 shadow-sm"
+                >
+                  {isTriggeringAi ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <>
+                      <Ionicons name="sparkles" size={16} color="white" />
+                      <Text className="text-white font-bold">
+                        Auto-Classify
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Details Card */}
           <View className="bg-surface dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">

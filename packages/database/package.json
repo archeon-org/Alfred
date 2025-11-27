@@ -1,0 +1,20 @@
+{
+  "name": "@archeon-org/database",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@archeon-org/types": "*",
+    "reflect-metadata": "^0.2.0",
+    "typeorm": "^0.3.27"
+  },
+  "devDependencies": {
+    "typescript": "^5.1.3"
+  }
+}

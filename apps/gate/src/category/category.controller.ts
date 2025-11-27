@@ -11,7 +11,7 @@ import {
 import { CategoryService } from './category.service';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { UserEntity } from '../user/user.entity';
+import { UserEntity } from '@archeon-org/database';
 import { Paginate, PaginateQuery } from 'nestjs-paginate';
 
 @Controller('categories')

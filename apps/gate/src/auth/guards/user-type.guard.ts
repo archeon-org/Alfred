@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import { UserEntity } from '../../user/user.entity';
+import { UserEntity } from '@archeon-org/database';
 import { USER_TYPE_KEY } from '../../common/decorators/user-type.decorator';
 
 @Injectable()

@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { TemplateEntity } from './template.entity';
-import { TemplateTagEntity } from './template-tag.entity';
-import { TemplateCategoryEntity } from './template-category.entity';
+import { TemplateEntity } from '@archeon-org/database';
+import { TemplateTagEntity } from '@archeon-org/database';
+import { TemplateCategoryEntity } from '@archeon-org/database';
 import { CategoryModule } from '../category/category.module';
 import { TagModule } from '../tag/tag.module';
 import { UserModule } from '../user/user.module';

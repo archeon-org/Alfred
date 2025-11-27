@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { TagEntity } from './tag.entity';
+import { TagEntity } from '@archeon-org/database';
 import { TagService } from './tag.service';
 import { TagController } from './tag.controller';
 

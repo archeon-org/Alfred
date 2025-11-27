@@ -1,6 +1,16 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
 import { ConfigService } from '@nestjs/config';
+import {
+  UserEntity,
+  DocumentEntity,
+  CategoryEntity,
+  TagEntity,
+  TemplateEntity,
+  TemplateCategoryEntity,
+  TemplateTagEntity,
+  NotificationEntity,
+} from '@archeon-org/database';
 
 config();
 
@@ -14,7 +24,16 @@ export const dataSourceOptions: DataSourceOptions = {
   username: configService.getOrThrow<string>('DATABASE_USERNAME'),
   password: configService.getOrThrow<string>('DATABASE_PASSWORD'),
   database: configService.getOrThrow<string>('DATABASE_NAME'),
-  entities: ['dist/**/*.entity.js'],
+  entities: [
+    UserEntity,
+    DocumentEntity,
+    CategoryEntity,
+    TagEntity,
+    TemplateEntity,
+    TemplateCategoryEntity,
+    TemplateTagEntity,
+    NotificationEntity,
+  ],
   migrations: ['dist/db/migrations/*.js'],
   migrationsTableName: 'migrations',
   migrationsRun: false,

@@ -2,7 +2,7 @@ import { Inject, Injectable, Scope } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
 
-import { UserEntity } from './user.entity';
+import { UserEntity } from '@archeon-org/database';
 import { UserOAuthCreateDto } from '../auth/dto/auth.dto';
 import { AuthProvider } from '@archeon-org/types';
 import { REQUEST } from '@nestjs/core';

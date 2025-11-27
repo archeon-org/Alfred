@@ -15,7 +15,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DocumentService } from './document.service';
 import { Request } from 'express';
-import { UserEntity } from '../user/user.entity';
+import { UserEntity } from '@archeon-org/database';
 import { UpdateDocumentDto } from './dto/document.dto';
 import { Paginate, PaginateQuery } from 'nestjs-paginate';
 
@@ -23,14 +23,16 @@ import { Paginate, PaginateQuery } from 'nestjs-paginate';
 export class DocumentController {
   constructor(private readonly documentService: DocumentService) {}
 
-  @Post('upload')
+  @Post('upload/ai')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(
+  async uploadAi(
     @Req() req: Request,
     @UploadedFile(
       new ParseFilePipeBuilder()
         .addFileTypeValidator({
-          fileType: /(pdf|jpeg|png|jpg|heic|heif)$/i,
+          fileType:
+            /(pdf|jpeg|jpg|png|heic|heif|application\/pdf|application\/x-pdf|image\/jpeg|image\/png|image\/heic|image\/heif)/i,
+          skipMagicNumbersValidation: true,
         })
         .addMaxSizeValidator({
           maxSize: 20 * 1024 * 1024, // 20MB
@@ -40,14 +42,33 @@ export class DocumentController {
         }),
     )
     file: Express.Multer.File,
-    @Body() body: { classificationSource?: 'AI' | 'MANUAL' },
   ) {
     const user = req.user as UserEntity;
-    return this.documentService.uploadDocument(
-      user.id,
-      file,
-      body.classificationSource,
-    );
+    return this.documentService.uploadAi(user.id, file);
+  }
+
+  @Post('upload/manual')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadManual(
+    @Req() req: Request,
+    @UploadedFile(
+      new ParseFilePipeBuilder()
+        .addFileTypeValidator({
+          fileType:
+            /(pdf|jpeg|jpg|png|heic|heif|application\/pdf|application\/x-pdf|image\/jpeg|image\/png|image\/heic|image\/heif)/i,
+          skipMagicNumbersValidation: true,
+        })
+        .addMaxSizeValidator({
+          maxSize: 20 * 1024 * 1024, // 20MB
+        })
+        .build({
+          errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
+        }),
+    )
+    file: Express.Multer.File,
+  ) {
+    const user = req.user as UserEntity;
+    return this.documentService.uploadManual(user.id, file);
   }
 
   @Get()

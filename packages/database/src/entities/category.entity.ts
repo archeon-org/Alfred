@@ -1,4 +1,4 @@
-import { Category } from '@archeon-org/types';
+import { Category } from "@archeon-org/types";
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -8,22 +8,22 @@ import {
   CreateDateColumn,
   JoinColumn,
   UpdateDateColumn,
-} from 'typeorm';
-import { UserEntity } from '../user/user.entity';
-import { DocumentEntity } from '../document/document.entity';
+} from "typeorm";
+import { UserEntity } from "./user.entity";
+import { DocumentEntity } from "./document.entity";
 
-@Entity('categories')
+@Entity("categories")
 export class CategoryEntity implements Category {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
   name: string; // e.g., "Finance", "Medical"
 
-  @Column({ default: 'folder-outline' })
+  @Column({ default: "folder-outline" })
   icon: string; // Ionicons name
 
-  @Column({ default: '#4F46E5' })
+  @Column({ default: "#4F46E5" })
   color: string; // Hex Code
 
   @Column({ default: true })
@@ -34,9 +34,9 @@ export class CategoryEntity implements Category {
   userId: string;
 
   @ManyToOne(() => UserEntity, (user) => user.categories, {
-    onDelete: 'CASCADE',
+    onDelete: "CASCADE",
   })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: "userId" })
   user: UserEntity;
 
   @OneToMany(() => DocumentEntity, (doc) => doc.category)

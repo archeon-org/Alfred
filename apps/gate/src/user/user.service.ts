@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { UserRepository } from './user.repository';
-import { UserEntity } from './user.entity';
+import { UserEntity } from '@archeon-org/database';
 import { UserOAuthCreateDto } from '../auth/dto/auth.dto';
 
 @Injectable()

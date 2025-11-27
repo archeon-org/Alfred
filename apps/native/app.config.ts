@@ -35,6 +35,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           ],
         },
       ],
+      UIBackgroundModes: ["remote-notification"],
     },
     config: {
       usesNonExemptEncryption: false,
@@ -57,6 +58,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     "expo-router",
+    "expo-notifications",
+    "expo-secure-store",
     [
       "react-native-document-scanner-plugin",
       {

@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { CategoryEntity } from './category.entity';
+import { CategoryEntity } from '@archeon-org/database';
 import { CategoryService } from './category.service';
 import { CategoryController } from './category.controller';
-import { DocumentEntity } from '../document/document.entity';
+import { DocumentEntity } from '@archeon-org/database';
 
 @Module({
   imports: [TypeOrmModule.forFeature([CategoryEntity, DocumentEntity])],

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TagEntity } from './tag.entity';
+import { TagEntity } from '@archeon-org/database';
 
 @Injectable()
 export class TagService {

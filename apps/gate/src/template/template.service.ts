@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { TemplateRepository } from './template.repository';
 import { CreateTemplateDto, UpdateTemplateDto } from './dto/template.dto';
-import { TemplateEntity } from './template.entity';
+import { TemplateEntity } from '@archeon-org/database';
 import { CategoryService } from '../category/category.service';
 import { TagService } from '../tag/tag.service';
 import { UserService } from '../user/user.service';
@@ -9,7 +9,7 @@ import { paginate, PaginateQuery, Paginated } from 'nestjs-paginate';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { TemplateCategoryEntity } from './template-category.entity';
+import { TemplateCategoryEntity } from '@archeon-org/database';
 
 @Injectable()
 export class TemplateService {

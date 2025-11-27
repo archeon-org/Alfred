@@ -6,10 +6,10 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { DocumentRepository } from './document.repository';
-import { DocumentEntity } from './document.entity';
+import { DocumentEntity } from '@archeon-org/database';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
-import { R2Service } from '../common/modules/r2/r2.service';
+import { R2Service } from '@archeon-org/module';
 import { UpdateDocumentDto } from './dto/document.dto';
 import {
   paginate,
@@ -20,8 +20,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserService } from '../user/user.service';
+import { QueueService } from '../queue/queue.service';
 
-import { ProcessingStatus } from './document.entity';
+import { ProcessingStatus } from '@archeon-org/database';
 
 @Injectable()
 export class DocumentService {
@@ -33,12 +34,41 @@ export class DocumentService {
     private readonly documentRepository: DocumentRepository,
     private readonly r2Service: R2Service,
     private readonly userService: UserService,
+    private readonly queueService: QueueService,
   ) {}
 
-  async uploadDocument(
+  async uploadAi(
     userId: string,
     file: Express.Multer.File,
-    classificationSource: 'AI' | 'MANUAL' = 'AI',
+  ): Promise<DocumentEntity> {
+    const document = await this.handleFileUpload(userId, file, 'AI');
+
+    // Add job to queue for processing
+    await this.queueService.addDocumentProcessingJob({
+      documentId: document.id,
+      userId: document.userId,
+      key: document.path,
+    });
+    this.logger.log(`Document queued for AI processing: ${document.id}`);
+
+    return document;
+  }
+
+  async uploadManual(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<DocumentEntity> {
+    const document = await this.handleFileUpload(userId, file, 'MANUAL');
+    this.logger.log(
+      `Document uploaded manually, skipping AI processing: ${document.id}`,
+    );
+    return document;
+  }
+
+  private async handleFileUpload(
+    userId: string,
+    file: Express.Multer.File,
+    classificationSource: 'AI' | 'MANUAL',
   ): Promise<DocumentEntity> {
     if (!file) {
       throw new BadRequestException('File is required');
@@ -162,10 +192,11 @@ export class DocumentService {
       throw new ForbiddenException('Access denied');
     }
 
-    // If category is updated, update processing status to COMPLETED if it was PENDING
+    // If category is updated, update processing status to COMPLETED if it was PENDING or FAILED
     if (
       updateDocumentDto.categoryId &&
-      document.processingStatus === ProcessingStatus.PENDING
+      (document.processingStatus === ProcessingStatus.PENDING ||
+        document.processingStatus === ProcessingStatus.FAILED)
     ) {
       updateDocumentDto.processingStatus = ProcessingStatus.COMPLETED;
       updateDocumentDto.isProcessed = true;
@@ -259,6 +290,13 @@ export class DocumentService {
     if (document.userId !== userId) {
       throw new ForbiddenException('Access denied');
     }
+
+    // Add job to queue for processing
+    await this.queueService.addDocumentProcessingJob({
+      documentId: document.id,
+      userId: document.userId,
+      key: document.path,
+    });
 
     return this.documentRepository.update(documentId, {
       classificationSource: 'AI',

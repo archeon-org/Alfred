@@ -1,12 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Readable } from "stream";
 
 @Injectable()
 export class R2Service {
@@ -15,15 +16,16 @@ export class R2Service {
   private readonly bucketName: string;
 
   constructor(private readonly configService: ConfigService) {
-    const accountId = this.configService.get<string>('R2_ACCOUNT_ID');
-    const accessKeyId = this.configService.get<string>('R2_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>(
-      'R2_SECRET_ACCESS_KEY',
+    const accountId = this.configService.getOrThrow<string>("R2_ACCOUNT_ID");
+    const accessKeyId =
+      this.configService.getOrThrow<string>("R2_ACCESS_KEY_ID");
+    const secretAccessKey = this.configService.getOrThrow<string>(
+      "R2_SECRET_ACCESS_KEY"
     );
-    this.bucketName = this.configService.get<string>('R2_BUCKET_NAME');
+    this.bucketName = this.configService.getOrThrow<string>("R2_BUCKET_NAME");
 
     this.s3Client = new S3Client({
-      region: 'auto',
+      region: "auto",
       endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId,
@@ -35,7 +37,7 @@ export class R2Service {
   async uploadFile(
     key: string,
     body: Buffer | Uint8Array | Blob | string,
-    contentType: string,
+    contentType: string
   ): Promise<void> {
     try {
       await this.s3Client.send(
@@ -44,13 +46,35 @@ export class R2Service {
           Key: key,
           Body: body,
           ContentType: contentType,
-        }),
+        })
       );
       this.logger.log(`File uploaded successfully to R2: ${key}`);
     } catch (error) {
       this.logger.error(
         `Failed to upload file to R2: ${error.message}`,
-        error.stack,
+        error.stack
+      );
+      throw error;
+    }
+  }
+
+  async getFile(key: string): Promise<Buffer> {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+      const response = await this.s3Client.send(command);
+      const stream = response.Body as Readable;
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      return Buffer.concat(chunks);
+    } catch (error) {
+      this.logger.error(
+        `Failed to get file from R2: ${error.message}`,
+        error.stack
       );
       throw error;
     }
@@ -66,7 +90,7 @@ export class R2Service {
     } catch (error) {
       this.logger.error(
         `Failed to generate signed URL: ${error.message}`,
-        error.stack,
+        error.stack
       );
       throw error;
     }
@@ -78,13 +102,13 @@ export class R2Service {
         new DeleteObjectCommand({
           Bucket: this.bucketName,
           Key: key,
-        }),
+        })
       );
       this.logger.log(`File deleted successfully from R2: ${key}`);
     } catch (error) {
       this.logger.error(
         `Failed to delete file from R2: ${error.message}`,
-        error.stack,
+        error.stack
       );
       throw error;
     }

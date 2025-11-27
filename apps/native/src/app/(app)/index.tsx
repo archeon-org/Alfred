@@ -7,6 +7,7 @@ import {
   useActionRequiredDocuments,
 } from "../../hooks/useDocuments";
 import { useCategories } from "../../hooks/useCategories";
+import { useNotifications } from "../../hooks/useNotifications";
 import { HomeHeader } from "../../components/home/HomeHeader";
 import { StorageWidget } from "../../components/home/StorageWidget";
 import { QuickActions } from "../../components/home/QuickActions";
@@ -16,6 +17,7 @@ import { CategoryList } from "../../components/home/CategoryList";
 
 export default function HomeScreen() {
   const { data: user, refetch: refetchUser } = useUser();
+  const { refetch: refetchNotifications } = useNotifications();
   const {
     data: recentDocs,
     isLoading: isLoadingDocs,
@@ -37,7 +39,14 @@ export default function HomeScreen() {
     refetchDocs();
     refetchActionRequired();
     refetchCategories();
-  }, []);
+    refetchNotifications();
+  }, [
+    refetchUser,
+    refetchDocs,
+    refetchActionRequired,
+    refetchCategories,
+    refetchNotifications,
+  ]);
 
   return (
     <SafeAreaView

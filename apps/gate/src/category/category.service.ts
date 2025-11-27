@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CategoryEntity } from './category.entity';
+import { CategoryEntity } from '@archeon-org/database';
 import { CreateCategoryDto, UpdateCategoryDto } from './dto/category.dto';
 import { paginate, PaginateQuery, Paginated } from 'nestjs-paginate';
-import { DocumentEntity, ProcessingStatus } from '../document/document.entity';
+import { DocumentEntity, ProcessingStatus } from '@archeon-org/database';
 
 @Injectable()
 export class CategoryService {

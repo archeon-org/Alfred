@@ -13,13 +13,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../../context/AuthContext";
 import { useUser } from "../../../hooks/useUser";
+
 import colors from "tailwindcss/colors";
-import { useRouter } from "expo-router";
-import { StorageProgress } from "../../../components/common/StorageProgress";
+import { RelativePathString, useRouter } from "expo-router";
+import { useNotifications } from "@/hooks/useNotifications";
+import { StorageProgress } from "@/components/common/StorageProgress";
 
 export default function ProfileScreen() {
   const { signOut } = useAuth();
   const { data: user, isLoading, refetch } = useUser();
+  const { unreadCount } = useNotifications();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();

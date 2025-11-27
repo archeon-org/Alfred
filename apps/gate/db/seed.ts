@@ -1,9 +1,12 @@
 import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
-import { TemplateEntity } from '../src/template/template.entity';
-import { TemplateCategoryEntity } from '../src/template/template-category.entity';
-import { TemplateTagEntity } from '../src/template/template-tag.entity';
+
 import templatesData from './templates.json';
+import {
+  TemplateCategoryEntity,
+  TemplateEntity,
+  TemplateTagEntity,
+} from '@archeon-org/database';
 
 // Load .env variables
 config();

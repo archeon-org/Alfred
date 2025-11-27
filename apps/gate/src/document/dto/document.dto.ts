@@ -1,5 +1,5 @@
 import { IsOptional, IsString, IsUUID, IsJSON, IsEnum } from 'class-validator';
-import { ProcessingStatus } from '../document.entity';
+import { ProcessingStatus } from '@archeon-org/database';
 
 export class CreateDocumentDto {
   @IsOptional()

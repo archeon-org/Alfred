@@ -1,14 +1,9 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { NotificationService } from './notification.service';
 import { NotificationController } from './notification.controller';
-import { NotificationEntity } from './notification.entity';
-import { NotificationRepository } from './notification.repository';
+import { NotificationModule as SharedNotificationModule } from '@archeon-org/module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([NotificationEntity])],
+  imports: [SharedNotificationModule],
   controllers: [NotificationController],
-  providers: [NotificationService, NotificationRepository],
-  exports: [NotificationService],
 })
 export class NotificationModule {}

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { dataSourceOptions } from 'db/datasource';
 import { UserModule } from './user/user.module';
@@ -13,11 +13,24 @@ import { CategoryModule } from './category/category.module';
 import { TagModule } from './tag/tag.module';
 import { TemplateModule } from './template/template.module';
 import { NotificationModule } from './notification/notification.module';
+import { BullModule } from '@nestjs/bull';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async (configService: ConfigService) => ({
+        redis: {
+          host: configService.get('REDIS_HOST', 'localhost'),
+          port: configService.get('REDIS_PORT', 6378),
+          password: configService.get('REDIS_PASSWORD', 'RedisPassword123'),
+        },
+      }),
+      inject: [ConfigService],
     }),
     TypeOrmModule.forRoot(dataSourceOptions as TypeOrmModule),
     UserModule,
@@ -27,7 +40,7 @@ import { NotificationModule } from './notification/notification.module';
     CategoryModule,
     TagModule,
     TemplateModule,
-
+    QueueModule,
     NotificationModule,
   ],
   providers: [

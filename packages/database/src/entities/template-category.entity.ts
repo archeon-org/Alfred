@@ -1,4 +1,4 @@
-import { TemplateCategory } from '@archeon-org/types';
+import { TemplateCategory } from "@archeon-org/types";
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -7,12 +7,12 @@ import {
   JoinColumn,
   UpdateDateColumn,
   CreateDateColumn,
-} from 'typeorm';
-import { TemplateEntity } from './template.entity';
+} from "typeorm";
+import { TemplateEntity } from "./template.entity";
 
-@Entity('template_categories')
+@Entity("template_categories")
 export class TemplateCategoryEntity implements TemplateCategory {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -24,11 +24,11 @@ export class TemplateCategoryEntity implements TemplateCategory {
   @Column()
   color: string;
 
-  @Column({ type: 'integer' })
+  @Column({ type: "integer" })
   order: number;
 
-  @ManyToOne(() => TemplateEntity, (t) => t.categories, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'templateId' })
+  @ManyToOne(() => TemplateEntity, (t) => t.categories, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "templateId" })
   template: TemplateEntity;
 
   @CreateDateColumn()

@@ -9,24 +9,24 @@ import {
   ManyToMany,
   JoinTable,
   JoinColumn,
-} from 'typeorm';
-import { UserEntity } from '../user/user.entity';
+} from "typeorm";
+import { UserEntity } from "./user.entity";
 
-import { Document } from '@archeon-org/types';
-import { CategoryEntity } from '../category/category.entity';
-import { TagEntity } from '../tag/tag.entity';
+import { Document } from "@archeon-org/types";
+import { CategoryEntity } from "./category.entity";
+import { TagEntity } from "./tag.entity";
 
 // Helps track where the file is in the pipeline
 export enum ProcessingStatus {
-  PENDING = 'PENDING',
-  PROCESSING = 'PROCESSING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
+  PENDING = "PENDING",
+  PROCESSING = "PROCESSING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
 }
 
-@Entity('documents')
+@Entity("documents")
 export class DocumentEntity implements Document {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -38,7 +38,7 @@ export class DocumentEntity implements Document {
   @Column()
   mimetype: string;
 
-  @Column('int')
+  @Column("int")
   size: number;
 
   @Column()
@@ -53,30 +53,30 @@ export class DocumentEntity implements Document {
   @Column({ nullable: true })
   description?: string; // AI Generated Summary
 
-  @Column({ type: 'text', nullable: true, select: false })
+  @Column({ type: "text", nullable: true, select: false })
   content?: string; // OCR Extracted Text
 
   // --- NEW: AI Metadata ---
   // Stores specific data like { "invoiceDate": "2023-01-01", "total": 500 }
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: "jsonb", nullable: true })
   metadata?: Record<string, any>;
 
   @Column({ default: false })
   isProcessed: boolean;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: ProcessingStatus,
     default: ProcessingStatus.PENDING,
   })
   processingStatus: ProcessingStatus;
 
   @Column({
-    type: 'enum',
-    enum: ['AI', 'MANUAL'],
-    default: 'AI',
+    type: "enum",
+    enum: ["AI", "MANUAL"],
+    default: "AI",
   })
-  classificationSource: 'AI' | 'MANUAL';
+  classificationSource: "AI" | "MANUAL";
 
   @CreateDateColumn()
   createdAt: Date;
@@ -92,9 +92,9 @@ export class DocumentEntity implements Document {
 
   // --- RELATIONSHIPS ---
   @ManyToOne(() => UserEntity, (user) => user.documents, {
-    onDelete: 'CASCADE',
+    onDelete: "CASCADE",
   })
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: "userId" })
   user: UserEntity;
 
   // Folder Relation
@@ -103,17 +103,17 @@ export class DocumentEntity implements Document {
 
   @ManyToOne(() => CategoryEntity, (cat) => cat.documents, {
     nullable: true,
-    onDelete: 'SET NULL',
+    onDelete: "SET NULL",
   })
-  @JoinColumn({ name: 'categoryId' })
+  @JoinColumn({ name: "categoryId" })
   category: CategoryEntity;
 
   // Tags Relation (Many-to-Many)
   @ManyToMany(() => TagEntity, (tag) => tag.documents, { cascade: true })
   @JoinTable({
-    name: 'document_tags',
-    joinColumn: { name: 'documentId', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'tagId', referencedColumnName: 'id' },
+    name: "document_tags",
+    joinColumn: { name: "documentId", referencedColumnName: "id" },
+    inverseJoinColumn: { name: "tagId", referencedColumnName: "id" },
   })
   tags: TagEntity[];
 }

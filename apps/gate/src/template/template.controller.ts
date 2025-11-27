@@ -12,7 +12,7 @@ import { CreateTemplateDto, UpdateTemplateDto } from './dto/template.dto';
 import { AuthorizedUser } from 'src/common/decorators/user-type.decorator';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { UserType } from '@archeon-org/types';
-import { UserEntity } from '../user/user.entity';
+import { UserEntity } from '@archeon-org/database';
 import { Paginate, PaginateQuery } from 'nestjs-paginate';
 
 @Controller('templates')

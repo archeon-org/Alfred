@@ -1,4 +1,4 @@
-import { Template } from '@archeon-org/types';
+import { Template } from "@archeon-org/types";
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -6,13 +6,13 @@ import {
   OneToMany,
   UpdateDateColumn,
   CreateDateColumn,
-} from 'typeorm';
-import { TemplateCategoryEntity } from './template-category.entity';
-import { TemplateTagEntity } from './template-tag.entity';
+} from "typeorm";
+import { TemplateCategoryEntity } from "./template-category.entity";
+import { TemplateTagEntity } from "./template-tag.entity";
 
-@Entity('templates')
+@Entity("templates")
 export class TemplateEntity implements Template {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ unique: true })
@@ -24,7 +24,7 @@ export class TemplateEntity implements Template {
   @Column()
   icon: string;
 
-  @Column({ type: 'integer' })
+  @Column({ type: "integer" })
   order: number;
 
   @CreateDateColumn()

@@ -4,7 +4,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { BaseRepository } from '../common/interceptors/transaction/base-repository';
-import { TemplateEntity } from './template.entity';
+import { TemplateEntity } from '@archeon-org/database';
 
 @Injectable({ scope: Scope.REQUEST })
 export class TemplateRepository extends BaseRepository {

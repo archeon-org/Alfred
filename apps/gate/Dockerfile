@@ -8,6 +8,8 @@ COPY package.json yarn.lock ./
 # Copy workspace package files
 COPY apps/gate/package.json apps/gate/
 COPY packages/types/package.json packages/types/
+COPY packages/database/package.json packages/database/
+COPY packages/module/package.json packages/module/
 
 # Remove postinstall script to prevent premature build
 RUN sed -i '/"postinstall":/d' package.json
@@ -18,9 +20,13 @@ RUN yarn install --frozen-lockfile
 # Copy source code
 COPY apps/gate apps/gate
 COPY packages/types packages/types
+COPY packages/database packages/database
+COPY packages/module packages/module
 
 # Build packages
 RUN yarn workspace @archeon-org/types build
+RUN yarn workspace @archeon-org/database build
+RUN yarn workspace @archeon-org/module build
 RUN yarn workspace gate build
 
 # Production stage
@@ -40,6 +46,10 @@ COPY --from=builder /app/apps/gate/src ./apps/gate/src
 COPY --from=builder /app/apps/gate/tsconfig.json ./apps/gate/
 COPY --from=builder /app/packages/types/dist ./packages/types/dist
 COPY --from=builder /app/packages/types/package.json ./packages/types/
+COPY --from=builder /app/packages/database/dist ./packages/database/dist
+COPY --from=builder /app/packages/database/package.json ./packages/database/
+COPY --from=builder /app/packages/module/dist ./packages/module/dist
+COPY --from=builder /app/packages/module/package.json ./packages/module/
 
 # Set working directory to the app
 WORKDIR /app/apps/gate

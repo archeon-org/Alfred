@@ -50,4 +50,8 @@ export class UpdateUserDto {
   @IsOptional()
   @IsObject()
   preferences?: Record<string, any>;
+
+  @IsOptional()
+  @IsString()
+  pushToken?: string;
 }

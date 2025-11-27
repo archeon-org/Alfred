@@ -2,11 +2,19 @@ import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme, TouchableOpacity } from "react-native";
 import colors from "tailwindcss/colors";
+import { usePushNotifications } from "../../hooks/usePushNotifications";
+import { useNotifications } from "../../hooks/useNotifications";
 
 export default function AppLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();
+
+  // Initialize push notifications once user is authenticated
+  usePushNotifications();
+
+  // Get unread notification count for badge
+  const { unreadCount } = useNotifications();
 
   return (
     <Tabs

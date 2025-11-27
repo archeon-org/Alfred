@@ -1,0 +1,152 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, In } from 'typeorm';
+import { ProcessDocumentJobData } from '@archeon-org/types';
+import {
+  DocumentEntity,
+  ProcessingStatus,
+  CategoryEntity,
+  TagEntity,
+} from '@archeon-org/database';
+
+import { OCRService } from '../ocr/ocr.service';
+import { NotificationService, R2Service } from '@archeon-org/module';
+import { ClassificationService } from '../classification/classification.service';
+
+@Injectable()
+export class DocumentService {
+  private readonly logger = new Logger(DocumentService.name);
+
+  constructor(
+    @InjectRepository(DocumentEntity)
+    private readonly documentRepository: Repository<DocumentEntity>,
+    @InjectRepository(CategoryEntity)
+    private readonly categoryRepository: Repository<CategoryEntity>,
+    @InjectRepository(TagEntity)
+    private readonly tagRepository: Repository<TagEntity>,
+    private readonly r2Service: R2Service,
+    private readonly ocrService: OCRService,
+    private readonly classificationService: ClassificationService,
+    private notificationService: NotificationService,
+  ) {}
+
+  async processDocument(data: ProcessDocumentJobData): Promise<void> {
+    this.logger.log(
+      `Starting processing logic for document: ${data.documentId}`,
+    );
+    this.logger.debug(`User ID: ${data.userId}`);
+    this.logger.debug(`Storage Key: ${data.key}`);
+
+    // Update status to PROCESSING
+    await this.documentRepository.update(data.documentId, {
+      processingStatus: ProcessingStatus.PROCESSING,
+    });
+
+    try {
+      // 1. Download file from R2
+      this.logger.log(`Downloading file from R2: ${data.key}`);
+      const fileBuffer = await this.r2Service.getFile(data.key);
+
+      // 2. Perform OCR
+      this.logger.log(`Performing OCR on document: ${data.documentId}`);
+      const text = await this.ocrService.recognize(fileBuffer);
+      this.logger.log(`OCR completed. Extracted ${text.length} characters.`);
+
+      // 3. AI Classification
+      this.logger.log(
+        `Starting AI classification for document: ${data.documentId}`,
+      );
+
+      // Fetch user's categories and tags
+      const [categories, tags] = await Promise.all([
+        this.categoryRepository.find({ where: { userId: data.userId } }),
+        this.tagRepository.find({ where: { userId: data.userId } }),
+      ]);
+
+      this.logger.debug(
+        `Found ${categories.length} categories and ${tags.length} tags for user ${data.userId}`,
+      );
+
+      const classificationResult =
+        await this.classificationService.classifyDocument(
+          text,
+          categories.map((c) => ({ id: c.id, name: c.name })),
+          tags.map((t) => ({ id: t.id, name: t.name })),
+        );
+
+      // Prepare update data
+      const updateData: Partial<DocumentEntity> = {
+        content: text,
+        processingStatus: ProcessingStatus.COMPLETED,
+        isProcessed: true,
+        classificationSource: 'AI',
+      };
+
+      if (classificationResult.categoryId) {
+        updateData.categoryId = classificationResult.categoryId;
+      }
+
+      this.logger.log(
+        `Updating document ${data.documentId} with category: ${
+          classificationResult.categoryId || 'None'
+        } and tags: ${classificationResult.tagIds.join(', ') || 'None'}`,
+      );
+
+      // 4. Update document with content and classification
+      // We use save() instead of update() to handle ManyToMany relations (tags)
+      const document = await this.documentRepository.findOne({
+        where: { id: data.documentId },
+      });
+      if (document) {
+        Object.assign(document, updateData);
+
+        if (classificationResult.tagIds.length > 0) {
+          const selectedTags = await this.tagRepository.findBy({
+            id: In(classificationResult.tagIds),
+          });
+          document.tags = selectedTags;
+        }
+
+        await this.documentRepository.save(document);
+      } else {
+        // Fallback if document not found (shouldn't happen)
+        await this.documentRepository.update(data.documentId, updateData);
+      }
+
+      this.logger.log(
+        `Successfully processed and classified document: ${data.documentId}`,
+      );
+
+      // 5. Send success notification
+      await this.notificationService.create({
+        userId: data.userId,
+        title: 'Document Processed',
+        message:
+          'Your document has been successfully processed and classified.',
+        data: {
+          documentId: data.documentId,
+          url: `/(app)/documents/${data.documentId}`,
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to process document ${data.documentId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      // Update status to FAILED
+      await this.documentRepository.update(data.documentId, {
+        processingStatus: ProcessingStatus.FAILED,
+      });
+
+      // 6. Send failure notification
+      await this.notificationService.create({
+        userId: data.userId,
+        title: 'Document Processing Failed',
+        message: 'There was an error processing your document.',
+        data: { documentId: data.documentId },
+      });
+
+      throw error;
+    }
+  }
+}

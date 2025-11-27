@@ -1,4 +1,4 @@
-import { Tag } from '@archeon-org/types';
+import { Tag } from "@archeon-org/types";
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -8,19 +8,19 @@ import {
   CreateDateColumn,
   JoinColumn,
   UpdateDateColumn,
-} from 'typeorm';
-import { UserEntity } from '../user/user.entity';
-import { DocumentEntity } from '../document/document.entity';
+} from "typeorm";
+import { UserEntity } from "./user.entity";
+import { DocumentEntity } from "./document.entity";
 
-@Entity('tags')
+@Entity("tags")
 export class TagEntity implements Tag {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
   name: string;
 
-  @Column({ default: '#94A3B8' })
+  @Column({ default: "#94A3B8" })
   color: string;
 
   @Column({ default: true })
@@ -30,8 +30,8 @@ export class TagEntity implements Tag {
   @Column({ nullable: true })
   userId: string;
 
-  @ManyToOne(() => UserEntity, (user) => user.tags, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => UserEntity, (user) => user.tags, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
   user: UserEntity;
 
   @ManyToMany(() => DocumentEntity, (doc) => doc.tags)

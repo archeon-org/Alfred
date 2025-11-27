@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { User } from "@archeon-org/types";
 import { useRouter } from "expo-router";
 import { shadows } from "../../constants/shadows";
+import { NotificationBell } from "../NotificationBell";
 
 interface HomeHeaderProps {
   user?: User;
@@ -39,16 +40,7 @@ export const HomeHeader = ({ user }: HomeHeaderProps) => {
         </View>
       </View>
 
-      <TouchableOpacity
-        className="w-12 h-12 rounded-full bg-surface dark:bg-surface-dark items-center justify-center border border-gray-100 dark:border-gray-800"
-        onPress={() => router.push("/notifications")}
-        // Using native shadow instead of NativeWind to avoid React Navigation context conflicts
-        style={shadows.sm}
-      >
-        <Ionicons name="notifications-outline" size={22} color="#4B5563" />
-        {/* Notification Badge (Mock) */}
-        <View className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-gray-900" />
-      </TouchableOpacity>
+      <NotificationBell />
     </View>
   );
 };
