@@ -58,9 +58,8 @@ export class ClassificationService {
       const ClassificationSchema = z.object({
         categoryId: z
           .string()
-          .nullable()
           .describe(
-            'The ID of the most relevant category, or null if none match.',
+            'The ID of the best matching category. You MUST always select a category - pick the closest match even if imperfect.',
           ),
         tagIds: z.array(z.string()).describe('Array of IDs of relevant tags.'),
         title: z
@@ -70,10 +69,10 @@ export class ClassificationService {
           ),
         confidence: z
           .enum(['high', 'medium', 'low'])
-          .describe('Your confidence level in the classification.'),
+          .describe('Your confidence level in the category match.'),
         reasoning: z
           .string()
-          .describe('Brief explanation of why you chose this classification.'),
+          .describe('Brief explanation of why you chose this category.'),
       });
 
       // Format categories and tags for clearer presentation
@@ -87,53 +86,77 @@ export class ClassificationService {
           ? tags.map((t) => `- "${t.name}" (ID: ${t.id})`).join('\n')
           : '(No tags defined yet)';
 
-      const prompt = `You are an intelligent document classifier for a personal document management system.
-Your task is to analyze the document content and:
-1. Assign the most appropriate category and tags from the user's existing lists
-2. Generate a clear, descriptive title for the document
+      const prompt = `You are a document classifier for a personal document management system. Your job is to categorize documents into the user's existing folder structure.
 
 ${originalFileName ? `Original filename: "${originalFileName}"` : ''}
 
-## Available Categories:
+## USER'S CATEGORIES (folders):
 ${formattedCategories}
 
-## Available Tags:
+## USER'S TAGS (labels):
 ${formattedTags}
 
-## Classification Guidelines:
+---
 
-### Title Generation:
-- Create a concise, human-readable title (max 60 characters)
-- The title should describe WHAT the document is (e.g., "Electricity Bill - January 2024", "Apartment Lease Agreement", "Car Insurance Policy")
-- Include relevant details like dates, company names, or key identifiers when available
-- Use the document's language for the title (if document is in French, title should be in French)
-- Do NOT use the filename as the title unless it's already descriptive
-- Do NOT include file extensions in the title
+## YOUR TASK:
 
-### Category Selection:
-- Select the ONE category that best matches the document's primary purpose or type
-- Be flexible with interpretation: a utility bill could match "Bills", "Utilities", "Expenses", "Monthly", "Home", etc.
-- Consider synonyms and related concepts (e.g., "Receipts" could apply to invoices, purchase confirmations, etc.)
-- Consider the document's language - category names may be in a different language than the document content
-- If a category is a reasonable fit (even partial), prefer selecting it over returning null
-- Only return null for categoryId if truly no category is even remotely applicable
+### 1. CATEGORY SELECTION (MANDATORY - You MUST pick one)
+**CRITICAL: Every document MUST be assigned to a category. There is no "null" or "none" option.**
 
-### Tag Selection:
-- Select ALL tags that are relevant to the document, even if only partially
-- Be generous with tags - if a tag could reasonably apply, include it
-- Tags can represent: document type, source, time period, topic, importance, etc.
-- Empty tag list [] is acceptable if no tags apply
+The user has created these categories to organize their documents. Your job is to find the BEST FIT, not a perfect match.
 
-### Strict Rules (NEVER violate):
-- You MUST only use IDs from the provided lists above
-- NEVER invent, generate, or hallucinate new IDs
-- If you're unsure about a category, prefer null over guessing a wrong ID
-- Double-check that every ID you return exists in the lists above
+**Selection Strategy (in order of priority):**
+1. **Direct match**: Document clearly belongs to a category (e.g., invoice → "Bills", course notes → "Lecture Notes")
+2. **Semantic similarity**: Document relates to the category's theme (e.g., traffic fine → "Library Fines" because both are fines/penalties)
+3. **Functional similarity**: Document serves a similar purpose (e.g., payment receipt → "Tuition & Fees" if it's a payment-related category)
+4. **Catch-all match**: If nothing else works, pick the most general/administrative category (e.g., "Student ID/Admin", "References/CV", or any category that could serve as "miscellaneous")
 
-### Examples of flexible matching:
-- Document: French tax form → Category: "Taxes" or "Impôts" or "Finance" or "Government"
-- Document: Amazon receipt → Tags: "Shopping", "Online", "Receipts", "E-commerce"
-- Document: Lease agreement → Category: "Housing", "Contracts", "Legal", "Rental"
+**Think creatively about connections:**
+- A traffic fine receipt could go in "Library Fines" (both are fines/penalties)
+- A restaurant receipt could go in "Meal Plan" (both are food-related)
+- An insurance document could go in "Health/Gym" (health-related) or "Transport/Bus Pass" (vehicle-related)
+- A random administrative document could go in "Student ID/Admin" (administrative catch-all)
+- A personal document could go in "Parent/Guardian Info" (personal/family category)
+
+### 2. TITLE GENERATION
+- Create a clear, descriptive title (max 60 characters)
+- Include dates, amounts, or key identifiers when available
+- Use the document's language (French document → French title)
+- Examples: "Facture EDF - Janvier 2024", "Contrat de bail - Appartement", "Amende routière - 135€"
+
+### 3. TAG SELECTION
+- Select ALL relevant tags
+- Be generous - if a tag might apply, include it
+- "Important", "PDF", "Reference", "Admin" are often applicable
+- Empty array [] is OK if truly no tags fit
+
+---
+
+## STRICT RULES:
+1. **ALWAYS return a categoryId** - never null, never empty
+2. **Only use IDs from the lists above** - never invent IDs
+3. **Verify each ID exists** before including it
+4. If you're uncertain between categories, pick the one with the loosest interpretation
+
+---
+
+## EXAMPLES OF CREATIVE MATCHING:
+
+Document: French traffic fine payment receipt
+Available categories: Student-focused (Course Syllabus, Lecture Notes, Library Fines, Transport/Bus Pass, etc.)
+→ Best choice: "Library Fines" (both are fines/penalties) OR "Transport/Bus Pass" (vehicle-related)
+
+Document: Amazon purchase receipt  
+Available categories: Student-focused
+→ Best choice: "Tuition & Fees" (payment record) OR "Student ID/Admin" (personal admin)
+
+Document: Medical test results
+Available categories: Student-focused with "Health/Gym"
+→ Best choice: "Health/Gym" (health-related)
+
+Document: Random PDF with unclear content
+Available categories: Student-focused
+→ Best choice: "Student ID/Admin" or "References/CV" (general catch-all)
 `;
 
       this.logger.debug(`Sending prompt to AI model: ${prompt}`);
@@ -169,19 +192,28 @@ ${formattedTags}
       const validCategoryIds = new Set(categories.map((c) => c.id));
       const validTagIds = new Set(tags.map((t) => t.id));
 
-      const validatedCategoryId =
+      let validatedCategoryId =
         parsed.categoryId && validCategoryIds.has(parsed.categoryId)
           ? parsed.categoryId
           : null;
+
+      // If AI returned null or invalid ID, pick the first available category as fallback
+      // This ensures every document gets categorized
+      if (!validatedCategoryId && categories.length > 0) {
+        validatedCategoryId = categories[0].id;
+        this.logger.warn(
+          `AI returned no valid category - using fallback: "${categories[0].name}" (${categories[0].id})`,
+        );
+      }
 
       const validatedTagIds = (parsed.tagIds || []).filter((id: string) =>
         validTagIds.has(id),
       );
 
       // Log if we had to filter out hallucinated IDs
-      if (parsed.categoryId && !validatedCategoryId) {
+      if (parsed.categoryId && !validCategoryIds.has(parsed.categoryId)) {
         this.logger.warn(
-          `AI hallucinated categoryId "${parsed.categoryId}" - filtered out`,
+          `AI hallucinated categoryId "${parsed.categoryId}" - using fallback category`,
         );
       }
 
@@ -205,9 +237,9 @@ ${formattedTags}
       };
     } catch (error) {
       this.logger.error('AI Classification failed', error);
-      // Return neutral result on failure so processing can continue
+      // Return fallback result on failure - use first category if available
       return {
-        categoryId: null,
+        categoryId: categories.length > 0 ? categories[0].id : null,
         tagIds: [],
         title: originalFileName || 'Untitled Document',
       };
