@@ -3,7 +3,7 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useNavigationContainerRef } from "expo-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import { updateUser } from "../services/user";
@@ -92,12 +92,26 @@ export function usePushNotifications() {
       } catch (error) {
         console.error("Error marking notification as read:", error);
       }
-    } else {
     }
 
     // Navigate to URL if present
     if (data?.url) {
-      router.push(data.url as any);
+      // Check if this is a document URL - we need special handling
+      const documentMatch = data.url.match(/\/documents\/([^/]+)$/);
+      if (documentMatch) {
+        // For document URLs, first navigate to documents tab, then to the document
+        // This ensures proper back navigation
+        setTimeout(() => {
+          // First, make sure we're on the documents tab
+          router.replace("/(app)/documents" as any);
+          // Then navigate to the specific document
+          setTimeout(() => {
+            router.push(data.url as any);
+          }, 100);
+        }, 100);
+      } else {
+        router.push(data.url as any);
+      }
     }
   };
 

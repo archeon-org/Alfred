@@ -8,7 +8,7 @@ import {
   RefreshControl,
   Share,
 } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useNavigation } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
@@ -110,6 +110,18 @@ export default function DocumentDetails() {
     isFetchingNextPage,
   } = useDocumentDetailsLogic();
 
+  const navigation = useNavigation();
+
+  // Smart back navigation - if we can't go back, go to documents list
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      router.back();
+    } else {
+      // No history, navigate to documents list
+      router.replace("/(app)/documents" as any);
+    }
+  };
+
   const handleShare = async () => {
     if (!document) return;
     try {
@@ -189,7 +201,7 @@ export default function DocumentDetails() {
       {/* Header */}
       <View className="flex-row items-center px-4 py-2">
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={handleBack}
           className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mr-3"
         >
           <Ionicons name="arrow-back" size={20} color="#6B7280" />
