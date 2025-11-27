@@ -2,12 +2,9 @@ import React, { useCallback } from "react";
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   useColorScheme,
-  ActivityIndicator,
   Image,
-  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,15 +21,10 @@ export default function ProfileScreen() {
   const isDark = colorScheme === "dark";
   const router = useRouter();
 
-  const onRefresh = useCallback(() => {
-    refetch();
-  }, [refetch]);
-
   const menuItems = [
     {
       icon: "person-outline",
       label: "Edit Profile",
-      description: "Update your personal information",
       color: "#6366F1",
       bgColor: "bg-indigo-50 dark:bg-indigo-900/20",
       onPress: () => router.push("/(app)/profile/edit"),
@@ -40,21 +32,18 @@ export default function ProfileScreen() {
     {
       icon: "notifications-outline",
       label: "Notifications",
-      description: "Manage your alerts",
       color: "#F59E0B",
       bgColor: "bg-amber-50 dark:bg-amber-900/20",
     },
     {
       icon: "shield-checkmark-outline",
-      label: "Privacy & Security",
-      description: "Protect your account",
+      label: "Privacy",
       color: "#10B981",
       bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
     },
     {
       icon: "help-circle-outline",
-      label: "Help & Support",
-      description: "Get assistance",
+      label: "Help",
       color: "#8B5CF6",
       bgColor: "bg-purple-50 dark:bg-purple-900/20",
     },
@@ -66,21 +55,20 @@ export default function ProfileScreen() {
         className="flex-1 bg-background dark:bg-background-dark"
         edges={["top"]}
       >
-        <View className="px-5 pt-4">
+        <View className="flex-1 px-5 pt-2">
           {/* Header skeleton */}
-          <View className="items-center mb-6">
-            <Skeleton className="w-24 h-24 rounded-full mb-4" />
-            <Skeleton className="h-7 w-40 mb-2" />
-            <Skeleton className="h-4 w-48" />
+          <View className="flex-row justify-end mb-2">
+            <Skeleton className="w-10 h-10 rounded-full" />
+          </View>
+          <View className="items-center mb-4">
+            <Skeleton className="w-20 h-20 rounded-full mb-3" />
+            <Skeleton className="h-6 w-36 mb-1" />
+            <Skeleton className="h-4 w-44" />
           </View>
           {/* Storage skeleton */}
-          <Skeleton className="h-24 w-full rounded-2xl mb-6" />
+          <Skeleton className="h-20 w-full rounded-2xl mb-4" />
           {/* Menu skeleton */}
-          <View className="gap-3">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-2xl" />
-            ))}
-          </View>
+          <Skeleton className="h-16 w-full rounded-2xl" />
         </View>
       </SafeAreaView>
     );
@@ -91,25 +79,35 @@ export default function ProfileScreen() {
       className="flex-1 bg-background dark:bg-background-dark"
       edges={["top"]}
     >
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={false} onRefresh={onRefresh} />
-        }
-      >
-        {/* Profile Header */}
-        <View className="items-center pt-6 pb-6 px-5">
-          <View className="relative mb-4">
-            <View className="w-24 h-24 bg-indigo-100 dark:bg-indigo-900/30 rounded-full items-center justify-center overflow-hidden border-4 border-white dark:border-gray-800 shadow-lg">
+      <View className="flex-1 px-5">
+        {/* Header with Logout */}
+        <View className="flex-row justify-between items-center pt-2 pb-2">
+          <Text className="text-2xl font-bold text-gray-900 dark:text-white">
+            Profile
+          </Text>
+          <TouchableOpacity
+            onPress={signOut}
+            className="w-10 h-10 rounded-full items-center justify-center bg-red-50 dark:bg-red-900/20"
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={20}
+              color={isDark ? "#F87171" : "#DC2626"}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Profile Header - Compact */}
+        <View className="items-center py-4">
+          <View className="relative mb-3">
+            <View className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full items-center justify-center overflow-hidden border-3 border-white dark:border-gray-800 shadow-lg">
               {user?.profilePicture ? (
                 <Image
                   source={{ uri: user.profilePicture }}
                   className="w-full h-full"
                 />
               ) : (
-                <Text className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                <Text className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                   {user?.firstName?.[0]}
                   {user?.lastName?.[0]}
                 </Text>
@@ -117,13 +115,13 @@ export default function ProfileScreen() {
             </View>
             <TouchableOpacity
               onPress={() => router.push("/(app)/profile/edit")}
-              className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 rounded-full items-center justify-center border-2 border-white dark:border-gray-900"
+              className="absolute bottom-0 right-0 w-7 h-7 bg-indigo-600 rounded-full items-center justify-center border-2 border-white dark:border-gray-900"
             >
-              <Ionicons name="pencil" size={14} color="white" />
+              <Ionicons name="pencil" size={12} color="white" />
             </TouchableOpacity>
           </View>
 
-          <Text className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+          <Text className="text-xl font-bold text-gray-900 dark:text-white mb-0.5">
             {user?.firstName} {user?.lastName}
           </Text>
           <Text className="text-gray-500 dark:text-gray-400 text-sm">
@@ -131,24 +129,24 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Storage Card */}
-        <View className="px-5 mb-6">
+        {/* Storage Card - Compact */}
+        <View className="mb-4">
           <View
-            className="rounded-2xl p-5 shadow-lg"
+            className="rounded-2xl p-4"
             style={{ backgroundColor: "#6366F1" }}
           >
-            <View className="flex-row items-center justify-between mb-4">
+            <View className="flex-row items-center justify-between mb-3">
               <View className="flex-row items-center gap-2">
                 <View
-                  className="w-10 h-10 rounded-xl items-center justify-center"
+                  className="w-8 h-8 rounded-lg items-center justify-center"
                   style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
                 >
-                  <Ionicons name="cloud" size={20} color="white" />
+                  <Ionicons name="cloud" size={16} color="white" />
                 </View>
-                <Text className="text-white font-bold text-lg">Storage</Text>
+                <Text className="text-white font-bold text-base">Storage</Text>
               </View>
               <View
-                className="px-3 py-1 rounded-full"
+                className="px-2 py-0.5 rounded-full"
                 style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
               >
                 <Text className="text-white text-xs font-semibold">
@@ -164,17 +162,17 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Menu Items */}
-        <View className="px-5 gap-3">
+        {/* Menu Items - Grid Layout */}
+        <View className="flex-row flex-wrap gap-3 mb-4">
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
               onPress={item.onPress}
               activeOpacity={0.7}
-              className="flex-row items-center p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800"
+              className="flex-1 min-w-[45%] items-center p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800"
             >
               <View
-                className={`w-12 h-12 rounded-xl items-center justify-center mr-4 ${item.bgColor}`}
+                className={`w-12 h-12 rounded-xl items-center justify-center mb-2 ${item.bgColor}`}
               >
                 <Ionicons
                   name={item.icon as any}
@@ -182,45 +180,20 @@ export default function ProfileScreen() {
                   color={item.color}
                 />
               </View>
-              <View className="flex-1">
-                <Text className="text-base font-bold text-gray-900 dark:text-white">
-                  {item.label}
-                </Text>
-                <Text className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {item.description}
-                </Text>
-              </View>
-              <View className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-full items-center justify-center">
-                <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-              </View>
+              <Text className="text-sm font-semibold text-gray-900 dark:text-white">
+                {item.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Sign Out Button */}
-        <View className="px-5 mt-6">
-          <TouchableOpacity
-            onPress={signOut}
-            className="flex-row items-center justify-center p-4 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-900/30"
-          >
-            <Ionicons
-              name="log-out-outline"
-              size={20}
-              color={isDark ? "#F87171" : "#DC2626"}
-            />
-            <Text className="text-red-600 dark:text-red-400 font-bold text-sm ml-2">
-              Sign Out
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* App Version */}
-        <View className="items-center mt-6">
-          <Text className="text-gray-400 dark:text-gray-600 text-xs">
+        {/* App Version - At bottom */}
+        <View className="flex-1 justify-end pb-4">
+          <Text className="text-gray-400 dark:text-gray-600 text-xs text-center">
             Archeon v1.0.0
           </Text>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
