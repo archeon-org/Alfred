@@ -22,6 +22,7 @@ export default function CategoriesScreen() {
   const {
     categories,
     isLoading,
+    isFetching,
     refetch,
     modalVisible,
     editingCategory,
@@ -38,7 +39,10 @@ export default function CategoriesScreen() {
     setHideEmpty,
   } = useCategoryScreenLogic();
 
-  if (isLoading) {
+  // Only show skeleton on initial load when there's no data yet
+  const showSkeleton = isLoading && categories.length === 0;
+
+  if (showSkeleton) {
     return (
       <SafeAreaView
         className="flex-1 bg-background dark:bg-background-dark"
@@ -123,7 +127,10 @@ export default function CategoriesScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}
         refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={refetch} />
+          <RefreshControl
+            refreshing={isFetching && !isLoading}
+            onRefresh={refetch}
+          />
         }
         onEndReached={() => {
           if (hasNextPage) {

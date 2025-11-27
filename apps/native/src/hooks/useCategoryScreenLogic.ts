@@ -2,15 +2,18 @@ import { useState } from "react";
 import { Alert } from "react-native";
 import { Category } from "@archeon-org/types";
 import { useCategories } from "./useCategories";
+import { useDebounce } from "./useDebounce";
 import { showError } from "../utils/apiError";
 
 export const useCategoryScreenLogic = () => {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const [hideEmpty, setHideEmpty] = useState(true);
 
   const {
     categories,
     isLoading,
+    isFetching,
     refetch,
     addCategory,
     editCategory,
@@ -18,7 +21,7 @@ export const useCategoryScreenLogic = () => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useCategories(search, hideEmpty);
+  } = useCategories(debouncedSearch, hideEmpty);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -69,6 +72,7 @@ export const useCategoryScreenLogic = () => {
   return {
     categories,
     isLoading,
+    isFetching,
     refetch,
     modalVisible,
     editingCategory,

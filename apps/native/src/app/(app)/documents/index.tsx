@@ -19,10 +19,12 @@ import { useDocumentMutations } from "../../../hooks/useDocuments";
 import { DocumentsEmptyState } from "../../../components/document/DocumentsEmptyState";
 import { Skeleton } from "../../../components/common/Skeleton";
 import { DocumentFilterModal } from "../../../components/document/DocumentFilterModal";
+import { useDebounce } from "../../../hooks/useDebounce";
 
 export default function DocumentsScreen() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 300);
   const [filters, setFilters] = useState<{
     processingStatus?: string;
     classificationSource?: string;
@@ -33,13 +35,17 @@ export default function DocumentsScreen() {
   const {
     documents,
     isLoading,
+    isFetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
     refetch,
     isRefetching,
-  } = useDocumentsList(search, filters);
+  } = useDocumentsList(debouncedSearch, filters);
   const { deleteDocument } = useDocumentMutations();
+
+  // Only show skeleton on initial load when there's no data yet
+  const showSkeleton = isLoading && documents.length === 0;
 
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
@@ -72,7 +78,7 @@ export default function DocumentsScreen() {
     />
   );
 
-  if (isLoading) {
+  if (showSkeleton) {
     return (
       <SafeAreaView className="flex-1 bg-background dark:bg-background-dark">
         <View className="flex-row justify-between items-center px-4 py-3 mb-2">

@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Modal, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  Modal,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Category } from "@archeon-org/types";
 import { useForm } from "react-hook-form";
@@ -78,71 +86,82 @@ export const CategoryModal = ({
       visible={visible}
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-end bg-black/50">
-        <View className="bg-white dark:bg-gray-900 rounded-t-3xl p-6">
-          <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-xl font-bold text-gray-900 dark:text-white">
-              {category ? "Edit Category" : "New Category"}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: "flex-end" }}
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
+          >
+            <View className="bg-white dark:bg-gray-900 rounded-t-3xl p-6">
+              <View className="flex-row justify-between items-center mb-6">
+                <Text className="text-xl font-bold text-gray-900 dark:text-white">
+                  {category ? "Edit Category" : "New Category"}
+                </Text>
+                <TouchableOpacity onPress={onClose}>
+                  <Ionicons name="close" size={24} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
 
-          <View className="mb-4">
-            <ControlledInput
-              control={control}
-              name="name"
-              label="Name"
-              placeholder="Category Name"
-              containerClassName="mb-2"
-            />
-          </View>
-
-          <View className="mb-6">
-            <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Icon
-            </Text>
-            <TouchableOpacity
-              onPress={() => setShowIconPicker(true)}
-              className="flex-row items-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3"
-            >
-              <View className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 items-center justify-center mr-3">
-                <Ionicons
-                  name={selectedIcon as any}
-                  size={24}
-                  color="#4F46E5"
+              <View className="mb-4">
+                <ControlledInput
+                  control={control}
+                  name="name"
+                  label="Name"
+                  placeholder="Category Name"
+                  containerClassName="mb-2"
                 />
               </View>
-              <Text className="flex-1 text-base text-gray-900 dark:text-white font-medium">
-                {selectedIcon}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
 
-          <Button
-            onPress={handleSubmit(onSubmit)}
-            isLoading={isSubmitting}
-            title={category ? "Save Changes" : "Create Category"}
-          />
+              <View className="mb-6">
+                <Text className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Icon
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowIconPicker(true)}
+                  className="flex-row items-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3"
+                >
+                  <View className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 items-center justify-center mr-3">
+                    <Ionicons
+                      name={selectedIcon as any}
+                      size={24}
+                      color="#4F46E5"
+                    />
+                  </View>
+                  <Text className="flex-1 text-base text-gray-900 dark:text-white font-medium">
+                    {selectedIcon}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
 
-          {category && onDelete && (
-            <TouchableOpacity
-              onPress={() => {
-                onDelete(category);
-                onClose();
-              }}
-              className="mt-4 items-center"
-            >
-              <Text className="text-red-500 font-medium text-base">
-                Delete Category
-              </Text>
-            </TouchableOpacity>
-          )}
-          <View className="h-8" />
+              <Button
+                onPress={handleSubmit(onSubmit)}
+                isLoading={isSubmitting}
+                title={category ? "Save Changes" : "Create Category"}
+              />
+
+              {category && onDelete && (
+                <TouchableOpacity
+                  onPress={() => {
+                    onDelete(category);
+                    onClose();
+                  }}
+                  className="mt-4 items-center"
+                >
+                  <Text className="text-red-500 font-medium text-base">
+                    Delete Category
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <View className="h-8" />
+            </View>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
 
       <IconPicker
         visible={showIconPicker}

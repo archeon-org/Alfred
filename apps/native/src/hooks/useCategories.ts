@@ -3,6 +3,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  keepPreviousData,
 } from "@tanstack/react-query";
 import { Alert } from "react-native";
 import { Category } from "@archeon-org/types";
@@ -40,6 +41,7 @@ export const useCategories = (search?: string, hideEmpty?: boolean) => {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isFetching,
     refetch,
   } = useInfiniteQuery({
     queryKey: ["categories", search, hideEmpty],
@@ -52,6 +54,7 @@ export const useCategories = (search?: string, hideEmpty?: boolean) => {
       return undefined;
     },
     initialPageParam: 1,
+    placeholderData: keepPreviousData,
   });
 
   const allCategories = data?.pages.flatMap((page) => page.data) || [];
@@ -98,6 +101,7 @@ export const useCategories = (search?: string, hideEmpty?: boolean) => {
   return {
     categories,
     isLoading,
+    isFetching,
     isError,
     fetchNextPage,
     hasNextPage,

@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from "expo-router";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, keepPreviousData } from "@tanstack/react-query";
 import { getDocuments } from "../services";
 
 export const useDocumentsList = (
@@ -18,6 +18,7 @@ export const useDocumentsList = (
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isFetching,
     refetch,
     isRefetching,
   } = useInfiniteQuery({
@@ -39,6 +40,7 @@ export const useDocumentsList = (
       return undefined;
     },
     initialPageParam: 1,
+    placeholderData: keepPreviousData,
   });
 
   const allDocuments = data?.pages.flatMap((page) => page.data) || [];
@@ -49,6 +51,7 @@ export const useDocumentsList = (
   return {
     documents,
     isLoading,
+    isFetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
