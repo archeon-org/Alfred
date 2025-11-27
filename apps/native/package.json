@@ -62,6 +62,7 @@
     "react-native": "0.81.5",
     "react-native-blob-util": "^0.24.4",
     "react-native-document-scanner-plugin": "^2.0.2",
+    "react-native-gesture-handler": "^2.29.1",
     "react-native-pdf": "^7.0.3",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",

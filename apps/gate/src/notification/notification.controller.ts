@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Req, Patch } from '@nestjs/common';
+import { Controller, Get, Param, Req, Patch, Delete } from '@nestjs/common';
 import { NotificationService } from '@archeon-org/module';
 
 import { Request } from 'express';
@@ -27,5 +27,11 @@ export class NotificationController {
   async markAllAsRead(@Req() req: Request) {
     const user = req.user as UserEntity;
     return this.notificationService.markAllAsRead(user.id);
+  }
+
+  @Delete(':id')
+  async deleteNotification(@Param('id') id: string, @Req() req: Request) {
+    const user = req.user as UserEntity;
+    return this.notificationService.delete(id, user.id);
   }
 }

@@ -5,6 +5,7 @@ export interface Notification {
   title: string;
   message: string;
   isRead: boolean;
+  redirect?: string;
   userId: string;
   createdAt: string;
   updatedAt: string;
@@ -37,4 +38,8 @@ export const markNotificationAsRead = async (id: string): Promise<void> => {
 
 export const markAllNotificationsAsRead = async (): Promise<void> => {
   await api.patch("/notifications/read-all");
+};
+
+export const deleteNotification = async (id: string): Promise<void> => {
+  await api.delete(`/notifications/${id}`);
 };

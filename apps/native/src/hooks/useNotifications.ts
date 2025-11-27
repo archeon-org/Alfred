@@ -3,6 +3,7 @@ import {
   getNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  deleteNotification,
   PaginatedNotifications,
 } from "@/services/notification";
 
@@ -92,12 +93,50 @@ export function useNotifications() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteNotification,
+    onMutate: async (notificationId) => {
+      await queryClient.cancelQueries({ queryKey: ["notifications"] });
+      const previousNotifications =
+        queryClient.getQueryData<PaginatedNotifications>(["notifications"]);
+
+      if (previousNotifications) {
+        queryClient.setQueryData<PaginatedNotifications>(
+          ["notifications"],
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              data: old.data.filter((n) => n.id !== notificationId),
+            };
+          }
+        );
+      }
+      return { previousNotifications };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousNotifications) {
+        queryClient.setQueryData(
+          ["notifications"],
+          context.previousNotifications
+        );
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+
   const handleMarkAsRead = (id: string) => {
     markAsReadMutation.mutate(id);
   };
 
   const handleMarkAllAsRead = () => {
     markAllAsReadMutation.mutate();
+  };
+
+  const handleDelete = (id: string) => {
+    deleteMutation.mutate(id);
   };
 
   const unreadCount = data?.data.filter((n) => !n.isRead).length || 0;
@@ -109,8 +148,10 @@ export function useNotifications() {
     refetch,
     handleMarkAsRead,
     handleMarkAllAsRead,
+    handleDelete,
     unreadCount,
     isMarkingAsRead: markAsReadMutation.isPending,
     isMarkingAllAsRead: markAllAsReadMutation.isPending,
+    isDeleting: deleteMutation.isPending,
   };
 }

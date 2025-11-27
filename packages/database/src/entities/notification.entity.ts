@@ -23,6 +23,9 @@ export class NotificationEntity {
   @Column({ default: false })
   isRead: boolean;
 
+  @Column({ nullable: true })
+  redirect: string;
+
   @Column()
   userId: string;
 

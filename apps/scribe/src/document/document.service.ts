@@ -127,6 +127,7 @@ export class DocumentService {
         userId: data.userId,
         title: 'Document Processed',
         message: `"${classificationResult.title}" has been successfully processed and classified.`,
+        redirect: `/(app)/documents/${data.documentId}`,
         data: {
           documentId: data.documentId,
           url: `/(app)/documents/${data.documentId}`,
@@ -147,6 +148,7 @@ export class DocumentService {
         userId: data.userId,
         title: 'Document Processing Failed',
         message: 'There was an error processing your document.',
+        redirect: `/(app)/documents/${data.documentId}`,
         data: { documentId: data.documentId },
       });
 
@@ -210,6 +212,7 @@ export class DocumentService {
         userId: data.userId,
         title: 'Title Generated',
         message: `Your document has been renamed to "${titleResult.title}".`,
+        redirect: `/(app)/documents/${data.documentId}`,
         data: {
           documentId: data.documentId,
           url: `/(app)/documents/${data.documentId}`,
@@ -226,6 +229,7 @@ export class DocumentService {
         userId: data.userId,
         title: 'Title Generation Failed',
         message: 'There was an error generating a title for your document.',
+        redirect: `/(app)/documents/${data.documentId}`,
         data: { documentId: data.documentId },
       });
 

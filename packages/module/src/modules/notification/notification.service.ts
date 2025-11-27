@@ -9,6 +9,7 @@ export interface CreateNotificationDto {
   title: string;
   message: string;
   userId: string;
+  redirect?: string;
   data?: any;
 }
 
@@ -35,6 +36,7 @@ export class NotificationService {
       title: createNotificationDto.title,
       message: createNotificationDto.message,
       userId: createNotificationDto.userId,
+      redirect: createNotificationDto.redirect,
       isRead: false,
     });
 
@@ -136,5 +138,10 @@ export class NotificationService {
   async markAllAsRead(userId: string): Promise<void> {
     this.logger.log(`Marking all notifications as read for user ${userId}`);
     await this.notificationRepository.update({ userId }, { isRead: true });
+  }
+
+  async delete(id: string, userId: string): Promise<void> {
+    this.logger.log(`Deleting notification ${id} for user ${userId}`);
+    await this.notificationRepository.delete({ id, userId });
   }
 }
