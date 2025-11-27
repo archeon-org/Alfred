@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { Alert } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as Print from "expo-print";
 import { readAsStringAsync } from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { useDocumentUpload } from "./useDocumentUpload";
-import { showError } from "../utils/apiError";
+import { useToast } from "../context/ToastContext";
+import { parseApiError } from "../utils/apiError";
 
 interface ScannedDocument {
   uri: string;
@@ -22,6 +22,7 @@ export const useDocumentScanner = (
   );
   const { isUploading, upload } = useDocumentUpload();
   const router = useRouter();
+  const { success, warning, error: showError } = useToast();
 
   // For backward compatibility, expose just the URIs
   const scannedImages = scannedDocuments.map((doc) => doc.uri);
@@ -41,7 +42,7 @@ export const useDocumentScanner = (
 
   const scanDocument = async () => {
     if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
-      Alert.alert(
+      warning(
         "Not Available",
         "Document scanning is not available in Expo Go. Please use a development build or upload from files."
       );
@@ -60,7 +61,8 @@ export const useDocumentScanner = (
       }
     } catch (error) {
       console.error("Error scanning document:", error);
-      showError(error, "Failed to scan document");
+      const appError = parseApiError(error);
+      showError("Failed to scan document", appError.message);
     }
   };
 
@@ -82,7 +84,8 @@ export const useDocumentScanner = (
       ]);
     } catch (error) {
       console.error("Error picking document:", error);
-      showError(error, "Failed to pick document");
+      const appError = parseApiError(error);
+      showError("Failed to pick document", appError.message);
     }
   };
 
@@ -107,11 +110,8 @@ export const useDocumentScanner = (
         if (result) {
           setScannedDocuments([]);
           if (autoClassify) {
-            Alert.alert(
-              "Success",
-              "Document uploaded and sent for AI classification!",
-              [{ text: "OK", onPress: () => router.back() }]
-            );
+            success("Upload Complete", "Document sent for AI classification!");
+            router.back();
           } else {
             router.push({
               pathname: `/(app)/documents/${result.id}`,
@@ -172,11 +172,8 @@ export const useDocumentScanner = (
         setScannedDocuments([]);
 
         if (autoClassify) {
-          Alert.alert(
-            "Success",
-            "Document uploaded and sent for AI classification!",
-            [{ text: "OK", onPress: () => router.back() }]
-          );
+          success("Upload Complete", "Document sent for AI classification!");
+          router.back();
         } else {
           // Direct redirect for manual classification
           router.push({
@@ -187,7 +184,8 @@ export const useDocumentScanner = (
       }
     } catch (error) {
       console.error("Error converting/uploading:", error);
-      showError(error, "Failed to process document");
+      const appError = parseApiError(error);
+      showError("Failed to process document", appError.message);
     }
   };
 

@@ -5,7 +5,6 @@ import {
   useQueryClient,
   keepPreviousData,
 } from "@tanstack/react-query";
-import { Alert } from "react-native";
 import { Category } from "@archeon-org/types";
 import {
   getCategories,
@@ -71,7 +70,6 @@ export const useCategories = (search?: string, hideEmpty?: boolean) => {
     },
     onError: (error) => {
       console.error("Failed to create category", error);
-      Alert.alert("Error", "Failed to create category");
     },
   });
 
@@ -83,7 +81,6 @@ export const useCategories = (search?: string, hideEmpty?: boolean) => {
     },
     onError: (error) => {
       console.error("Failed to update category", error);
-      Alert.alert("Error", "Failed to update category");
     },
   });
 
@@ -94,7 +91,6 @@ export const useCategories = (search?: string, hideEmpty?: boolean) => {
     },
     onError: (error) => {
       console.error("Failed to delete category", error);
-      Alert.alert("Error", "Failed to delete category");
     },
   });
 

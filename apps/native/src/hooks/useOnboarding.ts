@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from "react";
-import { Alert } from "react-native";
 import { Template } from "@archeon-org/types";
 import {
   getTemplates,
@@ -85,7 +84,6 @@ export const useOnboarding = () => {
     },
     onError: (error) => {
       console.error("Failed to apply template", error);
-      Alert.alert("Error", "Failed to apply template");
     },
   });
 

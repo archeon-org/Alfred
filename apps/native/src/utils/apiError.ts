@@ -1,4 +1,3 @@
-import { Alert } from "react-native";
 import { AxiosError } from "axios";
 
 export interface ApiErrorResponse {
@@ -59,9 +58,4 @@ export const parseApiError = (error: unknown): AppError => {
   }
 
   return new AppError("An unknown error occurred.", 500, error);
-};
-
-export const showError = (error: unknown, title: string = "Error") => {
-  const appError = parseApiError(error);
-  Alert.alert(title, appError.message);
 };

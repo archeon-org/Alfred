@@ -1,6 +1,5 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
-import { Alert } from "react-native";
 import Config from "../constants/Config";
 import { parseApiError } from "../utils/apiError";
 
@@ -37,10 +36,8 @@ api.interceptors.response.use(
       await SecureStore.deleteItemAsync("auth_token");
     }
 
-    // Show Alert for critical errors (Network or Server errors)
-    if (appError.statusCode === 0 || appError.statusCode >= 500) {
-      Alert.alert("Error", appError.message);
-    }
+    // Note: Error toasts are now handled at the component/hook level via useToast
+    // Critical errors (network/server) will be caught and displayed by the calling code
 
     return Promise.reject(appError);
   }

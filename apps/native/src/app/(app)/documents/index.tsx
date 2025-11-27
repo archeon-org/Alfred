@@ -7,8 +7,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   TextInput,
-  Alert,
 } from "react-native";
+import { useToast } from "../../../context/ToastContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -45,6 +45,7 @@ export default function DocumentsScreen() {
     isRefetching,
   } = useDocumentsList(debouncedSearch, filters);
   const { deleteDocument } = useDocumentMutations();
+  const { confirmDelete, error: showError } = useToast();
 
   // Only show skeleton on initial load when there's no data yet
   const showSkeleton = isLoading && documents.length === 0;
@@ -52,24 +53,17 @@ export default function DocumentsScreen() {
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
 
   const handleDeleteDocument = (document: Document) => {
-    Alert.alert(
-      "Delete Document",
-      `Are you sure you want to delete "${document.title || document.originalName}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteDocument(document.id);
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete document");
-            }
-          },
-        },
-      ]
-    );
+    confirmDelete({
+      title: "Delete Document",
+      message: `Are you sure you want to delete "${document.title || document.originalName}"?`,
+      onConfirm: async () => {
+        try {
+          await deleteDocument(document.id);
+        } catch (error) {
+          showError("Error", "Failed to delete document");
+        }
+      },
+    });
   };
 
   const renderDocument = ({ item }: { item: Document }) => (

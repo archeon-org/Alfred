@@ -1,14 +1,15 @@
 import { useState, useMemo } from "react";
-import { Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCategory } from "./useCategories";
 import { useDocuments, useDocumentMutations } from "./useDocuments";
-import { showError } from "../utils/apiError";
+import { useToast } from "../context/ToastContext";
+import { parseApiError } from "../utils/apiError";
 
 export const useCategoryDetailsLogic = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { category, isLoading: isLoadingCategory } = useCategory(id);
+  const { success, error: showError } = useToast();
 
   // Documents in this category
   const {
@@ -54,9 +55,10 @@ export const useCategoryDetailsLogic = () => {
       setIsAddModalVisible(false);
       setSelectedDocIds(new Set());
       refetchDocs();
-      Alert.alert("Success", "Documents added to category");
+      success("Documents Added", "Documents have been added to category");
     } catch (error) {
-      showError(error, "Failed to add documents");
+      const appError = parseApiError(error);
+      showError("Failed to add documents", appError.message);
     }
   };
 

@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useUser, useUpdateUser } from "./useUser";
+import { useToast } from "../context/ToastContext";
 
 const profileSchema = z.object({
   email: z.string().email().optional(),
@@ -24,6 +24,7 @@ export const useEditProfileLogic = () => {
   const router = useRouter();
   const { data: user } = useUser();
   const updateUserMutation = useUpdateUser();
+  const { success, error: showError } = useToast();
 
   const {
     control,
@@ -77,11 +78,11 @@ export const useEditProfileLogic = () => {
       },
       {
         onSuccess: () => {
-          Alert.alert("Success", "Profile updated successfully");
+          success("Profile Updated", "Your profile has been saved");
           router.back();
         },
         onError: (error) => {
-          Alert.alert("Error", "Failed to update profile");
+          showError("Error", "Failed to update profile");
           console.error(error);
         },
       }

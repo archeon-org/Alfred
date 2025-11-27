@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { Alert } from "react-native";
 import { Category } from "@archeon-org/types";
 import { useCategories } from "./useCategories";
 import { useDebounce } from "./useDebounce";
-import { showError } from "../utils/apiError";
+import { useToast } from "../context/ToastContext";
+import { parseApiError } from "../utils/apiError";
 
 export const useCategoryScreenLogic = () => {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const [hideEmpty, setHideEmpty] = useState(true);
+  const { confirmDelete, error: showError } = useToast();
 
   const {
     categories,
@@ -50,23 +51,17 @@ export const useCategoryScreenLogic = () => {
       setModalVisible(false);
     } catch (error) {
       console.error("Failed to save category", error);
-      showError(error, "Failed to save category");
+      const appError = parseApiError(error);
+      showError("Failed to save category", appError.message);
     }
   };
 
   const handleDeleteCategory = (category: Category) => {
-    Alert.alert(
-      "Delete Category",
-      `Are you sure you want to delete "${category.name}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => removeCategory(category.id),
-        },
-      ]
-    );
+    confirmDelete({
+      title: "Delete Category",
+      message: `Are you sure you want to delete "${category.name}"?`,
+      onConfirm: () => removeCategory(category.id),
+    });
   };
 
   return {

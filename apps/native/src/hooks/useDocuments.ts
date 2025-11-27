@@ -10,7 +10,6 @@ import {
   triggerAiTitleGeneration,
   deleteDocument,
 } from "../services";
-import { Alert } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 
 export const useDocuments = (categoryId?: string) => {
@@ -50,7 +49,6 @@ export const useDocumentViewer = () => {
     },
     onError: (error) => {
       console.error("Failed to open document:", error);
-      Alert.alert("Error", "Failed to open document.");
     },
   });
 

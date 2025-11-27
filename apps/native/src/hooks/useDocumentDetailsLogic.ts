@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   useDocument,
@@ -9,7 +8,8 @@ import {
 import { useCategories } from "./useCategories";
 import { useTags, useTagMutations } from "./useTags";
 import { Category, Tag } from "@archeon-org/types";
-import { showError } from "../utils/apiError";
+import { useToast } from "../context/ToastContext";
+import { parseApiError } from "../utils/apiError";
 
 export const useDocumentDetailsLogic = () => {
   const { id, openCategoryModal } = useLocalSearchParams<{
@@ -36,6 +36,7 @@ export const useDocumentDetailsLogic = () => {
     isFetchingNextPage,
   } = useCategories();
   const router = useRouter();
+  const { success, info, error: showError } = useToast();
 
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [tagModalVisible, setTagModalVisible] = useState(false);
@@ -67,9 +68,10 @@ export const useDocumentDetailsLogic = () => {
       });
       setCategoryModalVisible(false);
       refetch();
-      Alert.alert("Success", "Category updated successfully");
-    } catch (error) {
-      showError(error, "Failed to update category");
+      success("Category Updated", "Document category has been changed");
+    } catch (err) {
+      const appError = parseApiError(err);
+      showError("Failed to update category", appError.message);
     }
   };
 
@@ -78,7 +80,7 @@ export const useDocumentDetailsLogic = () => {
     try {
       const currentTagIds = data.document.tags?.map((t) => t.id) || [];
       if (currentTagIds.includes(tag.id)) {
-        Alert.alert("Info", "Tag already added");
+        info("Already Added", "This tag is already on the document");
         return;
       }
 
@@ -90,9 +92,10 @@ export const useDocumentDetailsLogic = () => {
       setTagModalVisible(false);
       setTagSearch("");
       refetch();
-      Alert.alert("Success", "Tag added successfully");
-    } catch (error) {
-      showError(error, "Failed to add tag");
+      success("Tag Added", `"${tag.name}" has been added`);
+    } catch (err) {
+      const appError = parseApiError(err);
+      showError("Failed to add tag", appError.message);
     }
   };
 
@@ -102,8 +105,9 @@ export const useDocumentDetailsLogic = () => {
     try {
       const tag = await createTag({ name: tagSearch.trim() });
       await handleAddTag(tag);
-    } catch (error) {
-      showError(error, "Failed to create tag");
+    } catch (err) {
+      const appError = parseApiError(err);
+      showError("Failed to create tag", appError.message);
     }
   };
 
@@ -125,12 +129,10 @@ export const useDocumentDetailsLogic = () => {
       setCategoryModalVisible(false);
       setCategorySearch("");
       refetch();
-      Alert.alert(
-        "Success",
-        `Category "${newCategory.name}" created and selected`
-      );
-    } catch (error) {
-      showError(error, "Failed to create category");
+      success("Category Created", `"${newCategory.name}" created and selected`);
+    } catch (err) {
+      const appError = parseApiError(err);
+      showError("Failed to create category", appError.message);
     }
   };
 
@@ -139,9 +141,10 @@ export const useDocumentDetailsLogic = () => {
     try {
       await triggerAiClassification(data.document.id);
       refetch();
-      Alert.alert("Success", "AI classification triggered");
-    } catch (error) {
-      showError(error, "Failed to trigger AI classification");
+      success("AI Classification", "Classification has been triggered");
+    } catch (err) {
+      const appError = parseApiError(err);
+      showError("Failed to trigger AI classification", appError.message);
     }
   };
 
@@ -161,9 +164,10 @@ export const useDocumentDetailsLogic = () => {
       });
       setTitleModalVisible(false);
       refetch();
-      Alert.alert("Success", "Title updated successfully");
-    } catch (error) {
-      showError(error, "Failed to update title");
+      success("Title Updated", "Document title has been changed");
+    } catch (err) {
+      const appError = parseApiError(err);
+      showError("Failed to update title", appError.message);
     }
   };
 
@@ -172,12 +176,10 @@ export const useDocumentDetailsLogic = () => {
     try {
       await generateAiTitle(data.document.id);
       setTitleModalVisible(false);
-      Alert.alert(
-        "Title Generation Started",
-        "AI is generating a title for your document. You'll receive a notification when it's ready."
-      );
-    } catch (error) {
-      showError(error, "Failed to trigger AI title generation");
+      info("Title Generation Started", "You'll be notified when it's ready");
+    } catch (err) {
+      const appError = parseApiError(err);
+      showError("Failed to trigger AI title generation", appError.message);
     }
   };
 

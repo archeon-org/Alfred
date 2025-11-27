@@ -3,9 +3,8 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
-import { uploadDocument } from "../../services/document";
-import { Alert } from "react-native";
-import { showError } from "../../utils/apiError";
+import { useToast } from "../../context/ToastContext";
+import { parseApiError } from "../../utils/apiError";
 
 interface QuickActionsProps {
   onSearchPress?: () => void;
@@ -15,6 +14,7 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
   onSearchPress,
 }) => {
   const router = useRouter();
+  const { error: showError } = useToast();
 
   const handleUpload = async () => {
     try {
@@ -37,7 +37,8 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
       });
     } catch (error) {
       console.error(error);
-      showError(error, "Failed to pick document");
+      const appError = parseApiError(error);
+      showError("Failed to pick document", appError.message);
     }
   };
 

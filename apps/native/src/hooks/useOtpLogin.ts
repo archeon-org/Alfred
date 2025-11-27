@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { requestOtp, verifyOtp } from "../services";
 import { useAuth } from "../context/AuthContext";
-import { showError } from "../utils/apiError";
+import { useToast } from "../context/ToastContext";
+import { parseApiError } from "../utils/apiError";
 
 const otpSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -21,6 +21,7 @@ export const useOtpLogin = () => {
   const [confirmedEmail, setConfirmedEmail] = useState<string>("");
   const router = useRouter();
   const { signIn } = useAuth();
+  const { error: showError } = useToast();
 
   const {
     control,
@@ -49,7 +50,8 @@ export const useOtpLogin = () => {
       setStep("otp");
     } catch (error) {
       console.error(error);
-      showError(error, "Request Failed");
+      const appError = parseApiError(error);
+      showError("Request Failed", appError.message);
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +73,8 @@ export const useOtpLogin = () => {
       // Navigation is handled by AuthContext
     } catch (error) {
       console.error(error);
-      showError(error, "Verification Failed");
+      const appError = parseApiError(error);
+      showError("Verification Failed", appError.message);
     } finally {
       setIsLoading(false);
     }

@@ -2,6 +2,7 @@ import { Slot, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "../context/AuthContext";
+import { ToastProvider } from "../context/ToastContext";
 import {
   ThemeProvider,
   DefaultTheme,
@@ -21,23 +22,25 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ThemeProvider
-          value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-        >
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(app)" />
-            <Stack.Screen
-              name="notifications"
-              options={{
-                headerShown: false,
-                presentation: "card",
-                animation: "slide_from_right",
-                gestureEnabled: true,
-                gestureDirection: "horizontal",
-              }}
-            />
-          </Stack>
-        </ThemeProvider>
+        <ToastProvider>
+          <ThemeProvider
+            value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+          >
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(app)" />
+              <Stack.Screen
+                name="notifications"
+                options={{
+                  headerShown: false,
+                  presentation: "card",
+                  animation: "slide_from_right",
+                  gestureEnabled: true,
+                  gestureDirection: "horizontal",
+                }}
+              />
+            </Stack>
+          </ThemeProvider>
+        </ToastProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
