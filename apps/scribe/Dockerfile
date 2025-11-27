@@ -32,8 +32,15 @@ RUN yarn workspace scribe build
 # Production stage
 FROM node:22-alpine
 
-# Install Tesseract OCR and poppler-utils (for PDF to image conversion with pdftoppm)
-RUN apk add --no-cache tesseract-ocr poppler-utils
+# Install Tesseract OCR with English language data, poppler-utils (for PDF to image), and fonts
+RUN apk add --no-cache \
+    tesseract-ocr \
+    tesseract-ocr-data-eng \
+    poppler-utils \
+    fontconfig \
+    ttf-dejavu \
+    ttf-liberation \
+    font-noto
 
 WORKDIR /app
 
