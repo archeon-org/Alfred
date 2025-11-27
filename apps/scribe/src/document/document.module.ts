@@ -6,20 +6,27 @@ import {
   DocumentEntity,
   CategoryEntity,
   TagEntity,
+  NotificationEntity,
+  UserEntity,
 } from '@archeon-org/database';
-import { R2Module, NotificationModule } from '@archeon-org/module';
+import { R2Module, NotificationService } from '@archeon-org/module';
 import { OCRModule } from '../ocr/ocr.module';
 import { ClassificationModule } from '../classification/classification.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DocumentEntity, CategoryEntity, TagEntity]),
+    TypeOrmModule.forFeature([
+      DocumentEntity,
+      CategoryEntity,
+      TagEntity,
+      NotificationEntity,
+      UserEntity,
+    ]),
     R2Module,
     OCRModule,
-    NotificationModule,
     ClassificationModule,
   ],
-  providers: [DocumentService, DocumentProcessor],
+  providers: [DocumentService, DocumentProcessor, NotificationService],
   exports: [DocumentService],
 })
 export class DocumentModule {}

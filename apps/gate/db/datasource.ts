@@ -1,6 +1,5 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { config } from 'dotenv';
-import { ConfigService } from '@nestjs/config';
 import {
   UserEntity,
   DocumentEntity,
@@ -14,16 +13,14 @@ import {
 
 config();
 
-const configService = new ConfigService();
-
 export const dataSourceOptions: DataSourceOptions = {
   // @ts-expect-error // TypeORM expects predefined strings for type
-  type: configService.getOrThrow<string>('DATABASE_TYPE'),
-  host: configService.getOrThrow<string>('DATABASE_HOST'),
-  port: configService.getOrThrow<number>('DATABASE_PORT'),
-  username: configService.getOrThrow<string>('DATABASE_USERNAME'),
-  password: configService.getOrThrow<string>('DATABASE_PASSWORD'),
-  database: configService.getOrThrow<string>('DATABASE_NAME'),
+  type: process.env.DATABASE_TYPE || 'postgres',
+  host: process.env.DATABASE_HOST || 'localhost',
+  port: parseInt(process.env.DATABASE_PORT || '5432', 10),
+  username: process.env.DATABASE_USERNAME || 'postgres',
+  password: process.env.DATABASE_PASSWORD || 'postgres',
+  database: process.env.DATABASE_NAME || 'postgres',
   entities: [
     UserEntity,
     DocumentEntity,
@@ -40,14 +37,10 @@ export const dataSourceOptions: DataSourceOptions = {
   synchronize: false,
   logging: false,
   extra: {
-    connectionLimit: 10, // Adjust based on your database connection pool requirements
+    connectionLimit: 10,
   },
 };
 
 const dataSource = new DataSource(dataSourceOptions);
-
-// You might want to do
-// dataSource.initialize()
-// but I found mine working regardless of it
 
 export default dataSource;
