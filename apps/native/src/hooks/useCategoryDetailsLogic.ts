@@ -1,15 +1,14 @@
 import { useState, useMemo } from "react";
 import { Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCategories } from "./useCategories";
+import { useCategory } from "./useCategories";
 import { useDocuments, useDocumentMutations } from "./useDocuments";
 import { showError } from "../utils/apiError";
 
 export const useCategoryDetailsLogic = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { categories } = useCategories();
-  const category = categories?.find((c) => c.id === id);
+  const { category, isLoading: isLoadingCategory } = useCategory(id);
 
   // Documents in this category
   const {
@@ -65,6 +64,7 @@ export const useCategoryDetailsLogic = () => {
     id,
     router,
     category,
+    isLoadingCategory,
     categoryDocuments,
     isLoadingDocs,
     refetchDocs,

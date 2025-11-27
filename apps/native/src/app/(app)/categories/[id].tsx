@@ -20,6 +20,7 @@ export default function CategoryDetails() {
   const {
     router,
     category,
+    isLoadingCategory,
     categoryDocuments,
     isLoadingDocs,
     refetchDocs,
@@ -33,6 +34,15 @@ export default function CategoryDetails() {
     isLoadingAllDocs,
     isBulkUpdating,
   } = useCategoryDetailsLogic();
+
+  // Show loading state while fetching category
+  if (isLoadingCategory) {
+    return (
+      <View className="flex-1 justify-center items-center bg-background dark:bg-background-dark">
+        <ActivityIndicator size="large" color="#6366F1" />
+      </View>
+    );
+  }
 
   if (!category) {
     return (

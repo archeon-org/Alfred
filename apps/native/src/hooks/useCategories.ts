@@ -1,16 +1,34 @@
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { Alert } from "react-native";
 import { Category } from "@archeon-org/types";
 import {
   getCategories,
+  getCategoryById,
   createCategory,
   updateCategory,
   deleteCategory,
 } from "../services";
+
+// Hook to fetch a single category by ID
+export const useCategory = (id: string | undefined) => {
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ["category", id],
+    queryFn: () => getCategoryById(id!),
+    enabled: !!id,
+  });
+
+  return {
+    category: data,
+    isLoading,
+    isError,
+    refetch,
+  };
+};
 
 export const useCategories = (search?: string, hideEmpty?: boolean) => {
   const queryClient = useQueryClient();
