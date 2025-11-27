@@ -30,6 +30,13 @@ export default function ProfileScreen() {
       onPress: () => router.push("/(app)/profile/edit"),
     },
     {
+      icon: "lock-closed-outline",
+      label: "Security",
+      color: "#10B981",
+      bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+      onPress: () => router.push("/(app)/profile/security"),
+    },
+    {
       icon: "notifications-outline",
       label: "Notifications",
       color: "#F59E0B",
@@ -38,8 +45,8 @@ export default function ProfileScreen() {
     {
       icon: "document-text-outline",
       label: "Terms",
-      color: "#10B981",
-      bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+      color: "#3B82F6",
+      bgColor: "bg-blue-50 dark:bg-blue-900/20",
       onPress: () => router.push("/terms"),
     },
     {

@@ -13,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Template } from "@archeon-org/types";
 import { useOnboarding } from "../hooks/useOnboarding";
+import { BiometricSetupModal } from "../components/BiometricSetupModal";
+import { useBiometric } from "../context/BiometricContext";
 
 export default function OnboardingScreen() {
   const {
@@ -33,7 +35,18 @@ export default function OnboardingScreen() {
     refetch,
     searchQuery,
     handleSearch,
+    showBiometricSetup,
+    handleBiometricSetupComplete,
   } = useOnboarding();
+
+  const { enableBiometric, biometricType } = useBiometric();
+
+  const handleBiometricComplete = async (enabled: boolean) => {
+    if (enabled) {
+      await enableBiometric();
+    }
+    handleBiometricSetupComplete();
+  };
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
@@ -185,6 +198,12 @@ export default function OnboardingScreen() {
               )}
             </TouchableOpacity>
           </View>
+
+          <BiometricSetupModal
+            visible={showBiometricSetup}
+            onComplete={handleBiometricComplete}
+            biometricType={biometricType}
+          />
         </View>
       </SafeAreaView>
     );
@@ -282,6 +301,12 @@ export default function OnboardingScreen() {
           />
         )}
       </View>
+
+      <BiometricSetupModal
+        visible={showBiometricSetup}
+        onComplete={handleBiometricComplete}
+        biometricType={biometricType}
+      />
     </SafeAreaView>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import * as Print from "expo-print";
 import { readAsStringAsync } from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
@@ -86,6 +87,42 @@ export const useDocumentScanner = (
       console.error("Error picking document:", error);
       const appError = parseApiError(error);
       showError("Failed to pick document", appError.message);
+    }
+  };
+
+  const pickFromGallery = async () => {
+    try {
+      // Request permissions
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        warning(
+          "Permission Required",
+          "Please grant access to your photo library to upload images."
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        quality: 0.9,
+        selectionLimit: 20,
+      });
+
+      if (result.canceled) return;
+
+      // Add all selected images
+      const newDocuments = result.assets.map((asset) => ({
+        uri: asset.uri,
+        originalFilename: asset.fileName || undefined,
+      }));
+
+      setScannedDocuments((prev) => [...prev, ...newDocuments]);
+    } catch (error) {
+      console.error("Error picking from gallery:", error);
+      const appError = parseApiError(error);
+      showError("Failed to pick images", appError.message);
     }
   };
 
@@ -196,6 +233,7 @@ export const useDocumentScanner = (
     isUploading,
     scanDocument,
     pickDocument,
+    pickFromGallery,
     handleUpload,
     clearImages,
   };

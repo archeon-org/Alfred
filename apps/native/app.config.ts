@@ -27,6 +27,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         "This app needs access to your photos to upload documents.",
       NSMicrophoneUsageDescription:
         "This app needs access to the microphone for video recording.",
+      NSFaceIDUsageDescription:
+        "This app uses Face ID to protect your documents.",
       ITSAppUsesNonExemptEncryption: false,
       CFBundleURLTypes: [
         {
@@ -60,6 +62,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-router",
     "expo-notifications",
     "expo-secure-store",
+    "expo-local-authentication",
     [
       "react-native-document-scanner-plugin",
       {

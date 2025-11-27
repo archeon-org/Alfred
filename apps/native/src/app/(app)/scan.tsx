@@ -11,7 +11,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { useDocumentScanner } from "../../hooks/useDocumentScanner";
-import { ScanEmptyState } from "../../components/scan/ScanEmptyState";
 import { ScanPreview } from "../../components/scan/ScanPreview";
 import { Button } from "../../components/Button";
 import { cn } from "../../utils/cn";
@@ -26,6 +25,7 @@ export default function ScanScreen() {
     isUploading,
     scanDocument,
     pickDocument,
+    pickFromGallery,
     handleUpload,
     clearImages,
   } = useDocumentScanner(initialDocUri, initialDocName);
@@ -37,75 +37,127 @@ export default function ScanScreen() {
   const [classificationModalVisible, setClassificationModalVisible] =
     useState(false);
 
+  const UploadOption = ({
+    icon,
+    label,
+    color,
+    bgColor,
+    onPress,
+    disabled,
+  }: {
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+    color: string;
+    bgColor: string;
+    onPress: () => void;
+    disabled?: boolean;
+  }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      className="items-center"
+      style={{ opacity: disabled ? 0.4 : 1 }}
+    >
+      <View
+        className="w-20 h-20 rounded-full items-center justify-center mb-3 shadow-lg"
+        style={{ backgroundColor: bgColor }}
+      >
+        <Ionicons name={icon} size={32} color={color} />
+      </View>
+      <Text className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
   return (
     <SafeAreaView className="flex-1 bg-background dark:bg-background-dark p-4">
       <View className="flex-1 items-center justify-center">
         {scannedImages.length > 0 ? (
           <ScanPreview scannedImages={scannedImages} />
         ) : (
-          <ScanEmptyState />
+          /* Empty State with Upload Options */
+          <View className="flex-1 items-center justify-center">
+            {/* Icon */}
+            <View className="bg-indigo-100 dark:bg-indigo-900/30 p-8 rounded-full mb-6">
+              <Ionicons name="cloud-upload-outline" size={64} color="#6366F1" />
+            </View>
+
+            {/* Title & Subtitle */}
+            <Text className="text-gray-900 dark:text-white text-2xl font-bold mb-2 text-center">
+              Add Document
+            </Text>
+            <Text className="text-gray-500 dark:text-gray-400 text-center px-8 text-base leading-6 mb-12">
+              Choose how you'd like to add your document
+            </Text>
+
+            {/* Three Upload Options */}
+            <View className="flex-row justify-center gap-8">
+              <UploadOption
+                icon="scan-outline"
+                label="Scan"
+                color="#FFFFFF"
+                bgColor="#6366F1"
+                onPress={scanDocument}
+                disabled={isExpoGo}
+              />
+              <UploadOption
+                icon="images-outline"
+                label="Gallery"
+                color="#FFFFFF"
+                bgColor="#10B981"
+                onPress={pickFromGallery}
+              />
+              <UploadOption
+                icon="folder-outline"
+                label="Files"
+                color="#FFFFFF"
+                bgColor="#F59E0B"
+                onPress={pickDocument}
+              />
+            </View>
+
+            {isExpoGo && (
+              <Text className="text-gray-400 dark:text-gray-500 text-xs text-center mt-8 px-8">
+                Scanning is not available in Expo Go. Use Gallery or Files
+                instead.
+              </Text>
+            )}
+          </View>
         )}
 
-        <View className="w-full gap-4 mt-auto">
-          {scannedImages.length === 0 ? (
-            <>
-              {!isExpoGo && (
-                <Button
-                  onPress={scanDocument}
-                  title="Start Scanning"
-                  icon={<Ionicons name="camera" size={24} color="white" />}
-                  className="bg-primary dark:bg-primary-600 rounded-3xl shadow-lg shadow-primary/30"
-                  textClassName="text-lg font-bold ml-2"
-                />
+        {/* Bottom Actions when images are selected */}
+        {scannedImages.length > 0 && (
+          <View className="w-full gap-4 mt-auto">
+            <Button
+              onPress={() => setClassificationModalVisible(true)}
+              disabled={isUploading}
+              isLoading={isUploading}
+              title={`Upload PDF (${scannedImages.length} ${scannedImages.length === 1 ? "page" : "pages"})`}
+              icon={
+                !isUploading && (
+                  <Ionicons name="cloud-upload" size={24} color="white" />
+                )
+              }
+              className={cn(
+                isUploading
+                  ? "bg-gray-400 dark:bg-gray-600"
+                  : "bg-secondary dark:bg-secondary-600 shadow-lg shadow-secondary/30",
+                "rounded-3xl"
               )}
+              textClassName="text-lg font-bold ml-2"
+            />
 
-              <Button
-                onPress={pickDocument}
-                title="Upload from Files"
-                variant="outline"
-                icon={
-                  <Ionicons
-                    name="document-text-outline"
-                    size={24}
-                    color={isDark ? "#D1D5DB" : "#4B5563"}
-                  />
-                }
-                className="bg-surface dark:bg-surface-dark border-gray-200 dark:border-gray-700 rounded-3xl"
-                textClassName="text-gray-700 dark:text-gray-300 text-lg font-bold ml-2"
-              />
-            </>
-          ) : (
-            <>
-              <Button
-                onPress={() => setClassificationModalVisible(true)}
-                disabled={isUploading}
-                isLoading={isUploading}
-                title={`Upload PDF (${scannedImages.length} pages)`}
-                icon={
-                  !isUploading && (
-                    <Ionicons name="cloud-upload" size={24} color="white" />
-                  )
-                }
-                className={cn(
-                  isUploading
-                    ? "bg-gray-400 dark:bg-gray-600"
-                    : "bg-secondary dark:bg-secondary-600 shadow-lg shadow-secondary/30",
-                  "rounded-3xl"
-                )}
-                textClassName="text-lg font-bold ml-2"
-              />
-
-              <Button
-                onPress={clearImages}
-                disabled={isUploading}
-                title="Retake / Clear"
-                variant="outline"
-                className="bg-surface dark:bg-surface-dark border-gray-200 dark:border-gray-700 rounded-3xl"
-                textClassName="text-gray-700 dark:text-gray-300 font-semibold"
-              />
-            </>
-          )}
-        </View>
+            <Button
+              onPress={clearImages}
+              disabled={isUploading}
+              title="Clear Selection"
+              variant="outline"
+              className="bg-surface dark:bg-surface-dark border-gray-200 dark:border-gray-700 rounded-3xl"
+              textClassName="text-gray-700 dark:text-gray-300 font-semibold"
+            />
+          </View>
+        )}
       </View>
 
       {/* Classification Modal */}

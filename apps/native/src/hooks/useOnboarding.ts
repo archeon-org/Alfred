@@ -20,6 +20,7 @@ export const useOnboarding = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
     null
   );
+  const [showBiometricSetup, setShowBiometricSetup] = useState(false);
 
   // Debounce search to avoid refetching on every keystroke
   useEffect(() => {
@@ -79,8 +80,8 @@ export const useOnboarding = () => {
   const applyMutation = useMutation({
     mutationFn: (templateId: string) => applyTemplate(templateId),
     onSuccess: async () => {
-      await refreshUser();
-      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      // Show biometric setup modal instead of immediately refreshing
+      setShowBiometricSetup(true);
     },
     onError: (error) => {
       console.error("Failed to apply template", error);
@@ -91,6 +92,12 @@ export const useOnboarding = () => {
     if (selectedTemplateId) {
       await applyMutation.mutateAsync(selectedTemplateId);
     }
+  };
+
+  const handleBiometricSetupComplete = async () => {
+    setShowBiometricSetup(false);
+    await refreshUser();
+    queryClient.invalidateQueries({ queryKey: ["templates"] });
   };
 
   const handleSearch = useCallback((query: string) => {
@@ -115,5 +122,7 @@ export const useOnboarding = () => {
     isFetchingNextPage,
     searchQuery,
     handleSearch,
+    showBiometricSetup,
+    handleBiometricSetupComplete,
   };
 };
