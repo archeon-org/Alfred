@@ -60,8 +60,8 @@ export const useAuthProvider = () => {
     const inOnboarding = (segments[0] as string) === "onboarding";
 
     if (!user && !inAuthGroup) {
-      // Redirect to the sign-in page.
-      router.replace("/(auth)/login");
+      // Redirect to the welcome page for unauthenticated users.
+      router.replace("/(auth)/welcome");
     } else if (user) {
       if (!user.isOnboarded) {
         if (!inOnboarding) {
