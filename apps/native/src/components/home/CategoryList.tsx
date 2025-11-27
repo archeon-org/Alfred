@@ -56,7 +56,7 @@ export const CategoryList = ({ categories, isLoading }: CategoryListProps) => {
         {categories.slice(0, 5).map((category) => (
           <TouchableOpacity
             key={category.id}
-            className="mr-4 items-center"
+            className="mr-3 items-center w-20"
             onPress={() => router.push(`/categories/${category.id}`)}
             activeOpacity={0.7}
           >
@@ -70,13 +70,16 @@ export const CategoryList = ({ categories, isLoading }: CategoryListProps) => {
                 color={category.color}
               />
             </View>
-            <Text className="text-xs font-bold text-gray-700 dark:text-gray-300">
+            <Text
+              className="text-xs font-bold text-gray-700 dark:text-gray-300 text-center"
+              numberOfLines={1}
+            >
               {category.name}
             </Text>
           </TouchableOpacity>
         ))}
         <TouchableOpacity
-          className="mr-4 items-center"
+          className="mr-3 items-center w-20"
           onPress={() => router.push("/(app)/categories")}
           activeOpacity={0.7}
         >
