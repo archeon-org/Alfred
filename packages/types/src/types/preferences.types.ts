@@ -50,6 +50,10 @@ export interface DisplayPreferences {
   theme: "light" | "dark" | "system";
   /** Compact mode for document lists */
   compactMode: boolean;
+  /** View mode for categories: 'list' or 'grid' */
+  categoriesViewMode: "list" | "grid";
+  /** View mode for documents: 'list' or 'grid' */
+  documentsViewMode: "list" | "grid";
 }
 
 /**
@@ -78,6 +82,8 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
   display: {
     theme: "system",
     compactMode: false,
+    categoriesViewMode: "list",
+    documentsViewMode: "list",
   },
 };
 

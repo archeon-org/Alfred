@@ -12,8 +12,9 @@ import { useToast } from "../../../context/ToastContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Document } from "@archeon-org/types";
+import { Document, getPreferencesWithDefaults } from "@archeon-org/types";
 import { DocumentItem } from "../../../components/document/DocumentItem";
+import { DocumentGridItem } from "../../../components/document/DocumentGridItem";
 import { useDocumentsList } from "../../../hooks/useDocumentsList";
 import { useDocumentMutations } from "../../../hooks/useDocuments";
 import { DocumentsEmptyState } from "../../../components/document/DocumentsEmptyState";
@@ -21,6 +22,8 @@ import { Skeleton } from "../../../components/common/Skeleton";
 import { DocumentFilterModal } from "../../../components/document/DocumentFilterModal";
 import { AISearchBottomSheet } from "../../../components/search/AISearchBottomSheet";
 import { useDebounce } from "../../../hooks/useDebounce";
+import { ViewModeToggle } from "../../../components/common/ViewModeToggle";
+import { useUser, useUpdateUser } from "../../../hooks/useUser";
 
 export default function DocumentsScreen() {
   const router = useRouter();
@@ -33,6 +36,23 @@ export default function DocumentsScreen() {
   }>({});
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [aiSearchVisible, setAiSearchVisible] = useState(false);
+
+  // View mode from preferences
+  const { data: user } = useUser();
+  const { mutate: updateUser } = useUpdateUser();
+  const preferences = getPreferencesWithDefaults(user?.preferences);
+  const viewMode = preferences.display.documentsViewMode;
+
+  const toggleViewMode = () => {
+    const newMode = viewMode === "list" ? "grid" : "list";
+    updateUser({
+      preferences: {
+        display: {
+          documentsViewMode: newMode,
+        },
+      },
+    });
+  };
 
   const {
     documents,
@@ -66,13 +86,24 @@ export default function DocumentsScreen() {
     });
   };
 
-  const renderDocument = ({ item }: { item: Document }) => (
-    <DocumentItem
-      document={item}
-      onPress={(doc) => router.push(`/(app)/documents/${doc.id}` as any)}
-      onLongPress={handleDeleteDocument}
-    />
-  );
+  const renderDocument = ({ item }: { item: Document }) => {
+    if (viewMode === "grid") {
+      return (
+        <DocumentGridItem
+          document={item}
+          onPress={(doc) => router.push(`/(app)/documents/${doc.id}` as any)}
+          onLongPress={handleDeleteDocument}
+        />
+      );
+    }
+    return (
+      <DocumentItem
+        document={item}
+        onPress={(doc) => router.push(`/(app)/documents/${doc.id}` as any)}
+        onLongPress={handleDeleteDocument}
+      />
+    );
+  };
 
   if (showSkeleton) {
     return (
@@ -116,6 +147,7 @@ export default function DocumentsScreen() {
           Documents
         </Text>
         <View className="flex-row items-center gap-2">
+          <ViewModeToggle mode={viewMode} onModeChange={toggleViewMode} />
           <TouchableOpacity
             onPress={() => setAiSearchVisible(true)}
             className="w-10 h-10 rounded-full items-center justify-center bg-primary/10 dark:bg-primary/20 border border-primary/20"
@@ -165,9 +197,14 @@ export default function DocumentsScreen() {
       </View>
 
       <FlatList
+        key={viewMode} // Force re-render when mode changes
         data={documents}
         renderItem={renderDocument}
         keyExtractor={(item) => item.id}
+        numColumns={viewMode === "grid" ? 2 : 1}
+        columnWrapperStyle={
+          viewMode === "grid" ? { justifyContent: "space-between" } : undefined
+        }
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 120 }}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} />

@@ -14,11 +14,33 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCategoryScreenLogic } from "../../../hooks/useCategoryScreenLogic";
 import { CategoryItem } from "../../../components/category/CategoryItem";
+import {
+  CategoryGridItem,
+  GRID_GAP,
+} from "../../../components/category/CategoryGridItem";
 import { CategoryModal } from "../../../components/category/CategoryModal";
 import { Skeleton } from "../../../components/common/Skeleton";
+import { ViewModeToggle } from "../../../components/common/ViewModeToggle";
+import { useUser, useUpdateUser } from "../../../hooks/useUser";
+import { getPreferencesWithDefaults } from "@archeon-org/types";
 
 export default function CategoriesScreen() {
   const router = useRouter();
+  const { data: user } = useUser();
+  const { mutate: updateUser } = useUpdateUser();
+  const prefs = getPreferencesWithDefaults(user?.preferences);
+  const viewMode = prefs.display.categoriesViewMode;
+
+  const handleViewModeChange = (mode: "list" | "grid") => {
+    updateUser({
+      preferences: {
+        display: {
+          categoriesViewMode: mode,
+        },
+      },
+    });
+  };
+
   const {
     categories,
     isLoading,
@@ -77,12 +99,15 @@ export default function CategoriesScreen() {
         <Text className="text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
           Categories
         </Text>
-        <TouchableOpacity
-          onPress={() => handleOpenModal()}
-          className="bg-primary p-3 rounded-full shadow-lg shadow-primary/30"
-        >
-          <Ionicons name="add" size={24} color="white" />
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-3">
+          <ViewModeToggle mode={viewMode} onModeChange={handleViewModeChange} />
+          <TouchableOpacity
+            onPress={() => handleOpenModal()}
+            className="bg-primary p-3 rounded-full shadow-lg shadow-primary/30"
+          >
+            <Ionicons name="add" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View className="px-4 mb-4 gap-4">
@@ -116,15 +141,26 @@ export default function CategoriesScreen() {
       </View>
 
       <FlatList
+        key={viewMode} // Force re-render when mode changes
         data={categories}
-        renderItem={({ item }) => (
-          <CategoryItem
-            item={item}
-            onPress={(category) => router.push(`/categories/${category.id}`)}
-            onLongPress={handleOpenModal}
-          />
-        )}
+        renderItem={({ item }) =>
+          viewMode === "grid" ? (
+            <CategoryGridItem
+              item={item}
+              onPress={(category) => router.push(`/categories/${category.id}`)}
+              onLongPress={handleOpenModal}
+            />
+          ) : (
+            <CategoryItem
+              item={item}
+              onPress={(category) => router.push(`/categories/${category.id}`)}
+              onLongPress={handleOpenModal}
+            />
+          )
+        }
         keyExtractor={(item) => item.id}
+        numColumns={viewMode === "grid" ? 2 : 1}
+        columnWrapperStyle={viewMode === "grid" ? { gap: GRID_GAP } : undefined}
         contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}
         refreshControl={
           <RefreshControl

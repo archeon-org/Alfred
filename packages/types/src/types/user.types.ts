@@ -1,5 +1,5 @@
 import { Document } from "./document.types";
-import { UserPreferences } from "./preferences.types";
+import { UserPreferences, UserPreferencesUpdate } from "./preferences.types";
 
 /**
  * User type enumeration
@@ -66,8 +66,10 @@ export interface User {
 export type CreateUserInput = Omit<User, "id" | "createdAt" | "updatedAt">;
 
 /**
- * User update input type
+ * User update input type - uses UserPreferencesUpdate for proper partial updates
  */
 export type UpdateUserInput = Partial<
-  Omit<User, "id" | "email" | "createdAt" | "updatedAt">
->;
+  Omit<User, "id" | "email" | "createdAt" | "updatedAt" | "preferences">
+> & {
+  preferences?: UserPreferencesUpdate;
+};

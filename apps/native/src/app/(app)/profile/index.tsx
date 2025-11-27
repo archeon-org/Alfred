@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -73,7 +73,8 @@ export default function ProfileScreen() {
       >
         <View className="flex-1 px-5 pt-2">
           {/* Header skeleton */}
-          <View className="flex-row justify-end mb-2">
+          <View className="flex-row justify-between items-center mb-2">
+            <Skeleton className="h-8 w-20" />
             <Skeleton className="w-10 h-10 rounded-full" />
           </View>
           <View className="items-center mb-4">
@@ -96,19 +97,20 @@ export default function ProfileScreen() {
       edges={["top"]}
     >
       <View className="flex-1 px-5">
-        {/* Header with Logout */}
+        {/* Header */}
         <View className="flex-row justify-between items-center pt-2 pb-2">
           <Text className="text-2xl font-bold text-gray-900 dark:text-white">
             Profile
           </Text>
           <TouchableOpacity
             onPress={signOut}
-            className="w-10 h-10 rounded-full items-center justify-center bg-red-50 dark:bg-red-900/20"
+            activeOpacity={0.7}
+            className="w-10 h-10 rounded-full items-center justify-center bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30"
           >
             <Ionicons
               name="log-out-outline"
               size={20}
-              color={isDark ? "#F87171" : "#DC2626"}
+              color={isDark ? "#FCA5A5" : "#DC2626"}
             />
           </TouchableOpacity>
         </View>
