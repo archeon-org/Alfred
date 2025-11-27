@@ -78,6 +78,27 @@ export class DocumentService {
           data.originalName,
         );
 
+      // Handle AI-suggested new category creation
+      let finalCategoryId = classificationResult.categoryId;
+      if (!finalCategoryId && classificationResult.newCategory) {
+        this.logger.log(
+          `AI suggested new category: "${classificationResult.newCategory.name}" with icon "${classificationResult.newCategory.icon}" and color "${classificationResult.newCategory.color}"`,
+        );
+        // Create the new category with AI-provided details
+        const newCategory = this.categoryRepository.create({
+          name: classificationResult.newCategory.name,
+          icon: classificationResult.newCategory.icon,
+          color: classificationResult.newCategory.color,
+          userId: data.userId,
+          isSystemDefault: true, // Mark as AI-created
+        });
+        const savedCategory = await this.categoryRepository.save(newCategory);
+        finalCategoryId = savedCategory.id;
+        this.logger.log(
+          `Created new category "${classificationResult.newCategory.name}" with ID: ${finalCategoryId}`,
+        );
+      }
+
       // Prepare update data
       const updateData: Partial<DocumentEntity> = {
         content: text,
@@ -87,13 +108,13 @@ export class DocumentService {
         title: classificationResult.title,
       };
 
-      if (classificationResult.categoryId) {
-        updateData.categoryId = classificationResult.categoryId;
+      if (finalCategoryId) {
+        updateData.categoryId = finalCategoryId;
       }
 
       this.logger.log(
         `Updating document ${data.documentId} with category: ${
-          classificationResult.categoryId || 'None'
+          finalCategoryId || 'None'
         } and tags: ${classificationResult.tagIds.join(', ') || 'None'}`,
       );
 

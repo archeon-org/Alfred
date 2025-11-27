@@ -6,6 +6,12 @@ import { zodResponseFormat } from 'openai/helpers/zod';
 
 export interface ClassificationResult {
   categoryId: string | null;
+  // If these are set, create a new category instead of using categoryId
+  newCategory: {
+    name: string;
+    icon: string; // Ionicons icon name (e.g., "document-outline")
+    color: string; // Hex color code (balanced for dark/light themes)
+  } | null;
   tagIds: string[];
   title: string;
 }
@@ -55,12 +61,34 @@ export class ClassificationService {
         `Content truncated from ${content.length} to ${truncatedContent.length} characters.`,
       );
 
+      const NewCategorySchema = z.object({
+        name: z
+          .string()
+          .describe(
+            'Category name (max 25 chars, 1-3 words, simple and clear).',
+          ),
+        icon: z
+          .string()
+          .describe(
+            'Ionicons icon name. Choose from: document-outline, folder-outline, receipt-outline, cash-outline, card-outline, wallet-outline, briefcase-outline, medkit-outline, heart-outline, fitness-outline, car-outline, airplane-outline, home-outline, business-outline, school-outline, library-outline, book-outline, newspaper-outline, mail-outline, chatbubbles-outline, people-outline, person-outline, id-card-outline, key-outline, lock-closed-outline, shield-outline, warning-outline, alert-circle-outline, checkbox-outline, clipboard-outline, calendar-outline, time-outline, calculator-outline, cart-outline, pricetag-outline, gift-outline, restaurant-outline, cafe-outline, beer-outline, musical-notes-outline, game-controller-outline, camera-outline, images-outline, film-outline, tv-outline, phone-portrait-outline, laptop-outline, desktop-outline, cloud-outline, server-outline, code-outline, construct-outline, hammer-outline, build-outline, cog-outline, settings-outline, flask-outline, leaf-outline, flower-outline, paw-outline, globe-outline, map-outline, location-outline, flag-outline, star-outline, trophy-outline, ribbon-outline, sparkles-outline, bulb-outline, flash-outline, battery-charging-outline, water-outline, thermometer-outline, sunny-outline, moon-outline, cloudy-outline, rainy-outline, snow-outline, umbrella-outline, boat-outline, bus-outline, train-outline, bicycle-outline, football-outline, basketball-outline, tennisball-outline, barbell-outline, pizza-outline, nutrition-outline, wine-outline, ice-cream-outline, fast-food-outline, body-outline, hand-left-outline, happy-outline, sad-outline, skull-outline, bug-outline, bonfire-outline, compass-outline, megaphone-outline, notifications-outline, volume-high-outline, mic-outline, headset-outline, radio-outline, print-outline, scan-outline, qr-code-outline, barcode-outline, finger-print-outline, eye-outline, glasses-outline, brush-outline, color-palette-outline, pencil-outline, create-outline, cut-outline, copy-outline, download-outline, share-outline, archive-outline, trash-outline, file-tray-outline, file-tray-full-outline, albums-outline, grid-outline, list-outline, layers-outline, pie-chart-outline, stats-chart-outline, trending-up-outline, trending-down-outline, analytics-outline',
+          ),
+        color: z
+          .string()
+          .describe(
+            'Hex color code. Choose balanced colors that work on both dark and light themes. Available colors: #EF4444 (red), #F97316 (orange), #F59E0B (amber), #EAB308 (yellow), #84CC16 (lime), #22C55E (green), #10B981 (emerald), #14B8A6 (teal), #06B6D4 (cyan), #0EA5E9 (sky), #3B82F6 (blue), #6366F1 (indigo), #8B5CF6 (violet), #A855F7 (purple), #D946EF (fuchsia), #EC4899 (pink), #F43F5E (rose), #64748B (slate), #78716C (stone), #0F766E (dark teal), #15803D (dark green), #B45309 (dark amber), #9F1239 (dark rose), #4338CA (dark indigo), #7C3AED (vivid purple), #2563EB (vivid blue), #059669 (vivid emerald), #DC2626 (vivid red), #CA8A04 (dark yellow)',
+          ),
+      });
+
       const ClassificationSchema = z.object({
         categoryId: z
           .string()
+          .nullable()
           .describe(
-            'The ID of the best matching category. You MUST always select a category - pick the closest match even if imperfect.',
+            'The ID of the best matching existing category, OR null if you need to create a new category.',
           ),
+        newCategory: NewCategorySchema.nullable().describe(
+          'ONLY if no existing category fits: provide name, icon, and color for a new category. Leave null if using an existing category.',
+        ),
         tagIds: z.array(z.string()).describe('Array of IDs of relevant tags.'),
         title: z
           .string()
@@ -72,7 +100,9 @@ export class ClassificationService {
           .describe('Your confidence level in the category match.'),
         reasoning: z
           .string()
-          .describe('Brief explanation of why you chose this category.'),
+          .describe(
+            'Brief explanation of why you chose this category or suggested a new one.',
+          ),
       });
 
       // Format categories and tags for clearer presentation
@@ -86,77 +116,72 @@ export class ClassificationService {
           ? tags.map((t) => `- "${t.name}" (ID: ${t.id})`).join('\n')
           : '(No tags defined yet)';
 
-      const prompt = `You are a document classifier for a personal document management system. Your job is to categorize documents into the user's existing folder structure.
+      const prompt = `You are a document classifier for a personal document management system. Your job is to categorize documents into the user's existing folder structure, or suggest a new category when truly necessary.
 
 ${originalFileName ? `Original filename: "${originalFileName}"` : ''}
 
-## USER'S CATEGORIES (folders):
+## USER'S EXISTING CATEGORIES:
 ${formattedCategories}
 
-## USER'S TAGS (labels):
+## USER'S TAGS:
 ${formattedTags}
 
 ---
 
 ## YOUR TASK:
 
-### 1. CATEGORY SELECTION (MANDATORY - You MUST pick one)
-**CRITICAL: Every document MUST be assigned to a category. There is no "null" or "none" option.**
+### 1. CATEGORY SELECTION (Choose ONE approach)
 
-The user has created these categories to organize their documents. Your job is to find the BEST FIT, not a perfect match.
+**APPROACH A: Use an existing category (PREFERRED - try this first!)**
+Find the best matching existing category. Be creative with connections:
+- Direct match: invoice → "Bills", course notes → "Lecture Notes"
+- Semantic similarity: traffic fine → "Library Fines" (both are fines)
+- Functional similarity: payment receipt → "Tuition & Fees" (both are payments)
+- Catch-all: random document → "Student ID/Admin" or similar general category
 
-**Selection Strategy (in order of priority):**
-1. **Direct match**: Document clearly belongs to a category (e.g., invoice → "Bills", course notes → "Lecture Notes")
-2. **Semantic similarity**: Document relates to the category's theme (e.g., traffic fine → "Library Fines" because both are fines/penalties)
-3. **Functional similarity**: Document serves a similar purpose (e.g., payment receipt → "Tuition & Fees" if it's a payment-related category)
-4. **Catch-all match**: If nothing else works, pick the most general/administrative category (e.g., "Student ID/Admin", "References/CV", or any category that could serve as "miscellaneous")
+**APPROACH B: Create a new category (ONLY as last resort)**
+If the document truly doesn't fit ANY existing category even with creative matching:
+- Set categoryId to null
+- Provide newCategory object with:
+  - name: Short, clear name (max 25 chars, 1-3 words)
+  - icon: An Ionicons outline icon name (see the icon list in the schema)
+  - color: A hex color from the allowed list (balanced for dark/light themes)
 
-**Think creatively about connections:**
-- A traffic fine receipt could go in "Library Fines" (both are fines/penalties)
-- A restaurant receipt could go in "Meal Plan" (both are food-related)
-- An insurance document could go in "Health/Gym" (health-related) or "Transport/Bus Pass" (vehicle-related)
-- A random administrative document could go in "Student ID/Admin" (administrative catch-all)
-- A personal document could go in "Parent/Guardian Info" (personal/family category)
+**STRICT RULES for new categories:**
+- Only suggest a new category if NO existing category can work, even loosely
+- Keep the name SHORT and GENERAL (reusable for similar documents)
+- Match the user's language style (French categories → French names)
+- Pick an icon that semantically matches the category content
+- Pick a color that's visually distinct from common colors
+
+**Icon selection guidance:**
+- Financial docs → cash-outline, wallet-outline, card-outline, receipt-outline
+- Medical → medkit-outline, heart-outline, fitness-outline
+- Vehicle/Transport → car-outline, bus-outline, airplane-outline
+- Legal/Admin → document-outline, clipboard-outline, shield-outline
+- Home → home-outline, construct-outline, hammer-outline
+- Education → school-outline, book-outline, library-outline
+- Communication → mail-outline, chatbubbles-outline, megaphone-outline
+- Tech → laptop-outline, phone-portrait-outline, cloud-outline
 
 ### 2. TITLE GENERATION
-- Create a clear, descriptive title (max 60 characters)
-- Include dates, amounts, or key identifiers when available
-- Use the document's language (French document → French title)
-- Examples: "Facture EDF - Janvier 2024", "Contrat de bail - Appartement", "Amende routière - 135€"
+- Clear, descriptive title (max 60 characters)
+- Include dates, amounts, key identifiers
+- Use document's language
+- Examples: "Facture EDF - Janvier 2024", "Amende routière - 135€"
 
 ### 3. TAG SELECTION
-- Select ALL relevant tags
-- Be generous - if a tag might apply, include it
-- "Important", "PDF", "Reference", "Admin" are often applicable
-- Empty array [] is OK if truly no tags fit
+- Select ALL relevant tags from the existing list
+- Be generous with tags
+- Empty array [] is OK if none fit
 
 ---
 
-## STRICT RULES:
-1. **ALWAYS return a categoryId** - never null, never empty
-2. **Only use IDs from the lists above** - never invent IDs
-3. **Verify each ID exists** before including it
-4. If you're uncertain between categories, pick the one with the loosest interpretation
-
----
-
-## EXAMPLES OF CREATIVE MATCHING:
-
-Document: French traffic fine payment receipt
-Available categories: Student-focused (Course Syllabus, Lecture Notes, Library Fines, Transport/Bus Pass, etc.)
-→ Best choice: "Library Fines" (both are fines/penalties) OR "Transport/Bus Pass" (vehicle-related)
-
-Document: Amazon purchase receipt  
-Available categories: Student-focused
-→ Best choice: "Tuition & Fees" (payment record) OR "Student ID/Admin" (personal admin)
-
-Document: Medical test results
-Available categories: Student-focused with "Health/Gym"
-→ Best choice: "Health/Gym" (health-related)
-
-Document: Random PDF with unclear content
-Available categories: Student-focused
-→ Best choice: "Student ID/Admin" or "References/CV" (general catch-all)
+## OUTPUT RULES:
+1. For existing category: set categoryId to the ID, set newCategory to null
+2. For new category: set categoryId to null, provide complete newCategory object (name, icon, color)
+3. NEVER invent category IDs - only use IDs from the list above
+4. Prefer existing categories over creating new ones (80% of documents should fit existing categories)
 `;
 
       this.logger.debug(`Sending prompt to AI model: ${prompt}`);
@@ -197,12 +222,22 @@ Available categories: Student-focused
           ? parsed.categoryId
           : null;
 
-      // If AI returned null or invalid ID, pick the first available category as fallback
-      // This ensures every document gets categorized
-      if (!validatedCategoryId && categories.length > 0) {
+      // Determine newCategory from parsed response
+      // Only use newCategory if AI explicitly asked to create a new category (categoryId is null)
+      const newCategory =
+        validatedCategoryId === null && parsed.newCategory
+          ? {
+              name: parsed.newCategory.name || 'New Category',
+              icon: parsed.newCategory.icon || 'folder-outline',
+              color: parsed.newCategory.color || '#6366F1',
+            }
+          : null;
+
+      // If AI returned invalid ID and didn't suggest a new category, use fallback
+      if (!validatedCategoryId && !newCategory && categories.length > 0) {
         validatedCategoryId = categories[0].id;
         this.logger.warn(
-          `AI returned no valid category - using fallback: "${categories[0].name}" (${categories[0].id})`,
+          `AI returned no valid category and no new category - using fallback: "${categories[0].name}" (${categories[0].id})`,
         );
       }
 
@@ -227,11 +262,12 @@ Available categories: Student-focused
       }
 
       this.logger.log(
-        `Validated Classification result: categoryId=${validatedCategoryId}, tagIds=${JSON.stringify(validatedTagIds)}, title="${parsed.title}"`,
+        `Validated Classification result: categoryId=${validatedCategoryId}, newCategory=${newCategory ? JSON.stringify(newCategory) : 'null'}, tagIds=${JSON.stringify(validatedTagIds)}, title="${parsed.title}"`,
       );
 
       return {
         categoryId: validatedCategoryId,
+        newCategory,
         tagIds: validatedTagIds,
         title: parsed.title || originalFileName || 'Untitled Document',
       };
@@ -240,6 +276,7 @@ Available categories: Student-focused
       // Return fallback result on failure - use first category if available
       return {
         categoryId: categories.length > 0 ? categories[0].id : null,
+        newCategory: null,
         tagIds: [],
         title: originalFileName || 'Untitled Document',
       };
