@@ -19,10 +19,15 @@ export const QuickActions = () => {
 
       if (result.canceled) return;
 
-      // Navigate to Scan screen with the URI to trigger the preview/classification workflow
+      const asset = result.assets[0];
+
+      // Navigate to Scan screen with the URI and filename to trigger the preview/classification workflow
       router.push({
         pathname: "/(app)/scan",
-        params: { initialDocUri: result.assets[0].uri },
+        params: {
+          initialDocUri: asset.uri,
+          initialDocName: asset.name,
+        },
       });
     } catch (error) {
       console.error(error);

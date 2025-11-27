@@ -6,15 +6,20 @@ export const useDocumentUpload = () => {
     mutationFn: ({
       uri,
       classificationSource,
+      originalFilename,
     }: {
       uri: string;
       classificationSource?: "AI" | "MANUAL";
-    }) => uploadDocument(uri, classificationSource),
+      originalFilename?: string;
+    }) => uploadDocument(uri, classificationSource, originalFilename),
   });
 
   return {
-    upload: (uri: string, classificationSource?: "AI" | "MANUAL") =>
-      mutateAsync({ uri, classificationSource }),
+    upload: (
+      uri: string,
+      classificationSource?: "AI" | "MANUAL",
+      originalFilename?: string
+    ) => mutateAsync({ uri, classificationSource, originalFilename }),
     isUploading: isPending,
     error,
     isSuccess,

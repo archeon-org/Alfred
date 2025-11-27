@@ -94,8 +94,16 @@ export class DocumentService {
     const fileExtension = path.extname(file.originalname);
     const key = `${userId}/${uuidv4()}${fileExtension}`;
 
+    // Decode URL-encoded filename and clean up for use as initial title
+    const decodedFilename = decodeURIComponent(file.originalname);
+    const cleanTitle = path
+      .basename(decodedFilename, path.extname(decodedFilename))
+      .replace(/[_-]+/g, ' ') // Replace underscores and hyphens with spaces
+      .replace(/\s+/g, ' ') // Normalize multiple spaces
+      .trim();
+
     this.logger.log(
-      `Uploading document for user ${userId}: ${file.originalname}`,
+      `Uploading document for user ${userId}: ${decodedFilename}`,
     );
 
     try {
@@ -104,11 +112,11 @@ export class DocumentService {
       const document = await this.documentRepository.create({
         userId,
         filename: key,
-        originalName: file.originalname,
+        originalName: decodedFilename, // Store decoded filename
         mimetype: file.mimetype,
         size: file.size,
         path: key,
-        title: file.originalname,
+        title: cleanTitle || decodedFilename, // Use cleaned title, fallback to original
         classificationSource,
       });
 

@@ -8,20 +8,36 @@ import Constants, { ExecutionEnvironment } from "expo-constants";
 import { useDocumentUpload } from "./useDocumentUpload";
 import { showError } from "../utils/apiError";
 
-export const useDocumentScanner = (initialDocUri?: string) => {
-  const [scannedImages, setScannedImages] = useState<string[]>([]);
+interface ScannedDocument {
+  uri: string;
+  originalFilename?: string;
+}
+
+export const useDocumentScanner = (
+  initialDocUri?: string,
+  initialDocName?: string
+) => {
+  const [scannedDocuments, setScannedDocuments] = useState<ScannedDocument[]>(
+    []
+  );
   const { isUploading, upload } = useDocumentUpload();
   const router = useRouter();
 
+  // For backward compatibility, expose just the URIs
+  const scannedImages = scannedDocuments.map((doc) => doc.uri);
+
   useEffect(() => {
     if (initialDocUri) {
-      setScannedImages((prev) => {
+      setScannedDocuments((prev) => {
         // Prevent adding duplicates if the same URI is passed
-        if (prev.includes(initialDocUri)) return prev;
-        return [...prev, initialDocUri];
+        if (prev.some((doc) => doc.uri === initialDocUri)) return prev;
+        return [
+          ...prev,
+          { uri: initialDocUri, originalFilename: initialDocName },
+        ];
       });
     }
-  }, [initialDocUri]);
+  }, [initialDocUri, initialDocName]);
 
   const scanDocument = async () => {
     if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
@@ -39,7 +55,8 @@ export const useDocumentScanner = (initialDocUri?: string) => {
       const { scannedImages: newScannedImages } =
         await DocumentScanner.scanDocument();
       if (newScannedImages && newScannedImages.length > 0) {
-        setScannedImages(newScannedImages);
+        // Scanned images don't have original filenames
+        setScannedDocuments(newScannedImages.map((uri: string) => ({ uri })));
       }
     } catch (error) {
       console.error("Error scanning document:", error);
@@ -58,9 +75,11 @@ export const useDocumentScanner = (initialDocUri?: string) => {
 
       const asset = result.assets[0];
 
-      // Instead of uploading immediately, we add it to the scanned images
-      // This allows the user to preview it and choose AI vs Manual
-      setScannedImages((prev) => [...prev, asset.uri]);
+      // Store both URI and original filename
+      setScannedDocuments((prev) => [
+        ...prev,
+        { uri: asset.uri, originalFilename: asset.name },
+      ]);
     } catch (error) {
       console.error("Error picking document:", error);
       showError(error, "Failed to pick document");
@@ -68,20 +87,25 @@ export const useDocumentScanner = (initialDocUri?: string) => {
   };
 
   const handleUpload = async (autoClassify = true) => {
-    if (scannedImages.length === 0) return;
+    if (scannedDocuments.length === 0) return;
 
     try {
       // Check if we have a single PDF file to upload directly
       // This avoids converting an existing PDF to images and back to PDF (which breaks it)
       if (
-        scannedImages.length === 1 &&
-        scannedImages[0].toLowerCase().endsWith(".pdf")
+        scannedDocuments.length === 1 &&
+        scannedDocuments[0].uri.toLowerCase().endsWith(".pdf")
       ) {
+        const doc = scannedDocuments[0];
         const classificationSource = autoClassify ? "AI" : "MANUAL";
-        const result = await upload(scannedImages[0], classificationSource);
+        const result = await upload(
+          doc.uri,
+          classificationSource,
+          doc.originalFilename
+        );
 
         if (result) {
-          setScannedImages([]);
+          setScannedDocuments([]);
           if (autoClassify) {
             Alert.alert(
               "Success",
@@ -99,8 +123,8 @@ export const useDocumentScanner = (initialDocUri?: string) => {
       }
 
       // Generate HTML for all pages
-      const pagesHtmlPromises = scannedImages.map(async (img) => {
-        const base64 = await readAsStringAsync(img, {
+      const pagesHtmlPromises = scannedDocuments.map(async (doc) => {
+        const base64 = await readAsStringAsync(doc.uri, {
           encoding: "base64",
         });
         // Check if it's a PDF or Image to render correctly
@@ -131,13 +155,21 @@ export const useDocumentScanner = (initialDocUri?: string) => {
         base64: false,
       });
 
+      // For scanned documents, use a descriptive name based on date
+      // since they don't have original filenames
+      const scannedFilename = `Scanned Document ${new Date().toLocaleDateString()}.pdf`;
+
       // Upload
       const classificationSource = autoClassify ? "AI" : "MANUAL";
-      const result = await upload(pdfUri, classificationSource);
+      const result = await upload(
+        pdfUri,
+        classificationSource,
+        scannedFilename
+      );
 
       if (result) {
         // Clear images after successful upload
-        setScannedImages([]);
+        setScannedDocuments([]);
 
         if (autoClassify) {
           Alert.alert(
@@ -159,7 +191,7 @@ export const useDocumentScanner = (initialDocUri?: string) => {
     }
   };
 
-  const clearImages = () => setScannedImages([]);
+  const clearImages = () => setScannedDocuments([]);
 
   return {
     scannedImages,

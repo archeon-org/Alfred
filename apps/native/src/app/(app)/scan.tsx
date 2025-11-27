@@ -11,7 +11,10 @@ import { Button } from "../../components/Button";
 import { cn } from "../../utils/cn";
 
 export default function ScanScreen() {
-  const { initialDocUri } = useLocalSearchParams<{ initialDocUri?: string }>();
+  const { initialDocUri, initialDocName } = useLocalSearchParams<{
+    initialDocUri?: string;
+    initialDocName?: string;
+  }>();
   const {
     scannedImages,
     isUploading,
@@ -19,7 +22,7 @@ export default function ScanScreen() {
     pickDocument,
     handleUpload,
     clearImages,
-  } = useDocumentScanner(initialDocUri);
+  } = useDocumentScanner(initialDocUri, initialDocName);
 
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";

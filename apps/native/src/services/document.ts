@@ -3,10 +3,12 @@ import { Document } from "@archeon-org/types";
 
 export const uploadDocument = async (
   uri: string,
-  classificationSource: "AI" | "MANUAL" = "AI"
+  classificationSource: "AI" | "MANUAL" = "AI",
+  originalFilename?: string
 ): Promise<Document> => {
   const formData = new FormData();
-  const filename = uri.split("/").pop() || "document.pdf";
+  // Use provided filename or extract from URI as fallback
+  const filename = originalFilename || uri.split("/").pop() || "document.pdf";
 
   // Ensure we are sending a PDF
   const type = "application/pdf";
