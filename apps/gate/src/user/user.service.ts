@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { UserRepository } from './user.repository';
 import { UserEntity } from '@archeon-org/database';
 import { UserOAuthCreateDto } from '../auth/dto/auth.dto';
+import { UpdateUserDto } from './dto/user.dto';
+import { mergePreferences } from '@archeon-org/types';
 
 @Injectable()
 export class UserService {
@@ -50,11 +52,39 @@ export class UserService {
     return this.userRepository.clearOtp(userId);
   }
 
-  public update(
+  public async update(
     userId: string,
-    data: Partial<UserEntity>,
+    data: UpdateUserDto,
   ): Promise<UserEntity> {
     this.logger.log(`Updating user: ${userId}`);
+
+    // If preferences are being updated, merge them properly
+    if (data.preferences) {
+      const currentUser = await this.userRepository.findById(userId);
+      if (currentUser) {
+        this.logger.log(
+          `Current preferences: ${JSON.stringify(currentUser.preferences)}`,
+        );
+        this.logger.log(
+          `Incoming preferences update: ${JSON.stringify(data.preferences)}`,
+        );
+
+        const mergedPreferences = mergePreferences(
+          currentUser.preferences,
+          data.preferences,
+        );
+
+        this.logger.log(
+          `Merged preferences: ${JSON.stringify(mergedPreferences)}`,
+        );
+
+        return this.userRepository.update(userId, {
+          ...data,
+          preferences: mergedPreferences,
+        });
+      }
+    }
+
     return this.userRepository.update(userId, data);
   }
 }

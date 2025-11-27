@@ -37,6 +37,13 @@ export default function ProfileScreen() {
       onPress: () => router.push("/(app)/profile/security"),
     },
     {
+      icon: "settings-outline",
+      label: "Preferences",
+      color: "#8B5CF6",
+      bgColor: "bg-purple-50 dark:bg-purple-900/20",
+      onPress: () => router.push("/(app)/profile/preferences"),
+    },
+    {
       icon: "notifications-outline",
       label: "Notifications",
       color: "#F59E0B",
@@ -52,8 +59,8 @@ export default function ProfileScreen() {
     {
       icon: "shield-checkmark-outline",
       label: "Privacy",
-      color: "#8B5CF6",
-      bgColor: "bg-purple-50 dark:bg-purple-900/20",
+      color: "#EC4899",
+      bgColor: "bg-pink-50 dark:bg-pink-900/20",
       onPress: () => router.push("/privacy"),
     },
   ];

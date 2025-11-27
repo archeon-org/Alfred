@@ -15,6 +15,7 @@ import { RecentDocuments } from "../../components/home/RecentDocuments";
 import { ActionRequiredDocuments } from "../../components/home/ActionRequiredDocuments";
 import { CategoryList } from "../../components/home/CategoryList";
 import { AISearchBottomSheet } from "../../components/search/AISearchBottomSheet";
+import { TipsSection } from "../../components/home/TipsSection";
 
 export default function HomeScreen() {
   const { data: user, refetch: refetchUser } = useUser();
@@ -98,6 +99,8 @@ export default function HomeScreen() {
           }
           isLoading={false}
         />
+
+        <TipsSection preferences={user?.preferences} />
 
         <QuickActions onSearchPress={() => setAiSearchVisible(true)} />
 

@@ -9,3 +9,4 @@ export * from "./types/category.types";
 export * from "./types/tag.types";
 export * from "./types/template.types";
 export * from "./types/queue.types";
+export * from "./types/preferences.types";

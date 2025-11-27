@@ -1,6 +1,7 @@
 // src/hooks/useUser.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProfile, updateUser, UpdateUserDto, User } from "../services";
+import { mergePreferences } from "@archeon-org/types";
 
 export const USER_QUERY_KEY = ["user"];
 
@@ -16,11 +17,40 @@ export const useUpdateUser = () => {
 
   return useMutation({
     mutationFn: (data: UpdateUserDto) => updateUser(data),
-    onSuccess: (data) => {
-      // Update the cache with the new user data
-      queryClient.setQueryData(USER_QUERY_KEY, data);
-      // Alternatively, invalidate to refetch
-      // queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY });
+    onMutate: async (newData) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: USER_QUERY_KEY });
+
+      // Snapshot the previous value
+      const previousUser = queryClient.getQueryData<User>(USER_QUERY_KEY);
+
+      // Optimistically update the cache
+      if (previousUser) {
+        const updatedUser = { ...previousUser, ...newData };
+
+        // Properly merge preferences if they're being updated
+        if (newData.preferences) {
+          updatedUser.preferences = mergePreferences(
+            previousUser.preferences,
+            newData.preferences
+          );
+        }
+
+        queryClient.setQueryData<User>(USER_QUERY_KEY, updatedUser);
+      }
+
+      // Return context with previous value for rollback
+      return { previousUser };
+    },
+    onError: (_err, _newData, context) => {
+      // Rollback to previous value on error
+      if (context?.previousUser) {
+        queryClient.setQueryData(USER_QUERY_KEY, context.previousUser);
+      }
+    },
+    onSettled: () => {
+      // Refetch to ensure consistency
+      queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY });
     },
   });
 };

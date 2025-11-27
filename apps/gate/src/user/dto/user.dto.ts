@@ -3,8 +3,10 @@ import {
   IsString,
   IsObject,
   ValidateNested,
+  IsNumber,
+  IsBoolean,
 } from 'class-validator';
-import { Address } from '@archeon-org/types';
+import { Address, UserPreferencesUpdate } from '@archeon-org/types';
 import { Type } from 'class-transformer';
 
 export class AddressDto implements Address {
@@ -49,9 +51,17 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsObject()
-  preferences?: Record<string, any>;
+  preferences?: UserPreferencesUpdate;
 
   @IsOptional()
   @IsString()
   pushToken?: string;
+
+  @IsOptional()
+  @IsNumber()
+  storageUsed?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isOnboarded?: boolean;
 }

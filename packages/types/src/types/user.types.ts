@@ -1,4 +1,5 @@
 import { Document } from "./document.types";
+import { UserPreferences } from "./preferences.types";
 
 /**
  * User type enumeration
@@ -44,7 +45,7 @@ export interface User {
   pushToken?: string;
   storageUsed: number;
   storageLimit: number;
-  preferences: Record<string, any>;
+  preferences: Partial<UserPreferences>;
   searchCount: number;
   address?: Address;
   role: UserType;
