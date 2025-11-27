@@ -86,7 +86,17 @@ export default function Welcome() {
           className="w-full"
         />
         <Text className="text-center text-sm mt-4 text-gray-400 dark:text-gray-500">
-          By continuing, you agree to our Terms & Privacy Policy
+          By continuing, you agree to our{" "}
+          <Text className="text-primary" onPress={() => router.push("/terms")}>
+            Terms
+          </Text>{" "}
+          &{" "}
+          <Text
+            className="text-primary"
+            onPress={() => router.push("/privacy")}
+          >
+            Privacy Policy
+          </Text>
         </Text>
       </View>
     </SafeAreaView>

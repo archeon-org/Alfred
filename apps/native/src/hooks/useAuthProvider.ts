@@ -6,6 +6,12 @@ import { RelativePathString, useRouter, useSegments } from "expo-router";
 import { User } from "@archeon-org/types";
 import { getProfile } from "@/services/user";
 import { AppError } from "@/utils/apiError";
+import {
+  isPublicRoute,
+  isAuthRoute,
+  isOnboardingRoute,
+  DEFAULT_ROUTES,
+} from "@/constants/routes";
 
 export const useAuthProvider = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -13,30 +19,25 @@ export const useAuthProvider = () => {
   const router = useRouter();
   const segments = useSegments();
 
+  // Load user on mount
   useEffect(() => {
     const loadUser = async () => {
       try {
         const token = await SecureStore.getItemAsync("auth_token");
         if (token) {
-          // Verify token and get user info
           try {
             const userData = await getProfile();
             setUser(userData);
           } catch (error) {
             // Only clear token if it's an authentication error (401)
-            // or if we can't determine the error (safety fallback, but maybe risky for network errors)
-            // Since api.ts handles 401 by clearing token, we might just need to sync state.
-            // But let's be explicit.
             if (error instanceof AppError && error.statusCode === 401) {
               await SecureStore.deleteItemAsync("auth_token");
               setUser(null);
             } else if (error instanceof AppError && error.statusCode === 0) {
-              // Network error, do nothing (keep user logged in locally if possible, or maybe retry)
-              // For now, we don't clear token on network error.
+              // Network error - keep user logged in locally
               console.log("Network error during loadUser, keeping token.");
             } else {
-              // Other errors (500, etc). Maybe we should keep the token?
-              // If the server is down, we shouldn't logout the user.
+              // Other errors (500, etc) - keep the token
               console.error("Failed to load user profile", error);
             }
           }
@@ -45,7 +46,6 @@ export const useAuthProvider = () => {
         console.error("Failed to load user", error);
       } finally {
         setIsLoading(false);
-        // Hide splash screen once we know if we are logged in or not
         await SplashScreen.hideAsync();
       }
     };
@@ -53,23 +53,35 @@ export const useAuthProvider = () => {
     loadUser();
   }, []);
 
+  // Handle navigation based on auth state
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthGroup = segments[0] === "(auth)";
-    const inOnboarding = (segments[0] as string) === "onboarding";
+    const currentSegment = segments[0] as string;
 
-    if (!user && !inAuthGroup) {
-      // Redirect to the welcome page for unauthenticated users.
-      router.replace("/(auth)/welcome");
-    } else if (user) {
+    // Public routes are always accessible
+    if (isPublicRoute(currentSegment)) {
+      return;
+    }
+
+    const inAuthGroup = isAuthRoute(currentSegment);
+    const inOnboarding = isOnboardingRoute(currentSegment);
+
+    if (!user) {
+      // Unauthenticated user trying to access protected route
+      if (!inAuthGroup) {
+        router.replace(DEFAULT_ROUTES.UNAUTHENTICATED);
+      }
+    } else {
+      // Authenticated user
       if (!user.isOnboarded) {
+        // User needs to complete onboarding
         if (!inOnboarding) {
-          router.replace("/onboarding");
+          router.replace(DEFAULT_ROUTES.ONBOARDING);
         }
       } else if (inAuthGroup || inOnboarding) {
-        // Redirect away from the sign-in page or onboarding.
-        router.replace("/(app)/" as RelativePathString);
+        // Fully authenticated user on auth/onboarding pages - redirect to app
+        router.replace(DEFAULT_ROUTES.AUTHENTICATED as RelativePathString);
       }
     }
   }, [user, segments, isLoading]);

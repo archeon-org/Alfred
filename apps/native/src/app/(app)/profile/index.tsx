@@ -36,16 +36,18 @@ export default function ProfileScreen() {
       bgColor: "bg-amber-50 dark:bg-amber-900/20",
     },
     {
-      icon: "shield-checkmark-outline",
-      label: "Privacy",
+      icon: "document-text-outline",
+      label: "Terms",
       color: "#10B981",
       bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+      onPress: () => router.push("/terms"),
     },
     {
-      icon: "help-circle-outline",
-      label: "Help",
+      icon: "shield-checkmark-outline",
+      label: "Privacy",
       color: "#8B5CF6",
       bgColor: "bg-purple-50 dark:bg-purple-900/20",
+      onPress: () => router.push("/privacy"),
     },
   ];
 

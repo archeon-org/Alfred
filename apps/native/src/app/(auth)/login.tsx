@@ -84,8 +84,16 @@ export default function Login() {
       <View className="px-6 pb-4 items-center">
         <Text className="text-center text-sm text-gray-400 dark:text-gray-500">
           By continuing, you agree to our{" "}
-          <Text className="text-primary">Terms of Service</Text> and{" "}
-          <Text className="text-primary">Privacy Policy</Text>
+          <Text className="text-primary" onPress={() => router.push("/terms")}>
+            Terms of Service
+          </Text>{" "}
+          and{" "}
+          <Text
+            className="text-primary"
+            onPress={() => router.push("/privacy")}
+          >
+            Privacy Policy
+          </Text>
         </Text>
       </View>
     </SafeAreaView>

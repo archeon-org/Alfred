@@ -38,6 +38,26 @@ export default function RootLayout() {
                   gestureDirection: "horizontal",
                 }}
               />
+              <Stack.Screen
+                name="terms"
+                options={{
+                  headerShown: false,
+                  presentation: "card",
+                  animation: "slide_from_right",
+                  gestureEnabled: true,
+                  gestureDirection: "horizontal",
+                }}
+              />
+              <Stack.Screen
+                name="privacy"
+                options={{
+                  headerShown: false,
+                  presentation: "card",
+                  animation: "slide_from_right",
+                  gestureEnabled: true,
+                  gestureDirection: "horizontal",
+                }}
+              />
             </Stack>
           </ThemeProvider>
         </ToastProvider>
