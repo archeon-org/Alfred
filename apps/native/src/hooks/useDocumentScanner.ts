@@ -228,6 +228,10 @@ export const useDocumentScanner = (
 
   const clearImages = () => setScannedDocuments([]);
 
+  const removePage = (index: number) => {
+    setScannedDocuments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   return {
     scannedImages,
     isUploading,
@@ -236,5 +240,6 @@ export const useDocumentScanner = (
     pickFromGallery,
     handleUpload,
     clearImages,
+    removePage,
   };
 };

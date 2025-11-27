@@ -28,6 +28,7 @@ export default function ScanScreen() {
     pickFromGallery,
     handleUpload,
     clearImages,
+    removePage,
   } = useDocumentScanner(initialDocUri, initialDocName);
 
   const colorScheme = useColorScheme();
@@ -74,7 +75,11 @@ export default function ScanScreen() {
     <SafeAreaView className="flex-1 bg-background dark:bg-background-dark p-4">
       <View className="flex-1 items-center justify-center">
         {scannedImages.length > 0 ? (
-          <ScanPreview scannedImages={scannedImages} />
+          <ScanPreview
+            scannedImages={scannedImages}
+            onRemovePage={removePage}
+            onAddMore={pickFromGallery}
+          />
         ) : (
           /* Empty State with Upload Options */
           <View className="flex-1 items-center justify-center">
