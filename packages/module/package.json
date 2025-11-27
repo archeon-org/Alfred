@@ -15,6 +15,7 @@
     "@aws-sdk/s3-request-presigner": "^3.937.0",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^4.0.2",
+    "@nestjs/swagger": "^11.2.3",
     "@nestjs/typeorm": "^10.0.2",
     "expo-server-sdk": "^4.0.0",
     "nestjs-paginate": "^12.8.3",
