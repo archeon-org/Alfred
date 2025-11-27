@@ -64,13 +64,15 @@ export class CategoryService {
     userId: string,
     query: PaginateQuery,
     hideEmpty: boolean = false,
-  ): Promise<Paginated<CategoryEntity>> {
+  ): Promise<Paginated<CategoryEntity & { documentCount?: number }>> {
     this.logger.debug(
       `Finding all categories for user ${userId} (hideEmpty: ${hideEmpty})`,
     );
 
     const queryBuilder = this.categoryRepository.createQueryBuilder('category');
-    queryBuilder.where('category.userId = :userId', { userId });
+    queryBuilder
+      .where('category.userId = :userId', { userId })
+      .loadRelationCountAndMap('category.documentCount', 'category.documents');
 
     if (hideEmpty) {
       queryBuilder.andWhere((qb) => {

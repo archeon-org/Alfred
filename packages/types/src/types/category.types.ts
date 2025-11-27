@@ -10,12 +10,13 @@ export interface Category {
   userId: string;
   user?: User;
   documents?: Document[];
+  documentCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export type CreateCategoryInput = Omit<
   Category,
-  "id" | "createdAt" | "updatedAt" | "user" | "documents"
+  "id" | "createdAt" | "updatedAt" | "user" | "documents" | "documentCount"
 >;
 export type UpdateCategoryInput = Partial<CreateCategoryInput>;

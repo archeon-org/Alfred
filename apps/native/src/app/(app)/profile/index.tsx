@@ -133,15 +133,24 @@ export default function ProfileScreen() {
 
         {/* Storage Card */}
         <View className="px-5 mb-6">
-          <View className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 shadow-lg">
+          <View
+            className="rounded-2xl p-5 shadow-lg"
+            style={{ backgroundColor: "#6366F1" }}
+          >
             <View className="flex-row items-center justify-between mb-4">
               <View className="flex-row items-center gap-2">
-                <View className="w-10 h-10 bg-white/20 rounded-xl items-center justify-center">
+                <View
+                  className="w-10 h-10 rounded-xl items-center justify-center"
+                  style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
+                >
                   <Ionicons name="cloud" size={20} color="white" />
                 </View>
                 <Text className="text-white font-bold text-lg">Storage</Text>
               </View>
-              <View className="bg-white/20 px-3 py-1 rounded-full">
+              <View
+                className="px-3 py-1 rounded-full"
+                style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
+              >
                 <Text className="text-white text-xs font-semibold">
                   {user?.searchCount || 0} searches
                 </Text>
