@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import * as tesseract from 'node-tesseract-ocr';
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -12,7 +11,7 @@ export class OCRService {
 
   async recognize(
     image: Buffer,
-    config: tesseract.Config = {
+    config: { lang?: string; oem?: number; psm?: number } = {
       lang: 'eng',
       oem: 1,
       psm: 3,
@@ -33,9 +32,7 @@ export class OCRService {
       }
 
       this.logger.log('Processing as image...');
-      const text = await tesseract.recognize(image, config);
-      this.logger.debug(`OCR completed. Extracted ${text.length} characters.`);
-      return text;
+      return await this.runTesseract(image, config);
     } catch (error) {
       this.logger.error('OCR recognition failed');
       this.logger.error(error);
@@ -45,14 +42,78 @@ export class OCRService {
 
   private isPdf(buffer: Buffer): boolean {
     // Check for %PDF magic bytes - they might be at the start or after some whitespace
-    // Standard PDF starts with %PDF, but some PDFs have leading whitespace
     const header = buffer.slice(0, 1024).toString('ascii');
     return header.includes('%PDF');
   }
 
+  private async runTesseract(
+    imageBuffer: Buffer,
+    config: { lang?: string; oem?: number; psm?: number },
+  ): Promise<string> {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tesseract-'));
+    const inputPath = path.join(tmpDir, 'input.png');
+    const outputBase = path.join(tmpDir, 'output');
+
+    try {
+      // Write buffer to file
+      fs.writeFileSync(inputPath, imageBuffer);
+
+      // Run tesseract using file-based I/O
+      const args = [
+        inputPath,
+        outputBase,
+        '-l',
+        config.lang || 'eng',
+        '--oem',
+        String(config.oem || 1),
+        '--psm',
+        String(config.psm || 3),
+      ];
+
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn('tesseract', args);
+        let stderr = '';
+
+        proc.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        proc.on('close', (code) => {
+          if (code === 0) {
+            resolve();
+          } else {
+            reject(new Error(`Tesseract exited with code ${code}: ${stderr}`));
+          }
+        });
+
+        proc.on('error', (err) => {
+          reject(err);
+        });
+      });
+
+      // Read output
+      const outputPath = outputBase + '.txt';
+      if (fs.existsSync(outputPath)) {
+        return fs.readFileSync(outputPath, 'utf-8');
+      }
+      return '';
+    } finally {
+      // Cleanup
+      try {
+        const files = fs.readdirSync(tmpDir);
+        for (const file of files) {
+          fs.unlinkSync(path.join(tmpDir, file));
+        }
+        fs.rmdirSync(tmpDir);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
+
   private async processPdf(
     buffer: Buffer,
-    config: tesseract.Config,
+    config: { lang?: string; oem?: number; psm?: number },
   ): Promise<string> {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ocr-'));
     const pdfPath = path.join(tmpDir, 'input.pdf');
@@ -81,8 +142,9 @@ export class OCRService {
       // Process each page and concatenate text
       const textParts: string[] = [];
       for (const pageFile of pageFiles) {
-        const pageBuffer = fs.readFileSync(path.join(tmpDir, pageFile));
-        const pageText = await tesseract.recognize(pageBuffer, config);
+        const pagePath = path.join(tmpDir, pageFile);
+        const pageBuffer = fs.readFileSync(pagePath);
+        const pageText = await this.runTesseract(pageBuffer, config);
         textParts.push(pageText.trim());
       }
 
