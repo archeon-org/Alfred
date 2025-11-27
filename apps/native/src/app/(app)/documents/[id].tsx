@@ -12,13 +12,61 @@ import { Stack } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
-import { DocumentStatusBadge } from "../../../components/document/DocumentStatusBadge";
 import { useDocumentDetailsLogic } from "../../../hooks/useDocumentDetailsLogic";
 import { CategorySelectionModal } from "../../../components/document/CategorySelectionModal";
 import { TagSelectionModal } from "../../../components/document/TagSelectionModal";
 import { TitleEditModal } from "../../../components/document/TitleEditModal";
-
 import { Skeleton } from "../../../components/common/Skeleton";
+
+const getStatusConfig = (status: string) => {
+  switch (status) {
+    case "COMPLETED":
+      return {
+        label: "Ready",
+        description: "Document is fully processed",
+        color: "#10B981",
+        bgColor: "bg-emerald-50 dark:bg-emerald-900/20",
+        borderColor: "border-emerald-100 dark:border-emerald-800",
+        icon: "checkmark-circle" as const,
+      };
+    case "PROCESSING":
+      return {
+        label: "Processing",
+        description: "AI is analyzing your document",
+        color: "#F59E0B",
+        bgColor: "bg-amber-50 dark:bg-amber-900/20",
+        borderColor: "border-amber-100 dark:border-amber-800",
+        icon: "sync" as const,
+      };
+    case "PENDING":
+      return {
+        label: "Pending",
+        description: "Waiting to be processed",
+        color: "#6366F1",
+        bgColor: "bg-indigo-50 dark:bg-indigo-900/20",
+        borderColor: "border-indigo-100 dark:border-indigo-800",
+        icon: "time" as const,
+      };
+    case "FAILED":
+      return {
+        label: "Failed",
+        description: "Processing encountered an error",
+        color: "#EF4444",
+        bgColor: "bg-red-50 dark:bg-red-900/20",
+        borderColor: "border-red-100 dark:border-red-800",
+        icon: "alert-circle" as const,
+      };
+    default:
+      return {
+        label: status,
+        description: "Unknown status",
+        color: "#6B7280",
+        bgColor: "bg-gray-50 dark:bg-gray-800",
+        borderColor: "border-gray-200 dark:border-gray-700",
+        icon: "help-circle" as const,
+      };
+  }
+};
 
 export default function DocumentDetails() {
   const {
@@ -71,50 +119,34 @@ export default function DocumentDetails() {
     }
   };
 
+  const statusConfig = document
+    ? getStatusConfig(document.processingStatus)
+    : null;
+
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-white dark:bg-black" edges={["top"]}>
-        <View className="flex-row items-center px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-          <View className="mr-4 w-6 h-6">
-            <Ionicons name="arrow-back" size={24} color="#374151" />
+      <SafeAreaView
+        className="flex-1 bg-background dark:bg-background-dark"
+        edges={["top"]}
+      >
+        <View className="flex-row items-center px-4 py-3">
+          <View className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mr-3">
+            <Ionicons name="arrow-back" size={20} color="#9CA3AF" />
           </View>
-          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-5 w-32" />
         </View>
-        <View className="p-4">
-          <View className="items-center mb-8 mt-4">
-            <Skeleton className="w-24 h-24 rounded-2xl mb-4" />
-            <Skeleton className="h-8 w-3/4 mb-2" />
-            <Skeleton className="h-4 w-1/2" />
+        <View className="px-5 pt-4">
+          <View className="items-center mb-8">
+            <Skeleton className="w-20 h-24 rounded-xl mb-5" />
+            <Skeleton className="h-7 w-4/5 mb-3" />
+            <Skeleton className="h-4 w-1/3" />
           </View>
-          <View className="flex-row gap-4 mb-8">
-            <Skeleton className="flex-1 h-12 rounded-xl" />
-            <Skeleton className="w-12 h-12 rounded-xl" />
+          <View className="flex-row gap-3 mb-8">
+            <Skeleton className="flex-1 h-14 rounded-2xl" />
+            <Skeleton className="w-14 h-14 rounded-2xl" />
           </View>
-          <View className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 space-y-4">
-            <View>
-              <View className="flex-row justify-between mb-2">
-                <Skeleton className="h-3 w-16" />
-                <Skeleton className="h-3 w-8" />
-              </View>
-              <Skeleton className="h-5 w-32" />
-            </View>
-            <View className="h-[1px] bg-gray-200 dark:bg-gray-700" />
-            <View>
-              <Skeleton className="h-3 w-16 mb-2" />
-              <Skeleton className="h-6 w-24 rounded-full" />
-            </View>
-            <View className="h-[1px] bg-gray-200 dark:bg-gray-700" />
-            <View>
-              <View className="flex-row justify-between mb-2">
-                <Skeleton className="h-3 w-10" />
-                <Skeleton className="h-3 w-8" />
-              </View>
-              <View className="flex-row gap-2">
-                <Skeleton className="h-8 w-20 rounded-full" />
-                <Skeleton className="h-8 w-24 rounded-full" />
-              </View>
-            </View>
-          </View>
+          <Skeleton className="h-32 w-full rounded-2xl mb-4" />
+          <Skeleton className="h-48 w-full rounded-2xl" />
         </View>
       </SafeAreaView>
     );
@@ -122,17 +154,26 @@ export default function DocumentDetails() {
 
   if (error || !document) {
     return (
-      <View className="flex-1 justify-center items-center bg-white dark:bg-black p-4">
-        <Text className="text-gray-500 dark:text-gray-400 text-lg mb-4">
-          Failed to load document
+      <SafeAreaView
+        className="flex-1 bg-background dark:bg-background-dark justify-center items-center"
+        edges={["top"]}
+      >
+        <View className="w-24 h-24 rounded-full bg-red-50 dark:bg-red-900/20 items-center justify-center mb-6">
+          <Ionicons name="alert-circle" size={48} color="#EF4444" />
+        </View>
+        <Text className="text-gray-900 dark:text-white font-bold text-xl mb-2">
+          Document not found
+        </Text>
+        <Text className="text-gray-500 dark:text-gray-400 text-center mb-6 px-8">
+          We couldn't load this document. It may have been deleted or moved.
         </Text>
         <TouchableOpacity
           onPress={() => router.replace("/(app)/documents")}
-          className="bg-indigo-600 px-4 py-2 rounded-lg"
+          className="bg-indigo-600 px-6 py-3 rounded-xl"
         >
-          <Text className="text-white font-medium">Go Back</Text>
+          <Text className="text-white font-bold">Go Back</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
@@ -144,21 +185,22 @@ export default function DocumentDetails() {
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* Header */}
-      <View className="flex-row items-center px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+      <View className="flex-row items-center px-4 py-2">
         <TouchableOpacity
           onPress={() => router.back()}
-          className="mr-4 p-2 -ml-2"
+          className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mr-3"
         >
-          <Ionicons name="arrow-back" size={24} color="#374151" />
+          <Ionicons name="arrow-back" size={20} color="#6B7280" />
         </TouchableOpacity>
-        <Text
-          className="text-lg font-bold text-gray-900 dark:text-white flex-1"
-          numberOfLines={1}
+        <View className="flex-1" />
+        <TouchableOpacity
+          onPress={handleShare}
+          className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mr-2"
         >
-          Document Details
-        </Text>
-        <TouchableOpacity className="p-2">
-          <Ionicons name="ellipsis-horizontal" size={24} color="#374151" />
+          <Ionicons name="share-outline" size={20} color="#6B7280" />
+        </TouchableOpacity>
+        <TouchableOpacity className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center">
+          <Ionicons name="ellipsis-horizontal" size={20} color="#6B7280" />
         </TouchableOpacity>
       </View>
 
@@ -168,230 +210,269 @@ export default function DocumentDetails() {
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
         }
+        showsVerticalScrollIndicator={false}
       >
-        {/* Preview Section */}
-        <View className="bg-surface dark:bg-surface-dark pb-8 pt-6 px-4 border-b border-gray-100 dark:border-gray-800 mb-6">
-          <View className="items-center">
-            <View className="w-28 h-36 bg-gray-100 dark:bg-gray-800 rounded-xl items-center justify-center mb-6 shadow-sm border border-gray-200 dark:border-gray-700 relative overflow-hidden">
-              <View className="absolute top-0 right-0 w-12 h-12 bg-gray-200 dark:bg-gray-700 -mr-6 -mt-6 rotate-45" />
-              <Ionicons name="document-text" size={48} color="#4F46E5" />
-              <View className="absolute bottom-2 left-0 right-0 items-center">
-                <Text className="text-[10px] font-bold text-gray-400 uppercase">
-                  PDF
-                </Text>
-              </View>
-            </View>
+        {/* Hero Section */}
+        <View className="items-center pt-4 pb-6 px-5">
+          {/* Document Icon */}
+          <View className="w-20 h-24 bg-gradient-to-b from-indigo-50 to-indigo-100 dark:from-indigo-900/30 dark:to-indigo-900/50 rounded-xl items-center justify-center mb-5 border border-indigo-100 dark:border-indigo-800 relative">
+            <View className="absolute top-0 right-0 w-6 h-6 bg-indigo-100 dark:bg-indigo-800 rounded-bl-lg" />
+            <Ionicons name="document-text" size={32} color="#6366F1" />
+          </View>
 
-            <Text className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-2 px-4 leading-tight">
+          <TouchableOpacity onPress={handleOpenTitleModal} activeOpacity={0.7}>
+            <Text className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-1 px-4 leading-tight">
               {document.title}
             </Text>
+          </TouchableOpacity>
+
+          <View className="flex-row items-center gap-2 mt-2">
             <TouchableOpacity
               onPress={handleOpenTitleModal}
-              className="flex-row items-center gap-1 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-full"
+              className="flex-row items-center gap-1.5 bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-full"
             >
               <Ionicons name="pencil" size={12} color="#6B7280" />
               <Text className="text-gray-500 dark:text-gray-400 text-xs font-medium">
-                Edit title
+                Edit
               </Text>
             </TouchableOpacity>
-            <Text className="text-gray-500 dark:text-gray-400 text-sm font-medium mt-2">
-              Added on {format(new Date(document.createdAt), "MMMM d, yyyy")}
+            <Text className="text-gray-300 dark:text-gray-600">•</Text>
+            <Text className="text-gray-400 dark:text-gray-500 text-sm">
+              {format(new Date(document.createdAt), "MMM d, yyyy")}
             </Text>
-          </View>
-
-          {/* Primary Actions */}
-          <View className="flex-row gap-3 mt-8">
-            <TouchableOpacity
-              onPress={() => openDocument(document.id)}
-              disabled={isOpening}
-              className="flex-1 bg-indigo-600 h-12 rounded-xl flex-row items-center justify-center gap-2 shadow-lg shadow-indigo-200 dark:shadow-none"
-            >
-              {isOpening ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <>
-                  <Ionicons name="eye" size={20} color="white" />
-                  <Text className="text-white font-bold text-base">
-                    View Document
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleShare}
-              className="w-12 h-12 bg-white dark:bg-gray-800 rounded-xl items-center justify-center border border-gray-200 dark:border-gray-700 shadow-sm"
-            >
-              <Ionicons name="share-outline" size={22} color="#374151" />
-            </TouchableOpacity>
           </View>
         </View>
 
-        <View className="px-4 space-y-8">
-          {/* Classification Needed Section */}
-          {((document.processingStatus === "PENDING" &&
-            document.classificationSource === "MANUAL") ||
-            document.processingStatus === "FAILED") && (
-            <View className="bg-orange-50 dark:bg-orange-900/20 p-5 rounded-2xl border border-orange-200 dark:border-orange-800">
-              <View className="flex-row items-start gap-3 mb-3">
-                <View className="bg-orange-100 dark:bg-orange-900/40 p-2 rounded-full">
-                  <Ionicons name="alert" size={20} color="#F97316" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-orange-900 dark:text-orange-100 font-bold text-lg mb-1">
-                    Action Required
-                  </Text>
-                  <Text className="text-orange-700 dark:text-orange-300 text-sm leading-5">
-                    This document needs classification. You can do it manually
-                    or let our AI handle it for you.
-                  </Text>
-                </View>
-              </View>
+        {/* Primary Action */}
+        <View className="px-5 mb-6">
+          <TouchableOpacity
+            onPress={() => openDocument(document.id)}
+            disabled={isOpening}
+            className="bg-indigo-600 h-14 rounded-2xl flex-row items-center justify-center gap-2"
+            style={{
+              shadowColor: "#6366F1",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.25,
+              shadowRadius: 12,
+            }}
+          >
+            {isOpening ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Ionicons name="eye" size={22} color="white" />
+                <Text className="text-white font-bold text-base">
+                  Open Document
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
 
-              <View className="flex-row gap-3 mt-2">
-                <TouchableOpacity
-                  onPress={() => setCategoryModalVisible(true)}
-                  className="flex-1 bg-white dark:bg-black border border-orange-200 dark:border-orange-800 py-3 rounded-xl items-center shadow-sm"
-                >
-                  <Text className="text-orange-700 dark:text-orange-300 font-bold">
-                    Classify Manually
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleTriggerAi}
-                  disabled={isTriggeringAi}
-                  className="flex-1 bg-orange-500 py-3 rounded-xl items-center flex-row justify-center gap-2 shadow-sm"
-                >
-                  {isTriggeringAi ? (
-                    <ActivityIndicator color="white" size="small" />
-                  ) : (
-                    <>
-                      <Ionicons name="sparkles" size={16} color="white" />
-                      <Text className="text-white font-bold">
-                        Auto-Classify
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+        {/* Classification Alert */}
+        {((document.processingStatus === "PENDING" &&
+          document.classificationSource === "MANUAL") ||
+          document.processingStatus === "FAILED") && (
+          <View className="mx-5 mb-6 bg-amber-50 dark:bg-amber-900/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-800">
+            <View className="flex-row items-start gap-3 mb-4">
+              <View className="w-10 h-10 bg-amber-100 dark:bg-amber-900/40 rounded-xl items-center justify-center">
+                <Ionicons name="sparkles" size={20} color="#F59E0B" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-amber-900 dark:text-amber-100 font-bold text-base mb-0.5">
+                  Needs Classification
+                </Text>
+                <Text className="text-amber-700 dark:text-amber-300 text-sm">
+                  Classify manually or let AI do it
+                </Text>
               </View>
             </View>
-          )}
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setCategoryModalVisible(true)}
+                className="flex-1 bg-white dark:bg-black py-3 rounded-xl items-center border border-amber-200 dark:border-amber-800"
+              >
+                <Text className="text-amber-700 dark:text-amber-300 font-bold text-sm">
+                  Manual
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleTriggerAi}
+                disabled={isTriggeringAi}
+                className="flex-1 bg-amber-500 py-3 rounded-xl items-center flex-row justify-center gap-2"
+              >
+                {isTriggeringAi ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="flash" size={16} color="white" />
+                    <Text className="text-white font-bold text-sm">
+                      Auto-Classify
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
-          {/* Details Card */}
-          <View className="bg-surface dark:bg-surface-dark rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-            <View className="p-4 border-b border-gray-100 dark:border-gray-800">
-              <Text className="text-base font-bold text-gray-900 dark:text-white">
-                Document Information
+        {/* Quick Info Grid */}
+        <View className="px-5 mb-6">
+          <View className="flex-row gap-3">
+            {/* Category Card */}
+            <TouchableOpacity
+              onPress={() => setCategoryModalVisible(true)}
+              activeOpacity={0.7}
+              className="flex-1 bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800"
+            >
+              <View
+                className="w-12 h-12 rounded-xl items-center justify-center mb-3"
+                style={{
+                  backgroundColor: `${document.category?.color || "#6366F1"}15`,
+                }}
+              >
+                <Ionicons
+                  name={(document.category?.icon as any) || "folder"}
+                  size={24}
+                  color={document.category?.color || "#6366F1"}
+                />
+              </View>
+              <Text className="text-[11px] text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider mb-1">
+                Category
+              </Text>
+              <Text
+                className="text-gray-900 dark:text-white font-bold text-base"
+                numberOfLines={1}
+              >
+                {document.category?.name || "Uncategorized"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Status Card */}
+            <View
+              className={`flex-1 rounded-2xl p-4 border ${statusConfig?.bgColor} ${statusConfig?.borderColor}`}
+            >
+              <View
+                className="w-12 h-12 rounded-xl items-center justify-center mb-3"
+                style={{ backgroundColor: `${statusConfig?.color}15` }}
+              >
+                <Ionicons
+                  name={statusConfig?.icon || "help-circle"}
+                  size={24}
+                  color={statusConfig?.color}
+                />
+              </View>
+              <Text className="text-[11px] text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider mb-1">
+                Status
+              </Text>
+              <Text
+                className="font-bold text-base"
+                style={{ color: statusConfig?.color }}
+              >
+                {statusConfig?.label}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Tags Section */}
+        <View className="px-5 mb-6">
+          <View className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center gap-2">
+                <View className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg items-center justify-center">
+                  <Ionicons name="pricetags" size={16} color="#6B7280" />
+                </View>
+                <Text className="text-gray-900 dark:text-white font-bold text-base">
+                  Tags
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setTagModalVisible(true)}
+                className="bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg"
+              >
+                <Text className="text-indigo-600 dark:text-indigo-400 text-xs font-bold">
+                  Manage
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {document.tags && document.tags.length > 0 ? (
+              <View className="flex-row flex-wrap gap-2">
+                {document.tags.map((tag) => (
+                  <View
+                    key={tag.id}
+                    className="bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded-xl"
+                  >
+                    <Text className="text-gray-700 dark:text-gray-300 text-sm font-medium">
+                      {tag.name}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => setTagModalVisible(true)}
+                className="flex-row items-center justify-center py-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700"
+              >
+                <Ionicons name="add" size={18} color="#9CA3AF" />
+                <Text className="text-gray-400 dark:text-gray-500 text-sm ml-1">
+                  Add tags
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* File Details */}
+        <View className="px-5">
+          <View className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800">
+            <View className="flex-row items-center gap-2 mb-4">
+              <View className="w-8 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg items-center justify-center">
+                <Ionicons name="information-circle" size={16} color="#6B7280" />
+              </View>
+              <Text className="text-gray-900 dark:text-white font-bold text-base">
+                File Details
               </Text>
             </View>
 
-            <View className="p-4 space-y-8">
-              {/* Category */}
-              <View>
-                <View className="flex-row justify-between items-center mb-3">
-                  <Text className="text-gray-500 dark:text-gray-400 text-xs uppercase font-bold tracking-wider">
-                    Category
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => setCategoryModalVisible(true)}
-                  >
-                    <Text className="text-indigo-600 dark:text-indigo-400 text-xs font-bold">
-                      Change
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <View className="flex-row items-center gap-3 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl">
-                  <View
-                    className="w-10 h-10 rounded-full items-center justify-center"
-                    style={{
-                      backgroundColor: `${document.category?.color || "#4F46E5"}20`,
-                    }}
-                  >
-                    <Ionicons
-                      name="folder"
-                      size={20}
-                      color={document.category?.color || "#4F46E5"}
-                    />
-                  </View>
-                  <View>
-                    <Text className="text-gray-900 dark:text-white font-bold text-base">
-                      {document.category?.name || "Uncategorized"}
-                    </Text>
-                    <Text className="text-gray-500 dark:text-gray-400 text-xs">
-                      {document.category
-                        ? "Custom Category"
-                        : "No category assigned"}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Status */}
-              <View>
-                <Text className="text-gray-500 dark:text-gray-400 text-xs uppercase font-bold tracking-wider mb-2">
-                  Processing Status
+            <View className="space-y-3">
+              {/* Filename */}
+              <View className="flex-row items-center py-3 border-b border-gray-100 dark:border-gray-800">
+                <Text className="text-gray-500 dark:text-gray-400 text-sm w-24">
+                  Filename
                 </Text>
-                <View className="flex-row">
-                  <DocumentStatusBadge status={document.processingStatus} />
+                <Text
+                  className="text-gray-900 dark:text-white text-sm font-medium flex-1"
+                  numberOfLines={1}
+                >
+                  {document.filename || "document.pdf"}
+                </Text>
+              </View>
+
+              {/* Format */}
+              <View className="flex-row items-center py-3 border-b border-gray-100 dark:border-gray-800">
+                <Text className="text-gray-500 dark:text-gray-400 text-sm w-24">
+                  Format
+                </Text>
+                <View className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                  <Text className="text-gray-700 dark:text-gray-300 text-xs font-bold uppercase">
+                    PDF
+                  </Text>
                 </View>
               </View>
 
-              {/* Tags */}
-              <View>
-                <View className="flex-row justify-between items-center mb-2">
-                  <Text className="text-gray-500 dark:text-gray-400 text-xs uppercase font-bold tracking-wider">
-                    Tags
-                  </Text>
-                  <TouchableOpacity onPress={() => setTagModalVisible(true)}>
-                    <Text className="text-indigo-600 dark:text-indigo-400 text-xs font-bold">
-                      Manage
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <View className="flex-row flex-wrap gap-2">
-                  {document.tags && document.tags.length > 0 ? (
-                    document.tags.map((tag) => (
-                      <View
-                        key={tag.id}
-                        className="bg-gray-100 dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 flex-row items-center gap-1"
-                      >
-                        <Ionicons name="pricetag" size={12} color="#6B7280" />
-                        <Text className="text-gray-700 dark:text-gray-300 text-sm font-medium">
-                          {tag.name}
-                        </Text>
-                      </View>
-                    ))
-                  ) : (
-                    <Text className="text-gray-400 dark:text-gray-500 italic text-sm">
-                      No tags added yet
-                    </Text>
+              {/* Added */}
+              <View className="flex-row items-center py-3">
+                <Text className="text-gray-500 dark:text-gray-400 text-sm w-24">
+                  Added
+                </Text>
+                <Text className="text-gray-900 dark:text-white text-sm font-medium">
+                  {format(
+                    new Date(document.createdAt),
+                    "MMMM d, yyyy 'at' h:mm a"
                   )}
-                </View>
-              </View>
-
-              {/* File Info */}
-              <View>
-                <Text className="text-gray-500 dark:text-gray-400 text-xs uppercase font-bold tracking-wider mb-2">
-                  File Details
                 </Text>
-                <View className="bg-gray-50 dark:bg-gray-800/50 p-3 rounded-xl flex-row items-center gap-3">
-                  <View className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg items-center justify-center">
-                    <Text className="text-[10px] font-bold text-gray-500">
-                      PDF
-                    </Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text
-                      className="text-gray-900 dark:text-white font-medium text-sm"
-                      numberOfLines={1}
-                    >
-                      {document.filename || "document.pdf"}
-                    </Text>
-                    <Text className="text-gray-500 dark:text-gray-400 text-xs">
-                      Original File
-                    </Text>
-                  </View>
-                </View>
               </View>
             </View>
           </View>

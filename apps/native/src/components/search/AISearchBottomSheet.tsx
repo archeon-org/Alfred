@@ -14,10 +14,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { useChatSearch } from "../../hooks/useChatSearch";
 import { DocumentSuggestion } from "../../services/search";
 import Config from "../../constants/Config";
+import { DocumentPreviewSheet } from "./DocumentPreviewSheet";
 
 interface AISearchBottomSheetProps {
   visible: boolean;
@@ -28,9 +28,9 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
   visible,
   onClose,
 }) => {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [inputText, setInputText] = useState("");
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
@@ -125,8 +125,11 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
   };
 
   const handleDocumentPress = (docId: string) => {
-    onClose();
-    router.push(`/documents/${docId}`);
+    setPreviewDocId(docId);
+  };
+
+  const handleClosePreview = () => {
+    setPreviewDocId(null);
   };
 
   const handleExcludeDocument = async (docId: string) => {
@@ -424,6 +427,17 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
           }}
         />
       </View>
+
+      {/* Document Preview Sheet */}
+      <DocumentPreviewSheet
+        visible={previewDocId !== null}
+        documentId={previewDocId}
+        onClose={handleClosePreview}
+        onOpenFullDetails={() => {
+          handleClosePreview();
+          onClose();
+        }}
+      />
     </Modal>
   );
 };
