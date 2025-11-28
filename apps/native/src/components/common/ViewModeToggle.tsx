@@ -2,6 +2,7 @@ import React from "react";
 import { View, TouchableOpacity, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColorScheme } from "nativewind";
+import { shadows } from "../../constants/shadows";
 
 interface ViewModeToggleProps {
   mode: "list" | "grid";
@@ -21,8 +22,9 @@ export const ViewModeToggle = ({ mode, onModeChange }: ViewModeToggleProps) => {
       <TouchableOpacity
         onPress={() => onModeChange("list")}
         className={`p-2 rounded-lg ${
-          mode === "list" ? (isDark ? "bg-gray-700" : "bg-white shadow-sm") : ""
+          mode === "list" ? (isDark ? "bg-gray-700" : "bg-white") : ""
         }`}
+        style={mode === "list" && !isDark ? shadows.sm : undefined}
         activeOpacity={0.7}
       >
         <Ionicons
@@ -34,8 +36,9 @@ export const ViewModeToggle = ({ mode, onModeChange }: ViewModeToggleProps) => {
       <TouchableOpacity
         onPress={() => onModeChange("grid")}
         className={`p-2 rounded-lg ${
-          mode === "grid" ? (isDark ? "bg-gray-700" : "bg-white shadow-sm") : ""
+          mode === "grid" ? (isDark ? "bg-gray-700" : "bg-white") : ""
         }`}
+        style={mode === "grid" && !isDark ? shadows.sm : undefined}
         activeOpacity={0.7}
       >
         <Ionicons

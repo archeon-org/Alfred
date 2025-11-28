@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "684087979006",
+    "project_id": "archeon-10c32",
+    "storage_bucket": "archeon-10c32.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:684087979006:android:3a61f6c945fe408e48aeaf",
+        "android_client_info": {
+          "package_name": "com.soymusta.archeon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFt2q-aK6ks7Xob1fQW4KXTsVEzTijgdE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

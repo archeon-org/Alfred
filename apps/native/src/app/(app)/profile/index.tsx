@@ -1,18 +1,21 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   useColorScheme,
   Image,
+  ScrollView,
+  RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../../context/AuthContext";
 import { useUser } from "../../../hooks/useUser";
 import { useRouter } from "expo-router";
-import { StorageProgress } from "@/components/common/StorageProgress";
+import { SubscriptionCard } from "@/components/profile/SubscriptionCard";
 import { Skeleton } from "@/components/common/Skeleton";
+import { shadows } from "../../../constants/shadows";
 
 export default function ProfileScreen() {
   const { signOut } = useAuth();
@@ -20,6 +23,13 @@ export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
   const menuItems = [
     {
@@ -96,29 +106,39 @@ export default function ProfileScreen() {
       className="flex-1 bg-background dark:bg-background-dark"
       edges={["top"]}
     >
-      <View className="flex-1 px-5">
-        {/* Header */}
-        <View className="flex-row justify-between items-center pt-2 pb-2">
-          <Text className="text-2xl font-bold text-gray-900 dark:text-white">
-            Profile
-          </Text>
-          <TouchableOpacity
-            onPress={signOut}
-            activeOpacity={0.7}
-            className="w-10 h-10 rounded-full items-center justify-center bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30"
-          >
-            <Ionicons
-              name="log-out-outline"
-              size={20}
-              color={isDark ? "#FCA5A5" : "#DC2626"}
-            />
-          </TouchableOpacity>
-        </View>
+      {/* Header - Fixed at top */}
+      <View className="flex-row justify-between items-center pt-2 pb-2 px-5">
+        <Text className="text-2xl font-bold text-gray-900 dark:text-white">
+          Profile
+        </Text>
+        <TouchableOpacity
+          onPress={signOut}
+          activeOpacity={0.7}
+          className="w-10 h-10 rounded-full items-center justify-center bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30"
+        >
+          <Ionicons
+            name="log-out-outline"
+            size={20}
+            color={isDark ? "#FCA5A5" : "#DC2626"}
+          />
+        </TouchableOpacity>
+      </View>
 
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="px-5 pb-8"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* Profile Header - Compact */}
         <View className="items-center py-4">
           <View className="relative mb-3">
-            <View className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full items-center justify-center overflow-hidden border-3 border-white dark:border-gray-800 shadow-lg">
+            <View
+              className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-full items-center justify-center overflow-hidden border-3 border-white dark:border-gray-800"
+              style={shadows.lg}
+            >
               {user?.profilePicture ? (
                 <Image
                   source={{ uri: user.profilePicture }}
@@ -147,38 +167,11 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Storage Card - Compact */}
-        <View className="mb-4">
-          <View
-            className="rounded-2xl p-4"
-            style={{ backgroundColor: "#6366F1" }}
-          >
-            <View className="flex-row items-center justify-between mb-3">
-              <View className="flex-row items-center gap-2">
-                <View
-                  className="w-8 h-8 rounded-lg items-center justify-center"
-                  style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
-                >
-                  <Ionicons name="cloud" size={16} color="white" />
-                </View>
-                <Text className="text-white font-bold text-base">Storage</Text>
-              </View>
-              <View
-                className="px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
-              >
-                <Text className="text-white text-xs font-semibold">
-                  {user?.searchCount || 0} searches
-                </Text>
-              </View>
-            </View>
-            <StorageProgress
-              used={user?.storageUsed || 0}
-              limit={user?.storageLimit || 0}
-              variant="light"
-            />
-          </View>
-        </View>
+        {/* Subscription Card - replaces old storage card */}
+        <SubscriptionCard
+          subscription={user?.subscription}
+          onPress={() => router.push("/(app)/profile/subscription")}
+        />
 
         {/* Menu Items - Grid Layout */}
         <View className="flex-row flex-wrap gap-3 mb-4">
@@ -205,13 +198,11 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* App Version - At bottom */}
-        <View className="flex-1 justify-end pb-4">
-          <Text className="text-gray-400 dark:text-gray-600 text-xs text-center">
-            Archeon v1.0.0
-          </Text>
-        </View>
-      </View>
+        {/* App Version */}
+        <Text className="text-gray-400 dark:text-gray-600 text-xs text-center mt-4">
+          Archeon v1.0.0
+        </Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }

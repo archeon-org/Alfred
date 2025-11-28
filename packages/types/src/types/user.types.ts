@@ -1,5 +1,6 @@
 import { Document } from "./document.types";
 import { UserPreferences, UserPreferencesUpdate } from "./preferences.types";
+import { SubscriptionTier } from "./subscription.types";
 
 /**
  * User type enumeration
@@ -45,6 +46,7 @@ export interface User {
   pushToken?: string;
   storageUsed: number;
   storageLimit: number;
+  extraStorage: number; // Extra storage purchased (in bytes)
   preferences: Partial<UserPreferences>;
   searchCount: number;
   address?: Address;
@@ -55,6 +57,12 @@ export interface User {
   otpHash?: string;
   otpExpiresAt?: Date;
   isOnboarded: boolean;
+  // Subscription fields
+  subscriptionTier: SubscriptionTier;
+  credits: number;
+  dailySearchUsed: number;
+  dailySearchResetAt: Date;
+  bonusSearches: number; // Purchased AI searches that don't reset daily
   createdAt: Date;
   updatedAt: Date;
   documents?: Document[];

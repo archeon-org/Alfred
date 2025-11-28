@@ -76,9 +76,16 @@ export interface ChatContext {
   searchAttempts: number;
 }
 
+export interface SearchLimitInfo {
+  remainingSearches: number;
+  bonusSearches: number;
+  resetsAt: string;
+}
+
 export interface ChatResponse {
   response: ChatMessage;
   context: ChatContext;
+  searchLimitInfo?: SearchLimitInfo;
 }
 
 /**

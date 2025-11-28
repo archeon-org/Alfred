@@ -1,4 +1,11 @@
-import { Address, AuthProvider, User, UserType } from "@archeon-org/types";
+import {
+  Address,
+  AuthProvider,
+  User,
+  UserType,
+  SubscriptionTier,
+  TIER_LIMITS,
+} from "@archeon-org/types";
 import {
   Entity,
   Column,
@@ -37,8 +44,14 @@ export class UserEntity implements User {
   @Column({ type: "bigint", default: 0 })
   storageUsed: number;
 
-  @Column({ type: "bigint", default: 2147483648 })
+  @Column({
+    type: "bigint",
+    default: TIER_LIMITS[SubscriptionTier.FREE].storageLimitBytes,
+  })
   storageLimit: number;
+
+  @Column({ type: "bigint", default: 0 })
+  extraStorage: number; // Extra storage purchased (in bytes)
 
   @Column({ type: "jsonb", default: {} })
   preferences: Record<string, any>;
@@ -69,6 +82,29 @@ export class UserEntity implements User {
 
   @Column({ default: false })
   isOnboarded: boolean;
+
+  // === SUBSCRIPTION FIELDS ===
+
+  @Column({
+    type: "enum",
+    enum: SubscriptionTier,
+    default: SubscriptionTier.FREE,
+  })
+  subscriptionTier: SubscriptionTier;
+
+  @Column({ default: TIER_LIMITS[SubscriptionTier.FREE].initialCredits })
+  credits: number;
+
+  @Column({ default: 0 })
+  dailySearchUsed: number;
+
+  @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+  dailySearchResetAt: Date;
+
+  @Column({ default: 0 })
+  bonusSearches: number; // Purchased AI searches that don't reset daily
+
+  // === TIMESTAMPS ===
 
   @CreateDateColumn()
   createdAt: Date;

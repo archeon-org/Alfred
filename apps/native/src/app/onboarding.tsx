@@ -15,6 +15,7 @@ import { Template } from "@archeon-org/types";
 import { useOnboarding } from "../hooks/useOnboarding";
 import { BiometricSetupModal } from "../components/BiometricSetupModal";
 import { useBiometric } from "../context/BiometricContext";
+import { shadows } from "../constants/shadows";
 
 export default function OnboardingScreen() {
   const {
@@ -54,7 +55,8 @@ export default function OnboardingScreen() {
     <TouchableOpacity
       onPress={() => handleSelectTemplate(item.id)}
       disabled={applying !== null}
-      className={`mb-4 rounded-2xl border-2 border-gray-100 bg-white p-5 shadow-sm active:scale-98 dark:border-gray-800 dark:bg-gray-800`}
+      className={`mb-4 rounded-2xl border-2 border-gray-100 bg-white p-5 active:scale-98 dark:border-gray-800 dark:bg-gray-800`}
+      style={shadows.sm}
     >
       <View className="flex-row items-start">
         <View className="mr-4 h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600">
@@ -118,7 +120,10 @@ export default function OnboardingScreen() {
           </TouchableOpacity>
 
           <View className="items-center">
-            <View className="mb-6 h-24 w-24 items-center justify-center rounded-3xl bg-indigo-600 shadow-lg">
+            <View
+              className="mb-6 h-24 w-24 items-center justify-center rounded-3xl bg-indigo-600"
+              style={shadows.lg}
+            >
               <Ionicons
                 name={selectedTemplate.icon as any}
                 size={48}
@@ -148,7 +153,10 @@ export default function OnboardingScreen() {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 100 }}
                 renderItem={({ item }) => (
-                  <View className="mb-3 flex-row items-center rounded-xl bg-white p-4 shadow-sm dark:bg-gray-800">
+                  <View
+                    className="mb-3 flex-row items-center rounded-xl bg-white p-4 dark:bg-gray-800"
+                    style={shadows.sm}
+                  >
                     <View
                       className="mr-4 h-10 w-10 items-center justify-center rounded-full"
                       style={{ backgroundColor: `${item.color}20` }}
@@ -181,7 +189,10 @@ export default function OnboardingScreen() {
             )}
           </View>
 
-          <View className="absolute bottom-0 left-0 right-0 bg-white px-6 py-4 shadow-lg dark:bg-gray-900">
+          <View
+            className="absolute bottom-0 left-0 right-0 bg-white px-6 py-4 dark:bg-gray-900"
+            style={shadows.lg}
+          >
             <TouchableOpacity
               onPress={handleApplyTemplate}
               disabled={applying !== null}
@@ -222,7 +233,10 @@ export default function OnboardingScreen() {
         </View>
 
         {/* Search Bar */}
-        <View className="mb-4 flex-row items-center rounded-xl bg-white px-4 py-3 shadow-sm dark:bg-gray-800">
+        <View
+          className="mb-4 flex-row items-center rounded-xl bg-white px-4 py-3 dark:bg-gray-800"
+          style={shadows.sm}
+        >
           <Ionicons
             name="search-outline"
             size={20}

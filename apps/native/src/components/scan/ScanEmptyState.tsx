@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, useColorScheme } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { cn } from "../../utils/cn";
+import { shadows } from "../../constants/shadows";
 
 export const ScanEmptyState = () => {
   const colorScheme = useColorScheme();
@@ -9,7 +10,10 @@ export const ScanEmptyState = () => {
 
   return (
     <View className="items-center justify-center mb-8 flex-1">
-      <View className="bg-surface dark:bg-surface-dark p-10 rounded-full mb-6 shadow-sm">
+      <View
+        className="bg-surface dark:bg-surface-dark p-10 rounded-full mb-6"
+        style={shadows.sm}
+      >
         <Ionicons
           name="scan-outline"
           size={80}

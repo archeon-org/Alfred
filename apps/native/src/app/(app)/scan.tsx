@@ -14,6 +14,7 @@ import { useDocumentScanner } from "../../hooks/useDocumentScanner";
 import { ScanPreview } from "../../components/scan/ScanPreview";
 import { Button } from "../../components/Button";
 import { cn } from "../../utils/cn";
+import { shadows } from "../../constants/shadows";
 
 export default function ScanScreen() {
   const { initialDocUri, initialDocName } = useLocalSearchParams<{
@@ -60,8 +61,8 @@ export default function ScanScreen() {
       style={{ opacity: disabled ? 0.4 : 1 }}
     >
       <View
-        className="w-20 h-20 rounded-full items-center justify-center mb-3 shadow-lg"
-        style={{ backgroundColor: bgColor }}
+        className="w-20 h-20 rounded-full items-center justify-center mb-3"
+        style={[{ backgroundColor: bgColor }, shadows.lg]}
       >
         <Ionicons name={icon} size={32} color={color} />
       </View>
@@ -147,9 +148,10 @@ export default function ScanScreen() {
               className={cn(
                 isUploading
                   ? "bg-gray-400 dark:bg-gray-600"
-                  : "bg-secondary dark:bg-secondary-600 shadow-lg shadow-secondary/30",
+                  : "bg-secondary dark:bg-secondary-600",
                 "rounded-3xl"
               )}
+              style={!isUploading ? shadows.primary : undefined}
               textClassName="text-lg font-bold ml-2"
             />
 

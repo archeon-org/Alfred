@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { dataSourceOptions } from 'db/datasource';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
@@ -16,12 +17,15 @@ import { NotificationModule } from './notification/notification.module';
 import { BullModule } from '@nestjs/bull';
 import { QueueModule } from './queue/queue.module';
 import { SearchModule } from './search/search.module';
+import { SubscriptionModule } from './subscription/subscription.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -44,6 +48,8 @@ import { SearchModule } from './search/search.module';
     QueueModule,
     NotificationModule,
     SearchModule,
+    SubscriptionModule,
+    AdminModule,
   ],
   providers: [
     {

@@ -10,6 +10,7 @@ import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 import { ChatSearchController } from './chat-search.controller';
 import { ChatSearchService } from './chat-search.service';
+import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { ChatSearchService } from './chat-search.service';
       DocumentEmbeddingEntity,
       CategoryEntity,
     ]),
+    SubscriptionModule,
   ],
   controllers: [SearchController, ChatSearchController],
   providers: [SearchService, ChatSearchService],

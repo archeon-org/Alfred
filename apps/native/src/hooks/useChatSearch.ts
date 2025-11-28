@@ -1,18 +1,21 @@
 import { useState, useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   sendChatMessage,
   excludeDocument,
   ChatMessage,
   ChatContext,
   ChatResponse,
+  SearchLimitInfo,
 } from "../services/search";
+import { SUBSCRIPTION_QUERY_KEY } from "./useSubscription";
 
 export interface UseChatSearchReturn {
   messages: ChatMessage[];
   context: ChatContext | null;
   isLoading: boolean;
   error: Error | null;
+  searchLimitInfo: SearchLimitInfo | null;
   sendMessage: (message: string) => Promise<void>;
   excludeDoc: (documentId: string) => Promise<void>;
   clearChat: () => void;
@@ -22,7 +25,7 @@ export interface UseChatSearchReturn {
  * Hook for chat-based document search
  *
  * @example
- * const { messages, sendMessage, isLoading } = useChatSearch();
+ * const { messages, sendMessage, isLoading, searchLimitInfo } = useChatSearch();
  *
  * // Send a message
  * await sendMessage("I'm looking for my electricity bill from January");
@@ -32,10 +35,16 @@ export interface UseChatSearchReturn {
  *
  * // Exclude a document from results
  * await excludeDoc(documentId);
+ *
+ * // Check remaining searches
+ * console.log(searchLimitInfo?.remainingSearches);
  */
 export function useChatSearch(): UseChatSearchReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [context, setContext] = useState<ChatContext | null>(null);
+  const [searchLimitInfo, setSearchLimitInfo] =
+    useState<SearchLimitInfo | null>(null);
+  const queryClient = useQueryClient();
 
   const chatMutation = useMutation<
     ChatResponse,
@@ -55,6 +64,13 @@ export function useChatSearch(): UseChatSearchReturn {
       // Update messages and context
       setMessages((prev) => [...prev, userMessage, data.response]);
       setContext(data.context);
+
+      // Update search limit info
+      if (data.searchLimitInfo) {
+        setSearchLimitInfo(data.searchLimitInfo);
+        // Invalidate subscription query to keep it in sync
+        queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
+      }
     },
   });
 
@@ -91,6 +107,7 @@ export function useChatSearch(): UseChatSearchReturn {
   const clearChat = useCallback(() => {
     setMessages([]);
     setContext(null);
+    setSearchLimitInfo(null);
   }, []);
 
   return {
@@ -98,6 +115,7 @@ export function useChatSearch(): UseChatSearchReturn {
     context,
     isLoading: chatMutation.isPending || excludeMutation.isPending,
     error: chatMutation.error || excludeMutation.error,
+    searchLimitInfo,
     sendMessage,
     excludeDoc,
     clearChat,

@@ -139,6 +139,8 @@ export class NotificationService {
       title,
       body: message,
       data,
+      priority: "high",
+      channelId: "default",
     });
 
     this.logger.log(`Message payload: ${JSON.stringify(messages[0], null, 2)}`);

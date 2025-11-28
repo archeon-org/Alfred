@@ -190,7 +190,8 @@ export const DocumentFilterModal = ({
           <View className="p-4 border-t border-gray-100 dark:border-gray-800 safe-area-pb">
             <TouchableOpacity
               onPress={handleApply}
-              className="bg-primary py-4 rounded-2xl items-center shadow-lg shadow-primary/30"
+              className="bg-primary py-4 rounded-2xl items-center"
+              style={shadows.primary}
             >
               <Text className="text-white font-bold text-lg">
                 Apply Filters

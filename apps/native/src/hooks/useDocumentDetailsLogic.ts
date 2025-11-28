@@ -10,6 +10,19 @@ import { useTags, useTagMutations } from "./useTags";
 import { Category, Tag } from "@archeon-org/types";
 import { useToast } from "../context/ToastContext";
 import { parseApiError } from "../utils/apiError";
+import { useQueryClient } from "@tanstack/react-query";
+import { SUBSCRIPTION_QUERY_KEY } from "./useSubscription";
+
+/**
+ * Check if the error is related to insufficient credits
+ */
+const isInsufficientCreditsError = (message: string): boolean => {
+  const lowerMessage = message.toLowerCase();
+  return (
+    lowerMessage.includes("insufficient credits") ||
+    lowerMessage.includes("not enough credits")
+  );
+};
 
 export const useDocumentDetailsLogic = () => {
   const { id, openCategoryModal } = useLocalSearchParams<{
@@ -38,6 +51,7 @@ export const useDocumentDetailsLogic = () => {
     isFetchingNextPage,
   } = useCategories();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { success, info, error: showError } = useToast();
 
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
@@ -138,6 +152,22 @@ export const useDocumentDetailsLogic = () => {
     }
   };
 
+  /**
+   * Handle AI-related errors - redirect to subscription page if insufficient credits
+   */
+  const handleAiError = (err: unknown, defaultMessage: string) => {
+    const appError = parseApiError(err);
+    if (isInsufficientCreditsError(appError.message)) {
+      queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
+      router.push({
+        pathname: "/(app)/profile/subscription",
+        params: { reason: "insufficient_credits" },
+      });
+    } else {
+      showError(defaultMessage, appError.message);
+    }
+  };
+
   const handleTriggerAi = async () => {
     if (!data?.document) return;
     try {
@@ -145,8 +175,7 @@ export const useDocumentDetailsLogic = () => {
       refetch();
       success("AI Classification", "Classification has been triggered");
     } catch (err) {
-      const appError = parseApiError(err);
-      showError("Failed to trigger AI classification", appError.message);
+      handleAiError(err, "Failed to trigger AI classification");
     }
   };
 
@@ -180,8 +209,7 @@ export const useDocumentDetailsLogic = () => {
       setTitleModalVisible(false);
       info("Title Generation Started", "You'll be notified when it's ready");
     } catch (err) {
-      const appError = parseApiError(err);
-      showError("Failed to trigger AI title generation", appError.message);
+      handleAiError(err, "Failed to trigger AI title generation");
     }
   };
 
@@ -191,8 +219,7 @@ export const useDocumentDetailsLogic = () => {
       await triggerEmbedding(data.document.id);
       info("Search Enabling Started", "You'll be notified when it's ready");
     } catch (err) {
-      const appError = parseApiError(err);
-      showError("Failed to enable search", appError.message);
+      handleAiError(err, "Failed to enable search");
     }
   };
 

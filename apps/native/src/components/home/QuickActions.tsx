@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { shadows } from "../../constants/shadows";
 import * as DocumentPicker from "expo-document-picker";
 import { useToast } from "../../context/ToastContext";
 import { parseApiError } from "../../utils/apiError";
@@ -79,7 +80,8 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
           activeOpacity={0.7}
         >
           <View
-            className={`w-16 h-16 rounded-3xl items-center justify-center shadow-lg shadow-gray-200 dark:shadow-none ${action.color}`}
+            className={`w-16 h-16 rounded-3xl items-center justify-center ${action.color}`}
+            style={shadows.lg}
           >
             <Ionicons name={action.icon as any} size={28} color="white" />
           </View>

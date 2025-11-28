@@ -15,6 +15,7 @@ import { DocumentItem } from "@/components/document/DocumentItem";
 import { useCategoryDetailsLogic } from "../../../hooks/useCategoryDetailsLogic";
 import { AddDocumentsModal } from "../../../components/category/AddDocumentsModal";
 import { Skeleton } from "../../../components/common/Skeleton";
+import { shadows } from "../../../constants/shadows";
 
 export default function CategoryDetails() {
   const {
@@ -89,7 +90,8 @@ export default function CategoryDetails() {
         </View>
         <TouchableOpacity
           onPress={() => setIsAddModalVisible(true)}
-          className="bg-primary p-3 rounded-full shadow-lg shadow-primary/30"
+          className="bg-primary p-3 rounded-full"
+          style={shadows.primary}
         >
           <Ionicons name="add" size={24} color="white" />
         </TouchableOpacity>
@@ -139,7 +141,8 @@ export default function CategoryDetails() {
               </Text>
               <TouchableOpacity
                 onPress={() => setIsAddModalVisible(true)}
-                className="bg-primary px-6 py-3 rounded-full shadow-lg shadow-primary/30"
+                className="bg-primary px-6 py-3 rounded-full"
+                style={shadows.primary}
               >
                 <Text className="text-white font-bold text-base">
                   Add Documents

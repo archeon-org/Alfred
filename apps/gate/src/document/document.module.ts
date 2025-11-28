@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { R2Module } from '@archeon-org/module';
 import { UserModule } from '../user/user.module';
 import { QueueModule } from '../queue/queue.module';
+import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { QueueModule } from '../queue/queue.module';
     R2Module,
     UserModule,
     QueueModule,
+    SubscriptionModule,
   ],
   controllers: [DocumentController],
   providers: [DocumentService, DocumentRepository],

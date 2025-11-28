@@ -51,7 +51,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: "com.soymusta.archeon",
+    googleServicesFile: "./google-services.json",
     versionCode: versionConfig.androidVersionCode,
+    permissions: [
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.SCHEDULE_EXACT_ALARM",
+      "android.permission.POST_NOTIFICATIONS",
+    ],
   },
   web: {
     bundler: "metro",
@@ -60,7 +66,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   plugins: [
     "expo-router",
-    "expo-notifications",
+    [
+      "expo-notifications",
+      {
+        color: "#6366F1",
+        sounds: [],
+        androidMode: "default",
+        androidCollapsedTitle: "#{unread_notifications} new notifications",
+      },
+    ],
     "expo-secure-store",
     "expo-local-authentication",
     [

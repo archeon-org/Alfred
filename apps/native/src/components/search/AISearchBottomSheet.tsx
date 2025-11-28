@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useChatSearch } from "../../hooks/useChatSearch";
+import { useCanAiSearch } from "../../hooks/useSubscription";
 import { DocumentSuggestion } from "../../services/search";
 import Config from "../../constants/Config";
 import { DocumentPreviewSheet } from "./DocumentPreviewSheet";
@@ -34,14 +35,35 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
-  const { messages, isLoading, sendMessage, excludeDoc, clearChat } =
-    useChatSearch();
+  const {
+    messages,
+    isLoading,
+    sendMessage,
+    excludeDoc,
+    clearChat,
+    searchLimitInfo,
+  } = useChatSearch();
+  const {
+    canSearch,
+    dailyRemaining,
+    totalRemaining,
+    limit,
+    bonusSearches,
+    refetch: refetchSubscription,
+  } = useCanAiSearch();
 
   const primaryColor = "#6366F1";
 
   const lastMessageCount = useRef(0);
   const keyboardHeight = useRef(new Animated.Value(0)).current;
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  // Refetch subscription data when bottom sheet opens
+  useEffect(() => {
+    if (visible) {
+      refetchSubscription();
+    }
+  }, [visible, refetchSubscription]);
 
   // Reset chat when closing
   const handleClose = useCallback(() => {
@@ -287,9 +309,21 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
             <Text className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
               AI Search
             </Text>
-            <Text className="text-xs text-gray-500 dark:text-gray-400">
-              Describe what you're looking for
-            </Text>
+            <View className="flex-row items-center">
+              <Text className="text-xs text-gray-500 dark:text-gray-400">
+                Describe what you're looking for
+              </Text>
+              {/* Search limit badge */}
+              <View className="ml-2 flex-row items-center bg-primary/10 dark:bg-primary/20 px-2 py-0.5 rounded-full">
+                <Ionicons name="search" size={10} color="#6366F1" />
+                <Text className="text-xs font-medium text-primary ml-1">
+                  {searchLimitInfo?.remainingSearches ?? dailyRemaining}
+                  {(searchLimitInfo?.bonusSearches ?? bonusSearches) > 0
+                    ? ` (+${searchLimitInfo?.bonusSearches ?? bonusSearches})`
+                    : ""}
+                </Text>
+              </View>
+            </View>
           </View>
           <View className="flex-row items-center gap-2">
             {messages.length > 0 && (
@@ -384,40 +418,70 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
           )}
         </ScrollView>
 
-        {/* Input */}
+        {/* Input or Limit Reached Message */}
         <View className="px-4 py-2 border-t border-gray-100 dark:border-gray-800 bg-background dark:bg-background-dark">
-          <View className="flex-row items-end bg-surface dark:bg-surface-dark border border-gray-100 dark:border-gray-800 rounded-2xl px-4 py-2">
-            <TextInput
-              ref={inputRef}
-              placeholder="Describe what you're looking for..."
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 text-base text-gray-900 dark:text-white max-h-24 py-2"
-              value={inputText}
-              onChangeText={setInputText}
-              multiline
-              onSubmitEditing={handleSend}
-              returnKeyType="send"
-              blurOnSubmit={false}
-              autoCorrect={false}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <TouchableOpacity
-              onPress={handleSend}
-              disabled={!inputText.trim() || isLoading}
-              className={`ml-2 w-10 h-10 rounded-full items-center justify-center ${
-                inputText.trim() && !isLoading
-                  ? "bg-primary"
-                  : "bg-gray-200 dark:bg-gray-700"
-              }`}
-            >
-              <Ionicons
-                name="send"
-                size={18}
-                color={inputText.trim() && !isLoading ? "white" : "#9CA3AF"}
-              />
-            </TouchableOpacity>
-          </View>
+          {(() => {
+            // Calculate total remaining from either searchLimitInfo or subscription
+            const currentDailyRemaining =
+              searchLimitInfo?.remainingSearches ?? dailyRemaining;
+            const currentBonusRemaining =
+              searchLimitInfo?.bonusSearches ?? bonusSearches;
+            const isExhausted =
+              currentDailyRemaining + currentBonusRemaining <= 0;
+
+            if (!canSearch && isExhausted) {
+              return (
+                // No searches remaining - show limit message
+                <View className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl px-4 py-3 flex-row items-center">
+                  <Ionicons name="time-outline" size={20} color="#F59E0B" />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                      Daily search limit reached
+                    </Text>
+                    <Text className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                      Resets at midnight UTC
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+
+            return (
+              // Normal input
+              <View className="flex-row items-end bg-surface dark:bg-surface-dark border border-gray-100 dark:border-gray-800 rounded-2xl px-4 py-2">
+                <TextInput
+                  ref={inputRef}
+                  placeholder="Describe what you're looking for..."
+                  placeholderTextColor="#9CA3AF"
+                  className="flex-1 text-base text-gray-900 dark:text-white max-h-24 py-2"
+                  value={inputText}
+                  onChangeText={setInputText}
+                  multiline
+                  onSubmitEditing={handleSend}
+                  returnKeyType="send"
+                  blurOnSubmit={false}
+                  autoCorrect={false}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <TouchableOpacity
+                  onPress={handleSend}
+                  disabled={!inputText.trim() || isLoading}
+                  className={`ml-2 w-10 h-10 rounded-full items-center justify-center ${
+                    inputText.trim() && !isLoading
+                      ? "bg-primary"
+                      : "bg-gray-200 dark:bg-gray-700"
+                  }`}
+                >
+                  <Ionicons
+                    name="send"
+                    size={18}
+                    color={inputText.trim() && !isLoading ? "white" : "#9CA3AF"}
+                  />
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
         </View>
 
         {/* Dynamic keyboard spacer - uses actual keyboard height or bottom safe area */}

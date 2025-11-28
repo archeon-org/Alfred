@@ -8,11 +8,36 @@ import Constants, { ExecutionEnvironment } from "expo-constants";
 import { useDocumentUpload } from "./useDocumentUpload";
 import { useToast } from "../context/ToastContext";
 import { parseApiError } from "../utils/apiError";
+import { useQueryClient } from "@tanstack/react-query";
+import { SUBSCRIPTION_QUERY_KEY } from "./useSubscription";
 
 interface ScannedDocument {
   uri: string;
   originalFilename?: string;
 }
+
+/**
+ * Check if the error is related to insufficient credits
+ */
+const isInsufficientCreditsError = (message: string): boolean => {
+  const lowerMessage = message.toLowerCase();
+  return (
+    lowerMessage.includes("insufficient credits") ||
+    lowerMessage.includes("not enough credits")
+  );
+};
+
+/**
+ * Check if the error is related to storage limit exceeded
+ */
+const isStorageLimitError = (message: string): boolean => {
+  const lowerMessage = message.toLowerCase();
+  return (
+    lowerMessage.includes("storage limit") ||
+    lowerMessage.includes("storage exceeded") ||
+    lowerMessage.includes("not enough storage")
+  );
+};
 
 export const useDocumentScanner = (
   initialDocUri?: string,
@@ -23,6 +48,7 @@ export const useDocumentScanner = (
   );
   const { isUploading, upload } = useDocumentUpload();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { success, warning, error: showError } = useToast();
 
   // For backward compatibility, expose just the URIs
@@ -222,7 +248,24 @@ export const useDocumentScanner = (
     } catch (error) {
       console.error("Error converting/uploading:", error);
       const appError = parseApiError(error);
-      showError("Failed to process document", appError.message);
+
+      // Handle insufficient credits - redirect to subscription page
+      if (isInsufficientCreditsError(appError.message)) {
+        queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
+        router.push({
+          pathname: "/(app)/profile/subscription",
+          params: { reason: "insufficient_credits" },
+        });
+      } else if (isStorageLimitError(appError.message)) {
+        // Handle storage limit exceeded - redirect to subscription page
+        queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
+        router.push({
+          pathname: "/(app)/profile/subscription",
+          params: { reason: "insufficient_storage" },
+        });
+      } else {
+        showError("Failed to process document", appError.message);
+      }
     }
   };
 

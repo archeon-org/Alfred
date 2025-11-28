@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { View, Text, Animated, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { shadows } from "../../constants/shadows";
 
 export type ToastType = "success" | "error" | "info" | "warning";
 
@@ -113,14 +114,8 @@ export const Toast: React.FC<ToastProps> = ({
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={hideToast}
-        className={`flex-row items-center p-4 rounded-2xl border shadow-lg ${config.bgColor} ${config.borderColor}`}
-        style={{
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
-          elevation: 5,
-        }}
+        className={`flex-row items-center p-4 rounded-2xl border ${config.bgColor} ${config.borderColor}`}
+        style={shadows.lg}
       >
         <View
           className="w-10 h-10 rounded-full items-center justify-center mr-3"

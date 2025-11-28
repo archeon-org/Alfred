@@ -23,6 +23,7 @@ import { Skeleton } from "../../../components/common/Skeleton";
 import { ViewModeToggle } from "../../../components/common/ViewModeToggle";
 import { useUser, useUpdateUser } from "../../../hooks/useUser";
 import { getPreferencesWithDefaults } from "@archeon-org/types";
+import { shadows } from "../../../constants/shadows";
 
 export default function CategoriesScreen() {
   const router = useRouter();
@@ -103,7 +104,8 @@ export default function CategoriesScreen() {
           <ViewModeToggle mode={viewMode} onModeChange={handleViewModeChange} />
           <TouchableOpacity
             onPress={() => handleOpenModal()}
-            className="bg-primary p-3 rounded-full shadow-lg shadow-primary/30"
+            className="bg-primary p-3 rounded-full"
+            style={shadows.primary}
           >
             <Ionicons name="add" size={24} color="white" />
           </TouchableOpacity>

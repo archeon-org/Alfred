@@ -10,7 +10,11 @@ import {
   NotificationEntity,
   UserEntity,
 } from '@archeon-org/database';
-import { R2Module, NotificationService } from '@archeon-org/module';
+import {
+  R2Module,
+  NotificationService,
+  CreditService,
+} from '@archeon-org/module';
 import { OCRModule } from '../ocr/ocr.module';
 import { ClassificationModule } from '../classification/classification.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
@@ -30,7 +34,12 @@ import { EmbeddingModule } from '../embedding/embedding.module';
     ClassificationModule,
     EmbeddingModule,
   ],
-  providers: [DocumentService, DocumentProcessor, NotificationService],
+  providers: [
+    DocumentService,
+    DocumentProcessor,
+    NotificationService,
+    CreditService,
+  ],
   exports: [DocumentService],
 })
 export class DocumentModule {}

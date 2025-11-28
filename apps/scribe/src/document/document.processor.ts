@@ -6,18 +6,13 @@ import {
   ProcessDocumentJobData,
   GenerateTitleJobData,
   GenerateEmbeddingJobData,
-  DeleteEmbeddingJobData,
 } from '@archeon-org/types';
-import { EmbeddingService } from '../embedding/embedding.service';
 
 @Processor('documents')
 export class DocumentProcessor {
   private readonly logger = new Logger(DocumentProcessor.name);
 
-  constructor(
-    private readonly documentService: DocumentService,
-    private readonly embeddingService: EmbeddingService,
-  ) {}
+  constructor(private readonly documentService: DocumentService) {}
 
   @Process('process-document')
   async handleProcessDocument(job: Job<ProcessDocumentJobData>) {
@@ -74,25 +69,6 @@ export class DocumentProcessor {
     } catch (error) {
       this.logger.error(
         `Embedding generation job ${job.id} failed for document ${job.data.documentId}`,
-        error instanceof Error ? error.stack : String(error),
-      );
-    }
-  }
-
-  @Process('delete-embedding')
-  async handleDeleteEmbedding(job: Job<DeleteEmbeddingJobData>) {
-    this.logger.log(
-      `Received job ${job.id} to delete embedding for document ${job.data.documentId}`,
-    );
-
-    try {
-      await this.embeddingService.deleteEmbedding(job.data.documentId);
-      this.logger.log(
-        `Successfully deleted embedding for document ${job.data.documentId}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to delete embedding for document ${job.data.documentId}`,
         error instanceof Error ? error.stack : String(error),
       );
     }

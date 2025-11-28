@@ -51,6 +51,15 @@ export default function HomeScreen() {
     refetchNotifications,
   ]);
 
+  // Use subscription data for storage info (more accurate and includes extra storage)
+  const storageUsed = user?.subscription?.storageUsed ?? user?.storageUsed ?? 0;
+  const storageLimit =
+    user?.subscription?.storageLimit ?? user?.storageLimit ?? 1073741824;
+  const credits = user?.subscription?.credits;
+  const dailySearchUsed = user?.subscription?.dailySearchUsed ?? 0;
+  const dailySearchLimit = user?.subscription?.dailySearchLimit ?? 0;
+  const bonusSearches = user?.subscription?.bonusSearches ?? 0;
+
   return (
     <SafeAreaView
       className="flex-1 bg-background dark:bg-background-dark"
@@ -70,8 +79,12 @@ export default function HomeScreen() {
         <HomeHeader user={user} />
 
         <StorageWidget
-          used={user?.storageUsed || 0}
-          limit={user?.storageLimit || 2147483648}
+          used={storageUsed}
+          limit={storageLimit}
+          credits={credits}
+          dailySearchUsed={dailySearchUsed}
+          dailySearchLimit={dailySearchLimit}
+          bonusSearches={bonusSearches}
         />
 
         {/* 

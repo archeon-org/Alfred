@@ -1,12 +1,17 @@
 // src/hooks/useUser.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getProfile, updateUser, UpdateUserDto, User } from "../services";
+import {
+  getProfile,
+  updateUser,
+  UpdateUserDto,
+  UserWithSubscription,
+} from "../services";
 import { mergePreferences } from "@archeon-org/types";
 
 export const USER_QUERY_KEY = ["user"];
 
 export const useUser = () => {
-  return useQuery<User>({
+  return useQuery<UserWithSubscription>({
     queryKey: USER_QUERY_KEY,
     queryFn: getProfile,
   });
@@ -22,7 +27,8 @@ export const useUpdateUser = () => {
       await queryClient.cancelQueries({ queryKey: USER_QUERY_KEY });
 
       // Snapshot the previous value
-      const previousUser = queryClient.getQueryData<User>(USER_QUERY_KEY);
+      const previousUser =
+        queryClient.getQueryData<UserWithSubscription>(USER_QUERY_KEY);
 
       // Optimistically update the cache
       if (previousUser) {
@@ -36,7 +42,10 @@ export const useUpdateUser = () => {
           );
         }
 
-        queryClient.setQueryData<User>(USER_QUERY_KEY, updatedUser);
+        queryClient.setQueryData<UserWithSubscription>(
+          USER_QUERY_KEY,
+          updatedUser
+        );
       }
 
       // Return context with previous value for rollback

@@ -4,6 +4,7 @@ import {
   Body,
   Req,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { UserEntity } from '@archeon-org/database';
@@ -12,6 +13,7 @@ import {
   ChatMessage,
   ChatContext,
 } from './chat-search.service';
+import { SubscriptionService } from '../subscription/subscription.service';
 
 interface ChatRequestDto {
   message: string;
@@ -22,6 +24,11 @@ interface ChatRequestDto {
 interface ChatResponseDto {
   response: ChatMessage;
   context: ChatContext;
+  searchLimitInfo?: {
+    remainingSearches: number;
+    bonusSearches: number;
+    resetsAt: Date;
+  };
 }
 
 interface ExcludeDocumentDto {
@@ -31,7 +38,10 @@ interface ExcludeDocumentDto {
 
 @Controller('search/chat')
 export class ChatSearchController {
-  constructor(private readonly chatSearchService: ChatSearchService) {}
+  constructor(
+    private readonly chatSearchService: ChatSearchService,
+    private readonly subscriptionService: SubscriptionService,
+  ) {}
 
   /**
    * Send a chat message to search for documents
@@ -48,6 +58,18 @@ export class ChatSearchController {
       throw new BadRequestException('Message is required');
     }
 
+    // Check and consume daily search limit
+    const searchLimit = await this.subscriptionService.useAiSearch(user.id);
+
+    if (!searchLimit.allowed) {
+      throw new ForbiddenException({
+        message: 'Daily AI search limit reached',
+        error: 'DAILY_SEARCH_LIMIT_EXCEEDED',
+        resetsAt: searchLimit.resetsAt,
+        remainingSearches: 0,
+      });
+    }
+
     const conversationHistory = body.conversationHistory || [];
     const context = body.context || this.chatSearchService.createContext();
 
@@ -61,6 +83,11 @@ export class ChatSearchController {
     return {
       response,
       context: updatedContext,
+      searchLimitInfo: {
+        remainingSearches: searchLimit.remainingSearches,
+        bonusSearches: searchLimit.bonusSearches,
+        resetsAt: searchLimit.resetsAt,
+      },
     };
   }
 

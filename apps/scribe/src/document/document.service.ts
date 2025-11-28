@@ -6,6 +6,7 @@ import {
   GenerateTitleJobData,
   GenerateEmbeddingJobData,
   NotificationType,
+  CreditOperation,
 } from '@archeon-org/types';
 import {
   DocumentEntity,
@@ -15,7 +16,11 @@ import {
 } from '@archeon-org/database';
 
 import { OCRService } from '../ocr/ocr.service';
-import { NotificationService, R2Service } from '@archeon-org/module';
+import {
+  NotificationService,
+  R2Service,
+  CreditService,
+} from '@archeon-org/module';
 import { ClassificationService } from '../classification/classification.service';
 import { EmbeddingService } from '../embedding/embedding.service';
 
@@ -34,7 +39,8 @@ export class DocumentService {
     private readonly ocrService: OCRService,
     private readonly classificationService: ClassificationService,
     private readonly embeddingService: EmbeddingService,
-    private notificationService: NotificationService,
+    private readonly notificationService: NotificationService,
+    private readonly creditService: CreditService,
   ) {}
 
   async processDocument(data: ProcessDocumentJobData): Promise<void> {
@@ -190,11 +196,19 @@ export class DocumentService {
         processingStatus: ProcessingStatus.FAILED,
       });
 
+      // Refund credits since processing failed
+      await this.creditService.refundCredits(
+        data.userId,
+        CreditOperation.AI_CLASSIFICATION,
+        `Document processing failed for ${data.documentId}`,
+      );
+
       // 7. Send failure notification (respects user preferences)
       await this.notificationService.create({
         userId: data.userId,
         title: 'Document Processing Failed',
-        message: 'There was an error processing your document.',
+        message:
+          'There was an error processing your document. Your credits have been refunded.',
         redirect: `/(app)/documents/${data.documentId}`,
         type: NotificationType.DOCUMENT_ERROR,
         data: { documentId: data.documentId },
@@ -273,11 +287,19 @@ export class DocumentService {
         error instanceof Error ? error.stack : String(error),
       );
 
+      // Refund credits since title generation failed
+      await this.creditService.refundCredits(
+        data.userId,
+        CreditOperation.AI_TITLE_GENERATION,
+        `Title generation failed for ${data.documentId}`,
+      );
+
       // Send failure notification (respects user preferences)
       await this.notificationService.create({
         userId: data.userId,
         title: 'Title Generation Failed',
-        message: 'There was an error generating a title for your document.',
+        message:
+          'There was an error generating a title for your document. Your credits have been refunded.',
         redirect: `/(app)/documents/${data.documentId}`,
         type: NotificationType.DOCUMENT_ERROR,
         data: { documentId: data.documentId },
@@ -355,11 +377,19 @@ export class DocumentService {
         error instanceof Error ? error.stack : String(error),
       );
 
+      // Refund credits since embedding generation failed
+      await this.creditService.refundCredits(
+        data.userId,
+        CreditOperation.AI_EMBEDDING,
+        `Embedding generation failed for ${data.documentId}`,
+      );
+
       // Send failure notification (respects user preferences)
       await this.notificationService.create({
         userId: data.userId,
         title: 'Search Enabling Failed',
-        message: 'There was an error enabling search for your document.',
+        message:
+          'There was an error enabling search for your document. Your credits have been refunded.',
         redirect: `/(app)/documents/${data.documentId}`,
         type: NotificationType.DOCUMENT_ERROR,
         data: { documentId: data.documentId },

@@ -1,20 +1,30 @@
 import { Tabs, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useColorScheme, TouchableOpacity } from "react-native";
-import colors from "tailwindcss/colors";
+import { useColorScheme, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { useNotifications } from "../../hooks/useNotifications";
+import { useUser } from "../../hooks/useUser";
+import { UserType } from "@archeon-org/types";
 
 export default function AppLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // Initialize push notifications once user is authenticated
   usePushNotifications();
 
   // Get unread notification count for badge
   const { unreadCount } = useNotifications();
+
+  // Get user to check if admin
+  const { data: user } = useUser();
+  const isAdmin = user?.role === UserType.ADMIN;
+
+  // Only add extra padding for Android navigation bar (iOS handles safe area automatically)
+  const isAndroid = Platform.OS === "android";
 
   return (
     <Tabs
@@ -26,6 +36,10 @@ export default function AppLayout() {
           backgroundColor: isDark ? "#1F2937" : "#FFFFFF",
           borderTopColor: isDark ? "#374151" : "#F3F4F6",
           paddingTop: 8,
+          ...(isAndroid && {
+            paddingBottom: insets.bottom + 8,
+            height: 60 + insets.bottom,
+          }),
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -85,6 +99,21 @@ export default function AppLayout() {
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="admin"
+        options={{
+          title: "Admin",
+          headerShown: false,
+          href: isAdmin ? undefined : null, // Hide tab if not admin
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={size}
+              color={color}
+            />
           ),
         }}
       />

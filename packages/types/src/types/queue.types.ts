@@ -17,7 +17,3 @@ export interface GenerateEmbeddingJobData {
   userId: string;
   key: string;
 }
-
-export interface DeleteEmbeddingJobData {
-  documentId: string;
-}

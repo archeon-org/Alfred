@@ -21,6 +21,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserService } from '../user/user.service';
 import { QueueService } from '../queue/queue.service';
+import { SubscriptionService } from '../subscription/subscription.service';
+import { CreditOperation } from '@archeon-org/types';
 
 import { ProcessingStatus } from '@archeon-org/database';
 
@@ -37,13 +39,33 @@ export class DocumentService {
     private readonly r2Service: R2Service,
     private readonly userService: UserService,
     private readonly queueService: QueueService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   async uploadAi(
     userId: string,
     file: Express.Multer.File,
   ): Promise<DocumentEntity> {
+    // Check if user has enough credits for AI classification
+    const creditCheck = await this.subscriptionService.checkCredits(
+      userId,
+      CreditOperation.AI_CLASSIFICATION,
+    );
+
+    if (!creditCheck.canAfford) {
+      throw new BadRequestException(
+        `Insufficient credits for AI processing. Required: ${creditCheck.cost}, Available: ${creditCheck.currentCredits}. ` +
+          'Please purchase more credits or upload manually.',
+      );
+    }
+
     const document = await this.handleFileUpload(userId, file, 'AI');
+
+    // Consume credits for AI classification
+    await this.subscriptionService.consumeCredits(
+      userId,
+      CreditOperation.AI_CLASSIFICATION,
+    );
 
     // Add job to queue for processing
     await this.queueService.addDocumentProcessingJob({
@@ -283,8 +305,7 @@ export class DocumentService {
       // to avoid blocking the user action, but we log the error.
     }
 
-    // Delete the document's embedding asynchronously
-    await this.queueService.addDeleteEmbeddingJob({ documentId });
+    // Note: Document embedding is deleted automatically via CASCADE
 
     // Update user storage usage
     const user = await this.userService.findById(userId);
@@ -315,6 +336,23 @@ export class DocumentService {
     if (document.userId !== userId) {
       throw new ForbiddenException('Access denied');
     }
+
+    // Check and consume credits for AI classification
+    const creditCheck = await this.subscriptionService.checkCredits(
+      userId,
+      CreditOperation.AI_CLASSIFICATION,
+    );
+
+    if (!creditCheck.canAfford) {
+      throw new BadRequestException(
+        `Insufficient credits for AI classification. Required: ${creditCheck.cost}, Available: ${creditCheck.currentCredits}.`,
+      );
+    }
+
+    await this.subscriptionService.consumeCredits(
+      userId,
+      CreditOperation.AI_CLASSIFICATION,
+    );
 
     // Add job to queue for processing
     await this.queueService.addDocumentProcessingJob({
@@ -347,6 +385,23 @@ export class DocumentService {
     if (document.userId !== userId) {
       throw new ForbiddenException('Access denied');
     }
+
+    // Check and consume credits for AI title generation
+    const creditCheck = await this.subscriptionService.checkCredits(
+      userId,
+      CreditOperation.AI_TITLE_GENERATION,
+    );
+
+    if (!creditCheck.canAfford) {
+      throw new BadRequestException(
+        `Insufficient credits for AI title generation. Required: ${creditCheck.cost}, Available: ${creditCheck.currentCredits}.`,
+      );
+    }
+
+    await this.subscriptionService.consumeCredits(
+      userId,
+      CreditOperation.AI_TITLE_GENERATION,
+    );
 
     // Add job to queue for title generation
     await this.queueService.addTitleGenerationJob({
@@ -384,6 +439,23 @@ export class DocumentService {
     if (embeddingExists) {
       throw new BadRequestException('Document already has an embedding');
     }
+
+    // Check and consume credits for embedding generation
+    const creditCheck = await this.subscriptionService.checkCredits(
+      userId,
+      CreditOperation.AI_EMBEDDING,
+    );
+
+    if (!creditCheck.canAfford) {
+      throw new BadRequestException(
+        `Insufficient credits for embedding generation. Required: ${creditCheck.cost}, Available: ${creditCheck.currentCredits}.`,
+      );
+    }
+
+    await this.subscriptionService.consumeCredits(
+      userId,
+      CreditOperation.AI_EMBEDDING,
+    );
 
     // Add job to queue for embedding generation
     await this.queueService.addEmbeddingGenerationJob({

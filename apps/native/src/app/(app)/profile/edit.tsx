@@ -59,7 +59,10 @@ export default function EditProfileScreen() {
           <View className="items-center py-6">
             <TouchableOpacity activeOpacity={0.8}>
               <View className="relative">
-                <View className="w-28 h-28 bg-indigo-100 dark:bg-indigo-900/30 rounded-full items-center justify-center overflow-hidden border-4 border-white dark:border-gray-800 shadow-lg">
+                <View
+                  className="w-28 h-28 bg-indigo-100 dark:bg-indigo-900/30 rounded-full items-center justify-center overflow-hidden border-4 border-white dark:border-gray-800"
+                  style={shadows.lg}
+                >
                   {user?.profilePicture ? (
                     <Image
                       source={{ uri: user.profilePicture }}
@@ -72,7 +75,10 @@ export default function EditProfileScreen() {
                     </Text>
                   )}
                 </View>
-                <View className="absolute bottom-0 right-0 w-10 h-10 bg-indigo-600 rounded-full items-center justify-center border-4 border-white dark:border-gray-900 shadow-md">
+                <View
+                  className="absolute bottom-0 right-0 w-10 h-10 bg-indigo-600 rounded-full items-center justify-center border-4 border-white dark:border-gray-900"
+                  style={shadows.md}
+                >
                   <Ionicons name="camera" size={18} color="white" />
                 </View>
               </View>

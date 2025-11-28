@@ -1,16 +1,32 @@
 import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { GoogleVerifyDto, RequestOtpDto, VerifyOtpDto } from './dto/auth.dto';
-import { User } from '@archeon-org/types';
+import { User, SubscriptionStatus } from '@archeon-org/types';
 import { AuthService } from './auth.service';
 import { Public } from '../common/decorators/public.decorator';
+import { SubscriptionService } from '../subscription/subscription.service';
+
+interface MeResponse extends User {
+  subscription: SubscriptionStatus;
+}
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly subscriptionService: SubscriptionService,
+  ) {}
 
   @Get('me')
-  getProfile(@Req() req: Request & { user: any }) {
-    return req.user as User;
+  async getProfile(@Req() req: Request & { user: any }): Promise<MeResponse> {
+    const user = req.user as User;
+    const subscription = await this.subscriptionService.getSubscriptionStatus(
+      user.id,
+    );
+
+    return {
+      ...user,
+      subscription,
+    };
   }
 
   @Post('google/verify')

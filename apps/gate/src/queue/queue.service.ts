@@ -5,7 +5,6 @@ import {
   ProcessDocumentJobData,
   GenerateTitleJobData,
   GenerateEmbeddingJobData,
-  DeleteEmbeddingJobData,
 } from '@archeon-org/types';
 
 @Injectable()
@@ -67,25 +66,6 @@ export class QueueService {
         error.stack,
       );
       throw error;
-    }
-  }
-
-  async addDeleteEmbeddingJob(data: DeleteEmbeddingJobData) {
-    try {
-      await this.documentsQueue.add('delete-embedding', data, {
-        attempts: 3, // Retry a few times for cleanup jobs
-        removeOnComplete: true,
-        removeOnFail: true, // Don't keep failed cleanup jobs
-      });
-      this.logger.log(
-        `Added delete embedding job for document ${data.documentId}`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to add delete embedding job for document ${data.documentId}`,
-        error.stack,
-      );
-      // Don't throw - embedding deletion is not critical
     }
   }
 }

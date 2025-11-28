@@ -76,7 +76,10 @@ export const BiometricLockScreen: React.FC<BiometricLockScreenProps> = ({
     <View className="absolute inset-0 z-50 items-center justify-center bg-black/95">
       {/* App Icon */}
       <View className="mb-8">
-        <View className="w-24 h-24 rounded-3xl bg-indigo-600 items-center justify-center shadow-2xl">
+        <View
+          className="w-24 h-24 rounded-3xl bg-indigo-600 items-center justify-center"
+          style={shadows.lg}
+        >
           <Ionicons name="documents" size={48} color="white" />
         </View>
       </View>
