@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTags } from "../../hooks/useTags";
+import { shadows } from "../../constants/shadows";
 
 interface DocumentFilterModalProps {
   visible: boolean;

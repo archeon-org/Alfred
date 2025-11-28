@@ -16,6 +16,7 @@ import { useEditProfileLogic } from "../../../hooks/useEditProfileLogic";
 import { ControlledInput } from "../../../components/ControlledInput";
 import { Button } from "../../../components/Button";
 import { useUser } from "../../../hooks/useUser";
+import { shadows } from "../../../constants/shadows";
 
 export default function EditProfileScreen() {
   const router = useRouter();

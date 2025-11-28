@@ -5,9 +5,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  InteractionManager,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useBiometric } from "../context/BiometricContext";
+import { shadows } from "../constants/shadows";
 
 interface BiometricLockScreenProps {
   onUnlock?: () => void;
@@ -21,9 +23,18 @@ export const BiometricLockScreen: React.FC<BiometricLockScreenProps> = ({
   const [authError, setAuthError] = useState<string | null>(null);
 
   // Auto-trigger authentication when lock screen appears
+  // Use InteractionManager to ensure UI is ready before calling biometric API
   useEffect(() => {
     if (isLocked) {
-      handleAuthenticate();
+      // Wait for animations and UI to be ready before triggering biometric
+      const handle = InteractionManager.runAfterInteractions(() => {
+        // Additional small delay to ensure iOS LocalAuthentication is ready
+        const timeout = setTimeout(() => {
+          handleAuthenticate();
+        }, 300);
+        return () => clearTimeout(timeout);
+      });
+      return () => handle.cancel();
     }
   }, [isLocked]);
 

@@ -44,7 +44,7 @@ export const useUpdateUser = () => {
 
         queryClient.setQueryData<UserWithSubscription>(
           USER_QUERY_KEY,
-          updatedUser
+          updatedUser as UserWithSubscription
         );
       }
 

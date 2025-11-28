@@ -144,8 +144,12 @@ export const BiometricProvider = ({
       setIsEnabled(biometricEnabled);
 
       // If biometric is enabled, start locked
+      // Add a small delay to ensure the app UI is ready before showing lock screen
       if (biometricEnabled) {
-        setIsLocked(true);
+        // Use requestAnimationFrame to defer locking until after initial render
+        requestAnimationFrame(() => {
+          setIsLocked(true);
+        });
       }
 
       setIsInitialized(true);
@@ -189,6 +193,12 @@ export const BiometricProvider = ({
 
   const authenticate = async (): Promise<boolean> => {
     try {
+      // Ensure we're in a valid state to authenticate
+      if (!isSupported || !isEnrolled) {
+        console.warn("Biometric authentication not available");
+        return false;
+      }
+
       const biometricLabel =
         biometricType === "faceid"
           ? "Face ID"

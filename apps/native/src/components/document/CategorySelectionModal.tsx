@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Category } from "@archeon-org/types";
+// @ts-ignore - expo-blur types may not be installed
 import { BlurView } from "expo-blur";
 
 interface CategorySelectionModalProps {
