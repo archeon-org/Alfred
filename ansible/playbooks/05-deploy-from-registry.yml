@@ -1,5 +1,5 @@
 ---
-- name: Deploy Gate and Scribe from GitHub Container Registry
+- name: Deploy Gate from GitHub Container Registry
   hosts: archeon-vps
   become: true
   gather_facts: true
@@ -8,7 +8,6 @@
     registry: ghcr.io
     repository_owner: archeon-org
     gate_image: "{{ registry }}/{{ repository_owner }}/archeon-gate"
-    scribe_image: "{{ registry }}/{{ repository_owner }}/archeon-scribe"
     image_tag: "{{ deployment_tag | default('latest') }}"
     app_directory: /opt/archeon
     
@@ -34,13 +33,6 @@
         source: pull
         force_source: true
 
-    - name: 📥 Pull latest scribe image
-      docker_image:
-        name: "{{ scribe_image }}"
-        tag: "{{ image_tag }}"
-        source: pull
-        force_source: true
-
     - name: 🌐 Create Docker network
       docker_network:
         name: archeon-network
@@ -49,14 +41,11 @@
 
     - name: 📁 Verify environment directories exist
       file:
-        path: "{{ app_directory }}/env/{{ item }}"
+        path: "{{ app_directory }}/env/gate"
         state: directory
         owner: "{{ vault_ssh_user }}"
         group: "{{ vault_ssh_user }}"
         mode: '0755'
-      loop:
-        - gate
-        - scribe
 
     - name: 📝 Update gate environment file
       template:
@@ -67,32 +56,17 @@
         mode: '0600'
         backup: yes
 
-    - name: 📝 Update scribe environment file
-      template:
-        src: templates/env/scribe.env.j2
-        dest: "{{ app_directory }}/env/scribe/.env"
-        owner: "{{ vault_ssh_user }}"
-        group: "{{ vault_ssh_user }}"
-        mode: '0600'
-        backup: yes
-
-    - name: 🛑 Stop existing containers if running
+    - name: 🛑 Stop existing gate container if running
       docker_container:
-        name: "{{ item }}"
+        name: archeon-gate
         state: stopped
       ignore_errors: true
-      loop:
-        - archeon-gate
-        - archeon-scribe
 
-    - name: 🗑️ Remove existing containers
+    - name: 🗑️ Remove existing gate container
       docker_container:
-        name: "{{ item }}"
+        name: archeon-gate
         state: absent
       ignore_errors: true
-      loop:
-        - archeon-gate
-        - archeon-scribe
 
     - name: 🚀 Start gate container
       docker_container:
@@ -112,23 +86,6 @@
           retries: 3
           start_period: 40s
         memory: 1g
-        log_driver: "json-file"
-        log_options:
-          max-size: "10m"
-          max-file: "3"
-
-    - name: 🚀 Start scribe container
-      docker_container:
-        name: archeon-scribe
-        image: "{{ scribe_image }}:{{ image_tag }}"
-        state: started
-        restart_policy: unless-stopped
-        ports:
-          - "{{ vault_scribe_port | default('3001') }}:3000"
-        env_file: "{{ app_directory }}/env/scribe/.env"
-        networks:
-          - name: archeon-network
-        memory: 512m
         log_driver: "json-file"
         log_options:
           max-size: "10m"
@@ -165,8 +122,6 @@
       shell: |
         # Remove old gate images (keep last 3)
         docker images {{ gate_image }} --format "table {{ '{{' }}.Tag{{ '}}' }}\t{{ '{{' }}.ID{{ '}}' }}" | tail -n +2 | head -n -3 | awk '{print $2}' | xargs -r docker rmi || true
-        # Remove old scribe images (keep last 3)
-        docker images {{ scribe_image }} --format "table {{ '{{' }}.Tag{{ '}}' }}\t{{ '{{' }}.ID{{ '}}' }}" | tail -n +2 | head -n -3 | awk '{print $2}' | xargs -r docker rmi || true
         # Remove dangling images
         docker image prune -f
       ignore_errors: true
@@ -174,25 +129,21 @@
     - name: 📋 Display deployment status
       debug:
         msg: |
-          🎉 Deployment completed successfully!
+          🎉 Gate Deployment completed successfully!
           
-          Gate: https://{{ vault_gate_domain | default('gate.archeon.com') }} (container: archeon-gate)
-          Scribe: https://{{ vault_scribe_domain | default('scribe.archeon.com') }} (container: archeon-scribe)
+          Gate API: https://{{ vault_gate_domain | default('gate.archeon.com') }} (container: archeon-gate)
           
-          Image versions deployed:
+          Image version deployed:
           - Gate: {{ gate_image }}:{{ image_tag }}
-          - Scribe: {{ scribe_image }}:{{ image_tag }}
           
-          Environment files:
+          Environment file:
           - Gate: {{ app_directory }}/env/gate/.env
-          - Scribe: {{ app_directory }}/env/scribe/.env
           
           Container status:
           - Gate health: {{ 'OK' if gate_health.status == 200 else 'FAILED' }}
           
-          📝 Prerequisites:
-          - Make sure PostgreSQL database is running (run 03-setup-docker-services.yml first)
-          - Ensure nginx and SSL are configured (run 04-setup-subdomains-https.yml)
+          ℹ️ Scribe workers are deployed separately on scribe-worker VPS.
+          Use playbook 06-deploy-scribe-workers.yml for scribe deployment.
 
     - name: 📊 Show running containers
       command: docker ps --filter "name=archeon-" --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Image{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}\t{{ '{{' }}.Ports{{ '}}' }}"

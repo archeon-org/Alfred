@@ -11,6 +11,15 @@ on:
         required: false
         default: false
         type: boolean
+      deploy_target:
+        description: "What to deploy"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - gate
+          - scribe
 
 env:
   REGISTRY: ghcr.io
@@ -95,12 +104,73 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
   # ============================================================================
-  # 2️⃣ BUILD GATE
+  # 2️⃣ SETUP ENVIRONMENTS
+  # ============================================================================
+  setup-envs:
+    name: 🔧 Setup Environments
+    needs: changes
+    if: |
+      needs.changes.outputs.gate == 'true' || needs.changes.outputs.scribe == 'true' || 
+      github.event.inputs.force_deploy == 'true' || needs.changes.outputs.force_deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🛎️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible
+
+      - name: 🔑 Create vault password file
+        run: |
+          printf '%s' "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
+        shell: bash
+
+      - name: 📝 Create Ansible configuration
+        run: |
+          cat > ansible.cfg << 'ANSIBLE_EOF'
+          [defaults]
+          inventory = ansible/inventory.yml
+          vault_password_file = .vault_pass
+          host_key_checking = False
+          timeout = 30
+          gather_timeout = 30
+
+          [ssh_connection]
+          ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+          pipelining = True
+          timeout = 30
+          ANSIBLE_EOF
+
+      - name: 🔧 Setup .env files on all VPS
+        run: |
+          ansible-playbook ansible/playbooks/02-setup-app-env.yml \
+            --vault-password-file .vault_pass \
+            -v
+
+      - name: 🧹 Cleanup sensitive files
+        if: always()
+        run: |
+          rm -f .vault_pass
+        shell: bash
+
+  # ============================================================================
+  # 3️⃣ BUILD GATE
   # ============================================================================
   build-gate:
     name: 🏗️ Build Gate
-    needs: changes
-    if: needs.changes.outputs.gate == 'true' || github.event.inputs.force_deploy == 'true' || needs.changes.outputs.force_deploy == 'true'
+    needs: [changes, setup-envs]
+    if: |
+      always() &&
+      (needs.setup-envs.result == 'success' || needs.setup-envs.result == 'skipped') &&
+      (needs.changes.outputs.gate == 'true' || github.event.inputs.force_deploy == 'true' || needs.changes.outputs.force_deploy == 'true') &&
+      (github.event.inputs.deploy_target == 'all' || github.event.inputs.deploy_target == 'gate' || github.event.inputs.deploy_target == '')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -152,12 +222,16 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
 
   # ============================================================================
-  # 2️⃣ BUILD SCRIBE
+  # 3️⃣ BUILD SCRIBE
   # ============================================================================
   build-scribe:
     name: ✍️ Build Scribe
-    needs: changes
-    if: needs.changes.outputs.scribe == 'true' || github.event.inputs.force_deploy == 'true' || needs.changes.outputs.force_deploy == 'true'
+    needs: [changes, setup-envs]
+    if: |
+      always() &&
+      (needs.setup-envs.result == 'success' || needs.setup-envs.result == 'skipped') &&
+      (needs.changes.outputs.scribe == 'true' || github.event.inputs.force_deploy == 'true' || needs.changes.outputs.force_deploy == 'true') &&
+      (github.event.inputs.deploy_target == 'all' || github.event.inputs.deploy_target == 'scribe' || github.event.inputs.deploy_target == '')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -209,12 +283,15 @@ jobs:
             BUILDKIT_INLINE_CACHE=1
 
   # ============================================================================
-  # 3️⃣ DEPLOY TO SERVER
+  # 4️⃣ DEPLOY GATE TO MAIN VPS
   # ============================================================================
-  deploy:
-    name: 🚀 Deploy to Server
-    needs: [changes, build-gate, build-scribe]
-    if: always() && (needs.changes.outputs.gate == 'true' || needs.changes.outputs.scribe == 'true' || github.event.inputs.force_deploy == 'true' || needs.changes.outputs.force_deploy == 'true') && !failure() && !cancelled()
+  deploy-gate:
+    name: 🚀 Deploy Gate to Main VPS
+    needs: [changes, build-gate]
+    if: |
+      always() && 
+      needs.build-gate.result == 'success' &&
+      (github.event.inputs.deploy_target == 'all' || github.event.inputs.deploy_target == 'gate' || github.event.inputs.deploy_target == '')
     runs-on: ubuntu-latest
     steps:
       - name: 🛎️ Checkout repository
@@ -255,29 +332,104 @@ jobs:
           timeout = 30
           ANSIBLE_EOF
 
-      - name: 🔍 Test Ansible connection
+      - name: 🔍 Test Ansible connection to Main VPS
         run: |
           ansible archeon-vps -m ping -v
 
-      - name: 🚀 Deploy application using Ansible
+      - name: 🚀 Deploy Gate to Main VPS
         run: |
           ansible-playbook ansible/playbooks/05-deploy-from-registry.yml \
             --extra-vars "deployment_tag=latest" \
             --vault-password-file .vault_pass \
             -v
 
-      - name: Cleanup sensitive files
+      - name: 🧹 Cleanup sensitive files
         if: always()
         run: |
           rm -f .vault_pass
         shell: bash
 
   # ============================================================================
-  # 4️⃣ FINAL SUMMARY
+  # 4️⃣ DEPLOY SCRIBE TO WORKER VPS
+  # ============================================================================
+  deploy-scribe:
+    name: 🚀 Deploy Scribe Workers
+    needs: [changes, build-scribe]
+    if: |
+      always() && 
+      needs.build-scribe.result == 'success' &&
+      (github.event.inputs.deploy_target == 'all' || github.event.inputs.deploy_target == 'scribe' || github.event.inputs.deploy_target == '')
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🛎️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: 📦 Install Ansible
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible
+
+      - name: 🔧 Install Ansible Docker collection
+        run: |
+          ansible-galaxy collection install community.docker
+
+      - name: 🔑 Create vault password file
+        run: |
+          printf '%s' "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > .vault_pass
+        shell: bash
+
+      - name: 📝 Create Ansible configuration
+        run: |
+          cat > ansible.cfg << 'ANSIBLE_EOF'
+          [defaults]
+          inventory = ansible/inventory.yml
+          vault_password_file = .vault_pass
+          host_key_checking = False
+          timeout = 30
+          gather_timeout = 30
+
+          [ssh_connection]
+          ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+          pipelining = True
+          timeout = 30
+          ANSIBLE_EOF
+
+      - name: 🔍 Test Ansible connection to Scribe Workers
+        run: |
+          ansible scribe_workers -m ping -v
+
+      - name: 🚀 Deploy Scribe Workers (3 containers per VPS)
+        run: |
+          ansible-playbook ansible/playbooks/06-deploy-scribe-workers.yml \
+            --extra-vars "deployment_tag=latest" \
+            --vault-password-file .vault_pass \
+            -v
+
+      - name: 🧹 Cleanup sensitive files
+        if: always()
+        run: |
+          rm -f .vault_pass
+        shell: bash
+
+  # ============================================================================
+  # 5️⃣ FINAL SUMMARY
   # ============================================================================
   summary:
     name: 📊 Pipeline Summary
-    needs: [changes, build-gate, build-scribe, deploy]
+    needs:
+      [
+        changes,
+        setup-envs,
+        build-gate,
+        build-scribe,
+        deploy-gate,
+        deploy-scribe,
+      ]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -293,76 +445,86 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "## 🔍 1. Changes Detection" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Changes Detected | Action Taken |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|------------------|--------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Changes Detected |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|------------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🏗️ Gate | ${{ needs.changes.outputs.gate == 'true' && '✅ Yes' || '❌ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ✍️ Scribe | ${{ needs.changes.outputs.scribe == 'true' && '✅ Yes' || '❌ No' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [[ "${{ needs.changes.outputs.gate }}" == "true" || "${{ github.event.inputs.force_deploy }}" == "true" || "${{ needs.changes.outputs.force_deploy }}" == "true" ]]; then
-            echo "| 🏗️ Gate | ✅ Yes | Built & Deployed |" >> $GITHUB_STEP_SUMMARY
+          echo "## 🔧 2. Environment Setup" >> $GITHUB_STEP_SUMMARY
+          setup_envs="${{ needs.setup-envs.result }}"
+          if [[ "$setup_envs" == "success" ]]; then
+            echo "- **Status:** ✅ .env files updated on all VPS" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$setup_envs" == "skipped" ]]; then
+            echo "- **Status:** ⏭️ Skipped (no changes detected)" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| 🏗️ Gate | ❌ No | Skipped |" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## 🏗️ 3. Build Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          gate_build="${{ needs.build-gate.result }}"
+          scribe_build="${{ needs.build-scribe.result }}"
+
+          if [[ "$gate_build" == "success" ]]; then
+            echo "| 🏗️ Gate | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$gate_build" == "skipped" ]]; then
+            echo "| 🏗️ Gate | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🏗️ Gate | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
           fi
 
-          if [[ "${{ needs.changes.outputs.scribe }}" == "true" || "${{ github.event.inputs.force_deploy }}" == "true" || "${{ needs.changes.outputs.force_deploy }}" == "true" ]]; then
-            echo "| ✍️ Scribe | ✅ Yes | Built & Deployed |" >> $GITHUB_STEP_SUMMARY
+          if [[ "$scribe_build" == "success" ]]; then
+            echo "| ✍️ Scribe | ✅ Success |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$scribe_build" == "skipped" ]]; then
+            echo "| ✍️ Scribe | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "| ✍️ Scribe | ❌ No | Skipped |" >> $GITHUB_STEP_SUMMARY
+            echo "| ✍️ Scribe | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 🏗️ 2. Build Status" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 4. Deployment Status" >> $GITHUB_STEP_SUMMARY
+          echo "| Target | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|--------|" >> $GITHUB_STEP_SUMMARY
 
-          gate_status="${{ needs.build-gate.result }}"
-          scribe_status="${{ needs.build-scribe.result }}"
+          gate_deploy="${{ needs.deploy-gate.result }}"
+          scribe_deploy="${{ needs.deploy-scribe.result }}"
 
-          if [[ "$gate_status" == "success" ]]; then
-            echo "- 🏗️ **Gate Build:** ✅ Success" >> $GITHUB_STEP_SUMMARY
-          elif [[ "$gate_status" == "skipped" ]]; then
-            echo "- 🏗️ **Gate Build:** ⏭️ Skipped (no changes)" >> $GITHUB_STEP_SUMMARY
+          if [[ "$gate_deploy" == "success" ]]; then
+            echo "| 🏗️ Gate (Main VPS) | ✅ Deployed |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$gate_deploy" == "skipped" ]]; then
+            echo "| 🏗️ Gate (Main VPS) | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- 🏗️ **Gate Build:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
+            echo "| 🏗️ Gate (Main VPS) | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
           fi
 
-          if [[ "$scribe_status" == "success" ]]; then
-            echo "- ✍️ **Scribe Build:** ✅ Success" >> $GITHUB_STEP_SUMMARY
-          elif [[ "$scribe_status" == "skipped" ]]; then
-            echo "- ✍️ **Scribe Build:** ⏭️ Skipped (no changes)" >> $GITHUB_STEP_SUMMARY
+          if [[ "$scribe_deploy" == "success" ]]; then
+            echo "| ✍️ Scribe Workers (2 VPS × 3 workers) | ✅ Deployed |" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$scribe_deploy" == "skipped" ]]; then
+            echo "| ✍️ Scribe Workers (2 VPS × 3 workers) | ⏭️ Skipped |" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- ✍️ **Scribe Build:** ❌ Failed" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 🚀 3. Deployment Status" >> $GITHUB_STEP_SUMMARY
-
-          deploy_status="${{ needs.deploy.result }}"
-          if [[ "$deploy_status" == "success" ]]; then
-            echo "- **Status:** ✅ Successfully deployed to server" >> $GITHUB_STEP_SUMMARY
-            echo "- **Gate URL:** https://gate.archeon.com" >> $GITHUB_STEP_SUMMARY
-            echo "- **Scribe URL:** https://scribe.archeon.com" >> $GITHUB_STEP_SUMMARY
-            echo "- **Health Check:** https://gate.archeon.com/api/health" >> $GITHUB_STEP_SUMMARY
-          elif [[ "$deploy_status" == "skipped" ]]; then
-            echo "- **Status:** ⏭️ Skipped (no changes to deploy)" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Status:** ❌ Deployment failed" >> $GITHUB_STEP_SUMMARY
+            echo "| ✍️ Scribe Workers (2 VPS × 3 workers) | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
           fi
 
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 🐳 4. Container Images" >> $GITHUB_STEP_SUMMARY
+          echo "## 🌐 5. Endpoints" >> $GITHUB_STEP_SUMMARY
+          echo "- **Gate API:** https://gate.archeon.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **Health Check:** https://gate.archeon.com/api/health" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🐳 6. Container Images" >> $GITHUB_STEP_SUMMARY
           echo "- **Registry:** \`ghcr.io/${{ github.repository_owner }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Gate Image:** \`archeon-gate:latest\`" >> $GITHUB_STEP_SUMMARY  
-          echo "- **Scribe Image:** \`archeon-scribe:latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Gate:** \`archeon-gate:latest\`" >> $GITHUB_STEP_SUMMARY  
+          echo "- **Scribe:** \`archeon-scribe:latest\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
-          echo "## 📋 5. Next Steps" >> $GITHUB_STEP_SUMMARY
-          if [[ "$deploy_status" == "success" ]]; then
-            echo "1. ✅ Verify the application is running correctly" >> $GITHUB_STEP_SUMMARY
-            echo "2. 🧪 Run any manual tests if needed" >> $GITHUB_STEP_SUMMARY
-            echo "3. 📊 Monitor application logs: \`docker logs archeon-gate\` / \`docker logs archeon-scribe\`" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "1.  Check the deployment logs for errors" >> $GITHUB_STEP_SUMMARY
-            echo "2. 🔧 Fix any issues and push a new commit" >> $GITHUB_STEP_SUMMARY
-            echo "3. 🔄 The pipeline will automatically re-run on the next push" >> $GITHUB_STEP_SUMMARY
-          fi
-
+          echo "## 🖥️ 7. Infrastructure" >> $GITHUB_STEP_SUMMARY
+          echo "| VPS | Role | Containers |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|------|------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Main VPS | Gate API + PostgreSQL + Redis | archeon-gate, postgres-archeon, redis-archeon |" >> $GITHUB_STEP_SUMMARY
+          echo "| Worker VPS 1 | Scribe Workers | scribe-worker-1, scribe-worker-2, scribe-worker-3 |" >> $GITHUB_STEP_SUMMARY
+          echo "| Worker VPS 2 | Scribe Workers | scribe-worker-1, scribe-worker-2, scribe-worker-3 |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "*Pipeline completed at $(date -u)*" >> $GITHUB_STEP_SUMMARY
@@ -373,9 +535,3 @@ jobs:
           echo "## ⚠️ Pipeline Failed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "The CI/CD pipeline encountered errors. Please check the logs and fix the issues." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔍 Troubleshooting Steps:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Check the failed job logs above" >> $GITHUB_STEP_SUMMARY
-          echo "2. Fix the identified issues in your code" >> $GITHUB_STEP_SUMMARY
-          echo "3. Commit and push your changes" >> $GITHUB_STEP_SUMMARY
-          echo "4. The pipeline will automatically re-run" >> $GITHUB_STEP_SUMMARY

@@ -1,6 +1,7 @@
 ---
 all:
   children:
+    # Main VPS - runs Gate API, PostgreSQL, Redis
     production:
       hosts:
         archeon-vps:
@@ -9,6 +10,24 @@ all:
           ansible_password: "{{ vault_vps_password }}"
           ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
           ansible_python_interpreter: /usr/bin/python3
+
+    # Scribe Workers VPS - runs Scribe worker containers
+    scribe_workers:
+      hosts:
+        scribe-worker-1:
+          ansible_host: "{{ vault_scribe_worker_1_ip }}"
+          ansible_user: "{{ vault_scribe_worker_1_user }}"
+          ansible_password: "{{ vault_scribe_worker_1_password }}"
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+          ansible_python_interpreter: /usr/bin/python3
+          scribe_worker_count: 3
+        scribe-worker-2:
+          ansible_host: "{{ vault_scribe_worker_2_ip }}"
+          ansible_user: "{{ vault_scribe_worker_2_user }}"
+          ansible_password: "{{ vault_scribe_worker_2_password }}"
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+          ansible_python_interpreter: /usr/bin/python3
+          scribe_worker_count: 3
 
   vars:
     # Global variables for all hosts

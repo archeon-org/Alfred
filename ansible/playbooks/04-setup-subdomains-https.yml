@@ -1,12 +1,11 @@
 ---
-- name: Setup Gate and Scribe Subdomains with HTTPS
+- name: Setup Gate Subdomain with HTTPS
   hosts: archeon-vps
   become: true
   gather_facts: true
 
   vars:
     gate_domain: "{{ vault_gate_domain | default('gate.archeon.com') }}"
-    scribe_domain: "{{ vault_scribe_domain | default('scribe.archeon.com') }}"
     email: "{{ vault_email }}"
 
   tasks:
@@ -38,27 +37,10 @@
       args:
         creates: /etc/letsencrypt/live/{{ gate_domain }}/fullchain.pem
 
-    - name: 🔐 Generate SSL certificates for Scribe
-      command: >
-        certbot certonly --standalone
-        --email {{ email }}
-        --agree-tos
-        --non-interactive
-        --domains {{ scribe_domain }}
-      args:
-        creates: /etc/letsencrypt/live/{{ scribe_domain }}/fullchain.pem
-
     - name: 📝 Create Gate nginx configuration
       template:
-        src: ../templates/nginx-gate.conf.j2
+        src: templates/nginx-gate.conf.j2
         dest: /etc/nginx/sites-available/archeon-gate
-        backup: yes
-      notify: reload nginx
-
-    - name: 📝 Create Scribe nginx configuration
-      template:
-        src: ../templates/nginx-scribe.conf.j2
-        dest: /etc/nginx/sites-available/archeon-scribe
         backup: yes
       notify: reload nginx
 
@@ -69,12 +51,14 @@
         state: link
       notify: reload nginx
 
-    - name: 🔗 Enable Scribe site
+    - name: 🗑️ Remove old Scribe nginx configuration (no longer needed)
       file:
-        src: /etc/nginx/sites-available/archeon-scribe
-        dest: /etc/nginx/sites-enabled/archeon-scribe
-        state: link
-      notify: reload nginx
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/nginx/sites-enabled/archeon-scribe
+        - /etc/nginx/sites-available/archeon-scribe
+      ignore_errors: true
 
     - name: 🚫 Remove default nginx site
       file:
@@ -116,12 +100,14 @@
         msg: |
           🎉 HTTPS setup completed successfully!
           
-          Gate: https://{{ gate_domain }}
-          Scribe: https://{{ scribe_domain }}
+          Gate API: https://{{ gate_domain }}
           
           Make sure your DNS points to this server: {{ ansible_default_ipv4.address }}
           
           SSL certificates will auto-renew via cron job.
+          
+          ℹ️ Note: Scribe workers run on separate VPS and don't need HTTP endpoints.
+          They connect directly to Redis for queue processing.
 
   handlers:
     - name: reload nginx

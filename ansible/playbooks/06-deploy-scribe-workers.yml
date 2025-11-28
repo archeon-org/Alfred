@@ -1,0 +1,151 @@
+---
+# =============================================================================
+# Archeon Scribe Workers - Deployment
+# =============================================================================
+# Prerequisites: 
+#   - Run 01-setup-vps.yml to setup Docker and dependencies
+#   - Run 02-setup-app-env.yml to create directories and .env files
+#
+# Run: ansible-playbook ansible/playbooks/06-deploy-scribe-workers.yml
+# With tag: ansible-playbook ansible/playbooks/06-deploy-scribe-workers.yml -e "deployment_tag=v1.0.0"
+# =============================================================================
+
+- name: Deploy Scribe Workers
+  hosts: scribe_workers
+  become: true
+  gather_facts: true
+
+  vars:
+    registry: ghcr.io
+    repository_owner: archeon-org
+    scribe_image: "{{ registry }}/{{ repository_owner }}/archeon-scribe"
+    image_tag: "{{ deployment_tag | default('latest') }}"
+    app_directory: /opt/archeon-scribe
+    worker_count: "{{ scribe_worker_count | default(3) }}"
+
+  tasks:
+    - name: 🐳 Login to GitHub Container Registry
+      docker_login:
+        registry: "{{ registry }}"
+        username: "{{ repository_owner }}"
+        password: "{{ vault_ghcr_token }}"
+
+    - name: 📥 Pull latest scribe image
+      docker_image:
+        name: "{{ scribe_image }}"
+        tag: "{{ image_tag }}"
+        source: pull
+        force_source: true
+
+    - name: 🌐 Create Docker network
+      docker_network:
+        name: archeon-scribe-network
+        state: present
+        driver: bridge
+
+    - name: 🛑 Stop existing scribe worker containers
+      docker_container:
+        name: "scribe-worker-{{ item }}"
+        state: stopped
+      ignore_errors: true
+      loop: "{{ range(1, (worker_count | int) + 1) | list }}"
+
+    - name: 🗑️ Remove existing scribe worker containers
+      docker_container:
+        name: "scribe-worker-{{ item }}"
+        state: absent
+      ignore_errors: true
+      loop: "{{ range(1, (worker_count | int) + 1) | list }}"
+
+    - name: 🚀 Start scribe worker containers
+      docker_container:
+        name: "scribe-worker-{{ item }}"
+        image: "{{ scribe_image }}:{{ image_tag }}"
+        state: started
+        restart_policy: unless-stopped
+        env_file: "{{ app_directory }}/env/.env"
+        networks:
+          - name: archeon-scribe-network
+        memory: 1g
+        log_driver: "json-file"
+        log_options:
+          max-size: "50m"
+          max-file: "3"
+        labels:
+          app: "archeon-scribe"
+          worker_id: "{{ item }}"
+          host: "{{ inventory_hostname }}"
+      loop: "{{ range(1, (worker_count | int) + 1) | list }}"
+
+    - name: ⏳ Wait for workers to start
+      pause:
+        seconds: 10
+
+    - name: 🔍 Check worker container status
+      command: docker ps --filter "name=scribe-worker" --format "{{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}"
+      register: worker_status
+      changed_when: false
+
+    - name: 🧹 Clean up old Docker images
+      shell: |
+        docker images {{ scribe_image }} --format "table {{ '{{' }}.Tag{{ '}}' }}\t{{ '{{' }}.ID{{ '}}' }}" | tail -n +2 | head -n -2 | awk '{print $2}' | xargs -r docker rmi || true
+        docker image prune -f
+      ignore_errors: true
+
+    - name: 📝 Create worker management script
+      copy:
+        content: |
+          #!/bin/bash
+          # Archeon Scribe Workers Management
+          # Host: {{ inventory_hostname }}
+          
+          case "$1" in
+            start)
+              echo "🚀 Starting all scribe workers..."
+              docker start $(docker ps -aq --filter "name=scribe-worker")
+              ;;
+            stop)
+              echo "🛑 Stopping all scribe workers..."
+              docker stop $(docker ps -q --filter "name=scribe-worker")
+              ;;
+            restart)
+              echo "🔄 Restarting all scribe workers..."
+              docker restart $(docker ps -q --filter "name=scribe-worker")
+              ;;
+            logs)
+              if [ -z "$2" ]; then
+                docker logs -f scribe-worker-1
+              else
+                docker logs -f "scribe-worker-$2"
+              fi
+              ;;
+            status)
+              docker ps --filter "name=scribe-worker" --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}\t{{ '{{' }}.Image{{ '}}' }}"
+              ;;
+            *)
+              echo "Usage: $0 {start|stop|restart|logs [worker_number]|status}"
+              exit 1
+              ;;
+          esac
+        dest: "{{ app_directory }}/manage-workers.sh"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+
+    - name: ✅ Deployment Complete
+      debug:
+        msg: |
+          🎉 Scribe Workers Deployment Complete!
+          
+          Host: {{ inventory_hostname }} ({{ ansible_host }})
+          Image: {{ scribe_image }}:{{ image_tag }}
+          Workers deployed: {{ worker_count }}
+          
+          Worker containers:
+          {{ worker_status.stdout }}
+          
+          📡 Connecting to main VPS:
+          - Redis: {{ vault_vps_ip }}:6379
+          - PostgreSQL: {{ vault_vps_ip }}:5432
+          
+          🔧 Management: {{ app_directory }}/manage-workers.sh {start|stop|restart|logs|status}

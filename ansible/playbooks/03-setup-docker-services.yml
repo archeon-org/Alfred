@@ -129,11 +129,27 @@
         timeout: 60
         msg: "PostgreSQL is not responding"
 
-    - name: 🔥 Update UFW firewall for PostgreSQL
+    - name: 🔥 Configure UFW - Allow PostgreSQL from Scribe Workers
       ufw:
         rule: allow
         port: "5432"
         proto: tcp
+        from_ip: "{{ item }}"
+        comment: "PostgreSQL from {{ item }}"
+      loop:
+        - "{{ vault_scribe_worker_1_ip }}"
+        - "{{ vault_scribe_worker_2_ip }}"
+
+    - name: 🔥 Configure UFW - Allow Redis from Scribe Workers
+      ufw:
+        rule: allow
+        port: "6379"
+        proto: tcp
+        from_ip: "{{ item }}"
+        comment: "Redis from {{ item }}"
+      loop:
+        - "{{ vault_scribe_worker_1_ip }}"
+        - "{{ vault_scribe_worker_2_ip }}"
 
     - name: 🔍 Check container status
       command: docker ps

@@ -42,3 +42,4 @@ app/.yarn/*
 !app/.yarn/versions
 *.code-workspace
 .npmrc
+.vault_pass

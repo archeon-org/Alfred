@@ -10,7 +10,7 @@ services:
       - POSTGRES_PASSWORD={{ vault_db_password }}
       - POSTGRES_DB={{ vault_db_name }}
     ports:
-      - "5432:5432"
+      - "0.0.0.0:5432:5432"
     volumes:
       - postgres-archeon-storage:/var/lib/postgresql/data/
       - ./init-scripts:/docker-entrypoint-initdb.d/
@@ -28,7 +28,7 @@ services:
     image: redis:alpine
     restart: always
     ports:
-      - "6379:6379"
+      - "0.0.0.0:6379:6379"
     volumes:
       - redis-archeon-storage:/data
     command: redis-server --appendonly yes --requirepass {{ vault_redis_password }}

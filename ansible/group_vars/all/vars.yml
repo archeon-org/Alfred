@@ -25,12 +25,16 @@ docker_users:
   - "{{ deploy_user }}"
   - "{{ vault_vps_user }}"
 
-# Firewall rules
+# Firewall rules for main VPS
 ufw_rules:
   - { rule: "allow", port: "22", proto: "tcp" }    # SSH
   - { rule: "allow", port: "80", proto: "tcp" }    # HTTP
   - { rule: "allow", port: "443", proto: "tcp" }   # HTTPS
-  - { rule: "allow", port: "3000", proto: "tcp" }  # App (if needed)
+  - { rule: "allow", port: "3000", proto: "tcp" }  # Gate API
+
+# Scribe Worker configuration
+scribe_worker_app_directory: "/opt/archeon-scribe"
+default_scribe_worker_count: 3
 
 # SSH configuration
 ssh_port: 22
