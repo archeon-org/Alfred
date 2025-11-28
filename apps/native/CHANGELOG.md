@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2025-11-28 (iOS: 4, Android: 1)
+-
+
+ Fix crash when open the app
+
 ## [1.2.0] - 2025-11-28 (iOS: 3, Android: 1)
 -
 
