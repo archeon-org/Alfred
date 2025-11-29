@@ -43,12 +43,33 @@ export class DocumentService {
     private readonly creditService: CreditService,
   ) {}
 
-  async processDocument(data: ProcessDocumentJobData): Promise<void> {
+  async processDocument(
+    data: ProcessDocumentJobData,
+    isRetry: boolean = false,
+  ): Promise<void> {
     this.logger.log(
-      `Starting processing logic for document: ${data.documentId}`,
+      `Starting processing logic for document: ${data.documentId}${isRetry ? ' (RETRY)' : ''}`,
     );
     this.logger.debug(`User ID: ${data.userId}`);
     this.logger.debug(`Storage Key: ${data.key}`);
+
+    // Check if document is already completed (important for retries after stalled jobs)
+    if (isRetry) {
+      const existingDoc = await this.documentRepository.findOne({
+        where: { id: data.documentId },
+        select: ['id', 'processingStatus', 'isProcessed'],
+      });
+
+      if (
+        existingDoc?.isProcessed ||
+        existingDoc?.processingStatus === ProcessingStatus.COMPLETED
+      ) {
+        this.logger.log(
+          `Document ${data.documentId} is already processed. Skipping retry to avoid duplicate work.`,
+        );
+        return;
+      }
+    }
 
     // Update status to PROCESSING
     await this.documentRepository.update(data.documentId, {

@@ -1,4 +1,4 @@
-import { Process, Processor } from '@nestjs/bull';
+import { Process, Processor, OnQueueStalled } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bull';
 import { DocumentService } from './document.service';
@@ -14,14 +14,28 @@ export class DocumentProcessor {
 
   constructor(private readonly documentService: DocumentService) {}
 
+  /**
+   * Called when a job is detected as stalled (worker died mid-processing)
+   */
+  @OnQueueStalled()
+  onStalled(job: Job) {
+    this.logger.warn(
+      `⚠️ Job ${job.id} was stalled and will be retried. ` +
+        `Document: ${job.data?.documentId || 'unknown'}, ` +
+        `Attempt: ${job.attemptsMade + 1}/${job.opts?.attempts || 1}`,
+    );
+  }
+
   @Process('process-document')
   async handleProcessDocument(job: Job<ProcessDocumentJobData>) {
+    const isRetry = job.attemptsMade > 0;
     this.logger.log(
-      `Received job ${job.id} to process document ${job.data.documentId}`,
+      `Received job ${job.id} to process document ${job.data.documentId}` +
+        (isRetry ? ` (RETRY attempt ${job.attemptsMade + 1})` : ''),
     );
 
     try {
-      await this.documentService.processDocument(job.data);
+      await this.documentService.processDocument(job.data, isRetry);
       this.logger.log(
         `Successfully completed job ${job.id} for document ${job.data.documentId}`,
       );

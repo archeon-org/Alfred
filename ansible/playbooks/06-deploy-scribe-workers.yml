@@ -43,10 +43,46 @@
         state: present
         driver: bridge
 
-    - name: 🛑 Stop existing scribe worker containers
+    # =========================================================================
+    # GRACEFUL SHUTDOWN - Wait for jobs to finish before stopping
+    # =========================================================================
+    - name: 🔍 Check if scribe workers are running
+      command: docker ps -q --filter "name=scribe-worker"
+      register: running_workers
+      changed_when: false
+      ignore_errors: true
+
+    - name: ⏸️ Send SIGTERM to workers for graceful shutdown
+      shell: |
+        docker kill --signal=SIGTERM "scribe-worker-{{ item }}" 2>/dev/null || true
+      loop: "{{ range(1, (worker_count | int) + 1) | list }}"
+      when: running_workers.stdout | length > 0
+
+    - name: ⏳ Wait for workers to finish active jobs (max 10 minutes)
+      shell: |
+        # Wait for container to stop gracefully, or timeout after 600 seconds
+        timeout=600
+        elapsed=0
+        while docker ps -q --filter "name=scribe-worker-{{ item }}" | grep -q .; do
+          if [ $elapsed -ge $timeout ]; then
+            echo "Timeout reached for scribe-worker-{{ item }}"
+            break
+          fi
+          echo "Waiting for scribe-worker-{{ item }} to finish... ($elapsed seconds)"
+          sleep 10
+          elapsed=$((elapsed + 10))
+        done
+        echo "scribe-worker-{{ item }} has stopped or timeout reached"
+      loop: "{{ range(1, (worker_count | int) + 1) | list }}"
+      when: running_workers.stdout | length > 0
+      async: 660  # Slightly more than timeout to allow for command overhead
+      poll: 15
+
+    - name: 🛑 Force stop any remaining containers
       docker_container:
         name: "scribe-worker-{{ item }}"
         state: stopped
+        stop_timeout: 10
       ignore_errors: true
       loop: "{{ range(1, (worker_count | int) + 1) | list }}"
 
@@ -67,6 +103,8 @@
         networks:
           - name: archeon-scribe-network
         memory: 1g
+        # Graceful shutdown: Docker will send SIGTERM and wait 120s before SIGKILL
+        stop_timeout: 120
         log_driver: "json-file"
         log_options:
           max-size: "50m"
@@ -99,18 +137,49 @@
           # Archeon Scribe Workers Management
           # Host: {{ inventory_hostname }}
           
+          TIMEOUT=${GRACEFUL_TIMEOUT:-300}  # 5 minutes default
+          
+          graceful_stop() {
+            echo "⏸️ Sending SIGTERM to workers for graceful shutdown..."
+            docker ps -q --filter "name=scribe-worker" | xargs -r docker kill --signal=SIGTERM
+            
+            echo "⏳ Waiting for workers to finish active jobs (max $TIMEOUT seconds)..."
+            elapsed=0
+            while docker ps -q --filter "name=scribe-worker" | grep -q .; do
+              if [ $elapsed -ge $TIMEOUT ]; then
+                echo "⚠️ Timeout reached. Force stopping remaining containers..."
+                docker ps -q --filter "name=scribe-worker" | xargs -r docker stop -t 10
+                break
+              fi
+              sleep 5
+              elapsed=$((elapsed + 5))
+              active=$(docker ps -q --filter "name=scribe-worker" | wc -l)
+              echo "  Still running: $active workers ($elapsed seconds elapsed)"
+            done
+            echo "✅ All workers stopped"
+          }
+          
           case "$1" in
             start)
               echo "🚀 Starting all scribe workers..."
               docker start $(docker ps -aq --filter "name=scribe-worker")
               ;;
             stop)
-              echo "🛑 Stopping all scribe workers..."
+              echo "🛑 Stopping all scribe workers (immediate)..."
               docker stop $(docker ps -q --filter "name=scribe-worker")
+              ;;
+            graceful-stop)
+              graceful_stop
               ;;
             restart)
               echo "🔄 Restarting all scribe workers..."
               docker restart $(docker ps -q --filter "name=scribe-worker")
+              ;;
+            graceful-restart)
+              echo "🔄 Graceful restart: stopping workers then starting..."
+              graceful_stop
+              echo "🚀 Starting all scribe workers..."
+              docker start $(docker ps -aq --filter "name=scribe-worker")
               ;;
             logs)
               if [ -z "$2" ]; then
@@ -123,7 +192,19 @@
               docker ps --filter "name=scribe-worker" --format "table {{ '{{' }}.Names{{ '}}' }}\t{{ '{{' }}.Status{{ '}}' }}\t{{ '{{' }}.Image{{ '}}' }}"
               ;;
             *)
-              echo "Usage: $0 {start|stop|restart|logs [worker_number]|status}"
+              echo "Usage: $0 {start|stop|graceful-stop|restart|graceful-restart|logs [worker_number]|status}"
+              echo ""
+              echo "Commands:"
+              echo "  start            - Start all stopped workers"
+              echo "  stop             - Immediately stop all workers (may interrupt jobs!)"
+              echo "  graceful-stop    - Send SIGTERM and wait for jobs to finish"
+              echo "  restart          - Immediately restart all workers"
+              echo "  graceful-restart - Gracefully stop, then start all workers"
+              echo "  logs [n]         - Tail logs for worker n (default: 1)"
+              echo "  status           - Show status of all workers"
+              echo ""
+              echo "Environment variables:"
+              echo "  GRACEFUL_TIMEOUT - Seconds to wait for graceful stop (default: 300)"
               exit 1
               ;;
           esac
