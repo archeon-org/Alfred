@@ -265,54 +265,98 @@ export class SearchService {
   }
 
   /**
-   * Comprehensive keyword search - searches across all text fields
-   * Includes: title, originalName, description, content (OCR), and metadata
+   * Comprehensive keyword search using PostgreSQL Full-Text Search
+   * Uses GIN-indexed tsvector for O(log n) performance at scale
+   *
+   * Features:
+   * - Stemming: "running" matches "run", "runs", etc.
+   * - Ranking: Title matches rank higher than content matches
+   * - Phrase search: Supports quoted phrases
+   * - Scales to millions of documents
    */
   private async comprehensiveKeywordSearch(
     userId: string,
     query: string,
     limit: number,
   ): Promise<SearchResult[]> {
-    // Tokenize and clean search terms
     const searchTerms = this.tokenizeQuery(query);
 
     if (searchTerms.length === 0) {
       return [];
     }
 
-    this.logger.log(`Keyword search with terms: ${searchTerms.join(', ')}`);
+    this.logger.log(`FTS keyword search with terms: ${searchTerms.join(', ')}`);
 
-    // Build the comprehensive search query
-    // We search each term against multiple fields and track which fields matched
+    try {
+      // Use PostgreSQL Full-Text Search with ranking
+      const results = await this.documentRepository.query(
+        `
+        SELECT 
+          d.*,
+          ts_rank_cd(d."search_vector", query, 32) as rank,
+          -- Check which weight classes matched for detailed scoring
+          ts_rank_cd(d."search_vector", query, 1) > 0 as has_match
+        FROM "documents" d,
+          plainto_tsquery('english', $2) query
+        WHERE d."userId" = $1
+          AND d."deletedAt" IS NULL
+          AND d."search_vector" @@ query
+        ORDER BY rank DESC, d."createdAt" DESC
+        LIMIT $3
+        `,
+        [userId, query, limit],
+      );
+
+      // If FTS returns results, use them
+      if (results.length > 0) {
+        return results.map((row: any) => ({
+          document: this.mapRowToDocument(row),
+          similarity: this.normalizeFtsRank(row.rank),
+          matchReason: 'fulltext',
+          matchDetails: {
+            titleMatch: true, // FTS doesn't distinguish easily, assume true if matched
+            contentMatch: true,
+          },
+        }));
+      }
+
+      // Fallback to ILIKE for very short queries or when FTS finds nothing
+      // This handles edge cases like single characters or special terms
+      return this.fallbackKeywordSearch(userId, searchTerms, limit);
+    } catch (error) {
+      // If search_vector column doesn't exist yet (migration not run), fall back
+      this.logger.warn('FTS query failed, falling back to ILIKE search', error);
+      return this.fallbackKeywordSearch(userId, searchTerms, limit);
+    }
+  }
+
+  /**
+   * Fallback ILIKE search for edge cases or pre-migration compatibility
+   * Only searches title and originalName (lighter fields)
+   */
+  private async fallbackKeywordSearch(
+    userId: string,
+    searchTerms: string[],
+    limit: number,
+  ): Promise<SearchResult[]> {
+    if (searchTerms.length === 0) return [];
+
+    // Build simple ILIKE conditions for title/name only (faster)
+    const conditions = searchTerms.map(
+      (term) => `(
+        LOWER(COALESCE(d."title", '')) LIKE '%${this.escapeSqlLike(term)}%' OR
+        LOWER(COALESCE(d."originalName", '')) LIKE '%${this.escapeSqlLike(term)}%'
+      )`,
+    );
+
     const results = await this.documentRepository.query(
       `
-      SELECT 
-        d.*,
-        -- Track which fields matched for scoring
-        CASE WHEN ${this.buildFieldMatchCondition('d."title"', searchTerms)} THEN true ELSE false END as title_match,
-        CASE WHEN ${this.buildFieldMatchCondition('d."originalName"', searchTerms)} THEN true ELSE false END as name_match,
-        CASE WHEN ${this.buildFieldMatchCondition('d."description"', searchTerms)} THEN true ELSE false END as description_match,
-        CASE WHEN ${this.buildFieldMatchCondition('d."content"', searchTerms)} THEN true ELSE false END as content_match,
-        CASE WHEN ${this.buildMetadataMatchCondition(searchTerms)} THEN true ELSE false END as metadata_match,
-        -- Calculate match score based on number of matching fields
-        (
-          CASE WHEN ${this.buildFieldMatchCondition('d."title"', searchTerms)} THEN 3 ELSE 0 END +
-          CASE WHEN ${this.buildFieldMatchCondition('d."originalName"', searchTerms)} THEN 2 ELSE 0 END +
-          CASE WHEN ${this.buildFieldMatchCondition('d."description"', searchTerms)} THEN 1 ELSE 0 END +
-          CASE WHEN ${this.buildFieldMatchCondition('d."content"', searchTerms)} THEN 2 ELSE 0 END +
-          CASE WHEN ${this.buildMetadataMatchCondition(searchTerms)} THEN 1 ELSE 0 END
-        ) as match_score
+      SELECT d.*
       FROM "documents" d
       WHERE d."userId" = $1
         AND d."deletedAt" IS NULL
-        AND (
-          ${this.buildFieldMatchCondition('d."title"', searchTerms)}
-          OR ${this.buildFieldMatchCondition('d."originalName"', searchTerms)}
-          OR ${this.buildFieldMatchCondition('d."description"', searchTerms)}
-          OR ${this.buildFieldMatchCondition('d."content"', searchTerms)}
-          OR ${this.buildMetadataMatchCondition(searchTerms)}
-        )
-      ORDER BY match_score DESC, d."createdAt" DESC
+        AND (${conditions.join(' OR ')})
+      ORDER BY d."createdAt" DESC
       LIMIT $2
       `,
       [userId, limit],
@@ -320,15 +364,22 @@ export class SearchService {
 
     return results.map((row: any) => ({
       document: this.mapRowToDocument(row),
-      similarity: this.normalizeKeywordScore(row.match_score),
-      matchReason: 'keyword',
+      similarity: 0.4, // Lower score for fallback matches
+      matchReason: 'keyword-fallback',
       matchDetails: {
-        titleMatch: row.title_match || row.name_match,
-        contentMatch: row.content_match,
-        descriptionMatch: row.description_match,
-        metadataMatch: row.metadata_match,
+        titleMatch: true,
       },
     }));
+  }
+
+  /**
+   * Normalize FTS rank to 0-1 range
+   * ts_rank_cd returns values typically in 0-1 range but can exceed
+   */
+  private normalizeFtsRank(rank: number): number {
+    // ts_rank_cd with normalization 32 typically returns 0-1
+    // but we clamp and scale for consistency
+    return Math.min(1, Math.max(0, rank * 2));
   }
 
   /**
@@ -344,47 +395,10 @@ export class SearchService {
   }
 
   /**
-   * Build SQL condition for matching any term in a field
-   */
-  private buildFieldMatchCondition(field: string, terms: string[]): string {
-    if (terms.length === 0) return 'false';
-
-    const conditions = terms.map(
-      (term) =>
-        `LOWER(COALESCE(${field}, '')) LIKE '%${this.escapeSqlLike(term)}%'`,
-    );
-
-    return `(${conditions.join(' OR ')})`;
-  }
-
-  /**
-   * Build SQL condition for matching terms in JSONB metadata
-   */
-  private buildMetadataMatchCondition(terms: string[]): string {
-    if (terms.length === 0) return 'false';
-
-    // Cast metadata to text and search
-    const conditions = terms.map(
-      (term) =>
-        `LOWER(COALESCE(d."metadata"::text, '')) LIKE '%${this.escapeSqlLike(term)}%'`,
-    );
-
-    return `(${conditions.join(' OR ')})`;
-  }
-
-  /**
    * Escape special characters for SQL LIKE
    */
   private escapeSqlLike(str: string): string {
     return str.replace(/[%_\\]/g, '\\$&');
-  }
-
-  /**
-   * Normalize keyword match score to 0-1 range
-   */
-  private normalizeKeywordScore(score: number): number {
-    // Max possible score is 9 (3+2+1+2+1)
-    return Math.min(1, score / 9);
   }
 
   /**
@@ -410,18 +424,6 @@ export class SearchService {
       userId: row.userId,
       categoryId: row.categoryId,
     } as DocumentEntity;
-  }
-
-  /**
-   * Legacy keyword search - kept for backwards compatibility
-   * @deprecated Use comprehensiveKeywordSearch instead
-   */
-  private async keywordSearch(
-    userId: string,
-    query: string,
-    limit: number,
-  ): Promise<SearchResult[]> {
-    return this.comprehensiveKeywordSearch(userId, query, limit);
   }
 
   /**

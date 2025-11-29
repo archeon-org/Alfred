@@ -56,6 +56,11 @@ export class DocumentEntity implements Document {
   @Column({ type: "text", nullable: true, select: false })
   content?: string; // OCR Extracted Text
 
+  // Full-text search vector (auto-updated by trigger)
+  // Contains tokenized version of title, description, content, metadata
+  @Column({ type: "tsvector", nullable: true, select: false })
+  search_vector?: string;
+
   // --- NEW: AI Metadata ---
   // Stores specific data like { "invoiceDate": "2023-01-01", "total": 500 }
   @Column({ type: "jsonb", nullable: true })
