@@ -58,10 +58,11 @@
       loop: "{{ range(1, (worker_count | int) + 1) | list }}"
       when: running_workers.stdout | length > 0
 
-    - name: ⏳ Wait for workers to finish active jobs (max 10 minutes)
+    - name: ⏳ Wait for workers to finish active jobs (max 3 minutes)
       shell: |
-        # Wait for container to stop gracefully, or timeout after 600 seconds
-        timeout=600
+        # Wait for container to stop gracefully, or timeout after 180 seconds
+        # With optimized OCR (60s timeout + early stop), jobs complete in ~2 min max
+        timeout=180
         elapsed=0
         while docker ps -q --filter "name=scribe-worker-{{ item }}" | grep -q .; do
           if [ $elapsed -ge $timeout ]; then
@@ -75,7 +76,7 @@
         echo "scribe-worker-{{ item }} has stopped or timeout reached"
       loop: "{{ range(1, (worker_count | int) + 1) | list }}"
       when: running_workers.stdout | length > 0
-      async: 660  # Slightly more than timeout to allow for command overhead
+      async: 240  # Slightly more than timeout to allow for command overhead
       poll: 15
 
     - name: 🛑 Force stop any remaining containers
@@ -137,7 +138,8 @@
           # Archeon Scribe Workers Management
           # Host: {{ inventory_hostname }}
           
-          TIMEOUT=${GRACEFUL_TIMEOUT:-300}  # 5 minutes default
+          # With optimized OCR (60s timeout + early stop), jobs complete in ~2 min max
+          TIMEOUT=${GRACEFUL_TIMEOUT:-180}  # 3 minutes default
           
           graceful_stop() {
             echo "⏸️ Sending SIGTERM to workers for graceful shutdown..."

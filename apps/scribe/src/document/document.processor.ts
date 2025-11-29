@@ -9,9 +9,9 @@ import {
 } from '@archeon-org/types';
 import { activeJobsInThisWorker } from '../main';
 
-// Limit concurrency to 1 job at a time per worker
-// This prevents memory exhaustion from multiple OCR processes running simultaneously
-@Processor('documents', { concurrency: 1 })
+// Concurrency is set to 1 on each @Process decorator to prevent
+// memory exhaustion from multiple OCR processes running simultaneously
+@Processor('documents')
 export class DocumentProcessor {
   private readonly logger = new Logger(DocumentProcessor.name);
 
@@ -31,7 +31,7 @@ export class DocumentProcessor {
     activeJobsInThisWorker.delete(String(job.id));
   }
 
-  @Process('process-document')
+  @Process({ name: 'process-document', concurrency: 1 })
   async handleProcessDocument(job: Job<ProcessDocumentJobData>) {
     const jobId = String(job.id);
     activeJobsInThisWorker.add(jobId);
@@ -64,7 +64,7 @@ export class DocumentProcessor {
     }
   }
 
-  @Process('generate-title')
+  @Process({ name: 'generate-title', concurrency: 1 })
   async handleGenerateTitle(job: Job<GenerateTitleJobData>) {
     const jobId = String(job.id);
     activeJobsInThisWorker.add(jobId);
@@ -89,7 +89,7 @@ export class DocumentProcessor {
     }
   }
 
-  @Process('generate-embedding')
+  @Process({ name: 'generate-embedding', concurrency: 1 })
   async handleGenerateEmbedding(job: Job<GenerateEmbeddingJobData>) {
     const jobId = String(job.id);
     activeJobsInThisWorker.add(jobId);

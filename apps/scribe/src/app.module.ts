@@ -27,7 +27,8 @@ import { dataSourceOptions } from '../db/datasource';
           // Max times a job can be restarted due to stalling before failing
           maxStalledCount: 2,
           // Lock duration - if a job takes longer than this without heartbeat, it's stalled
-          lockDuration: 600000, // 10 minutes - enough for large OCR jobs
+          // With optimized OCR (60s timeout + early stop), jobs should complete in ~2 min max
+          lockDuration: 180000, // 3 minutes
         },
       }),
       inject: [ConfigService],

@@ -21,13 +21,9 @@ async function bootstrap() {
   // Graceful shutdown handler
   let isShuttingDown = false;
 
-  // Export shutdown status so processor can check it
-  (global as any).isShuttingDown = false;
-
   const gracefulShutdown = async (signal: string) => {
     if (isShuttingDown) return; // Prevent multiple shutdown attempts
     isShuttingDown = true;
-    (global as any).isShuttingDown = true;
 
     Logger.log(
       `⚠️ [${workerId}] Received ${signal}. Starting graceful shutdown...`,
@@ -42,7 +38,8 @@ async function bootstrap() {
     await documentsQueue.pause(true); // true = pause only this worker
 
     // 2. Wait for THIS WORKER's active jobs to complete (not global count)
-    const maxWaitTime = 10 * 60 * 1000; // 10 minutes max wait
+    // With optimized OCR (60s timeout + early stop), jobs complete in ~2 min max
+    const maxWaitTime = 3 * 60 * 1000; // 3 minutes max wait
     const startTime = Date.now();
 
     const checkActiveJobs = async (): Promise<void> => {
