@@ -54,7 +54,7 @@ const ChatResponseSchema = z.object({
     ),
   refinementSuggestions: z
     .array(z.string())
-    .optional()
+    .nullish()
     .describe(
       'Optional suggestions for how the user could refine their search, e.g., "from last month", "with a red logo".',
     ),
