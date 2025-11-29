@@ -115,11 +115,10 @@ export class ChatSearchService {
       newSearchAttempts++;
 
       // Fetch more results initially, we'll filter them
-      const searchResults = await this.searchService.semanticSearch(
+      const searchResults = await this.searchService.hybridSearch(
         userId,
         aiResponse.searchQuery,
         10,
-        0.3, // Lower DB threshold, we'll apply stricter filtering
       );
 
       // Filter out excluded documents

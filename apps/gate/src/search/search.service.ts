@@ -150,11 +150,16 @@ export class SearchService {
     // Process semantic results first (base scores)
     for (const result of semanticResults) {
       const docId = result.document.id;
+      const matchDetails = {
+        semantic: result.similarity,
+      };
+      // Apply weighting immediately to penalize pure semantic matches
+      const weightedScore = this.calculateWeightedScore(matchDetails);
+
       resultMap.set(docId, {
         ...result,
-        matchDetails: {
-          semantic: result.similarity,
-        },
+        similarity: weightedScore,
+        matchDetails,
       });
     }
 
@@ -288,23 +293,24 @@ export class SearchService {
     this.logger.log(`FTS keyword search with terms: ${searchTerms.join(', ')}`);
 
     try {
+      // Construct tsquery using OR logic (|) for broader recall
+      // We rely on ranking to push the best matches (most terms matched) to the top
+      const tsQuery = searchTerms.join(' | ');
+
       // Use PostgreSQL Full-Text Search with ranking
       const results = await this.documentRepository.query(
         `
         SELECT 
           d.*,
-          ts_rank_cd(d."search_vector", query, 32) as rank,
-          -- Check which weight classes matched for detailed scoring
-          ts_rank_cd(d."search_vector", query, 1) > 0 as has_match
-        FROM "documents" d,
-          plainto_tsquery('english', $2) query
+          ts_rank_cd(d."search_vector", to_tsquery('english', $2), 32) as rank
+        FROM "documents" d
         WHERE d."userId" = $1
           AND d."deletedAt" IS NULL
-          AND d."search_vector" @@ query
+          AND d."search_vector" @@ to_tsquery('english', $2)
         ORDER BY rank DESC, d."createdAt" DESC
         LIMIT $3
         `,
-        [userId, query, limit],
+        [userId, tsQuery, limit],
       );
 
       // If FTS returns results, use them
@@ -384,13 +390,130 @@ export class SearchService {
 
   /**
    * Tokenize query into searchable terms
+   * Removes stop words and short terms
    */
   private tokenizeQuery(query: string): string[] {
+    const stopWords = new Set([
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'but',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'of',
+      'with',
+      'by',
+      'from',
+      'up',
+      'about',
+      'into',
+      'over',
+      'after',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'shall',
+      'should',
+      'can',
+      'could',
+      'may',
+      'might',
+      'must',
+      'i',
+      'you',
+      'he',
+      'she',
+      'it',
+      'we',
+      'they',
+      'my',
+      'your',
+      'his',
+      'her',
+      'its',
+      'our',
+      'their',
+      'this',
+      'that',
+      'these',
+      'those',
+      'looking',
+      'search',
+      'find',
+      'show',
+      'me',
+      'document',
+      'file',
+      // French stop words
+      'le',
+      'la',
+      'les',
+      'un',
+      'une',
+      'des',
+      'et',
+      'ou',
+      'mais',
+      'dans',
+      'sur',
+      'a',
+      'au',
+      'aux',
+      'de',
+      'du',
+      'par',
+      'pour',
+      'avec',
+      'sans',
+      'ce',
+      'cet',
+      'cette',
+      'ces',
+      'mon',
+      'ton',
+      'son',
+      'ma',
+      'ta',
+      'sa',
+      'mes',
+      'tes',
+      'ses',
+      'je',
+      'tu',
+      'il',
+      'elle',
+      'nous',
+      'vous',
+      'ils',
+      'elles',
+      'cherche',
+      'trouve',
+      'montre',
+      'moi',
+    ]);
+
     return query
       .toLowerCase()
       .replace(/[^\w\s]/g, ' ') // Remove special chars
       .split(/\s+/)
-      .filter((term) => term.length > 1) // Keep terms > 1 char
+      .filter((term) => term.length > 1 && !stopWords.has(term)) // Keep terms > 1 char and not stop words
       .slice(0, 10); // Limit to 10 terms for performance
   }
 
