@@ -1,8 +1,11 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { ChildProcess, execSync, spawn } from 'child_process';
+import { ChildProcess, execFile, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
 
 @Injectable()
 export class OCRService implements OnModuleDestroy {
@@ -12,8 +15,12 @@ export class OCRService implements OnModuleDestroy {
   private readonly MAX_PAGES = 10;
   private readonly TESSERACT_TIMEOUT = 60000; // 60 seconds per page
   private readonly PDFTOPPM_TIMEOUT = 120000; // 2 minutes for PDF conversion
-  private readonly MIN_CHARS_FOR_EARLY_STOP = 500; // Stop early if we have enough text
+  private readonly MIN_TEXT_DENSITY = 0.1; // Min ratio of alphanumeric chars
+  private readonly MIN_LINES_WITH_TEXT = 3; // Min lines with actual content
   private readonly EARLY_STOP_AFTER_PAGES = 2; // Check for early stop after N pages
+
+  // DPI fallback chain for retry mechanism
+  private readonly DPI_CHAIN = [150, 100, 75];
 
   // Track active child processes for cleanup on shutdown
   private activeProcesses: Set<ChildProcess> = new Set();
@@ -36,17 +43,68 @@ export class OCRService implements OnModuleDestroy {
   }
 
   /**
-   * Determine optimal DPI based on file size to prevent OOM
+   * Determine starting DPI index based on file size
    */
-  private getDpiForFileSize(fileSizeBytes: number): number {
+  private getStartingDpiIndex(fileSizeBytes: number): number {
     const sizeMB = fileSizeBytes / (1024 * 1024);
 
     if (sizeMB < 5) {
-      return 150; // Small files: high quality
+      return 0; // Start at 150 DPI
     } else if (sizeMB < 20) {
-      return 100; // Medium files: balanced
+      return 1; // Start at 100 DPI
     } else {
-      return 75; // Large files: fast processing, prevent OOM
+      return 2; // Start at 75 DPI
+    }
+  }
+
+  /**
+   * Check if text extraction was successful using density heuristics
+   */
+  private isTextExtractionSuccessful(text: string): boolean {
+    if (!text || text.length < 50) return false;
+
+    // Count alphanumeric characters
+    const alphanumericCount = (text.match(/[a-zA-Z0-9]/g) || []).length;
+    const density = alphanumericCount / text.length;
+
+    // Count lines with meaningful content (at least 3 alphanumeric chars)
+    const lines = text.split('\n');
+    const meaningfulLines = lines.filter(
+      (line) => (line.match(/[a-zA-Z0-9]/g) || []).length >= 3,
+    ).length;
+
+    return (
+      density >= this.MIN_TEXT_DENSITY &&
+      meaningfulLines >= this.MIN_LINES_WITH_TEXT
+    );
+  }
+
+  /**
+   * Check if PDF already contains extractable text (skip OCR if possible)
+   */
+  private async hasEmbeddedText(pdfPath: string): Promise<string | null> {
+    try {
+      // Use pdftotext to extract embedded text (much faster than OCR)
+      const { stdout } = await execFileAsync(
+        'pdftotext',
+        ['-l', '2', pdfPath, '-'], // Only check first 2 pages
+        { timeout: 10000 }, // 10 second timeout
+      );
+
+      const text = stdout.trim();
+
+      // Check if we got meaningful text
+      if (this.isTextExtractionSuccessful(text)) {
+        this.logger.log(
+          `PDF has embedded text (${text.length} chars), skipping OCR`,
+        );
+        return text;
+      }
+
+      return null;
+    } catch {
+      // pdftotext failed or not installed, proceed with OCR
+      return null;
     }
   }
 
@@ -201,70 +259,179 @@ export class OCRService implements OnModuleDestroy {
   ): Promise<string> {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ocr-'));
     const pdfPath = path.join(tmpDir, 'input.pdf');
-    const outputPrefix = path.join(tmpDir, 'page');
-
-    // Dynamic DPI based on file size
-    const dpi = this.getDpiForFileSize(buffer.length);
-    this.logger.debug(
-      `Using DPI ${dpi} for ${(buffer.length / 1024 / 1024).toFixed(1)}MB PDF`,
-    );
 
     try {
       fs.writeFileSync(pdfPath, buffer);
 
-      // Convert PDF to PNG images using pdftoppm with grayscale for faster processing
-      execSync(
-        `pdftoppm -png -gray -r ${dpi} -l ${this.MAX_PAGES} "${pdfPath}" "${outputPrefix}"`,
-        { timeout: this.PDFTOPPM_TIMEOUT },
-      );
-
-      const pageFiles = fs
-        .readdirSync(tmpDir)
-        .filter((f) => f.startsWith('page-') && f.endsWith('.png'))
-        .sort();
-
-      if (pageFiles.length === 0) {
-        throw new Error('No pages extracted from PDF');
+      // 🚀 FAST PATH: Check if PDF has embedded text (skip OCR entirely)
+      const embeddedText = await this.hasEmbeddedText(pdfPath);
+      if (embeddedText) {
+        return embeddedText;
       }
 
-      this.logger.debug(`Extracted ${pageFiles.length} pages from PDF`);
+      // OCR path: try with DPI fallback chain
+      const startingDpiIndex = this.getStartingDpiIndex(buffer.length);
+      let lastError: Error | null = null;
 
-      // Process each page with early stopping
-      const textParts: string[] = [];
-      let totalChars = 0;
+      for (
+        let dpiIndex = startingDpiIndex;
+        dpiIndex < this.DPI_CHAIN.length;
+        dpiIndex++
+      ) {
+        const dpi = this.DPI_CHAIN[dpiIndex];
+        this.logger.debug(
+          `Attempting OCR with DPI ${dpi} for ${(buffer.length / 1024 / 1024).toFixed(1)}MB PDF`,
+        );
 
-      for (let i = 0; i < pageFiles.length; i++) {
-        const pageFile = pageFiles[i];
-        const pagePath = path.join(tmpDir, pageFile);
-        const pageBuffer = fs.readFileSync(pagePath);
+        try {
+          const result = await this.processPdfWithDpi(
+            tmpDir,
+            pdfPath,
+            dpi,
+            config,
+          );
 
-        const pageText = await this.runTesseract(pageBuffer, config);
-        const trimmedText = pageText.trim();
-        textParts.push(trimmedText);
-        totalChars += trimmedText.length;
+          // Check if extraction was successful
+          if (this.isTextExtractionSuccessful(result)) {
+            return result;
+          }
 
-        // Early stopping: if we have enough text after first N pages, stop
+          // If we got poor results, try next DPI
+          if (dpiIndex + 1 < this.DPI_CHAIN.length) {
+            this.logger.debug(
+              `Poor text extraction at ${dpi} DPI, trying ${this.DPI_CHAIN[dpiIndex + 1]} DPI`,
+            );
+          }
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          this.logger.warn(`OCR failed at ${dpi} DPI: ${lastError.message}`);
+
+          // Clean up page files before retry
+          this.cleanupPageFiles(tmpDir);
+        }
+      }
+
+      // If all DPIs failed, throw the last error
+      if (lastError) {
+        throw lastError;
+      }
+
+      return '';
+    } finally {
+      this.cleanupTmpDir(tmpDir);
+    }
+  }
+
+  /**
+   * Process PDF at a specific DPI using non-blocking execFile
+   */
+  private async processPdfWithDpi(
+    tmpDir: string,
+    pdfPath: string,
+    dpi: number,
+    config: { lang?: string; oem?: number; psm?: number },
+  ): Promise<string> {
+    const outputPrefix = path.join(tmpDir, 'page');
+
+    // Convert PDF to PNG using non-blocking execFile
+    await execFileAsync(
+      'pdftoppm',
+      [
+        '-png',
+        '-gray',
+        '-r',
+        String(dpi),
+        '-l',
+        String(this.MAX_PAGES),
+        pdfPath,
+        outputPrefix,
+      ],
+      { timeout: this.PDFTOPPM_TIMEOUT },
+    );
+
+    const pageFiles = fs
+      .readdirSync(tmpDir)
+      .filter((f) => f.startsWith('page-') && f.endsWith('.png'))
+      .sort();
+
+    if (pageFiles.length === 0) {
+      throw new Error('No pages extracted from PDF');
+    }
+
+    this.logger.debug(`Extracted ${pageFiles.length} pages at ${dpi} DPI`);
+
+    // Process each page with smart early stopping
+    const textParts: string[] = [];
+    let consecutivePoorPages = 0;
+
+    for (let i = 0; i < pageFiles.length; i++) {
+      const pageFile = pageFiles[i];
+      const pagePath = path.join(tmpDir, pageFile);
+      const pageBuffer = fs.readFileSync(pagePath);
+
+      const pageText = await this.runTesseract(pageBuffer, config);
+      const trimmedText = pageText.trim();
+      textParts.push(trimmedText);
+
+      // Check text density for this page
+      const pageHasGoodText = this.isTextExtractionSuccessful(trimmedText);
+
+      if (pageHasGoodText) {
+        consecutivePoorPages = 0;
+      } else {
+        consecutivePoorPages++;
+      }
+
+      // Smart early stopping conditions
+      if (i + 1 >= this.EARLY_STOP_AFTER_PAGES) {
+        const totalText = textParts.join(' ');
+
+        // Stop if we have good text density overall
         if (
-          i + 1 >= this.EARLY_STOP_AFTER_PAGES &&
-          totalChars >= this.MIN_CHARS_FOR_EARLY_STOP &&
+          this.isTextExtractionSuccessful(totalText) &&
           i + 1 < pageFiles.length
         ) {
           this.logger.debug(
-            `Early stop after ${i + 1} pages (${totalChars} chars). Skipping ${pageFiles.length - i - 1} remaining pages.`,
+            `Early stop after ${i + 1} pages (good density). Skipping ${pageFiles.length - i - 1} remaining.`,
+          );
+          break;
+        }
+
+        // Stop if last 2 pages had poor text (likely blank/image pages)
+        if (consecutivePoorPages >= 2 && i + 1 < pageFiles.length) {
+          this.logger.debug(
+            `Early stop after ${i + 1} pages (${consecutivePoorPages} poor pages). Skipping rest.`,
           );
           break;
         }
       }
+    }
 
-      const fullText = textParts.join('\n\n--- Page Break ---\n\n');
-      this.logger.debug(
-        `OCR completed for ${textParts.length}/${pageFiles.length} pages. Total ${fullText.length} characters.`,
-      );
+    const fullText = textParts.join('\n\n--- Page Break ---\n\n');
+    this.logger.debug(
+      `OCR completed for ${textParts.length}/${pageFiles.length} pages. Total ${fullText.length} chars.`,
+    );
 
-      return fullText;
-    } finally {
-      // Cleanup temp files
-      this.cleanupTmpDir(tmpDir);
+    return fullText;
+  }
+
+  /**
+   * Clean up page files only (for retry with different DPI)
+   */
+  private cleanupPageFiles(tmpDir: string): void {
+    try {
+      const files = fs.readdirSync(tmpDir);
+      for (const file of files) {
+        if (file.startsWith('page-') && file.endsWith('.png')) {
+          try {
+            fs.unlinkSync(path.join(tmpDir, file));
+          } catch {
+            // Ignore
+          }
+        }
+      }
+    } catch {
+      // Ignore
     }
   }
 
