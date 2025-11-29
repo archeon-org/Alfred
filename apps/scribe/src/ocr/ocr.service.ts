@@ -8,6 +8,9 @@ import * as os from 'os';
 export class OCRService {
   private readonly logger = new Logger(OCRService.name);
   private readonly MAX_PAGES = 10;
+  // 150 DPI is a good balance between quality and speed
+  // 300 DPI was causing Tesseract to run for 5-7+ minutes per page
+  private readonly PDF_DPI = 150;
 
   async recognize(
     image: Buffer,
@@ -53,6 +56,7 @@ export class OCRService {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tesseract-'));
     const inputPath = path.join(tmpDir, 'input.png');
     const outputBase = path.join(tmpDir, 'output');
+    const TESSERACT_TIMEOUT = 60000; // 60 seconds per page
 
     try {
       // Write buffer to file
@@ -73,12 +77,24 @@ export class OCRService {
       await new Promise<void>((resolve, reject) => {
         const proc = spawn('tesseract', args);
         let stderr = '';
+        let killed = false;
+
+        // Add timeout to prevent hanging
+        const timeout = setTimeout(() => {
+          killed = true;
+          proc.kill('SIGKILL');
+          reject(
+            new Error(`Tesseract timed out after ${TESSERACT_TIMEOUT / 1000}s`),
+          );
+        }, TESSERACT_TIMEOUT);
 
         proc.stderr.on('data', (data) => {
           stderr += data.toString();
         });
 
         proc.on('close', (code) => {
+          clearTimeout(timeout);
+          if (killed) return; // Already rejected by timeout
           if (code === 0) {
             resolve();
           } else {
@@ -87,7 +103,8 @@ export class OCRService {
         });
 
         proc.on('error', (err) => {
-          reject(err);
+          clearTimeout(timeout);
+          if (!killed) reject(err);
         });
       });
 
@@ -123,8 +140,9 @@ export class OCRService {
       fs.writeFileSync(pdfPath, buffer);
 
       // Convert PDF to PNG images using pdftoppm
+      // Using 150 DPI instead of 300 for faster processing (4x less pixels)
       execSync(
-        `pdftoppm -png -r 300 -l ${this.MAX_PAGES} "${pdfPath}" "${outputPrefix}"`,
+        `pdftoppm -png -r ${this.PDF_DPI} -l ${this.MAX_PAGES} "${pdfPath}" "${outputPrefix}"`,
         { timeout: 120000 },
       );
 

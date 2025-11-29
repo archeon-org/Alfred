@@ -9,7 +9,9 @@ import {
 } from '@archeon-org/types';
 import { activeJobsInThisWorker } from '../main';
 
-@Processor('documents')
+// Limit concurrency to 1 job at a time per worker
+// This prevents memory exhaustion from multiple OCR processes running simultaneously
+@Processor('documents', { concurrency: 1 })
 export class DocumentProcessor {
   private readonly logger = new Logger(DocumentProcessor.name);
 
