@@ -7,6 +7,7 @@ import {
   GenerateTitleJobData,
   GenerateEmbeddingJobData,
 } from '@archeon-org/types';
+import { activeJobsInThisWorker } from '../main';
 
 @Processor('documents')
 export class DocumentProcessor {
@@ -24,14 +25,20 @@ export class DocumentProcessor {
         `Document: ${job.data?.documentId || 'unknown'}, ` +
         `Attempt: ${job.attemptsMade + 1}/${job.opts?.attempts || 1}`,
     );
+    // Remove from our tracking if it was ours
+    activeJobsInThisWorker.delete(String(job.id));
   }
 
   @Process('process-document')
   async handleProcessDocument(job: Job<ProcessDocumentJobData>) {
+    const jobId = String(job.id);
+    activeJobsInThisWorker.add(jobId);
+
     const isRetry = job.attemptsMade > 0;
     this.logger.log(
       `Received job ${job.id} to process document ${job.data.documentId}` +
-        (isRetry ? ` (RETRY attempt ${job.attemptsMade + 1})` : ''),
+        (isRetry ? ` (RETRY attempt ${job.attemptsMade + 1})` : '') +
+        ` [Active in this worker: ${activeJobsInThisWorker.size}]`,
     );
 
     try {
@@ -47,13 +54,22 @@ export class DocumentProcessor {
         `Job ${job.id} failed for document ${job.data.documentId}`,
         error instanceof Error ? error.stack : String(error),
       );
+    } finally {
+      activeJobsInThisWorker.delete(jobId);
+      this.logger.debug(
+        `Job ${job.id} removed from active tracking [Active: ${activeJobsInThisWorker.size}]`,
+      );
     }
   }
 
   @Process('generate-title')
   async handleGenerateTitle(job: Job<GenerateTitleJobData>) {
+    const jobId = String(job.id);
+    activeJobsInThisWorker.add(jobId);
+
     this.logger.log(
-      `Received job ${job.id} to generate title for document ${job.data.documentId}`,
+      `Received job ${job.id} to generate title for document ${job.data.documentId}` +
+        ` [Active in this worker: ${activeJobsInThisWorker.size}]`,
     );
 
     try {
@@ -66,13 +82,19 @@ export class DocumentProcessor {
         `Title generation job ${job.id} failed for document ${job.data.documentId}`,
         error instanceof Error ? error.stack : String(error),
       );
+    } finally {
+      activeJobsInThisWorker.delete(jobId);
     }
   }
 
   @Process('generate-embedding')
   async handleGenerateEmbedding(job: Job<GenerateEmbeddingJobData>) {
+    const jobId = String(job.id);
+    activeJobsInThisWorker.add(jobId);
+
     this.logger.log(
-      `Received job ${job.id} to generate embedding for document ${job.data.documentId}`,
+      `Received job ${job.id} to generate embedding for document ${job.data.documentId}` +
+        ` [Active in this worker: ${activeJobsInThisWorker.size}]`,
     );
 
     try {
@@ -85,6 +107,8 @@ export class DocumentProcessor {
         `Embedding generation job ${job.id} failed for document ${job.data.documentId}`,
         error instanceof Error ? error.stack : String(error),
       );
+    } finally {
+      activeJobsInThisWorker.delete(jobId);
     }
   }
 }

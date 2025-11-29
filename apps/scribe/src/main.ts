@@ -4,6 +4,9 @@ import { Logger } from '@nestjs/common';
 import { Queue } from 'bull';
 import { getQueueToken } from '@nestjs/bull';
 
+// Track this worker's active jobs
+export const activeJobsInThisWorker = new Set<string>();
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const globalPrefix = 'api';
@@ -18,9 +21,13 @@ async function bootstrap() {
   // Graceful shutdown handler
   let isShuttingDown = false;
 
+  // Export shutdown status so processor can check it
+  (global as any).isShuttingDown = false;
+
   const gracefulShutdown = async (signal: string) => {
     if (isShuttingDown) return; // Prevent multiple shutdown attempts
     isShuttingDown = true;
+    (global as any).isShuttingDown = true;
 
     Logger.log(
       `⚠️ [${workerId}] Received ${signal}. Starting graceful shutdown...`,
@@ -34,28 +41,31 @@ async function bootstrap() {
     );
     await documentsQueue.pause(true); // true = pause only this worker
 
-    // 2. Wait for active jobs to complete
+    // 2. Wait for THIS WORKER's active jobs to complete (not global count)
     const maxWaitTime = 10 * 60 * 1000; // 10 minutes max wait
     const startTime = Date.now();
 
     const checkActiveJobs = async (): Promise<void> => {
-      const activeJobs = await documentsQueue.getActiveCount();
+      // Use our own tracking instead of global getActiveCount()
+      const myActiveJobs = activeJobsInThisWorker.size;
       const elapsed = Math.round((Date.now() - startTime) / 1000);
 
-      if (activeJobs > 0) {
+      if (myActiveJobs > 0) {
         if (Date.now() - startTime >= maxWaitTime) {
           Logger.warn(
             `⚠️ [${workerId}] Graceful shutdown timeout (${elapsed}s). ` +
-              `${activeJobs} job(s) will be returned to queue for retry.`,
+              `${myActiveJobs} job(s) in this worker will be returned to queue for retry.`,
             'Main',
           );
-          // Jobs will automatically be retried by another worker because
-          // Bull marks them as stalled when the worker disconnects
+          Logger.warn(
+            `⚠️ [${workerId}] Active job IDs: ${Array.from(activeJobsInThisWorker).join(', ')}`,
+            'Main',
+          );
           return;
         }
 
         Logger.log(
-          `⏳ [${workerId}] Waiting for ${activeJobs} active job(s)... (${elapsed}s elapsed)`,
+          `⏳ [${workerId}] Waiting for ${myActiveJobs} active job(s) in this worker... (${elapsed}s elapsed)`,
           'Main',
         );
 
@@ -66,7 +76,7 @@ async function bootstrap() {
           }, 5000); // Check every 5 seconds
         });
       }
-      Logger.log(`✅ [${workerId}] All active jobs completed!`, 'Main');
+      Logger.log(`✅ [${workerId}] All jobs in this worker completed!`, 'Main');
     };
 
     await checkActiveJobs();
