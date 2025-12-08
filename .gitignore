@@ -43,3 +43,4 @@ app/.yarn/*
 *.code-workspace
 .npmrc
 .vault_pass
+apps/LightRAG
