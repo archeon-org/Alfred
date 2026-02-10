@@ -1,13 +1,9 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bull';
+import { CeleryModule } from '../celery/celery.module';
 import { QueueService } from './queue.service';
 
 @Module({
-  imports: [
-    BullModule.registerQueue({
-      name: 'documents',
-    }),
-  ],
+  imports: [CeleryModule],
   providers: [QueueService],
   exports: [QueueService],
 })

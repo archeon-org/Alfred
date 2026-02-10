@@ -4,6 +4,7 @@ import { useCategory } from "./useCategories";
 import { useDocuments, useDocumentMutations } from "./useDocuments";
 import { useToast } from "../context/ToastContext";
 import { parseApiError } from "../utils/apiError";
+import { Alert } from "react-native";
 
 export const useCategoryDetailsLogic = () => {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,7 +24,8 @@ export const useCategoryDetailsLogic = () => {
   const { documents: allDocuments, isLoading: isLoadingAllDocs } =
     useDocuments();
 
-  const { bulkUpdateDocuments, isBulkUpdating } = useDocumentMutations();
+  const { bulkUpdateDocuments, isBulkUpdating, updateDocument, isUpdating } =
+    useDocumentMutations();
 
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
@@ -62,6 +64,36 @@ export const useCategoryDetailsLogic = () => {
     }
   };
 
+  const handleRemoveFromCategory = async (
+    documentId: string,
+    documentName: string
+  ) => {
+    Alert.alert(
+      "Remove from Category",
+      `Remove "${documentName}" from this category?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await updateDocument({
+                id: documentId,
+                data: { categoryId: null },
+              });
+              refetchDocs();
+              success("Document Removed", "Document removed from category");
+            } catch (error) {
+              const appError = parseApiError(error);
+              showError("Failed to remove document", appError.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return {
     id,
     router,
@@ -76,8 +108,10 @@ export const useCategoryDetailsLogic = () => {
     selectedDocIds,
     handleToggleSelection,
     handleAddDocuments,
+    handleRemoveFromCategory,
     availableDocuments,
     isLoadingAllDocs,
     isBulkUpdating,
+    isUpdating,
   };
 };

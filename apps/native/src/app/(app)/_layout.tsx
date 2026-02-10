@@ -83,13 +83,21 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="documents"
+        name="brain"
         options={{
-          title: "Documents",
+          title: "Brain",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="document-text-outline" size={size} color={color} />
+            <Ionicons name="planet-outline" size={size} color={color} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="documents"
+        options={{
+          href: null,
+          title: "Documents",
+          headerShown: false,
         }}
       />
       <Tabs.Screen

@@ -120,3 +120,35 @@ export const excludeDocument = async (
   );
   return response.data;
 };
+
+// ============================================
+// Second Brain Q&A API
+// ============================================
+
+export interface QuestionRequest {
+  question: string;
+  conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>;
+}
+
+export interface QuestionResponse {
+  answer: string;
+  contextUsed: string;
+  sources: string[];
+  processingTimeMs: number;
+  confidence: "high" | "medium" | "low";
+}
+
+/**
+ * Ask a question to your Second Brain
+ * Returns an AI-generated answer based on your personal knowledge graph
+ */
+export const askQuestion = async (
+  question: string,
+  conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>
+): Promise<QuestionResponse> => {
+  const response = await api.post<QuestionResponse>("/search/question", {
+    question,
+    conversationHistory,
+  });
+  return response.data;
+};

@@ -22,9 +22,6 @@ import { AdminService } from './admin.service';
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
-  /**
-   * Get all users with pagination and optional search
-   */
   @Get('users')
   async getUsers(
     @Query('page') page: number = 1,
@@ -34,17 +31,11 @@ export class AdminController {
     return this.adminService.getUsers(page, limit, search);
   }
 
-  /**
-   * Get a specific user by ID with full details
-   */
   @Get('users/:userId')
   async getUser(@Param('userId', ParseUUIDPipe) userId: string) {
     return this.adminService.getUserDetails(userId);
   }
 
-  /**
-   * Upgrade a user's subscription tier
-   */
   @Post('users/:userId/upgrade-tier')
   async upgradeTier(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -53,9 +44,6 @@ export class AdminController {
     return this.adminService.setUserTier(userId, tier);
   }
 
-  /**
-   * Add credits to a user (using credit pack)
-   */
   @Post('users/:userId/add-credits')
   async addCredits(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -64,9 +52,6 @@ export class AdminController {
     return this.adminService.addCreditPack(userId, pack);
   }
 
-  /**
-   * Add custom credits amount to a user
-   */
   @Post('users/:userId/add-credits-custom')
   async addCustomCredits(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -82,9 +67,6 @@ export class AdminController {
     );
   }
 
-  /**
-   * Set custom bonus searches for a user
-   */
   @Post('users/:userId/set-bonus-searches')
   async setCustomBonusSearches(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -98,9 +80,6 @@ export class AdminController {
     );
   }
 
-  /**
-   * Set storage for a user (using storage pack)
-   */
   @Post('users/:userId/set-storage')
   async setStorage(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -109,9 +88,6 @@ export class AdminController {
     return this.adminService.setStoragePack(userId, pack);
   }
 
-  /**
-   * Set custom storage for a user (in GB)
-   */
   @Post('users/:userId/set-storage-custom')
   async setCustomStorage(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -121,17 +97,11 @@ export class AdminController {
     return this.adminService.setCustomStorage(userId, storageGb, reason);
   }
 
-  /**
-   * Reset daily search usage for a user
-   */
   @Post('users/:userId/reset-daily-search')
   async resetDailySearch(@Param('userId', ParseUUIDPipe) userId: string) {
     return this.adminService.resetDailySearch(userId);
   }
 
-  /**
-   * Get subscription statistics
-   */
   @Get('stats')
   async getStats() {
     return this.adminService.getSubscriptionStats();

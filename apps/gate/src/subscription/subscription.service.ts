@@ -23,9 +23,6 @@ export class SubscriptionService {
     private readonly userRepository: Repository<UserEntity>,
   ) {}
 
-  /**
-   * Get the subscription status for a user
-   */
   async getSubscriptionStatus(userId: string): Promise<SubscriptionStatus> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
@@ -76,9 +73,6 @@ export class SubscriptionService {
     };
   }
 
-  /**
-   * Check if user can afford an operation and throw if not
-   */
   async checkCredits(
     userId: string,
     operation: CreditOperation,
@@ -102,10 +96,6 @@ export class SubscriptionService {
     };
   }
 
-  /**
-   * Consume credits for an operation
-   * Returns the new credit balance
-   */
   async consumeCredits(
     userId: string,
     operation: CreditOperation,
@@ -149,9 +139,6 @@ export class SubscriptionService {
     return newCredits;
   }
 
-  /**
-   * Add credits to a user (for purchases or admin adjustments)
-   */
   async addCredits(
     userId: string,
     amount: number,
@@ -180,10 +167,6 @@ export class SubscriptionService {
     return newCredits;
   }
 
-  /**
-   * Add bonus AI searches to a user (for credit pack purchases)
-   * These searches don't reset daily
-   */
   async addBonusSearches(
     userId: string,
     amount: number,
@@ -212,10 +195,6 @@ export class SubscriptionService {
     return newBonusSearches;
   }
 
-  /**
-   * Check if user can use AI search and increment counter
-   * Uses daily searches first, then bonus searches
-   */
   async useAiSearch(userId: string): Promise<{
     allowed: boolean;
     remainingSearches: number;
@@ -238,10 +217,8 @@ export class SubscriptionService {
       throw new BadRequestException('User not found');
     }
 
-    // Check and reset if needed
     await this.checkAndResetDailySearch(user);
 
-    // Reload user after potential reset
     const freshUser = await this.userRepository.findOne({
       where: { id: userId },
       select: [
@@ -263,7 +240,6 @@ export class SubscriptionService {
       tierLimits.dailySearchLimit - freshUser.dailySearchUsed,
     );
 
-    // Check if user can search (daily or bonus)
     if (dailyRemaining === 0 && freshUser.bonusSearches === 0) {
       return {
         allowed: false,
@@ -274,9 +250,7 @@ export class SubscriptionService {
       };
     }
 
-    // Use daily searches first, then bonus
     if (dailyRemaining > 0) {
-      // Use daily search
       await this.userRepository.update(userId, {
         dailySearchUsed: freshUser.dailySearchUsed + 1,
       });
@@ -289,7 +263,6 @@ export class SubscriptionService {
         usedBonus: false,
       };
     } else {
-      // Use bonus search
       await this.userRepository.update(userId, {
         bonusSearches: freshUser.bonusSearches - 1,
       });
@@ -304,14 +277,10 @@ export class SubscriptionService {
     }
   }
 
-  /**
-   * Check if daily search counter needs reset and reset if necessary
-   */
   private async checkAndResetDailySearch(user: UserEntity): Promise<void> {
     const now = new Date();
     const resetAt = new Date(user.dailySearchResetAt);
 
-    // Check if we need to reset (more than 24 hours have passed)
     if (now.getTime() - resetAt.getTime() >= 24 * 60 * 60 * 1000) {
       await this.userRepository.update(user.id, {
         dailySearchUsed: 0,
@@ -322,19 +291,12 @@ export class SubscriptionService {
     }
   }
 
-  /**
-   * Calculate the next reset time (24 hours from last reset)
-   */
   private getNextResetTime(lastResetAt: Date): Date {
     const nextReset = new Date(lastResetAt);
     nextReset.setTime(nextReset.getTime() + 24 * 60 * 60 * 1000);
     return nextReset;
   }
 
-  /**
-   * Upgrade user's subscription tier
-   * Applies new tier benefits: credits, storage limit
-   */
   async upgradeTier(
     userId: string,
     newTier: SubscriptionTier,
@@ -369,7 +331,6 @@ export class SubscriptionService {
     const extraStorage = Number(user.extraStorage) || 0;
     const newStorageLimit = newTierLimits.storageLimitBytes + extraStorage;
 
-    // Add the initial credits for the new tier
     const bonusCredits = newTierLimits.initialCredits;
 
     await this.userRepository.update(userId, {
@@ -386,17 +347,12 @@ export class SubscriptionService {
     return this.getSubscriptionStatus(userId);
   }
 
-  /**
-   * Update user's subscription tier (admin function - no restrictions)
-   * Also adds the initial credits for the new tier
-   */
   async updateTier(
     userId: string,
     tier: SubscriptionTier,
   ): Promise<SubscriptionStatus> {
     const tierLimits = TIER_LIMITS[tier];
 
-    // Get user's current data
     const user = await this.userRepository.findOne({
       where: { id: userId },
       select: ['id', 'extraStorage', 'credits', 'subscriptionTier'],
@@ -409,7 +365,6 @@ export class SubscriptionService {
     const extraStorage = Number(user.extraStorage) || 0;
     const newStorageLimit = tierLimits.storageLimitBytes + extraStorage;
 
-    // Set credits to the tier's initial credits (not added, just set)
     const newCredits = tierLimits.initialCredits;
 
     await this.userRepository.update(userId, {
@@ -425,9 +380,6 @@ export class SubscriptionService {
     return this.getSubscriptionStatus(userId);
   }
 
-  /**
-   * Get credit balance for a user
-   */
   async getCredits(userId: string): Promise<number> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
@@ -441,10 +393,6 @@ export class SubscriptionService {
     return user.credits;
   }
 
-  /**
-   * Add extra storage to a user (for purchases or admin adjustments)
-   * Returns the new total storage limit
-   */
   async addExtraStorage(
     userId: string,
     pack: StoragePack,
@@ -481,9 +429,6 @@ export class SubscriptionService {
     };
   }
 
-  /**
-   * Check if user has enough storage for a file
-   */
   async checkStorage(
     userId: string,
     fileSizeBytes: number,

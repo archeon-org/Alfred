@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { DocumentRepository } from './document.repository';
-import { DocumentEntity, DocumentEmbeddingEntity } from '@archeon-org/database';
+import { DocumentEntity } from '@archeon-org/database';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import { R2Service } from '@archeon-org/module';
@@ -33,8 +33,6 @@ export class DocumentService {
   constructor(
     @InjectRepository(DocumentEntity)
     private readonly documentRepo: Repository<DocumentEntity>,
-    @InjectRepository(DocumentEmbeddingEntity)
-    private readonly embeddingRepo: Repository<DocumentEmbeddingEntity>,
     private readonly documentRepository: DocumentRepository,
     private readonly r2Service: R2Service,
     private readonly userService: UserService,
@@ -46,7 +44,6 @@ export class DocumentService {
     userId: string,
     file: Express.Multer.File,
   ): Promise<DocumentEntity> {
-    // Check if user has enough credits for AI classification
     const creditCheck = await this.subscriptionService.checkCredits(
       userId,
       CreditOperation.AI_CLASSIFICATION,
@@ -61,13 +58,11 @@ export class DocumentService {
 
     const document = await this.handleFileUpload(userId, file, 'AI');
 
-    // Consume credits for AI classification
     await this.subscriptionService.consumeCredits(
       userId,
       CreditOperation.AI_CLASSIFICATION,
     );
 
-    // Add job to queue for processing
     await this.queueService.addDocumentProcessingJob({
       documentId: document.id,
       userId: document.userId,
@@ -99,7 +94,6 @@ export class DocumentService {
       throw new BadRequestException('File is required');
     }
 
-    // Check storage limit
     const user = await this.userService.findById(userId);
     if (!user) {
       throw new NotFoundException('User not found');
@@ -118,12 +112,11 @@ export class DocumentService {
     const fileExtension = path.extname(file.originalname);
     const key = `${userId}/${uuidv4()}${fileExtension}`;
 
-    // Decode URL-encoded filename and clean up for use as initial title
     const decodedFilename = decodeURIComponent(file.originalname);
     const cleanTitle = path
       .basename(decodedFilename, path.extname(decodedFilename))
-      .replace(/[_-]+/g, ' ') // Replace underscores and hyphens with spaces
-      .replace(/\s+/g, ' ') // Normalize multiple spaces
+      .replace(/[_-]+/g, ' ')
+      .replace(/\s+/g, ' ')
       .trim();
 
     this.logger.log(
@@ -136,15 +129,14 @@ export class DocumentService {
       const document = await this.documentRepository.create({
         userId,
         filename: key,
-        originalName: decodedFilename, // Store decoded filename
+        originalName: decodedFilename,
         mimetype: file.mimetype,
         size: file.size,
         path: key,
-        title: cleanTitle || decodedFilename, // Use cleaned title, fallback to original
+        title: cleanTitle || decodedFilename,
         classificationSource,
       });
 
-      // Update user storage usage
       await this.userService.update(userId, {
         storageUsed: newStorageUsed,
       });
@@ -204,14 +196,9 @@ export class DocumentService {
       throw new ForbiddenException('Access denied');
     }
 
-    // Check if document has an embedding
-    const embeddingExists = await this.embeddingRepo.exists({
-      where: { documentId },
-    });
-
     const url = await this.r2Service.getSignedUrl(document.path);
     return {
-      document: { ...document, hasEmbedding: embeddingExists },
+      document: { ...document, hasEmbedding: false },
       url,
     };
   }
@@ -236,7 +223,6 @@ export class DocumentService {
       throw new ForbiddenException('Access denied');
     }
 
-    // If category is updated, update processing status to COMPLETED if it was PENDING or FAILED
     if (
       updateDocumentDto.categoryId &&
       (document.processingStatus === ProcessingStatus.PENDING ||
@@ -258,7 +244,6 @@ export class DocumentService {
       `Bulk updating documents ${documentIds.join(', ')} to category ${categoryId} for user ${userId}`,
     );
 
-    // Verify ownership of all documents
     const documents = await this.documentRepository.findByIds(documentIds);
     if (documents.length !== documentIds.length) {
       throw new NotFoundException('One or more documents not found');
@@ -270,7 +255,6 @@ export class DocumentService {
       }
     }
 
-    // Update all documents
     await this.documentRepository.updateMany(documentIds, {
       categoryId,
       processingStatus: ProcessingStatus.COMPLETED,
@@ -301,13 +285,21 @@ export class DocumentService {
         `Failed to delete file from R2: ${error.message}`,
         error.stack,
       );
-      // We continue with the deletion process even if R2 deletion fails
-      // to avoid blocking the user action, but we log the error.
     }
 
-    // Note: Document embedding is deleted automatically via CASCADE
+    try {
+      await this.queueService.addGraphDeletionJob({
+        documentId,
+        userId,
+      });
+      this.logger.log(`Queued graph deletion for document ${documentId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to queue graph deletion for document ${documentId}: ${error.message}`,
+        error.stack,
+      );
+    }
 
-    // Update user storage usage
     const user = await this.userService.findById(userId);
     if (user) {
       const currentStorage = Number(user.storageUsed) || 0;
@@ -337,7 +329,6 @@ export class DocumentService {
       throw new ForbiddenException('Access denied');
     }
 
-    // Check and consume credits for AI classification
     const creditCheck = await this.subscriptionService.checkCredits(
       userId,
       CreditOperation.AI_CLASSIFICATION,
@@ -354,7 +345,6 @@ export class DocumentService {
       CreditOperation.AI_CLASSIFICATION,
     );
 
-    // Add job to queue for processing
     await this.queueService.addDocumentProcessingJob({
       documentId: document.id,
       userId: document.userId,
@@ -386,7 +376,6 @@ export class DocumentService {
       throw new ForbiddenException('Access denied');
     }
 
-    // Check and consume credits for AI title generation
     const creditCheck = await this.subscriptionService.checkCredits(
       userId,
       CreditOperation.AI_TITLE_GENERATION,
@@ -403,7 +392,6 @@ export class DocumentService {
       CreditOperation.AI_TITLE_GENERATION,
     );
 
-    // Add job to queue for title generation
     await this.queueService.addTitleGenerationJob({
       documentId: document.id,
       userId: document.userId,
@@ -414,12 +402,16 @@ export class DocumentService {
     return document;
   }
 
-  async triggerEmbedding(
+  /**
+   * Trigger knowledge graph ingestion for a document.
+   * This replaces the old embedding generation workflow.
+   */
+  async triggerGraphIngestion(
     userId: string,
     documentId: string,
   ): Promise<DocumentEntity> {
     this.logger.log(
-      `Triggering embedding generation for document ${documentId} for user ${userId}`,
+      `Triggering knowledge graph ingestion for document ${documentId} for user ${userId}`,
     );
     const document = await this.documentRepository.findById(documentId);
 
@@ -431,16 +423,12 @@ export class DocumentService {
       throw new ForbiddenException('Access denied');
     }
 
-    // Check if embedding already exists
-    const embeddingExists = await this.embeddingRepo.exists({
-      where: { documentId },
-    });
-
-    if (embeddingExists) {
-      throw new BadRequestException('Document already has an embedding');
+    if (!document.content) {
+      throw new BadRequestException(
+        'Document must be processed before graph ingestion',
+      );
     }
 
-    // Check and consume credits for embedding generation
     const creditCheck = await this.subscriptionService.checkCredits(
       userId,
       CreditOperation.AI_EMBEDDING,
@@ -448,7 +436,7 @@ export class DocumentService {
 
     if (!creditCheck.canAfford) {
       throw new BadRequestException(
-        `Insufficient credits for embedding generation. Required: ${creditCheck.cost}, Available: ${creditCheck.currentCredits}.`,
+        `Insufficient credits. Required: ${creditCheck.cost}, Available: ${creditCheck.currentCredits}.`,
       );
     }
 
@@ -457,11 +445,12 @@ export class DocumentService {
       CreditOperation.AI_EMBEDDING,
     );
 
-    // Add job to queue for embedding generation
-    await this.queueService.addEmbeddingGenerationJob({
+    await this.queueService.addGraphIngestionJob({
       documentId: document.id,
       userId: document.userId,
-      key: document.path,
+      documentName: document.title || document.originalName || 'Untitled',
+      content: document.content,
+      referenceTime: null,
     });
 
     return document;

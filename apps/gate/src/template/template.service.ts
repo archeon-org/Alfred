@@ -76,7 +76,6 @@ export class TemplateService {
       throw new NotFoundException('Template not found');
     }
 
-    // Copy Categories
     this.logger.debug(`Copying ${template.categories.length} categories`);
     const categoriesData = template.categories.map((cat) => ({
       name: cat.name,
@@ -85,7 +84,6 @@ export class TemplateService {
     }));
     await this.categoryService.createManySystem(categoriesData, userId);
 
-    // Copy Tags
     this.logger.debug(`Copying ${template.tags.length} tags`);
     const tagsData = template.tags.map((tag) => ({
       name: tag.name,
@@ -93,7 +91,6 @@ export class TemplateService {
     }));
     await this.tagService.createManySystem(tagsData, userId);
 
-    // Mark user as onboarded
     this.logger.log(`Marking user ${userId} as onboarded`);
     await this.userService.update(userId, { isOnboarded: true });
   }

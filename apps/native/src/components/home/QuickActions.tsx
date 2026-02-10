@@ -63,10 +63,10 @@ export const QuickActions: React.FC<QuickActionsProps> = ({
       onPress: onSearchPress || (() => router.push("/(app)/documents")),
     },
     {
-      label: "Categories",
-      icon: "folder-open",
+      label: "Documents",
+      icon: "documents",
       color: "bg-violet-500",
-      onPress: () => router.push("/(app)/categories"),
+      onPress: () => router.push("/(app)/documents"),
     },
   ];
 

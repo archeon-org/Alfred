@@ -1,0 +1,1447 @@
+"""
+Simplified Entity and Relationship Types for Graphiti Knowledge Graph
+
+Focused on the most essential entity types and relationships for personal document management.
+Optimized for faster extraction and lower LLM costs while maintaining rich semantic structure.
+"""
+
+from __future__ import annotations
+
+from pydantic import BaseModel
+
+
+# =============================================================================
+# CORE ENTITY TYPES (15 essential types instead of 87)
+# =============================================================================
+
+class Person(BaseModel):
+    """Any individual person - name, contact, author, family member, professional."""
+    pass
+
+
+class Organization(BaseModel):
+    """Any company, institution, or group - businesses, hospitals, agencies, schools."""
+    pass
+
+
+class Location(BaseModel):
+    """Any place - addresses, cities, countries, buildings, venues."""
+    pass
+
+
+class Document(BaseModel):
+    """Referenced documents - contracts, invoices, certificates, reports, emails."""
+    pass
+
+
+class Book(BaseModel):
+    """A book or publication - includes textbooks, novels, manuals,
+    guides, ebooks, or any bound publication."""
+    pass
+
+
+class Contract(BaseModel):
+    """A legal agreement or contract - includes employment contracts,
+    service agreements, NDAs, leases, or binding documents."""
+    pass
+
+
+class Invoice(BaseModel):
+    """A billing document - includes invoices, receipts, bills,
+    purchase orders, or payment requests."""
+    pass
+
+
+class Report(BaseModel):
+    """A formal report or analysis - includes business reports, medical reports,
+    financial statements, audit reports, or analytical documents."""
+    pass
+
+
+class Certificate(BaseModel):
+    """A certification or credential - includes diplomas, licenses,
+    certifications, awards, or official recognitions."""
+    pass
+
+
+class Presentation(BaseModel):
+    """A presentation or slideshow - includes PowerPoint, Keynote,
+    pitch decks, lectures, or visual presentations."""
+    pass
+
+
+class Spreadsheet(BaseModel):
+    """A spreadsheet or data table - includes Excel files, CSV data,
+    financial models, or tabular data documents."""
+    pass
+
+
+class Form(BaseModel):
+    """A form or template - includes application forms, registration forms,
+    questionnaires, surveys, or structured input documents."""
+    pass
+
+
+class Note(BaseModel):
+    """A personal note or memo - includes meeting notes, reminders,
+    annotations, sticky notes, or informal writings."""
+    pass
+
+
+class Message(BaseModel):
+    """A communication message - includes text messages, chat messages,
+    instant messages, or short communications."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - TIME & EVENTS
+# =============================================================================
+
+class Event(BaseModel):
+    """A time-bound activity, occurrence, or experience - includes meetings,
+    appointments, deadlines, transactions, procedures, incidents, milestones,
+    conferences, parties, or any dated happening."""
+    pass
+
+
+class Meeting(BaseModel):
+    """A scheduled meeting or gathering - includes business meetings,
+    appointments, calls, video conferences, or group discussions."""
+    pass
+
+
+class Deadline(BaseModel):
+    """A due date or time limit - includes project deadlines, payment due dates,
+    submission deadlines, or time-sensitive milestones."""
+    pass
+
+
+class Milestone(BaseModel):
+    """A significant achievement or checkpoint - includes project milestones,
+    anniversaries, goals achieved, or notable accomplishments."""
+    pass
+
+
+class Holiday(BaseModel):
+    """A holiday or special day - includes national holidays, religious holidays,
+    vacation days, or celebrations."""
+    pass
+
+
+class Trip(BaseModel):
+    """A journey or travel - includes business trips, vacations, commutes,
+    flights, or travel itineraries."""
+    pass
+
+
+class Appointment(BaseModel):
+    """A scheduled appointment - includes doctor appointments, interviews,
+    consultations, or booked time slots."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - PRODUCTS & SERVICES
+# =============================================================================
+
+class Product(BaseModel):
+    """A commercial product or good - includes software, physical products,
+    medications, equipment, devices, or any purchasable item."""
+    pass
+
+
+class Service(BaseModel):
+    """A service offering - includes consulting, maintenance, subscriptions,
+    support, or any service provided."""
+    pass
+
+
+class Software(BaseModel):
+    """A software application or program - includes apps, tools, platforms,
+    operating systems, or digital solutions."""
+    pass
+
+
+class Hardware(BaseModel):
+    """A physical device or equipment - includes computers, phones, machinery,
+    appliances, or electronic devices."""
+    pass
+
+
+class Medication(BaseModel):
+    """A medicine or pharmaceutical - includes drugs, prescriptions,
+    supplements, treatments, or medical products."""
+    pass
+
+
+class Food(BaseModel):
+    """A food item or meal - includes ingredients, dishes, recipes,
+    groceries, or consumable items."""
+    pass
+
+
+class Vehicle(BaseModel):
+    """A vehicle or transport - includes cars, bikes, planes, trains,
+    boats, or any mode of transportation."""
+    pass
+
+
+class Property(BaseModel):
+    """Real estate or property - includes houses, apartments, land,
+    buildings, or real estate assets."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - FINANCIAL
+# =============================================================================
+
+class Monetary(BaseModel):
+    """A monetary value, price, payment, or financial amount - includes 
+    salaries, costs, fees, budgets, invoices, taxes, or any financial figure."""
+    pass
+
+
+class Account(BaseModel):
+    """A financial or user account - includes bank accounts, user accounts,
+    investment accounts, or subscription accounts."""
+    pass
+
+
+class Transaction(BaseModel):
+    """A financial transaction - includes payments, transfers, purchases,
+    refunds, or monetary exchanges."""
+    pass
+
+
+class Budget(BaseModel):
+    """A budget or financial plan - includes project budgets, personal budgets,
+    cost estimates, or financial allocations."""
+    pass
+
+
+class Tax(BaseModel):
+    """A tax or levy - includes income tax, sales tax, property tax,
+    VAT, or government charges."""
+    pass
+
+
+class Investment(BaseModel):
+    """An investment or asset - includes stocks, bonds, real estate investments,
+    portfolios, or financial instruments."""
+    pass
+
+
+class Insurance(BaseModel):
+    """An insurance policy or coverage - includes health insurance, car insurance,
+    life insurance, or protection plans."""
+    pass
+
+
+class Loan(BaseModel):
+    """A loan or credit - includes mortgages, personal loans, credit cards,
+    financing, or borrowed funds."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - MEDICAL & HEALTH
+# =============================================================================
+
+class Diagnosis(BaseModel):
+    """A medical diagnosis or condition - includes diseases, disorders,
+    symptoms, health conditions, or medical findings."""
+    pass
+
+
+class Treatment(BaseModel):
+    """A medical treatment or therapy - includes procedures, surgeries,
+    therapies, rehabilitation, or medical interventions."""
+    pass
+
+
+class Symptom(BaseModel):
+    """A medical symptom or sign - includes pain, fever, discomfort,
+    abnormalities, or health indicators."""
+    pass
+
+
+class Prescription(BaseModel):
+    """A medical prescription - includes medication orders, dosage instructions,
+    treatment plans, or doctor's orders."""
+    pass
+
+
+class HealthMetric(BaseModel):
+    """A health measurement - includes blood pressure, weight, heart rate,
+    lab results, or vital signs."""
+    pass
+
+
+class Allergy(BaseModel):
+    """An allergy or sensitivity - includes food allergies, drug allergies,
+    environmental allergies, or adverse reactions."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - LEGAL
+# =============================================================================
+
+class LegalCase(BaseModel):
+    """A legal case or lawsuit - includes court cases, disputes, claims,
+    lawsuits, or legal proceedings."""
+    pass
+
+
+class Law(BaseModel):
+    """A law, regulation, or legal provision - includes statutes, regulations,
+    policies, rules, or legal requirements."""
+    pass
+
+
+class LegalParty(BaseModel):
+    """A party in legal proceedings - includes plaintiffs, defendants,
+    witnesses, attorneys, or legal representatives."""
+    pass
+
+
+class Clause(BaseModel):
+    """A contract clause or provision - includes terms, conditions,
+    stipulations, or contractual provisions."""
+    pass
+
+
+class Patent(BaseModel):
+    """A patent or intellectual property - includes patents, trademarks,
+    copyrights, or IP rights."""
+    pass
+
+
+class Compliance(BaseModel):
+    """A compliance requirement - includes regulatory compliance, standards,
+    certifications, or legal obligations."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - EDUCATION & LEARNING
+# =============================================================================
+
+class Course(BaseModel):
+    """An educational course or class - includes online courses, university classes,
+    training programs, workshops, or learning modules."""
+    pass
+
+
+class Degree(BaseModel):
+    """An academic degree or qualification - includes bachelor's, master's, PhD,
+    diplomas, or educational credentials."""
+    pass
+
+
+class School(BaseModel):
+    """An educational institution - includes schools, universities, colleges,
+    training centers, or learning organizations."""
+    pass
+
+
+class Subject(BaseModel):
+    """An academic subject or field - includes mathematics, science, history,
+    languages, or areas of study."""
+    pass
+
+
+class Exam(BaseModel):
+    """An examination or test - includes final exams, certifications,
+    assessments, quizzes, or evaluations."""
+    pass
+
+
+class Grade(BaseModel):
+    """A grade or score - includes letter grades, percentages, GPA,
+    ratings, or performance scores."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - TECHNICAL & PROJECTS
+# =============================================================================
+
+class Project(BaseModel):
+    """A project or initiative - includes work projects, personal projects,
+    research projects, or organized endeavors."""
+    pass
+
+
+class Task(BaseModel):
+    """A task or to-do item - includes action items, assignments,
+    work items, or things to accomplish."""
+    pass
+
+
+class Feature(BaseModel):
+    """A product feature or capability - includes software features,
+    product capabilities, or functional requirements."""
+    pass
+
+
+class Bug(BaseModel):
+    """A bug or issue - includes software bugs, defects, problems,
+    errors, or things to fix."""
+    pass
+
+
+class Technology(BaseModel):
+    """A technology or technical concept - includes programming languages,
+    frameworks, tools, APIs, or technical solutions."""
+    pass
+
+
+class System(BaseModel):
+    """A system or infrastructure - includes IT systems, networks,
+    platforms, architectures, or technical environments."""
+    pass
+
+
+class Database(BaseModel):
+    """A database or data store - includes SQL databases, data warehouses,
+    repositories, or data storage systems."""
+    pass
+
+
+class API(BaseModel):
+    """An API or interface - includes REST APIs, web services, integrations,
+    or programmatic interfaces."""
+    pass
+
+
+class Repository(BaseModel):
+    """A code repository - includes Git repos, version control,
+    codebases, or source code locations."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - ABSTRACT CONCEPTS
+# =============================================================================
+
+class Concept(BaseModel):
+    """An abstract idea, topic, or subject matter - includes skills, fields
+    of study, methodologies, theories, or knowledge domains."""
+    pass
+
+
+class Skill(BaseModel):
+    """A skill or ability - includes technical skills, soft skills,
+    competencies, or learned abilities."""
+    pass
+
+
+class Goal(BaseModel):
+    """A goal or objective - includes personal goals, business objectives,
+    targets, aspirations, or desired outcomes."""
+    pass
+
+
+class Strategy(BaseModel):
+    """A strategy or plan - includes business strategies, approaches,
+    methodologies, or planned courses of action."""
+    pass
+
+
+class Policy(BaseModel):
+    """A policy or guideline - includes company policies, rules,
+    procedures, or organizational guidelines."""
+    pass
+
+
+class Metric(BaseModel):
+    """A metric or KPI - includes performance metrics, measurements,
+    statistics, or quantifiable indicators."""
+    pass
+
+
+class Category(BaseModel):
+    """A category or classification - includes types, groups, tags,
+    labels, or organizational categories."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - IDENTIFIERS & REFERENCES
+# =============================================================================
+
+class Identifier(BaseModel):
+    """A unique identifier or reference number - includes account numbers,
+    case IDs, invoice numbers, patient IDs, order numbers, or tracking codes."""
+    pass
+
+
+class URL(BaseModel):
+    """A web URL or link - includes website addresses, hyperlinks,
+    resource locators, or web references."""
+    pass
+
+
+class PhoneNumber(BaseModel):
+    """A phone number - includes mobile numbers, landlines, fax numbers,
+    or contact numbers."""
+    pass
+
+
+class EmailAddress(BaseModel):
+    """An email address - includes personal emails, work emails,
+    or contact email addresses."""
+    pass
+
+
+class SocialMedia(BaseModel):
+    """A social media account or handle - includes Twitter, LinkedIn,
+    Instagram, Facebook, or social profiles."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - PERSONAL & LIFESTYLE
+# =============================================================================
+
+class Preference(BaseModel):
+    """A user preference, choice, opinion, or personal selection - includes
+    settings, favorites, likes, dislikes, or customization choices."""
+    pass
+
+
+class Requirement(BaseModel):
+    """A specific need, constraint, or functionality requirement - includes
+    project requirements, legal obligations, medical needs, or specifications."""
+    pass
+
+
+class Procedure(BaseModel):
+    """A standard operating procedure, process, or sequential instructions -
+    includes workflows, treatment protocols, legal processes, or how-to guides."""
+    pass
+
+
+class Hobby(BaseModel):
+    """A hobby or interest - includes sports, arts, games, activities,
+    or recreational pursuits."""
+    pass
+
+
+class Recipe(BaseModel):
+    """A recipe or cooking instructions - includes food recipes, formulas,
+    preparation methods, or cooking guides."""
+    pass
+
+
+class Relationship(BaseModel):
+    """A personal relationship - includes family ties, friendships,
+    romantic relationships, or social connections."""
+    pass
+
+
+class Memory(BaseModel):
+    """A personal memory or experience - includes memorable events,
+    past experiences, recollections, or life moments."""
+    pass
+
+
+class Wish(BaseModel):
+    """A wish or desire - includes wishlists, wants, dreams,
+    or things desired."""
+    pass
+
+
+# =============================================================================
+# ENTITY TYPES - MEDIA & ENTERTAINMENT
+# =============================================================================
+
+class Image(BaseModel):
+    """An image or photo - includes photographs, graphics, screenshots,
+    illustrations, or visual media."""
+    pass
+
+
+class Video(BaseModel):
+    """A video or recording - includes movies, YouTube videos, recordings,
+    tutorials, or video content."""
+    pass
+
+
+class Audio(BaseModel):
+    """An audio file or recording - includes podcasts, music, voice recordings,
+    audiobooks, or sound files."""
+    pass
+
+
+class Music(BaseModel):
+    """A music piece or song - includes tracks, albums, playlists,
+    compositions, or musical works."""
+    pass
+
+
+class Movie(BaseModel):
+    """A movie or film - includes feature films, documentaries,
+    shows, series, or video productions."""
+    pass
+
+
+class Podcast(BaseModel):
+    """A podcast or audio show - includes podcast episodes, series,
+    or audio broadcasts."""
+    pass
+
+
+class Game(BaseModel):
+    """A game - includes video games, board games, sports games,
+    or recreational games."""
+    pass
+
+
+# =============================================================================
+# RELATIONSHIP/EDGE TYPES
+# =============================================================================
+
+class WorksAt(BaseModel):
+    """Employment or affiliation relationship between a person and an organization."""
+    pass
+
+
+class LocatedIn(BaseModel):
+    """Physical or virtual location relationship - where something is located or based."""
+    pass
+
+
+class OwnsOrManages(BaseModel):
+    """Ownership, management, or control relationship between entities."""
+    pass
+
+
+class CreatedBy(BaseModel):
+    """Authorship or creation relationship - who made or authored something."""
+    pass
+
+
+class RelatesTo(BaseModel):
+    """General semantic relationship when no specific type applies."""
+    pass
+
+
+class Mentions(BaseModel):
+    """Reference relationship - when one document or entity mentions another."""
+    pass
+
+
+class PartOf(BaseModel):
+    """Hierarchical or compositional relationship - when something is part of a larger whole."""
+    pass
+
+
+class HasProperty(BaseModel):
+    """Attribute or characteristic relationship - when an entity has a specific property."""
+    pass
+
+
+class Interacts(BaseModel):
+    """Interaction relationship - when entities interact, communicate, or transact."""
+    pass
+
+
+class Requires(BaseModel):
+    """Dependency or requirement relationship - when something requires or needs another."""
+    pass
+
+
+class PrescribedFor(BaseModel):
+    """Medical or treatment relationship - medication/treatment prescribed for condition."""
+    pass
+
+
+class CostsAmount(BaseModel):
+    """Financial relationship - the cost or price of something."""
+    pass
+
+
+class ScheduledFor(BaseModel):
+    """Temporal relationship - when something is scheduled or planned for a time/date."""
+    pass
+
+
+class AssignedTo(BaseModel):
+    """Assignment relationship - when a task, case, or item is assigned to someone."""
+    pass
+
+
+class BelongsTo(BaseModel):
+    """Ownership or membership relationship - when something belongs to someone or something."""
+    pass
+
+
+class Contains(BaseModel):
+    """Container relationship - when something contains or includes something else."""
+    pass
+
+
+class DependsOn(BaseModel):
+    """Dependency relationship - when something depends on something else."""
+    pass
+
+
+class Produces(BaseModel):
+    """Production relationship - when something produces or generates something else."""
+    pass
+
+
+class Consumes(BaseModel):
+    """Consumption relationship - when something uses or consumes something else."""
+    pass
+
+
+class Provides(BaseModel):
+    """Provider relationship - when something provides or supplies something else."""
+    pass
+
+
+class FollowsFrom(BaseModel):
+    """Sequential relationship - when something comes after or follows from something else."""
+    pass
+
+
+class PrecedesTo(BaseModel):
+    """Preceding relationship - when something comes before something else."""
+    pass
+
+
+class Causes(BaseModel):
+    """Causal relationship - when something causes or leads to something else."""
+    pass
+
+
+class Affects(BaseModel):
+    """Impact relationship - when something affects or influences something else."""
+    pass
+
+
+class SimilarTo(BaseModel):
+    """Similarity relationship - when two things are similar or related."""
+    pass
+
+
+class OpposesTo(BaseModel):
+    """Opposition relationship - when two things are opposite or conflicting."""
+    pass
+
+
+class ConnectsTo(BaseModel):
+    """Connection relationship - when something connects to something else."""
+    pass
+
+
+class ReportsTo(BaseModel):
+    """Reporting relationship - when someone reports to someone else in hierarchy."""
+    pass
+
+
+class SupervisedBy(BaseModel):
+    """Supervision relationship - when someone is supervised or managed by another."""
+    pass
+
+
+class AttendedBy(BaseModel):
+    """Attendance relationship - when an event is attended by someone."""
+    pass
+
+
+class AuthoredBy(BaseModel):
+    """Authorship relationship - when a document is authored by someone."""
+    pass
+
+
+class SignedBy(BaseModel):
+    """Signature relationship - when a document is signed by someone."""
+    pass
+
+
+class ApprovedBy(BaseModel):
+    """Approval relationship - when something is approved by someone."""
+    pass
+
+
+class PaidBy(BaseModel):
+    """Payment relationship - when something is paid by someone."""
+    pass
+
+
+class PaidTo(BaseModel):
+    """Payment receipt relationship - when payment is made to someone."""
+    pass
+
+
+class SentTo(BaseModel):
+    """Sending relationship - when something is sent to someone or somewhere."""
+    pass
+
+
+class ReceivedFrom(BaseModel):
+    """Receipt relationship - when something is received from someone."""
+    pass
+
+
+class ValidUntil(BaseModel):
+    """Validity relationship - when something is valid until a certain time."""
+    pass
+
+
+class StartsAt(BaseModel):
+    """Start time relationship - when something starts at a certain time."""
+    pass
+
+
+class EndsAt(BaseModel):
+    """End time relationship - when something ends at a certain time."""
+    pass
+
+
+class DueOn(BaseModel):
+    """Due date relationship - when something is due on a certain date."""
+    pass
+
+
+class BornOn(BaseModel):
+    """Birth date relationship - when someone was born on a date."""
+    pass
+
+
+class DiagnosedWith(BaseModel):
+    """Diagnosis relationship - when someone is diagnosed with a condition."""
+    pass
+
+
+class TreatedWith(BaseModel):
+    """Treatment relationship - when a condition is treated with something."""
+    pass
+
+
+class AllergicTo(BaseModel):
+    """Allergy relationship - when someone is allergic to something."""
+    pass
+
+
+class GraduatedFrom(BaseModel):
+    """Education relationship - when someone graduated from an institution."""
+    pass
+
+
+class EnrolledIn(BaseModel):
+    """Enrollment relationship - when someone is enrolled in a course or program."""
+    pass
+
+
+class CompletedBy(BaseModel):
+    """Completion relationship - when something was completed by someone."""
+    pass
+
+
+class ReviewedBy(BaseModel):
+    """Review relationship - when something was reviewed by someone."""
+    pass
+
+
+class RatedAs(BaseModel):
+    """Rating relationship - when something is rated as a certain score."""
+    pass
+
+
+class TaggedWith(BaseModel):
+    """Tagging relationship - when something is tagged with a category or label."""
+    pass
+
+
+class LinkedTo(BaseModel):
+    """Link relationship - when something is linked to something else."""
+    pass
+
+
+class ReferencedIn(BaseModel):
+    """Reference relationship - when something is referenced in a document."""
+    pass
+
+
+class QuotedFrom(BaseModel):
+    """Quotation relationship - when something is quoted from a source."""
+    pass
+
+
+class BasedOn(BaseModel):
+    """Derivation relationship - when something is based on something else."""
+    pass
+
+
+class InspiredBy(BaseModel):
+    """Inspiration relationship - when something is inspired by something else."""
+    pass
+
+
+class FundedBy(BaseModel):
+    """Funding relationship - when something is funded by someone or something."""
+    pass
+
+
+class SponsoredBy(BaseModel):
+    """Sponsorship relationship - when something is sponsored by someone."""
+    pass
+
+
+class PartneredWith(BaseModel):
+    """Partnership relationship - when entities are partnered together."""
+    pass
+
+
+class CompetesWith(BaseModel):
+    """Competition relationship - when entities compete with each other."""
+    pass
+
+
+class AcquiredBy(BaseModel):
+    """Acquisition relationship - when something is acquired by someone."""
+    pass
+
+
+class MergedWith(BaseModel):
+    """Merger relationship - when entities merge together."""
+    pass
+
+
+class SucceededBy(BaseModel):
+    """Succession relationship - when something is succeeded by something else."""
+    pass
+
+
+class ReplacedBy(BaseModel):
+    """Replacement relationship - when something is replaced by something else."""
+    pass
+
+
+class UpgradedTo(BaseModel):
+    """Upgrade relationship - when something is upgraded to a newer version."""
+    pass
+
+
+class CompatibleWith(BaseModel):
+    """Compatibility relationship - when something is compatible with something else."""
+    pass
+
+
+class IntegratesWith(BaseModel):
+    """Integration relationship - when something integrates with something else."""
+    pass
+
+
+# =============================================================================
+# TYPE COLLECTIONS
+# =============================================================================
+
+# All entity types for extraction
+ENTITY_TYPES: dict[str, type[BaseModel]] = {
+    # People & Organizations
+    "Person": Person,
+    "Organization": Organization,
+    "Team": Team,
+    "Role": Role,
+    
+    # Locations & Places
+    "Location": Location,
+    "Address": Address,
+    "Country": Country,
+    "City": City,
+    "Venue": Venue,
+    
+    # Documents & Content
+    "Document": Document,
+    "Email": Email,
+    "Article": Article,
+    "Book": Book,
+    "Contract": Contract,
+    "Invoice": Invoice,
+    "Report": Report,
+    "Certificate": Certificate,
+    "Presentation": Presentation,
+    "Spreadsheet": Spreadsheet,
+    "Form": Form,
+    "Note": Note,
+    "Message": Message,
+    
+    # Time & Events
+    "Event": Event,
+    "Meeting": Meeting,
+    "Deadline": Deadline,
+    "Milestone": Milestone,
+    "Holiday": Holiday,
+    "Trip": Trip,
+    "Appointment": Appointment,
+    
+    # Products & Services
+    "Product": Product,
+    "Service": Service,
+    "Software": Software,
+    "Hardware": Hardware,
+    "Medication": Medication,
+    "Food": Food,
+    "Vehicle": Vehicle,
+    "Property": Property,
+    
+    # Financial
+    "Monetary": Monetary,
+    "Account": Account,
+    "Transaction": Transaction,
+    "Budget": Budget,
+    "Tax": Tax,
+    "Investment": Investment,
+    "Insurance": Insurance,
+    "Loan": Loan,
+    
+    # Medical & Health
+    "Diagnosis": Diagnosis,
+    "Treatment": Treatment,
+    "Symptom": Symptom,
+    "Prescription": Prescription,
+    "HealthMetric": HealthMetric,
+    "Allergy": Allergy,
+    
+    # Legal
+    "LegalCase": LegalCase,
+    "Law": Law,
+    "LegalParty": LegalParty,
+    "Clause": Clause,
+    "Patent": Patent,
+    "Compliance": Compliance,
+    
+    # Education & Learning
+    "Course": Course,
+    "Degree": Degree,
+    "School": School,
+    "Subject": Subject,
+    "Exam": Exam,
+    "Grade": Grade,
+    
+    # Technical & Projects
+    "Project": Project,
+    "Task": Task,
+    "Feature": Feature,
+    "Bug": Bug,
+    "Technology": Technology,
+    "System": System,
+    "Database": Database,
+    "API": API,
+    "Repository": Repository,
+    
+    # Abstract Concepts
+    "Concept": Concept,
+    "Skill": Skill,
+    "Goal": Goal,
+    "Strategy": Strategy,
+    "Policy": Policy,
+    "Metric": Metric,
+    "Category": Category,
+    
+    # Identifiers & References
+    "Identifier": Identifier,
+    "URL": URL,
+    "PhoneNumber": PhoneNumber,
+    "EmailAddress": EmailAddress,
+    "SocialMedia": SocialMedia,
+    
+    # Personal & Lifestyle
+    "Preference": Preference,
+    "Requirement": Requirement,
+    "Procedure": Procedure,
+    "Hobby": Hobby,
+    "Recipe": Recipe,
+    "Relationship": Relationship,
+    "Memory": Memory,
+    "Wish": Wish,
+    
+    # Media & Entertainment
+    "Image": Image,
+    "Video": Video,
+    "Audio": Audio,
+    "Music": Music,
+    "Movie": Movie,
+    "Podcast": Podcast,
+    "Game": Game,
+}
+
+
+# All edge/relationship types
+EDGE_TYPES: dict[str, type[BaseModel]] = {
+    # Core relationships
+    "WORKS_AT": WorksAt,
+    "LOCATED_IN": LocatedIn,
+    "OWNS_OR_MANAGES": OwnsOrManages,
+    "CREATED_BY": CreatedBy,
+    "RELATES_TO": RelatesTo,
+    "MENTIONS": Mentions,
+    "PART_OF": PartOf,
+    "HAS_PROPERTY": HasProperty,
+    "INTERACTS": Interacts,
+    "REQUIRES": Requires,
+    "PRESCRIBED_FOR": PrescribedFor,
+    "COSTS_AMOUNT": CostsAmount,
+    "SCHEDULED_FOR": ScheduledFor,
+    "ASSIGNED_TO": AssignedTo,
+    
+    # Ownership & Structure
+    "BELONGS_TO": BelongsTo,
+    "CONTAINS": Contains,
+    "DEPENDS_ON": DependsOn,
+    "PRODUCES": Produces,
+    "CONSUMES": Consumes,
+    "PROVIDES": Provides,
+    
+    # Temporal & Sequential
+    "FOLLOWS_FROM": FollowsFrom,
+    "PRECEDES_TO": PrecedesTo,
+    "CAUSES": Causes,
+    "AFFECTS": Affects,
+    "STARTS_AT": StartsAt,
+    "ENDS_AT": EndsAt,
+    "DUE_ON": DueOn,
+    "VALID_UNTIL": ValidUntil,
+    
+    # Similarity & Opposition
+    "SIMILAR_TO": SimilarTo,
+    "OPPOSES_TO": OpposesTo,
+    "CONNECTS_TO": ConnectsTo,
+    
+    # Organizational
+    "REPORTS_TO": ReportsTo,
+    "SUPERVISED_BY": SupervisedBy,
+    "ATTENDED_BY": AttendedBy,
+    
+    # Document & Content
+    "AUTHORED_BY": AuthoredBy,
+    "SIGNED_BY": SignedBy,
+    "APPROVED_BY": ApprovedBy,
+    "REVIEWED_BY": ReviewedBy,
+    "COMPLETED_BY": CompletedBy,
+    "REFERENCED_IN": ReferencedIn,
+    "QUOTED_FROM": QuotedFrom,
+    "BASED_ON": BasedOn,
+    "INSPIRED_BY": InspiredBy,
+    "LINKED_TO": LinkedTo,
+    "TAGGED_WITH": TaggedWith,
+    "RATED_AS": RatedAs,
+    
+    # Financial
+    "PAID_BY": PaidBy,
+    "PAID_TO": PaidTo,
+    "FUNDED_BY": FundedBy,
+    "SPONSORED_BY": SponsoredBy,
+    
+    # Communication
+    "SENT_TO": SentTo,
+    "RECEIVED_FROM": ReceivedFrom,
+    
+    # Medical
+    "DIAGNOSED_WITH": DiagnosedWith,
+    "TREATED_WITH": TreatedWith,
+    "ALLERGIC_TO": AllergicTo,
+    "BORN_ON": BornOn,
+    
+    # Education
+    "GRADUATED_FROM": GraduatedFrom,
+    "ENROLLED_IN": EnrolledIn,
+    
+    # Business
+    "PARTNERED_WITH": PartneredWith,
+    "COMPETES_WITH": CompetesWith,
+    "ACQUIRED_BY": AcquiredBy,
+    "MERGED_WITH": MergedWith,
+    
+    # Technical
+    "SUCCEEDED_BY": SucceededBy,
+    "REPLACED_BY": ReplacedBy,
+    "UPGRADED_TO": UpgradedTo,
+    "COMPATIBLE_WITH": CompatibleWith,
+    "INTEGRATES_WITH": IntegratesWith,
+}
+
+
+# Edge type map: defines which relationship types are valid between entity pairs
+# Format: (source_entity_type, target_entity_type) -> [allowed_relationship_types]
+# Note: This is a subset of common pairings. The LLM can still use any relationship
+# type for entity pairs not listed here (defaulting to RELATES_TO behavior).
+EDGE_TYPE_MAP: dict[tuple[str, str], list[str]] = {
+    # Person relationships
+    ("Person", "Organization"): ["WORKS_AT", "PART_OF", "INTERACTS", "OWNS_OR_MANAGES", "FOUNDED_BY"],
+    ("Person", "Location"): ["LOCATED_IN", "BORN_ON"],
+    ("Person", "City"): ["LOCATED_IN", "BORN_ON"],
+    ("Person", "Country"): ["LOCATED_IN", "BORN_ON"],
+    ("Person", "Document"): ["CREATED_BY", "AUTHORED_BY", "SIGNED_BY", "MENTIONS", "ASSIGNED_TO"],
+    ("Person", "Event"): ["SCHEDULED_FOR", "INTERACTS", "ATTENDED_BY"],
+    ("Person", "Meeting"): ["SCHEDULED_FOR", "ATTENDED_BY"],
+    ("Person", "Product"): ["OWNS_OR_MANAGES", "INTERACTS", "CREATED_BY"],
+    ("Person", "Concept"): ["HAS_PROPERTY", "RELATES_TO"],
+    ("Person", "Skill"): ["HAS_PROPERTY"],
+    ("Person", "Person"): ["INTERACTS", "RELATES_TO", "REPORTS_TO", "SUPERVISED_BY"],
+    ("Person", "Requirement"): ["REQUIRES", "ASSIGNED_TO"],
+    ("Person", "Procedure"): ["ASSIGNED_TO", "CREATED_BY"],
+    ("Person", "Preference"): ["HAS_PROPERTY"],
+    ("Person", "Role"): ["HAS_PROPERTY", "WORKS_AT"],
+    ("Person", "Team"): ["PART_OF", "WORKS_AT"],
+    ("Person", "Project"): ["WORKS_AT", "ASSIGNED_TO", "OWNS_OR_MANAGES"],
+    ("Person", "Task"): ["ASSIGNED_TO", "COMPLETED_BY"],
+    ("Person", "Goal"): ["HAS_PROPERTY", "ASSIGNED_TO"],
+    ("Person", "School"): ["GRADUATED_FROM", "ENROLLED_IN"],
+    ("Person", "Course"): ["ENROLLED_IN", "COMPLETED_BY"],
+    ("Person", "Degree"): ["HAS_PROPERTY", "GRADUATED_FROM"],
+    ("Person", "Diagnosis"): ["DIAGNOSED_WITH"],
+    ("Person", "Medication"): ["PRESCRIBED_FOR", "ALLERGIC_TO"],
+    ("Person", "Allergy"): ["HAS_PROPERTY", "ALLERGIC_TO"],
+    ("Person", "Account"): ["OWNS_OR_MANAGES", "HAS_PROPERTY"],
+    ("Person", "Hobby"): ["HAS_PROPERTY", "INTERACTS"],
+    ("Person", "Relationship"): ["HAS_PROPERTY", "RELATES_TO"],
+    
+    # Organization relationships
+    ("Organization", "Location"): ["LOCATED_IN"],
+    ("Organization", "City"): ["LOCATED_IN"],
+    ("Organization", "Country"): ["LOCATED_IN"],
+    ("Organization", "Person"): ["INTERACTS", "OWNS_OR_MANAGES"],
+    ("Organization", "Organization"): ["PART_OF", "INTERACTS", "RELATES_TO", "PARTNERED_WITH", "COMPETES_WITH", "ACQUIRED_BY", "MERGED_WITH"],
+    ("Organization", "Product"): ["OWNS_OR_MANAGES", "CREATED_BY", "PRODUCES"],
+    ("Organization", "Service"): ["PROVIDES", "OWNS_OR_MANAGES"],
+    ("Organization", "Document"): ["CREATED_BY", "MENTIONS"],
+    ("Organization", "Event"): ["SCHEDULED_FOR", "INTERACTS"],
+    ("Organization", "Project"): ["OWNS_OR_MANAGES"],
+    ("Organization", "Team"): ["CONTAINS", "OWNS_OR_MANAGES"],
+    
+    # Document relationships
+    ("Document", "Person"): ["CREATED_BY", "AUTHORED_BY", "MENTIONS", "ASSIGNED_TO", "SIGNED_BY", "APPROVED_BY"],
+    ("Document", "Organization"): ["MENTIONS", "CREATED_BY"],
+    ("Document", "Document"): ["MENTIONS", "RELATES_TO", "PART_OF", "REFERENCED_IN", "BASED_ON"],
+    ("Document", "Concept"): ["MENTIONS", "RELATES_TO"],
+    ("Document", "Event"): ["MENTIONS", "SCHEDULED_FOR"],
+    ("Document", "Monetary"): ["COSTS_AMOUNT", "MENTIONS"],
+    ("Document", "Identifier"): ["HAS_PROPERTY", "MENTIONS"],
+    ("Document", "Category"): ["TAGGED_WITH"],
+    
+    # Contract specific
+    ("Contract", "Person"): ["SIGNED_BY", "AUTHORED_BY", "ASSIGNED_TO"],
+    ("Contract", "Organization"): ["SIGNED_BY", "MENTIONS"],
+    ("Contract", "Clause"): ["CONTAINS"],
+    ("Contract", "Monetary"): ["COSTS_AMOUNT"],
+    ("Contract", "Deadline"): ["DUE_ON", "VALID_UNTIL"],
+    
+    # Invoice specific
+    ("Invoice", "Person"): ["SENT_TO", "PAID_BY"],
+    ("Invoice", "Organization"): ["SENT_TO", "PAID_BY", "CREATED_BY"],
+    ("Invoice", "Monetary"): ["COSTS_AMOUNT"],
+    ("Invoice", "Product"): ["CONTAINS", "MENTIONS"],
+    ("Invoice", "Service"): ["CONTAINS", "MENTIONS"],
+    
+    # Product relationships
+    ("Product", "Monetary"): ["COSTS_AMOUNT"],
+    ("Product", "Organization"): ["CREATED_BY", "PART_OF"],
+    ("Product", "Person"): ["PRESCRIBED_FOR", "ASSIGNED_TO", "CREATED_BY"],
+    ("Product", "Concept"): ["RELATES_TO", "HAS_PROPERTY"],
+    ("Product", "Product"): ["PART_OF", "RELATES_TO", "REQUIRES", "COMPATIBLE_WITH", "REPLACED_BY"],
+    ("Product", "Category"): ["TAGGED_WITH", "PART_OF"],
+    
+    # Software/Tech relationships
+    ("Software", "Technology"): ["DEPENDS_ON", "INTEGRATES_WITH", "COMPATIBLE_WITH"],
+    ("Software", "API"): ["PROVIDES", "CONSUMES", "INTEGRATES_WITH"],
+    ("Software", "Database"): ["CONNECTS_TO", "DEPENDS_ON"],
+    ("Software", "Feature"): ["CONTAINS", "PROVIDES"],
+    ("Software", "Bug"): ["CONTAINS"],
+    ("Software", "Software"): ["INTEGRATES_WITH", "DEPENDS_ON", "REPLACED_BY", "UPGRADED_TO"],
+    
+    # Project relationships
+    ("Project", "Person"): ["ASSIGNED_TO", "OWNED_BY"],
+    ("Project", "Task"): ["CONTAINS"],
+    ("Project", "Milestone"): ["CONTAINS"],
+    ("Project", "Deadline"): ["DUE_ON"],
+    ("Project", "Goal"): ["HAS_PROPERTY"],
+    ("Project", "Budget"): ["HAS_PROPERTY"],
+    ("Project", "Technology"): ["DEPENDS_ON"],
+    
+    # Task relationships
+    ("Task", "Person"): ["ASSIGNED_TO", "COMPLETED_BY"],
+    ("Task", "Deadline"): ["DUE_ON"],
+    ("Task", "Task"): ["DEPENDS_ON", "FOLLOWS_FROM", "PRECEDES_TO"],
+    ("Task", "Project"): ["PART_OF"],
+    
+    # Event relationships
+    ("Event", "Location"): ["LOCATED_IN"],
+    ("Event", "Venue"): ["LOCATED_IN"],
+    ("Event", "Person"): ["ASSIGNED_TO", "INTERACTS", "ATTENDED_BY"],
+    ("Event", "Organization"): ["INTERACTS"],
+    ("Event", "Event"): ["PART_OF", "RELATES_TO", "FOLLOWS_FROM", "PRECEDES_TO"],
+    ("Event", "Deadline"): ["STARTS_AT", "ENDS_AT"],
+    
+    # Meeting relationships
+    ("Meeting", "Person"): ["ATTENDED_BY", "SCHEDULED_FOR"],
+    ("Meeting", "Location"): ["LOCATED_IN"],
+    ("Meeting", "Venue"): ["LOCATED_IN"],
+    ("Meeting", "Note"): ["PRODUCES"],
+    
+    # Medical relationships
+    ("Diagnosis", "Treatment"): ["TREATED_WITH"],
+    ("Diagnosis", "Symptom"): ["CAUSES", "RELATES_TO"],
+    ("Diagnosis", "Medication"): ["TREATED_WITH"],
+    ("Prescription", "Medication"): ["CONTAINS"],
+    ("Prescription", "Person"): ["PRESCRIBED_FOR", "CREATED_BY"],
+    ("Medication", "Symptom"): ["TREATS"],
+    ("Medication", "Allergy"): ["CAUSES"],
+    ("Treatment", "Person"): ["PRESCRIBED_FOR"],
+    ("HealthMetric", "Person"): ["BELONGS_TO"],
+    
+    # Financial relationships
+    ("Transaction", "Person"): ["PAID_BY", "PAID_TO"],
+    ("Transaction", "Organization"): ["PAID_BY", "PAID_TO"],
+    ("Transaction", "Monetary"): ["COSTS_AMOUNT"],
+    ("Transaction", "Account"): ["BELONGS_TO"],
+    ("Account", "Person"): ["BELONGS_TO", "OWNED_BY"],
+    ("Account", "Organization"): ["BELONGS_TO", "OWNED_BY"],
+    ("Investment", "Person"): ["OWNED_BY"],
+    ("Investment", "Monetary"): ["COSTS_AMOUNT"],
+    ("Loan", "Person"): ["BELONGS_TO", "PAID_BY"],
+    ("Loan", "Monetary"): ["COSTS_AMOUNT"],
+    ("Insurance", "Person"): ["BELONGS_TO"],
+    ("Tax", "Person"): ["PAID_BY"],
+    ("Tax", "Monetary"): ["COSTS_AMOUNT"],
+    ("Budget", "Monetary"): ["CONTAINS"],
+    ("Budget", "Project"): ["BELONGS_TO"],
+    
+    # Legal relationships
+    ("LegalCase", "Person"): ["INVOLVES", "ASSIGNED_TO"],
+    ("LegalCase", "LegalParty"): ["INVOLVES"],
+    ("LegalCase", "Organization"): ["INVOLVES"],
+    ("LegalCase", "Document"): ["CONTAINS", "REFERENCED_IN"],
+    ("Law", "Compliance"): ["REQUIRES"],
+    ("Patent", "Person"): ["OWNED_BY", "CREATED_BY"],
+    ("Patent", "Organization"): ["OWNED_BY"],
+    
+    # Education relationships
+    ("Course", "Person"): ["ENROLLED_IN", "CREATED_BY"],
+    ("Course", "Subject"): ["PART_OF", "RELATES_TO"],
+    ("Course", "School"): ["PART_OF"],
+    ("Exam", "Course"): ["PART_OF"],
+    ("Exam", "Person"): ["ASSIGNED_TO", "COMPLETED_BY"],
+    ("Grade", "Person"): ["BELONGS_TO"],
+    ("Grade", "Course"): ["BELONGS_TO"],
+    ("Degree", "School"): ["PART_OF"],
+    ("Degree", "Person"): ["BELONGS_TO", "GRADUATED_FROM"],
+    
+    # Concept relationships
+    ("Concept", "Concept"): ["PART_OF", "RELATES_TO", "REQUIRES", "SIMILAR_TO", "OPPOSES_TO"],
+    ("Concept", "Product"): ["PRESCRIBED_FOR", "RELATES_TO"],
+    ("Concept", "Procedure"): ["REQUIRES", "RELATES_TO"],
+    ("Skill", "Person"): ["BELONGS_TO"],
+    ("Skill", "Role"): ["REQUIRES"],
+    ("Skill", "Skill"): ["RELATES_TO", "REQUIRES"],
+    
+    # Procedure relationships
+    ("Procedure", "Procedure"): ["PART_OF", "REQUIRES", "RELATES_TO", "FOLLOWS_FROM"],
+    ("Procedure", "Person"): ["ASSIGNED_TO"],
+    ("Procedure", "Product"): ["REQUIRES"],
+    ("Procedure", "Concept"): ["RELATES_TO"],
+    ("Procedure", "Task"): ["CONTAINS"],
+    
+    # Media relationships
+    ("Image", "Person"): ["CONTAINS", "CREATED_BY"],
+    ("Image", "Location"): ["LOCATED_IN"],
+    ("Image", "Event"): ["PART_OF"],
+    ("Video", "Person"): ["CONTAINS", "CREATED_BY"],
+    ("Video", "Event"): ["PART_OF"],
+    ("Audio", "Person"): ["CREATED_BY"],
+    ("Podcast", "Person"): ["CREATED_BY", "MENTIONS"],
+    ("Podcast", "Concept"): ["MENTIONS", "RELATES_TO"],
+    ("Music", "Person"): ["CREATED_BY"],
+    ("Movie", "Person"): ["CREATED_BY", "CONTAINS"],
+    ("Book", "Person"): ["AUTHORED_BY", "MENTIONS"],
+    ("Article", "Person"): ["AUTHORED_BY", "MENTIONS"],
+    
+    # Monetary relationships
+    ("Monetary", "Product"): ["COSTS_AMOUNT"],
+    ("Monetary", "Service"): ["COSTS_AMOUNT"],
+    ("Monetary", "Event"): ["RELATES_TO"],
+    ("Monetary", "Document"): ["MENTIONS"],
+    
+    # Identifier relationships
+    ("Identifier", "Document"): ["HAS_PROPERTY"],
+    ("Identifier", "Person"): ["HAS_PROPERTY"],
+    ("Identifier", "Organization"): ["HAS_PROPERTY"],
+    ("Identifier", "Event"): ["HAS_PROPERTY"],
+    ("Identifier", "Account"): ["HAS_PROPERTY"],
+    ("Identifier", "Transaction"): ["HAS_PROPERTY"],
+    
+    # Contact info relationships
+    ("EmailAddress", "Person"): ["BELONGS_TO"],
+    ("EmailAddress", "Organization"): ["BELONGS_TO"],
+    ("PhoneNumber", "Person"): ["BELONGS_TO"],
+    ("PhoneNumber", "Organization"): ["BELONGS_TO"],
+    ("SocialMedia", "Person"): ["BELONGS_TO"],
+    ("SocialMedia", "Organization"): ["BELONGS_TO"],
+    ("URL", "Organization"): ["BELONGS_TO"],
+    ("URL", "Document"): ["LINKED_TO"],
+    
+    # Location relationships
+    ("Address", "Person"): ["BELONGS_TO"],
+    ("Address", "Organization"): ["BELONGS_TO"],
+    ("Address", "City"): ["LOCATED_IN"],
+    ("City", "Country"): ["LOCATED_IN"],
+    ("Venue", "City"): ["LOCATED_IN"],
+    ("Venue", "Address"): ["LOCATED_IN"],
+    
+    # Personal relationships
+    ("Hobby", "Person"): ["BELONGS_TO"],
+    ("Recipe", "Food"): ["PRODUCES"],
+    ("Recipe", "Person"): ["CREATED_BY"],
+    ("Wish", "Person"): ["BELONGS_TO"],
+    ("Memory", "Person"): ["BELONGS_TO"],
+    ("Memory", "Event"): ["RELATES_TO"],
+    ("Preference", "Person"): ["BELONGS_TO"],
+    ("Goal", "Person"): ["BELONGS_TO"],
+    ("Goal", "Deadline"): ["DUE_ON"],
+    
+    # ==========================================================================
+    # UNIVERSAL FALLBACK - Allows ALL edge types for ANY entity pair not 
+    # explicitly mapped above. This is CRITICAL because Graphiti resets 
+    # relationship types to RELATES_TO if the entity pair isn't in the map.
+    # ==========================================================================
+    ("Entity", "Entity"): list(EDGE_TYPES.keys()),
+}
+
+
+def get_extraction_types() -> tuple[
+    dict[str, type[BaseModel]],
+    dict[str, type[BaseModel]],
+    dict[tuple[str, str], list[str]],
+]:
+    """
+    Get all entity types, edge types, and edge type map for extraction.
+    
+    Returns
+    -------
+    tuple
+        (entity_types, edge_types, edge_type_map)
+    """
+    return ENTITY_TYPES, EDGE_TYPES, EDGE_TYPE_MAP
+
+
+def get_entity_types() -> dict[str, type[BaseModel]]:
+    """Get entity types dictionary for add_episode()."""
+    return ENTITY_TYPES
+
+
+def get_edge_types() -> dict[str, type[BaseModel]]:
+    """Get edge types dictionary for add_episode()."""
+    return EDGE_TYPES
+
+
+def get_edge_type_map() -> dict[tuple[str, str], list[str]]:
+    """Get edge type map for add_episode()."""
+    return EDGE_TYPE_MAP

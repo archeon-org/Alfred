@@ -1,0 +1,116 @@
+# Docker Compose for standalone scribe-py development
+# For full-stack development, use /docker/docker-compose.local.yml from project root
+#
+# This file is for isolated scribe-py development only.
+# Credentials match the root /docker configuration for consistency.
+
+services:
+  # Scribe API Server
+  scribe-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: archeon-scribe-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - ENV=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - WORKER_HOST=scribe-api
+      - DATABASE_HOST=postgres-archeon
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - REDIS_HOST=redis-archeon
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=RedisPassword123
+    depends_on:
+      postgres-archeon:
+        condition: service_healthy
+      redis-archeon:
+        condition: service_healthy
+    networks:
+      - archeon-net
+    restart: unless-stopped
+
+  # Scribe Celery Worker
+  scribe-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: archeon-scribe-worker
+    command: ["python", "-m", "scribe.worker"]
+    env_file:
+      - .env
+    environment:
+      - ENV=development
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - WORKER_HOST=scribe-worker-1
+      - WORKER_CONCURRENCY=2
+      - DATABASE_HOST=postgres-archeon
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=postgres
+      - DATABASE_USER=postgres
+      - DATABASE_PASSWORD=postgres
+      - REDIS_HOST=redis-archeon
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=RedisPassword123
+    depends_on:
+      postgres-archeon:
+        condition: service_healthy
+      redis-archeon:
+        condition: service_healthy
+    networks:
+      - archeon-net
+    restart: unless-stopped
+
+  # PostgreSQL Database (matches /docker/docker-compose.yml)
+  postgres-archeon:
+    image: ankane/pgvector:latest
+    container_name: postgres-archeon
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - archeon-net
+
+  # Redis (matches /docker/docker-compose.yml)
+  redis-archeon:
+    image: redis:alpine
+    container_name: redis-archeon
+    command: redis-server --requirepass RedisPassword123 --appendonly yes
+    ports:
+      - "6378:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "RedisPassword123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - archeon-net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  archeon-net:
+    driver: bridge

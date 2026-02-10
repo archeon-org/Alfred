@@ -6,4 +6,5 @@ export * from "./document";
 export * from "./notification";
 export * from "./search";
 export * from "./subscription";
+export * from "./question";
 export { default as api } from "./api";

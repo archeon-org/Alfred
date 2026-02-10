@@ -1,69 +1,101 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
+import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Client } from 'celery-node';
 import {
   ProcessDocumentJobData,
   GenerateTitleJobData,
-  GenerateEmbeddingJobData,
+  IngestDocumentGraphJobData,
 } from '@archeon-org/types';
+import { CELERY_CLIENT } from '../celery/celery.module';
+
+const TASKS = {
+  PROCESS_DOCUMENT: 'scribe.tasks.document.process_document',
+  GENERATE_TITLE: 'scribe.tasks.document.generate_title',
+  INGEST_DOCUMENT_GRAPH: 'scribe.tasks.graphiti.ingest_document_to_graph',
+  DELETE_DOCUMENT_FROM_GRAPH:
+    'scribe.tasks.graphiti.delete_document_from_graph',
+} as const;
 
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
 
   constructor(
-    @InjectQueue('documents') private readonly documentsQueue: Queue,
+    @Inject(CELERY_CLIENT)
+    private readonly celeryClient: Client,
   ) {}
 
-  async addDocumentProcessingJob(data: ProcessDocumentJobData) {
+  async addDocumentProcessingJob(data: ProcessDocumentJobData): Promise<void> {
     try {
-      await this.documentsQueue.add('process-document', data, {
-        attempts: 1,
-        removeOnComplete: true,
-      });
+      const task = this.celeryClient.createTask(TASKS.PROCESS_DOCUMENT);
+
+      await task.applyAsync([data]);
+
       this.logger.log(
-        `Added document processing job for document ${data.documentId}`,
+        `Added document processing task for document ${data.documentId}`,
       );
     } catch (error) {
       this.logger.error(
-        `Failed to add document processing job for document ${data.documentId}`,
-        error.stack,
+        `Failed to add document processing task for document ${data.documentId}`,
+        error instanceof Error ? error.stack : String(error),
       );
       throw error;
     }
   }
 
-  async addTitleGenerationJob(data: GenerateTitleJobData) {
+  async addTitleGenerationJob(data: GenerateTitleJobData): Promise<void> {
     try {
-      await this.documentsQueue.add('generate-title', data, {
-        attempts: 1,
-        removeOnComplete: true,
-      });
+      const task = this.celeryClient.createTask(TASKS.GENERATE_TITLE);
+
+      await task.applyAsync([data]);
+
       this.logger.log(
-        `Added title generation job for document ${data.documentId}`,
+        `Added title generation task for document ${data.documentId}`,
       );
     } catch (error) {
       this.logger.error(
-        `Failed to add title generation job for document ${data.documentId}`,
-        error.stack,
+        `Failed to add title generation task for document ${data.documentId}`,
+        error instanceof Error ? error.stack : String(error),
       );
       throw error;
     }
   }
 
-  async addEmbeddingGenerationJob(data: GenerateEmbeddingJobData) {
+  async addGraphIngestionJob(data: IngestDocumentGraphJobData): Promise<void> {
     try {
-      await this.documentsQueue.add('generate-embedding', data, {
-        attempts: 1,
-        removeOnComplete: true,
-      });
+      const task = this.celeryClient.createTask(TASKS.INGEST_DOCUMENT_GRAPH);
+
+      await task.applyAsync([data]);
+
       this.logger.log(
-        `Added embedding generation job for document ${data.documentId}`,
+        `Added knowledge graph ingestion task for document ${data.documentId}`,
       );
     } catch (error) {
       this.logger.error(
-        `Failed to add embedding generation job for document ${data.documentId}`,
-        error.stack,
+        `Failed to add graph ingestion task for document ${data.documentId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
+    }
+  }
+
+  async addGraphDeletionJob(data: {
+    documentId: string;
+    userId: string;
+  }): Promise<void> {
+    try {
+      const task = this.celeryClient.createTask(
+        TASKS.DELETE_DOCUMENT_FROM_GRAPH,
+      );
+
+      await task.applyAsync([data]);
+
+      this.logger.log(
+        `Added knowledge graph deletion task for document ${data.documentId}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to add graph deletion task for document ${data.documentId}`,
+        error instanceof Error ? error.stack : String(error),
       );
       throw error;
     }

@@ -1,99 +1,258 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Archeon Gate (NestJS API Gateway)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+The main API gateway for Archeon, built with **NestJS** and **TypeScript**. Gate handles:
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+- 🔐 **Authentication** - JWT-based auth with Google OAuth support
+- 📄 **Document Management** - Upload, organize, and manage documents
+- 🔍 **Search** - Semantic, keyword, and graph-based search
+- 🧠 **Second Brain Q&A** - AI-powered question answering from your documents
+- 📊 **User Management** - Profiles, subscriptions, and credits
+- ⚡ **Rate Limiting** - Redis-backed request throttling
 
-## Description
+## Architecture
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Gate is the public-facing API that coordinates between:
+- **Mobile/Web clients** ← HTTP REST API → **Gate** ← Internal API → **Scribe (Python)**
 
-## Project setup
-
-```bash
-$ yarn install
+```
+┌─────────────────────┐
+│   Mobile / Web      │
+│   Applications      │
+└──────────┬──────────┘
+           │ JWT Auth + REST API
+           ▼
+┌─────────────────────┐      ┌─────────────────────┐
+│   Gate (NestJS)     │─────▶│   Scribe (FastAPI)  │
+│   Port: 3000        │      │   Port: 8000        │
+│   - Auth            │      │   - OCR             │
+│   - Documents CRUD  │      │   - AI Classification│
+│   - Search          │      │   - Knowledge Graph  │
+└──────────┬──────────┘      └─────────────────────┘
+           │
+           ▼
+┌─────────────────────┐
+│   PostgreSQL        │
+│   + Redis + Neo4j   │
+└─────────────────────┘
 ```
 
-## Compile and run the project
+## Quick Start (Docker - Recommended)
+
+The easiest way to run Gate is using Docker Compose from the project root:
 
 ```bash
-# development
-$ yarn run start
+# From the archeon root directory
+cd /path/to/archeon
 
-# watch mode
-$ yarn run start:dev
+# Start all services with hot reload
+yarn docker:dev
 
-# production mode
-$ yarn run start:prod
+# View Gate logs
+docker logs -f archeon-gate
 ```
 
-## Run tests
+This starts Gate with hot reload enabled - changes to `apps/gate/src/` auto-restart the server.
+
+**Access Points:**
+- http://localhost:3000/api - API endpoints
+- http://localhost:3000/docs - Swagger documentation
+
+## Environment Variables
+
+Copy the example and configure:
 
 ```bash
-# unit tests
-$ yarn run test
-
-# e2e tests
-$ yarn run test:e2e
-
-# test coverage
-$ yarn run test:cov
+cp .env.example .env
 ```
 
-## Deployment
+### Required Variables
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+| Variable | Description | Docker Default |
+|----------|-------------|----------------|
+| `DATABASE_HOST` | PostgreSQL host | `postgres-archeon` |
+| `DATABASE_PORT` | PostgreSQL port | `5432` |
+| `DATABASE_USERNAME` | Database user | `postgres` |
+| `DATABASE_PASSWORD` | Database password | `postgres` |
+| `DATABASE_NAME` | Database name | `postgres` |
+| `REDIS_HOST` | Redis host | `redis-archeon` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `REDIS_PASSWORD` | Redis password | `RedisPassword123` |
+| `ACCESS_TOKEN_SECRET` | JWT signing secret | Generate a secure value |
+| `FIREWORKS_API_KEY` | For AI search features | Get from fireworks.ai |
+| `INTERNAL_API_KEY` | Gate ↔ Scribe auth | Must match Scribe's key |
+| `SCRIBE_API_URL` | Scribe API URL | `http://archeon-scribe-api:8000` |
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Optional Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | API port | `3000` |
+| `NODE_ENV` | Environment | `development` |
+| `SWAGGER_ENABLED` | Enable Swagger | `true` |
+| `DOCS_USER` | Swagger auth user | - |
+| `DOCS_PASSWORD` | Swagger auth password | - |
+
+## Running Locally (Without Docker)
+
+If you prefer running Gate directly on your machine:
+
+### 1. Prerequisites
+
+- Node.js 20+
+- Yarn 1.22+
+- PostgreSQL running locally (or via Docker)
+- Redis running locally (or via Docker)
+
+### 2. Start Infrastructure
 
 ```bash
-$ yarn install -g mau
-$ mau deploy
+# From project root - start only databases
+docker-compose -f docker/docker-compose.local.yml up -d postgres-archeon redis-archeon
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 3. Install Dependencies
 
-## Resources
+```bash
+# From project root
+yarn install
 
-Check out a few resources that may come in handy when working with NestJS:
+# Build shared packages (required)
+yarn build:packages
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 4. Configure Environment
 
-## Support
+```bash
+cd apps/gate
+cp .env.example .env
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Edit `.env` for local development:
+```bash
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+REDIS_HOST=localhost
+REDIS_PORT=6378  # Note: Docker exposes Redis on 6378
+```
 
-## Stay in touch
+### 5. Run Database Migrations
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```bash
+cd apps/gate
+npm run migration:run
+```
+
+### 6. Start Development Server
+
+```bash
+cd apps/gate
+npm run start:dev
+```
+
+The server starts with hot reload at http://localhost:3000
+
+## Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run start:dev` | Start with hot reload |
+| `npm run start:debug` | Start with debugger |
+| `npm run build` | Build for production |
+| `npm run start:prod` | Run production build |
+| `npm run test` | Run unit tests |
+| `npm run test:e2e` | Run E2E tests |
+| `npm run test:cov` | Run tests with coverage |
+| `npm run migration:run` | Run database migrations |
+| `npm run migration:generate` | Generate new migration |
+| `npm run migration:revert` | Revert last migration |
+| `npm run lint` | Run ESLint |
+| `npm run format` | Format with Prettier |
+
+## Database Migrations
+
+### Generate a New Migration
+
+After modifying entities in `@archeon-org/database`:
+
+```bash
+# Rebuild the database package
+yarn workspace @archeon-org/database build
+
+# Generate migration
+npm run migration:generate db/migrations/YourMigrationName
+```
+
+### Run Migrations
+
+```bash
+# In Docker
+docker exec -it archeon-gate sh -c "cd apps/gate && npm run migration:run"
+
+# Locally
+npm run migration:run
+```
+
+## API Endpoints
+
+### Authentication
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Register new user |
+| POST | `/api/auth/login` | Login with email/password |
+| POST | `/api/auth/google` | Google OAuth login |
+| GET | `/api/auth/me` | Get current user |
+
+### Documents
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/documents/upload/ai` | Upload with AI processing |
+| GET | `/api/documents` | List user documents |
+| GET | `/api/documents/:id` | Get single document |
+| PATCH | `/api/documents/:id` | Update document |
+| DELETE | `/api/documents/:id` | Delete document |
+
+### Search
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/search` | Semantic/hybrid search |
+| POST | `/api/search/chat` | Chat-based search |
+| GET | `/api/search/graph` | Knowledge graph search |
+| POST | `/api/search/question` | Second Brain Q&A |
+
+## Troubleshooting
+
+### "Cannot find module @archeon-org/..."
+
+Rebuild shared packages:
+```bash
+yarn build:packages
+```
+
+### Database connection refused
+
+Ensure PostgreSQL is running:
+```bash
+docker exec -it postgres-archeon pg_isready -U postgres
+```
+
+### Redis connection refused
+
+Ensure Redis is running:
+```bash
+docker exec -it redis-archeon redis-cli -a RedisPassword123 ping
+```
+
+### Port 3000 already in use
+
+Find and kill the process:
+```bash
+lsof -i :3000
+kill -9 <PID>
+```
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+UNLICENSED - Archeon Organization

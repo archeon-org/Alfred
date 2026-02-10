@@ -44,3 +44,5 @@ app/.yarn/*
 .npmrc
 .vault_pass
 apps/LightRAG
+apps/graphiti
+apps/ragflow

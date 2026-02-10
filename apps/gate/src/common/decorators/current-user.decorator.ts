@@ -5,7 +5,6 @@ export const CurrentUser = createParamDecorator(
     const request = ctx.switchToHttp().getRequest();
     const user = request.user;
 
-    // If a specific property is requested (e.g., 'id'), return just that property
     if (data && user) {
       return user[data];
     }

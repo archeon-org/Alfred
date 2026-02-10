@@ -31,6 +31,7 @@ export default function CategoryDetails() {
     selectedDocIds,
     handleToggleSelection,
     handleAddDocuments,
+    handleRemoveFromCategory,
     availableDocuments,
     isLoadingAllDocs,
     isBulkUpdating,
@@ -115,10 +116,27 @@ export default function CategoryDetails() {
           data={categoryDocuments}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <DocumentItem
-              document={item}
-              onPress={(doc: Document) => router.push(`/documents/${doc.id}`)}
-            />
+            <View className="flex-row items-center">
+              <View className="flex-1">
+                <DocumentItem
+                  document={item}
+                  onPress={(doc: Document) =>
+                    router.push(`/documents/${doc.id}`)
+                  }
+                />
+              </View>
+              <TouchableOpacity
+                onPress={() =>
+                  handleRemoveFromCategory(
+                    item.id,
+                    item.title || item.originalName
+                  )
+                }
+                className="mr-4 p-2 rounded-full bg-red-50 dark:bg-red-900/20"
+              >
+                <Ionicons name="close-circle" size={24} color="#EF4444" />
+              </TouchableOpacity>
+            </View>
           )}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
           refreshControl={
