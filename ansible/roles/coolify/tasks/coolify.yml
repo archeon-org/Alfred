@@ -49,43 +49,17 @@
     group: "9999"
     recurse: yes
 
-- name: Set ACLs for deploy user on Coolify data directory
-  ansible.posix.acl:
-    path: /data/coolify
-    entity: "{{ admin_user }}"
-    etype: user
-    permissions: rwx
-    recursive: yes
-    state: present
-
-- name: Set default ACLs for deploy user (inherited by new files/dirs)
-  ansible.posix.acl:
-    path: /data/coolify
-    entity: "{{ admin_user }}"
-    etype: user
-    permissions: rwx
-    default: yes
-    recursive: yes
-    state: present
-
-- name: Set ACLs for Coolify container user (uid 9999)
-  ansible.posix.acl:
-    path: /data/coolify
-    entity: "9999"
-    etype: user
-    permissions: rwx
-    recursive: yes
-    state: present
-
-- name: Set default ACLs for Coolify container user (uid 9999)
-  ansible.posix.acl:
-    path: /data/coolify
-    entity: "9999"
-    etype: user
-    permissions: rwx
-    default: yes
-    recursive: yes
-    state: present
+- name: Set ACLs on Coolify data directory (dirs=rwx, files=rw, SSH keys protected)
+  ansible.builtin.shell: |
+    # Default ACLs on directories — inherited by all future files/dirs
+    find /data/coolify -type d -exec setfacl -m u:{{ admin_user }}:rwx,u:9999:rwx,d:u:{{ admin_user }}:rwx,d:u:9999:rwx,d:m::rwx {} +
+    # Directories: mask rwx
+    find /data/coolify -type d -exec setfacl -m m::rwx {} +
+    # Files: deploy + 9999 get rw (no execute), mask rw
+    find /data/coolify -type f -exec setfacl -m u:{{ admin_user }}:rw,u:9999:rw,m::rw {} + 2>/dev/null || true
+    # SSH private keys MUST be 0600 — strip all ACLs
+    find /data/coolify -type f \( -name 'ssh_key*' -o -name 'id.*' -o -name '*.pem' \) -exec setfacl -b {} \; -exec chmod 600 {} \;
+  changed_when: true
 
 # ── Authorize Coolify's SSH key for the deploy user ──
 # Coolify generates its own SSH key at install time and uses it to SSH

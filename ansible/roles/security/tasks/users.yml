@@ -22,18 +22,19 @@
     create_home: yes
     state: present
 
-- name: Check if docker group exists
-  ansible.builtin.command: getent group docker
-  register: docker_group_check
-  changed_when: false
-  failed_when: false
+# Pre-create the docker group so deploy is already a member when
+# Coolify later installs Docker on nodes. Docker's postinst reuses
+# an existing group, so deploy keeps membership automatically.
+- name: Ensure docker group exists (pre-create for Coolify nodes)
+  ansible.builtin.group:
+    name: docker
+    state: present
 
-- name: Add admin user to docker group (if Docker is installed)
+- name: Add admin user to docker group
   ansible.builtin.user:
     name: "{{ admin_user }}"
     groups: docker
     append: yes
-  when: docker_group_check.rc == 0
 
 - name: Grant admin user passwordless sudo
   ansible.builtin.copy:

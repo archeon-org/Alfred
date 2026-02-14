@@ -22,7 +22,7 @@ ssh_x11_forwarding: "no"
 ssh_allow_agent_forwarding: "no"
 ssh_allow_tcp_forwarding: "no"
 ssh_permit_tunnel: "no"
-ssh_max_sessions: 3
+ssh_max_sessions: 20
 ssh_max_startups: "10:30:60"
 ssh_allowed_users: "{{ admin_user }}"
 ssh_service_name: "ssh"
@@ -33,6 +33,11 @@ firewall_allowed_tcp_ports:
   - "443"
 firewall_allowed_udp_ports: []
 firewall_rate_limit_ssh: true
+
+# Coolify control VPS IP — whitelisted on nodes to bypass SSH rate-limit.
+# Dynamically resolved from the inventory's control group.
+# Can be overridden via --extra-vars if needed.
+coolify_control_ip: "{{ hostvars[groups['control'][0]]['ansible_host'] | default('') }}"
 
 # Fail2ban
 fail2ban_bantime: "3600"

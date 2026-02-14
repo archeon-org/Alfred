@@ -15,6 +15,17 @@
     direction: outgoing
     policy: allow
 
+# Coolify opens many parallel SSH connections from the control VPS.
+# The rate-limit rule below would block it, so whitelist the control IP first.
+- name: Whitelist Coolify control VPS for SSH (bypass rate-limit)
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ coolify_control_ip }}"
+    port: "{{ ssh_port | string }}"
+    proto: tcp
+    comment: "Coolify control VPS — no rate limit"
+  when: coolify_control_ip is defined and coolify_control_ip | length > 0
+
 - name: Rate-limit SSH port (anti brute-force)
   community.general.ufw:
     rule: limit
