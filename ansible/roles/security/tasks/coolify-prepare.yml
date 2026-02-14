@@ -1,0 +1,64 @@
+---
+# ── Pre-create Coolify data directory with proper ACLs ──────
+# Coolify (from the control VPS) creates /data/coolify on nodes via SSH
+# as the deploy user with sudo. New directories inherit restrictive root
+# permissions, blocking deploy from traversing them later.
+#
+# By pre-creating /data/coolify with POSIX default ACLs, ALL future
+# subdirectories automatically inherit rwx for deploy + uid 9999
+# (Coolify container). This eliminates permission issues for ANY
+# Coolify feature: proxy, databases, applications, services, backups, etc.
+
+- name: Ensure /data directory exists
+  ansible.builtin.file:
+    path: /data
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure Coolify data directory exists
+  ansible.builtin.file:
+    path: /data/coolify
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Set ACLs for deploy user on Coolify data directory
+  ansible.posix.acl:
+    path: /data/coolify
+    entity: "{{ admin_user }}"
+    etype: user
+    permissions: rwx
+    recursive: yes
+    state: present
+
+- name: Set default ACLs for deploy user (inherited by new files/dirs)
+  ansible.posix.acl:
+    path: /data/coolify
+    entity: "{{ admin_user }}"
+    etype: user
+    permissions: rwx
+    default: yes
+    recursive: yes
+    state: present
+
+- name: Set ACLs for Coolify container user (uid 9999)
+  ansible.posix.acl:
+    path: /data/coolify
+    entity: "9999"
+    etype: user
+    permissions: rwx
+    recursive: yes
+    state: present
+
+- name: Set default ACLs for Coolify container user (uid 9999)
+  ansible.posix.acl:
+    path: /data/coolify
+    entity: "9999"
+    etype: user
+    permissions: rwx
+    default: yes
+    recursive: yes
+    state: present

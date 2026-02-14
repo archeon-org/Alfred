@@ -1,0 +1,97 @@
+---
+# ── Additional system hardening ─────────────────
+
+- name: Set server timezone
+  community.general.timezone:
+    name: "{{ server_timezone }}"
+
+- name: Disable core dumps (limits.conf)
+  ansible.builtin.lineinfile:
+    path: /etc/security/limits.conf
+    line: "{{ item }}"
+    create: yes
+  loop:
+    - "* hard core 0"
+    - "* soft core 0"
+
+- name: Secure permissions on cron directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - /etc/cron.d
+    - /etc/cron.daily
+    - /etc/cron.hourly
+    - /etc/cron.monthly
+    - /etc/cron.weekly
+  ignore_errors: true
+
+- name: Secure permissions on crontab
+  ansible.builtin.file:
+    path: /etc/crontab
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Restrict su to sudo group
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/su
+    regexp: '^#?\s*auth\s+required\s+pam_wheel\.so'
+    line: "auth required pam_wheel.so use_uid"
+
+- name: Harden login.defs — PASS_MAX_DAYS
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MAX_DAYS'
+    line: "PASS_MAX_DAYS 90"
+
+- name: Harden login.defs — PASS_MIN_DAYS
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MIN_DAYS'
+    line: "PASS_MIN_DAYS 7"
+
+- name: Harden login.defs — PASS_WARN_AGE
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_WARN_AGE'
+    line: "PASS_WARN_AGE 14"
+
+- name: Harden login.defs — UMASK
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^UMASK'
+    line: "UMASK 027"
+
+- name: Disable unused kernel modules
+  ansible.builtin.copy:
+    content: |
+      install cramfs /bin/true
+      install freevxfs /bin/true
+      install jffs2 /bin/true
+      install hfs /bin/true
+      install hfsplus /bin/true
+      install squashfs /bin/true
+      install udf /bin/true
+    dest: /etc/modprobe.d/disable-filesystems.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Disable USB storage module
+  ansible.builtin.copy:
+    content: "install usb-storage /bin/true\n"
+    dest: /etc/modprobe.d/disable-usb-storage.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Secure shared memory
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '/run/shm'
+    line: "tmpfs /run/shm tmpfs defaults,noexec,nosuid 0 0"
+    create: yes
+  ignore_errors: true

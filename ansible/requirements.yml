@@ -1,0 +1,8 @@
+---
+# Ansible Galaxy requirements
+# Install: ansible-galaxy install -r ansible/requirements.yml
+
+collections:
+  - name: community.general    # UFW firewall module
+  - name: community.docker     # Docker management
+  - name: ansible.posix        # POSIX ACLs module

@@ -1,0 +1,99 @@
+---
+# ═══════════════════════════════════════════════════
+#  Setup Control VPS — secure + install Coolify
+# ═══════════════════════════════════════════════════
+#
+#  This is the FULL initial setup playbook that:
+#    1. Connects as root with password
+#    2. Hardens the VPS (security role)
+#    3. Reconnects as the new admin user with SSH key
+#    4. Installs Docker + Coolify
+#
+#  Usage:
+#    ansible-playbook ansible/playbooks/setup-control.yml
+#
+# ═══════════════════════════════════════════════════
+
+# ── Phase 1: Harden the VPS ────────────────────
+- name: "Phase 1 — Secure VPS (root + password)"
+  hosts: control
+  become: true
+  gather_facts: true
+  vars:
+    ansible_user: root
+    ansible_port: 22
+    ansible_password: "{{ initial_password }}"
+    ansible_ssh_private_key_file: ""
+
+  pre_tasks:
+    - name: Wait for system to be reachable
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+
+    - name: Gather facts
+      ansible.builtin.setup:
+
+  roles:
+    - security
+
+  post_tasks:
+    - name: Flush all handlers (restart SSH now)
+      ansible.builtin.meta: flush_handlers
+
+    - name: Pause to let SSH restart settle
+      ansible.builtin.pause:
+        seconds: 5
+
+# ── Phase 2: Install Coolify ───────────────────
+- name: "Phase 2 — Install Coolify (deploy + SSH key)"
+  hosts: control
+  become: true
+  gather_facts: true
+  vars:
+    ansible_user: "{{ admin_user | default('deploy') }}"
+    ansible_port: "{{ ssh_port | default(2222) }}"
+    ansible_ssh_private_key_file: "{{ admin_ssh_key_path | default('~/.ssh/archeon_vps') }}"
+    ansible_password: null
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+  pre_tasks:
+    - name: Wait for SSH on new port
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+
+    - name: Gather facts
+      ansible.builtin.setup:
+
+  roles:
+    - coolify
+
+  post_tasks:
+    - name: Final summary
+      ansible.builtin.debug:
+        msg: |
+          ╔══════════════════════════════════════════════════════════╗
+          ║  SETUP COMPLETE                                         ║
+          ╠══════════════════════════════════════════════════════════╣
+          ║                                                         ║
+          ║  Coolify Dashboard:                                     ║
+          ║    http://{{ ansible_host }}:8000                        ║
+          ║                                                         ║
+          ║  SSH Access:                                             ║
+          ║    ssh -i {{ admin_ssh_key_path }} \                    ║
+          ║        -p {{ ssh_port }} {{ admin_user }}@{{ ansible_host }}  ║
+          ║                                                         ║
+          ║  ⚠ REQUIRED: Update localhost server in Coolify UI:    ║
+          ║    1. Go to Servers → localhost → Settings              ║
+          ║    2. Set User: {{ admin_user }}                        ║
+          ║    3. Set Port: {{ ssh_port }}                          ║
+          ║    4. In Keys & Tokens, add a new key with the         ║
+          ║       contents of: {{ admin_ssh_key_path }}             ║
+          ║    5. Select that key for the localhost server          ║
+          ║    6. Save → Validate → Proxy tab → Start Proxy        ║
+          ║                                                         ║
+          ║  When adding nodes to Coolify, use:                     ║
+          ║    User: {{ admin_user }}                               ║
+          ║    Port: {{ ssh_port }}                                 ║
+          ║    Key:  contents of {{ admin_ssh_key_path }}           ║
+          ║                                                         ║
+          ╚══════════════════════════════════════════════════════════╝

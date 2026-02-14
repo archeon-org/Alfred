@@ -1,0 +1,65 @@
+---
+# ── User management ─────────────────────────────
+
+- name: Generate SSH key pair locally (if not exists)
+  ansible.builtin.command:
+    cmd: >
+      ssh-keygen -t ed25519
+      -f {{ admin_ssh_key_path }}
+      -C "{{ admin_ssh_key_comment }}"
+      -N ""
+    creates: "{{ admin_ssh_key_path }}"
+  delegate_to: localhost
+  become: false
+  run_once: true
+
+- name: Create admin user
+  ansible.builtin.user:
+    name: "{{ admin_user }}"
+    shell: "{{ admin_user_shell }}"
+    groups: sudo
+    append: yes
+    create_home: yes
+    state: present
+
+- name: Check if docker group exists
+  ansible.builtin.command: getent group docker
+  register: docker_group_check
+  changed_when: false
+  failed_when: false
+
+- name: Add admin user to docker group (if Docker is installed)
+  ansible.builtin.user:
+    name: "{{ admin_user }}"
+    groups: docker
+    append: yes
+  when: docker_group_check.rc == 0
+
+- name: Grant admin user passwordless sudo
+  ansible.builtin.copy:
+    content: "{{ admin_user }} ALL=(ALL) NOPASSWD: ALL\n"
+    dest: "/etc/sudoers.d/{{ admin_user }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+- name: Ensure .ssh directory exists for admin user
+  ansible.builtin.file:
+    path: "/home/{{ admin_user }}/.ssh"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: "0700"
+
+- name: Deploy SSH public key for admin user
+  ansible.builtin.authorized_key:
+    user: "{{ admin_user }}"
+    key: "{{ lookup('file', admin_ssh_key_path + '.pub') }}"
+    state: present
+    exclusive: no
+
+- name: Lock root account password
+  ansible.builtin.user:
+    name: root
+    password_lock: yes

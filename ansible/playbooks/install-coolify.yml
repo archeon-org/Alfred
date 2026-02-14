@@ -1,0 +1,31 @@
+---
+# ═══════════════════════════════════════════════════
+#  Install Coolify — run AFTER securing the VPS
+# ═══════════════════════════════════════════════════
+#
+#  Usage:
+#    ansible-playbook ansible/playbooks/install-coolify.yml
+#
+#  This connects using the hardened credentials (deploy
+#  user, SSH key, port 2222).
+#
+# ═══════════════════════════════════════════════════
+
+- name: "Install Coolify on control VPS"
+  hosts: control
+  become: true
+  gather_facts: true
+  vars:
+    ansible_user: "{{ admin_user | default('deploy') }}"
+    ansible_port: "{{ ssh_port | default(2222) }}"
+    ansible_ssh_private_key_file: "{{ admin_ssh_key_path | default('~/.ssh/archeon_vps') }}"
+    ansible_password: null
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+  pre_tasks:
+    - name: Wait for system to be reachable
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+
+  roles:
+    - coolify

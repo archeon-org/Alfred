@@ -1,0 +1,12 @@
+---
+# ═══════════════════════════════════════════════════
+#  Coolify role — task orchestrator
+# ═══════════════════════════════════════════════════
+
+- name: Install Docker
+  ansible.builtin.include_tasks: docker.yml
+  tags: [docker]
+
+- name: Install Coolify
+  ansible.builtin.include_tasks: coolify.yml
+  tags: [coolify]

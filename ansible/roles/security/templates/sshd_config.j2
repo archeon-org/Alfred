@@ -1,0 +1,59 @@
+# ═══════════════════════════════════════════════════
+#  Ansible-managed — hardened sshd_config
+# ═══════════════════════════════════════════════════
+
+# ── Network ─────────────────────────────────────
+Port {{ ssh_port }}
+AddressFamily inet
+ListenAddress 0.0.0.0
+Protocol 2
+
+# ── Host keys ───────────────────────────────────
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
+
+# ── Ciphers & algorithms ───────────────────────
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512
+
+# ── Authentication ──────────────────────────────
+LoginGraceTime {{ ssh_login_grace_time }}
+PermitRootLogin {{ ssh_permit_root_login }}
+StrictModes yes
+MaxAuthTries {{ ssh_max_auth_tries }}
+MaxSessions {{ ssh_max_sessions }}
+
+PubkeyAuthentication {{ ssh_pubkey_authentication }}
+AuthorizedKeysFile .ssh/authorized_keys
+
+PasswordAuthentication {{ ssh_password_authentication }}
+PermitEmptyPasswords no
+KbdInteractiveAuthentication no
+UsePAM yes
+
+# ── Features ────────────────────────────────────
+X11Forwarding {{ ssh_x11_forwarding }}
+AllowAgentForwarding {{ ssh_allow_agent_forwarding }}
+AllowTcpForwarding {{ ssh_allow_tcp_forwarding }}
+PermitTunnel {{ ssh_permit_tunnel }}
+PrintMotd no
+PrintLastLog yes
+TCPKeepAlive no
+Compression no
+UseDNS no
+
+# ── Limits ──────────────────────────────────────
+MaxStartups {{ ssh_max_startups }}
+ClientAliveInterval {{ ssh_client_alive_interval }}
+ClientAliveCountMax {{ ssh_client_alive_count_max }}
+
+# ── Access control ──────────────────────────────
+AllowUsers {{ ssh_allowed_users }}
+
+# ── Logging ─────────────────────────────────────
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# ── SFTP ────────────────────────────────────────
+Subsystem sftp /usr/lib/openssh/sftp-server -f AUTHPRIV -l INFO

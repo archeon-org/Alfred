@@ -1,0 +1,62 @@
+---
+# ── Firewall (UFW) ──────────────────────────────
+
+- name: Reset UFW to defaults
+  community.general.ufw:
+    state: reset
+
+- name: Set default incoming policy — DENY
+  community.general.ufw:
+    direction: incoming
+    policy: deny
+
+- name: Set default outgoing policy — ALLOW
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Rate-limit SSH port (anti brute-force)
+  community.general.ufw:
+    rule: limit
+    port: "{{ ssh_port | string }}"
+    proto: tcp
+  when: firewall_rate_limit_ssh | bool
+
+- name: Allow SSH port (if rate-limit is disabled)
+  community.general.ufw:
+    rule: allow
+    port: "{{ ssh_port | string }}"
+    proto: tcp
+  when: not (firewall_rate_limit_ssh | bool)
+
+- name: Allow specified TCP ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ firewall_allowed_tcp_ports }}"
+
+- name: Allow specified UDP ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: udp
+  loop: "{{ firewall_allowed_udp_ports }}"
+  when: firewall_allowed_udp_ports | length > 0
+
+- name: Allow traffic from Docker bridge network (container-to-host)
+  community.general.ufw:
+    rule: allow
+    interface: docker0
+    direction: in
+    comment: "Docker bridge — allow containers to reach host"
+
+- name: Allow traffic from Docker networks (172.16.0.0/12)
+  community.general.ufw:
+    rule: allow
+    from_ip: "172.16.0.0/12"
+    comment: "All Docker bridge subnets (default, compose, swarm)"
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled

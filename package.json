@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "start": "node scripts/start",
+    "ansible": "./scripts/ansible/ansible.sh",
     "docker:dev": "docker-compose -f ./docker/docker-compose.local.yml up -d",
     "docker:dev:build": "docker-compose -f ./docker/docker-compose.local.yml up -d --build",
     "docker:dev:logs": "node scripts/dev-logs.js",

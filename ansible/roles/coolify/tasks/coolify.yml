@@ -1,0 +1,179 @@
+---
+# ── Coolify installation ────────────────────────
+
+- name: Create Coolify data directory
+  ansible.builtin.file:
+    path: "{{ coolify_data_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check if Coolify is already running
+  ansible.builtin.shell: docker ps --filter "name=coolify" --format "{% raw %}{{.Names}}{% endraw %}" 2>/dev/null
+  register: coolify_running
+  changed_when: false
+  failed_when: false
+
+- name: Download Coolify install script
+  ansible.builtin.get_url:
+    url: "{{ coolify_install_url }}"
+    dest: /tmp/coolify-install.sh
+    mode: "0755"
+  when: coolify_running.stdout == ""
+
+- name: Run Coolify installer
+  ansible.builtin.shell: /tmp/coolify-install.sh
+  args:
+    executable: /bin/bash
+  environment:
+    NONINTERACTIVE: "1"
+  when: coolify_running.stdout == ""
+  register: coolify_install_result
+  changed_when: coolify_install_result.rc == 0
+
+- name: Clean up install script
+  ansible.builtin.file:
+    path: /tmp/coolify-install.sh
+    state: absent
+
+# ── Set POSIX ACLs so both deploy user AND Coolify container have full access ──
+# Coolify's container runs as www-data (uid 9999). The deploy user needs
+# traversal/read/write access for proxy/docker management via SSH.
+# Default ACLs propagate to ALL future files/dirs automatically, preventing
+# permission issues for any Coolify feature (proxy, apps, databases, etc.).
+- name: Ensure Coolify data owned by container user (uid 9999)
+  ansible.builtin.file:
+    path: /data/coolify
+    owner: "9999"
+    group: "9999"
+    recurse: yes
+
+- name: Set ACLs for deploy user on Coolify data directory
+  ansible.posix.acl:
+    path: /data/coolify
+    entity: "{{ admin_user }}"
+    etype: user
+    permissions: rwx
+    recursive: yes
+    state: present
+
+- name: Set default ACLs for deploy user (inherited by new files/dirs)
+  ansible.posix.acl:
+    path: /data/coolify
+    entity: "{{ admin_user }}"
+    etype: user
+    permissions: rwx
+    default: yes
+    recursive: yes
+    state: present
+
+- name: Set ACLs for Coolify container user (uid 9999)
+  ansible.posix.acl:
+    path: /data/coolify
+    entity: "9999"
+    etype: user
+    permissions: rwx
+    recursive: yes
+    state: present
+
+- name: Set default ACLs for Coolify container user (uid 9999)
+  ansible.posix.acl:
+    path: /data/coolify
+    entity: "9999"
+    etype: user
+    permissions: rwx
+    default: yes
+    recursive: yes
+    state: present
+
+# ── Authorize Coolify's SSH key for the deploy user ──
+# Coolify generates its own SSH key at install time and uses it to SSH
+# into the host for Docker/proxy management. After hardening, root login
+# is disabled, so we must authorize this key for the deploy user instead.
+
+- name: Check if Coolify SSH key exists
+  ansible.builtin.stat:
+    path: /data/coolify/ssh/keys/id.root@host.docker.internal
+  register: coolify_ssh_key
+
+- name: Derive public key from Coolify's private key
+  ansible.builtin.command:
+    cmd: ssh-keygen -y -f /data/coolify/ssh/keys/id.root@host.docker.internal
+  register: coolify_pubkey
+  changed_when: false
+  when: coolify_ssh_key.stat.exists
+
+- name: Authorize Coolify's SSH key for deploy user
+  ansible.builtin.authorized_key:
+    user: "{{ admin_user }}"
+    key: "{{ coolify_pubkey.stdout }}"
+    state: present
+    comment: "coolify-internal"
+  when: coolify_ssh_key.stat.exists
+
+- name: Copy Coolify key to deploy user's .ssh for self-connection
+  ansible.builtin.shell: |
+    cp /data/coolify/ssh/keys/id.root@host.docker.internal /home/{{ admin_user }}/.ssh/coolify_key
+    chown {{ admin_user }}:{{ admin_user }} /home/{{ admin_user }}/.ssh/coolify_key
+    chmod 600 /home/{{ admin_user }}/.ssh/coolify_key
+  when: coolify_ssh_key.stat.exists
+
+- name: Test deploy user can SSH to localhost on hardened port
+  ansible.builtin.shell: |
+    ssh -i /home/{{ admin_user }}/.ssh/coolify_key \
+      -p {{ ssh_port }} \
+      -o StrictHostKeyChecking=no \
+      -o UserKnownHostsFile=/dev/null \
+      {{ admin_user }}@localhost echo OK
+  become: true
+  become_user: "{{ admin_user }}"
+  register: localhost_ssh_test
+  changed_when: false
+  failed_when: false
+
+- name: Report localhost SSH test result
+  ansible.builtin.debug:
+    msg: "Coolify self-SSH test: {{ 'PASS' if localhost_ssh_test.rc == 0 else 'FAIL — ' + (localhost_ssh_test.stderr | default('unknown error')) }}"
+
+- name: Open Coolify ports in UFW
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ coolify_ports }}"
+
+- name: Wait for Coolify to become available
+  ansible.builtin.uri:
+    url: "http://localhost:8000"
+    status_code: [200, 302, 301]
+  register: coolify_health
+  until: coolify_health.status is defined and coolify_health.status in [200, 302, 301]
+  retries: 30
+  delay: 10
+  ignore_errors: true
+
+- name: Display Coolify access information
+  ansible.builtin.debug:
+    msg: |
+      ╔══════════════════════════════════════════════════════════╗
+      ║  Coolify is ready!                                       ║
+      ╠══════════════════════════════════════════════════════════╣
+      ║                                                          ║
+      ║  Dashboard: http://{{ ansible_host }}:8000                ║
+      ║                                                          ║
+      ║  IMPORTANT — Update localhost server in Coolify UI:      ║
+      ║    1. Go to Servers → localhost → Settings               ║
+      ║    2. Set User: {{ admin_user }}                         ║
+      ║    3. Set Port: {{ ssh_port }}                           ║
+      ║    4. Add a Private Key in Keys & Tokens, paste from:   ║
+      ║       {{ admin_ssh_key_path }}                           ║
+      ║    5. Select that key for the localhost server           ║
+      ║    6. Click Save, then Validate                          ║
+      ║    7. Go to Proxy tab → Start Proxy                      ║
+      ║                                                          ║
+      ║  SSH Access:                                              ║
+      ║    ssh -i {{ admin_ssh_key_path }} \                     ║
+      ║        -p {{ ssh_port }} {{ admin_user }}@{{ ansible_host }}  ║
+      ║                                                          ║
+      ╚══════════════════════════════════════════════════════════╝

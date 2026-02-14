@@ -1,0 +1,41 @@
+---
+# ── System packages ─────────────────────────────
+
+# On fresh VPS, apt-daily / unattended-upgrades often hold the lock at boot
+- name: Wait for apt locks to be released
+  ansible.builtin.shell: |
+    while fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/cache/apt/archives/lock >/dev/null 2>&1; do
+      echo "Waiting for apt lock..."
+      sleep 5
+    done
+  changed_when: false
+  timeout: 300
+
+- name: Kill any running unattended-upgrades (if still holding lock)
+  ansible.builtin.shell: |
+    systemctl stop unattended-upgrades 2>/dev/null || true
+    killall -q apt-get 2>/dev/null || true
+    sleep 2
+  changed_when: false
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Upgrade all system packages
+  ansible.builtin.apt:
+    upgrade: safe
+    autoremove: yes
+
+- name: Install security packages
+  ansible.builtin.apt:
+    name: "{{ security_packages }}"
+    state: present
+
+- name: Remove unnecessary packages
+  ansible.builtin.apt:
+    name: "{{ packages_to_remove }}"
+    state: absent
+    purge: yes
+  ignore_errors: true

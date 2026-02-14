@@ -1,15 +1,15 @@
 ---
 # ═══════════════════════════════════════════════════
-#  Shared variables for ALL hosts
+#  Security role — default variables
 # ═══════════════════════════════════════════════════
 
-# ── Admin user ──────────────────────────────────
+# Admin user
 admin_user: "deploy"
 admin_user_shell: "/bin/bash"
 admin_ssh_key_path: "~/.ssh/archeon_vps"
 admin_ssh_key_comment: "archeon-deploy-key"
 
-# ── SSH hardening ───────────────────────────────
+# SSH
 ssh_port: 2222
 ssh_permit_root_login: "no"
 ssh_password_authentication: "no"
@@ -27,27 +27,52 @@ ssh_max_startups: "10:30:60"
 ssh_allowed_users: "{{ admin_user }}"
 ssh_service_name: "ssh"
 
-# ── Firewall (UFW) ─────────────────────────────
+# Firewall
 firewall_allowed_tcp_ports:
   - "80"
   - "443"
 firewall_allowed_udp_ports: []
 firewall_rate_limit_ssh: true
 
-# ── Fail2ban ────────────────────────────────────
+# Fail2ban
 fail2ban_bantime: "3600"
 fail2ban_findtime: "600"
 fail2ban_maxretry: "3"
 fail2ban_destemail: "root@localhost"
 fail2ban_action: "%(action_)s"
 
-# ── System ──────────────────────────────────────
+# System
 server_timezone: "UTC"
 enable_auto_updates: true
 kernel_hardening: true
 
-# ── Coolify ports (opened only by coolify role) ─
-coolify_ports:
-  - "8000"
-  - "6001"
-  - "6002"
+# Packages to install
+security_packages:
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - apt-listchanges
+  - logwatch
+  - rkhunter
+  - libpam-tmpdir
+  - debsums
+  - acl
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+  - lsb-release
+  - software-properties-common
+  - sudo
+  - vim
+  - htop
+  - net-tools
+  - jq
+  - tmux
+  - git
+
+# Packages to remove
+packages_to_remove:
+  - telnet
+  - rsh-client
+  - rsh-redone-client

@@ -1,37 +1,22 @@
 ---
 all:
   children:
-    # Main VPS - runs Gate API, PostgreSQL, Redis
-    production:
+    # Control VPS - runs Coolify dashboard
+    control:
       hosts:
-        archeon-vps:
-          ansible_host: "{{ vault_vps_ip }}"
-          ansible_user: "{{ vault_vps_user }}"
-          ansible_password: "{{ vault_vps_password }}"
-          ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
-          ansible_python_interpreter: /usr/bin/python3
+        coolify-master:
+          ansible_host: 161.97.135.50
 
-    # Scribe Workers VPS - runs Scribe worker containers
-    scribe_workers:
+    # Node VPS - managed by Coolify
+    # Add nodes via: yarn ansible -> 4) Add a new node
+    nodes:
       hosts:
-        scribe-worker-1:
-          ansible_host: "{{ vault_scribe_worker_1_ip }}"
-          ansible_user: "{{ vault_scribe_worker_1_user }}"
-          ansible_password: "{{ vault_scribe_worker_1_password }}"
-          ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
-          ansible_python_interpreter: /usr/bin/python3
-          scribe_worker_count: 3
-        scribe-worker-2:
-          ansible_host: "{{ vault_scribe_worker_2_ip }}"
-          ansible_user: "{{ vault_scribe_worker_2_user }}"
-          ansible_password: "{{ vault_scribe_worker_2_password }}"
-          ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
-          ansible_python_interpreter: /usr/bin/python3
-          scribe_worker_count: 3
+        node-1:
+          ansible_host: 185.172.57.106
 
+  # Default connection vars (hardened)
   vars:
-    # Global variables for all hosts
-    ansible_ssh_port: 22
-    ansible_connection: ssh
-    ansible_ssh_timeout: 10
-    ansible_ssh_retries: 3
+    ansible_user: deploy
+    ansible_port: 2222
+    ansible_ssh_private_key_file: ~/.ssh/archeon_vps
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
