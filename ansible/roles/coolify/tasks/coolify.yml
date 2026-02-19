@@ -110,6 +110,82 @@
   ansible.builtin.debug:
     msg: "Coolify self-SSH test: {{ 'PASS' if localhost_ssh_test.rc == 0 else 'FAIL — ' + (localhost_ssh_test.stderr | default('unknown error')) }}"
 
+# ── Patch Coolify's localhost server to use hardened SSH settings ──
+# Coolify defaults to root@port22. After hardening, root login is
+# disabled and SSH runs on a custom port, so we must update Coolify's
+# database to use our deploy user and correct port.
+
+- name: Find Coolify database path
+  ansible.builtin.shell: |
+    find /data/coolify -name "database.sqlite" -type f 2>/dev/null | head -1
+  register: coolify_db_path
+  changed_when: false
+
+- name: Install sqlite3 (if not present)
+  ansible.builtin.apt:
+    name: sqlite3
+    state: present
+  when: coolify_db_path.stdout | length > 0
+
+- name: Update Coolify localhost server — set user to {{ admin_user }}
+  ansible.builtin.shell: |
+    sqlite3 "{{ coolify_db_path.stdout }}" \
+      "UPDATE servers SET user='{{ admin_user }}' WHERE name='localhost' OR ip='host.docker.internal';"
+  when: coolify_db_path.stdout | length > 0
+  register: coolify_db_user_update
+  changed_when: coolify_db_user_update.rc == 0
+
+- name: Update Coolify localhost server — set port to {{ ssh_port }}
+  ansible.builtin.shell: |
+    sqlite3 "{{ coolify_db_path.stdout }}" \
+      "UPDATE servers SET port={{ ssh_port }} WHERE name='localhost' OR ip='host.docker.internal';"
+  when: coolify_db_path.stdout | length > 0
+  register: coolify_db_port_update
+  changed_when: coolify_db_port_update.rc == 0
+
+- name: Import Coolify SSH key into Coolify's private_keys table
+  ansible.builtin.shell: |
+    PRIVKEY=$(cat /data/coolify/ssh/keys/id.root@host.docker.internal)
+    # Check if key already exists in private_keys
+    EXISTING=$(sqlite3 "{{ coolify_db_path.stdout }}" \
+      "SELECT id FROM private_keys WHERE name='hardened-localhost-key' LIMIT 1;")
+    if [ -z "$EXISTING" ]; then
+      sqlite3 "{{ coolify_db_path.stdout }}" \
+        "INSERT INTO private_keys (uuid, name, description, private_key, team_id, created_at, updated_at) \
+         VALUES ( \
+           lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(2)) || '-' || hex(randomblob(6))), \
+           'hardened-localhost-key', \
+           'Auto-configured by Ansible for hardened SSH (port {{ ssh_port }}, user {{ admin_user }})', \
+           '$PRIVKEY', \
+           (SELECT id FROM teams LIMIT 1), \
+           datetime('now'), \
+           datetime('now') \
+         );"
+      # Link the key to the localhost server
+      KEY_ID=$(sqlite3 "{{ coolify_db_path.stdout }}" \
+        "SELECT id FROM private_keys WHERE name='hardened-localhost-key' LIMIT 1;")
+      sqlite3 "{{ coolify_db_path.stdout }}" \
+        "UPDATE servers SET private_key_id=$KEY_ID WHERE name='localhost' OR ip='host.docker.internal';"
+    fi
+  when: coolify_db_path.stdout | length > 0 and coolify_ssh_key.stat.exists
+  register: coolify_key_import
+  changed_when: "'INSERT' in (coolify_key_import.stdout | default(''))"
+
+- name: Restart Coolify to apply database changes
+  ansible.builtin.shell: |
+    cd /data/coolify/source && docker compose restart 2>/dev/null || \
+    docker restart $(docker ps -q --filter "name=coolify") 2>/dev/null || true
+  when: (coolify_db_user_update.changed | default(false)) or (coolify_db_port_update.changed | default(false)) or (coolify_key_import.changed | default(false))
+
+- name: Wait for Coolify to restart
+  ansible.builtin.wait_for:
+    port: 8000
+    host: 127.0.0.1
+    delay: 5
+    timeout: 120
+    state: started
+  when: (coolify_db_user_update.changed | default(false)) or (coolify_db_port_update.changed | default(false))
+
 - name: Open Coolify ports in UFW
   community.general.ufw:
     rule: allow

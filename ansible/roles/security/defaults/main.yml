@@ -19,8 +19,8 @@ ssh_login_grace_time: 20
 ssh_client_alive_interval: 300
 ssh_client_alive_count_max: 2
 ssh_x11_forwarding: "no"
-ssh_allow_agent_forwarding: "no"
-ssh_allow_tcp_forwarding: "no"
+ssh_allow_agent_forwarding: "yes"
+ssh_allow_tcp_forwarding: "yes"
 ssh_permit_tunnel: "no"
 ssh_max_sessions: 20
 ssh_max_startups: "10:30:60"
