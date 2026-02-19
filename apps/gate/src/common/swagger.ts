@@ -2,14 +2,55 @@ import { INestApplication, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import basicAuth from 'express-basic-auth';
 
-export function setupSwagger(app: INestApplication): void {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const docsPath = 'docs';
-  const docsUser = process.env.DOCS_USER || 'archeon';
-  const docsPassword = process.env.DOCS_PASSWORD || 'archeon-docs-2024';
+const logger = new Logger('Swagger');
 
-  // Protect docs with basic auth in production
-  if (isProduction) {
+type Environment = 'local' | 'development' | 'production';
+
+function getServerUrl(env: Environment, port: string | number): string {
+  switch (env) {
+    case 'local':
+      return `http://localhost:${port}`;
+    case 'development':
+      return 'https://dev-api.archeon.app';
+    case 'production':
+      return 'https://api.archeon.app';
+  }
+}
+
+function getServerLabel(env: Environment): string {
+  switch (env) {
+    case 'local':
+      return 'Local';
+    case 'development':
+      return 'Development';
+    case 'production':
+      return 'Production';
+  }
+}
+
+export function setupSwagger(app: INestApplication): void {
+  const env = (process.env.NODE_ENV || 'local') as Environment;
+  const port = process.env.PORT || 3000;
+  const docsPath = 'docs';
+
+  // Production: Swagger is always disabled
+  if (env === 'production') {
+    logger.log('Swagger is disabled in production');
+    return;
+  }
+
+  // Development: protect docs with basic auth
+  if (env === 'development') {
+    const docsUser = process.env.DOCS_USER;
+    const docsPassword = process.env.DOCS_PASSWORD;
+
+    if (!docsUser || !docsPassword) {
+      logger.warn(
+        'DOCS_USER and DOCS_PASSWORD are required in development — Swagger disabled',
+      );
+      return;
+    }
+
     app.use(
       [`/${docsPath}`, `/${docsPath}-json`, `/${docsPath}-yaml`],
       basicAuth({
@@ -18,7 +59,10 @@ export function setupSwagger(app: INestApplication): void {
         realm: 'Archeon API Documentation',
       }),
     );
+    logger.log('Swagger docs protected with basic auth');
   }
+
+  // Local: no auth, open access
 
   const config = new DocumentBuilder()
     .setTitle('Archeon Gate API')
@@ -48,10 +92,7 @@ and intelligent search powered by RAG (Retrieval-Augmented Generation).
     .setVersion('1.0.0')
     .setContact('Archeon Team', 'https://archeon.app', 'support@archeon.app')
     .setLicense('UNLICENSED', '')
-    .addServer(
-      isProduction ? 'https://api.archeon.app' : 'http://localhost:3000',
-      isProduction ? 'Production' : 'Local Development',
-    )
+    .addServer(getServerUrl(env, port), getServerLabel(env))
     .addBearerAuth(
       {
         type: 'http',
@@ -116,10 +157,7 @@ and intelligent search powered by RAG (Retrieval-Augmented Generation).
     `,
   });
 
-  Logger.log(
-    `📚 Swagger docs available at: http://localhost:${process.env.PORT || 3000}/${docsPath}`,
+  logger.log(
+    `📚 Swagger docs available at: http://localhost:${port}/${docsPath}`,
   );
-  if (isProduction) {
-    Logger.log('🔒 API documentation is protected with basic auth');
-  }
 }
