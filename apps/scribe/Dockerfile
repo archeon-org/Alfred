@@ -1,8 +1,10 @@
 # ==============================================================================
-# Archeon Scribe - Production Dockerfile
+# Archeon Scribe - Base Dockerfile
 # ==============================================================================
-# Multi-stage build for optimized production image
-# Includes Tesseract OCR, Poppler (PDF tools), and Python dependencies
+# Shared base image for both API and Worker services.
+# Contains Python dependencies, Tesseract OCR, Poppler, and application code.
+#
+# Do NOT use this directly — use Dockerfile.api or Dockerfile.worker instead.
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -34,7 +36,7 @@ RUN pip install --upgrade pip && \
     pip install .
 
 # ------------------------------------------------------------------------------
-# Stage 2: Runtime
+# Stage 2: Runtime base
 # ------------------------------------------------------------------------------
 FROM python:3.11-slim-bookworm AS runtime
 
@@ -94,15 +96,3 @@ RUN mkdir -p /app/logs /app/tmp \
 
 # Switch to non-root user
 USER scribe
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/api/health/live', timeout=5)" || exit 1
-
-# Expose API port
-EXPOSE 8000
-
-# Default command - use gunicorn with uvicorn workers for production concurrency
-# For API server: docker run with CMD override or use docker-compose
-# For workers: docker run with CMD ["celery", "-A", "src.core.celery_app", "worker", "-l", "info"]
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--limit-concurrency", "1000", "--timeout-keep-alive", "5", "--backlog", "2048"]

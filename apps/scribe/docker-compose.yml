@@ -5,11 +5,19 @@
 # Credentials match the root /docker configuration for consistency.
 
 services:
+  # Build the shared base image first
+  scribe-base:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: archeon-scribe-base
+    entrypoint: ["echo", "base image built"]
+
   # Scribe API Server
   scribe-api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.api
     container_name: archeon-scribe-api
     ports:
       - "8000:8000"
@@ -31,6 +39,8 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=RedisPassword123
     depends_on:
+      scribe-base:
+        condition: service_completed_successfully
       postgres-archeon:
         condition: service_healthy
       redis-archeon:
@@ -43,9 +53,8 @@ services:
   scribe-worker:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.worker
     container_name: archeon-scribe-worker
-    command: ["python", "-m", "scribe.worker"]
     env_file:
       - .env
     environment:
@@ -63,6 +72,8 @@ services:
       - REDIS_PORT=6379
       - REDIS_PASSWORD=RedisPassword123
     depends_on:
+      scribe-base:
+        condition: service_completed_successfully
       postgres-archeon:
         condition: service_healthy
       redis-archeon:

@@ -1,0 +1,12 @@
+# ==============================================================================
+# Archeon Scribe - Celery Worker
+# ==============================================================================
+# Background worker for document processing tasks (OCR, classification, etc.).
+# Build context: apps/scribe
+# ==============================================================================
+
+FROM archeon-scribe-base AS worker
+
+# No HTTP port needed — worker communicates via Redis broker only
+
+CMD ["python", "-m", "scribe.worker"]
