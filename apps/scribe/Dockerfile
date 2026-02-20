@@ -98,4 +98,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", 
 # ------------------------------------------------------------------------------
 FROM base AS worker
 
+HEALTHCHECK --interval=30s --timeout=15s --start-period=30s --retries=3 \
+    CMD celery -A core.celery_app inspect ping || exit 1
+
 CMD ["python", "-m", "worker"]
