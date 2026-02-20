@@ -47,6 +47,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
     PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app/src \
     TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -97,4 +98,4 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", 
 # ------------------------------------------------------------------------------
 FROM base AS worker
 
-CMD ["python", "-m", "scribe.worker"]
+CMD ["python", "-m", "worker"]
