@@ -26,18 +26,20 @@ class DatabaseSettings(BaseSettings):
     host: str = Field(default="postgres-archeon", description="Database host")
     port: int = Field(default=5432, ge=1, le=65535, description="Database port")
     name: str = Field(default="postgres", description="Database name")
-    user: str = Field(default="postgres", description="Database user")
+    username: str = Field(default="postgres", description="Database user")
     password: SecretStr = Field(default="postgres", description="Database password")
     ssl: bool = Field(default=False, description="Use SSL connection")
     pool_size: int = Field(default=5, ge=1, le=20, description="Connection pool size")
-    max_overflow: int = Field(default=10, ge=0, le=50, description="Max overflow connections")
+    max_overflow: int = Field(
+        default=10, ge=0, le=50, description="Max overflow connections"
+    )
 
     @property
     def url(self) -> str:
         """Get SQLAlchemy database URL (sync)."""
         ssl_param = "?sslmode=require" if self.ssl else ""
         return (
-            f"postgresql://{self.user}:{self.password.get_secret_value()}"
+            f"postgresql://{self.username}:{self.password.get_secret_value()}"
             f"@{self.host}:{self.port}/{self.name}{ssl_param}"
         )
 
@@ -46,7 +48,7 @@ class DatabaseSettings(BaseSettings):
         """Get SQLAlchemy database URL (async with asyncpg)."""
         ssl_param = "?ssl=require" if self.ssl else ""
         return (
-            f"postgresql+asyncpg://{self.user}:{self.password.get_secret_value()}"
+            f"postgresql+asyncpg://{self.username}:{self.password.get_secret_value()}"
             f"@{self.host}:{self.port}/{self.name}{ssl_param}"
         )
 
@@ -62,7 +64,9 @@ class RedisSettings(BaseSettings):
     # Default values match /docker/docker-compose.yml configuration
     host: str = Field(default="redis-archeon", description="Redis host")
     port: int = Field(default=6379, ge=1, le=65535, description="Redis port")
-    password: SecretStr = Field(default="RedisPassword123", description="Redis password")
+    password: SecretStr = Field(
+        default="RedisPassword123", description="Redis password"
+    )
     db: int = Field(default=0, ge=0, le=15, description="Redis database number")
     ssl: bool = Field(default=False, description="Use SSL connection")
 
@@ -112,9 +116,12 @@ class AISettings(BaseSettings):
         default="https://api.fireworks.ai/inference/v1", alias="FIREWORKS_BASE_URL"
     )
     classification_model: str = Field(
-        default="accounts/fireworks/models/llama-v3p1-70b-instruct", alias="CLASSIFICATION_MODEL"
+        default="accounts/fireworks/models/llama-v3p1-70b-instruct",
+        alias="CLASSIFICATION_MODEL",
     )
-    embedding_model: str = Field(default="nomic-ai/nomic-embed-text-v1.5", alias="EMBEDDING_MODEL")
+    embedding_model: str = Field(
+        default="nomic-ai/nomic-embed-text-v1.5", alias="EMBEDDING_MODEL"
+    )
     embedding_dimensions: int = Field(default=768, alias="EMBEDDING_DIMENSIONS")
 
 
@@ -142,10 +149,18 @@ class CelerySettings(BaseSettings):
         extra="ignore",
     )
 
-    task_acks_late: bool = Field(default=True, description="Acknowledge after task completion")
-    task_reject_on_worker_lost: bool = Field(default=True, description="Reject task if worker dies")
-    task_time_limit: int = Field(default=300, ge=60, description="Hard time limit in seconds")
-    task_soft_time_limit: int = Field(default=240, ge=30, description="Soft time limit in seconds")
+    task_acks_late: bool = Field(
+        default=True, description="Acknowledge after task completion"
+    )
+    task_reject_on_worker_lost: bool = Field(
+        default=True, description="Reject task if worker dies"
+    )
+    task_time_limit: int = Field(
+        default=300, ge=60, description="Hard time limit in seconds"
+    )
+    task_soft_time_limit: int = Field(
+        default=240, ge=30, description="Soft time limit in seconds"
+    )
     worker_prefetch_multiplier: int = Field(default=1, ge=1, le=10)
     worker_max_tasks_per_child: int = Field(default=50, ge=1, le=1000)
 
@@ -163,7 +178,9 @@ class Settings(BaseSettings):
     # General
     env: Literal["development", "staging", "production"] = Field(default="development")
     debug: bool = Field(default=False)
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
+        default="INFO"
+    )
 
     # API Server
     api_host: str = Field(default="0.0.0.0")
