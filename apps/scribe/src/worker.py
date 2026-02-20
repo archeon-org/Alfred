@@ -30,7 +30,7 @@ def main():
             f"--hostname={settings.worker_host}@%h",
             f"--concurrency={settings.worker_concurrency}",
             "--loglevel=INFO",
-            "--queues=documents,documents.high,default",
+            "--queues=celery",
             "--prefetch-multiplier=1",
             "--without-heartbeat",  # Reduce Redis connections
             "--without-mingle",  # Don't sync with other workers on startup
