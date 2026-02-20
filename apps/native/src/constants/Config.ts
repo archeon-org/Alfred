@@ -5,10 +5,11 @@ const ENV = {
     apiUrl: process.env.EXPO_PUBLIC_API_URL,
   },
   development: {
-    apiUrl: process.env.EXPO_PUBLIC_API_URL || "https://gate-dev.mooo.com/api",
+    apiUrl:
+      process.env.EXPO_PUBLIC_API_URL || "https://gate.dev.egobis.cloud/api",
   },
   production: {
-    apiUrl: process.env.EXPO_PUBLIC_API_URL || "https://gate-dev.mooo.com/api",
+    apiUrl: process.env.EXPO_PUBLIC_API_URL || "https://gate.egobis.cloud/api",
   },
 };
 

@@ -116,7 +116,7 @@ class AISettings(BaseSettings):
         default="https://api.fireworks.ai/inference/v1", alias="FIREWORKS_BASE_URL"
     )
     classification_model: str = Field(
-        default="accounts/fireworks/models/llama-v3p1-70b-instruct",
+        default="accounts/fireworks/models/deepseek-v3p1",
         alias="CLASSIFICATION_MODEL",
     )
     embedding_model: str = Field(

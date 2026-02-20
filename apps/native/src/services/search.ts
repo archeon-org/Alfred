@@ -132,7 +132,6 @@ export interface QuestionRequest {
 
 export interface QuestionResponse {
   answer: string;
-  contextUsed: string;
   sources: string[];
   processingTimeMs: number;
   confidence: "high" | "medium" | "low";
@@ -146,7 +145,7 @@ export const askQuestion = async (
   question: string,
   conversationHistory?: Array<{ role: "user" | "assistant"; content: string }>
 ): Promise<QuestionResponse> => {
-  const response = await api.post<QuestionResponse>("/search/question", {
+  const response = await api.post<QuestionResponse>("/question", {
     question,
     conversationHistory,
   });

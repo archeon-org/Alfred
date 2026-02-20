@@ -66,7 +66,7 @@ type AIResponse = z.infer<typeof ChatResponseSchema>;
 export class ChatSearchService {
   private readonly logger = new Logger(ChatSearchService.name);
   private readonly openai: OpenAI;
-  private readonly chatModel = 'accounts/fireworks/models/deepseek-v3-0324';
+  private readonly chatModel = 'accounts/fireworks/models/deepseek-v3p1';
 
   constructor(
     private readonly configService: ConfigService,

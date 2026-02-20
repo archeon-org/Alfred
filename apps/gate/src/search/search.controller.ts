@@ -79,6 +79,18 @@ interface ExcludeDocumentDto {
   context: ChatContext;
 }
 
+interface QuestionRequestDto {
+  question: string;
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+}
+
+interface QuestionResponseDto {
+  answer: string;
+  sources: string[];
+  confidence: 'high' | 'medium' | 'low';
+  processingTimeMs: number;
+}
+
 @ApiTags('search')
 @ApiBearerAuth('JWT-auth')
 @Controller('search')
@@ -346,5 +358,93 @@ export class SearchController {
     );
 
     return { context: updatedContext };
+  }
+
+  @Post('question')
+  @ThrottleSearch()
+  @ApiOperation({
+    summary: 'Ask Second Brain question',
+    description:
+      'Backward-compatible question endpoint. Proxies question requests to Scribe API.',
+  })
+  @ApiBody({
+    description: 'Question request',
+    schema: {
+      type: 'object',
+      required: ['question'],
+      properties: {
+        question: { type: 'string', example: 'What contracts did I sign?' },
+        conversationHistory: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              role: { type: 'string', enum: ['user', 'assistant'] },
+              content: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiOkResponse({
+    description: 'Question answered successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        answer: { type: 'string' },
+        sources: { type: 'array', items: { type: 'string' } },
+        confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+        processingTimeMs: { type: 'number' },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Invalid question' })
+  @ApiUnauthorizedResponse({ description: 'Invalid or missing JWT token' })
+  @ApiForbiddenResponse({ description: 'Daily AI search limit reached' })
+  async question(
+    @Req() req: Request,
+    @Body() body: QuestionRequestDto,
+  ): Promise<QuestionResponseDto> {
+    const user = req.user as UserEntity;
+
+    if (!body.question || body.question.trim().length < 3) {
+      throw new BadRequestException(
+        'Question must be at least 3 characters long',
+      );
+    }
+
+    if (body.question.trim().length > 2000) {
+      throw new BadRequestException(
+        'Question must be less than 2000 characters',
+      );
+    }
+
+    const searchLimit = await this.subscriptionService.useAiSearch(user.id);
+    if (!searchLimit.allowed) {
+      throw new ForbiddenException({
+        message: 'Daily AI search limit reached',
+        error: 'DAILY_SEARCH_LIMIT_EXCEEDED',
+        resetsAt: searchLimit.resetsAt,
+        remainingSearches: 0,
+      });
+    }
+
+    const result = await this.graphitiSearchService.askQuestion(
+      user.id,
+      body.question.trim(),
+      body.conversationHistory,
+    );
+
+    if (!result) {
+      throw new BadRequestException('Failed to process your question');
+    }
+
+    return {
+      answer: result.answer,
+      sources: result.sources,
+      confidence: result.confidence,
+      processingTimeMs: result.processingTimeMs,
+    };
   }
 }
