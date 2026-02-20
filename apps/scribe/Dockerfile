@@ -29,7 +29,7 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
-COPY pyproject.toml ./
+COPY apps/scribe/pyproject.toml apps/scribe/README.md ./
 RUN pip install --upgrade pip && \
     pip install . --no-deps && \
     pip install .
@@ -72,8 +72,8 @@ RUN groupadd --gid 1000 scribe \
 
 WORKDIR /app
 
-COPY --chown=scribe:scribe src/ ./src/
-COPY --chown=scribe:scribe pyproject.toml ./
+COPY --chown=scribe:scribe apps/scribe/src/ ./src/
+COPY --chown=scribe:scribe apps/scribe/pyproject.toml ./
 
 RUN mkdir -p /app/logs /app/tmp \
     && chown -R scribe:scribe /app

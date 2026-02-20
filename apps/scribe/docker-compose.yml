@@ -8,8 +8,8 @@ services:
   # Scribe API Server
   scribe-api:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/scribe/Dockerfile
       target: api
     container_name: archeon-scribe-api
     ports:
@@ -43,8 +43,8 @@ services:
   # Scribe Celery Worker
   scribe-worker:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/scribe/Dockerfile
       target: worker
     container_name: archeon-scribe-worker
     env_file:
