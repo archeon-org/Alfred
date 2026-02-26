@@ -1,10 +1,3 @@
-"""
-Title Generation Pipeline
-
-Single Responsibility: Orchestrate title generation workflow.
-KISS: Minimal steps, focused on one task.
-"""
-
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
@@ -19,8 +12,6 @@ logger = get_logger(__name__)
 
 @dataclass
 class TitleJob:
-    """Input for title generation pipeline."""
-
     document_id: str
     user_id: str
     r2_key: str
@@ -29,24 +20,11 @@ class TitleJob:
 
 @dataclass
 class TitleResult:
-    """Output of title generation pipeline."""
-
     document_id: str
     title: str
 
 
 class TitlePipeline:
-    """
-    Orchestrates the title generation workflow.
-
-    Pipeline steps:
-    1. Get existing content or perform OCR
-    2. Generate title via AI
-    3. Update database
-
-    Single Responsibility: Only orchestrates title generation.
-    """
-
     def __init__(self, session: Session):
         self._session = session
         self._repository = DocumentRepository(session)
@@ -56,24 +34,12 @@ class TitlePipeline:
         self._classification_service = None
 
     def process(self, job: TitleJob) -> TitleResult:
-        """
-        Execute the title generation pipeline.
-
-        Args:
-            job: Title generation job data
-
-        Returns:
-            TitleResult with generated title
-        """
         logger.info("Starting title pipeline", document_id=job.document_id)
 
-        # Step 1: Get content (from DB or OCR)
         text_content = self._get_content(job)
 
-        # Step 2: Generate title
         title = self._generate_title(text_content, job.original_name)
 
-        # Step 3: Save to database
         self._repository.update_title(job.document_id, title)
 
         logger.info("Title pipeline completed", document_id=job.document_id, title=title)
@@ -81,13 +47,11 @@ class TitlePipeline:
         return TitleResult(document_id=job.document_id, title=title)
 
     def _get_content(self, job: TitleJob) -> str:
-        """Get document content, performing OCR if needed."""
         content = self._repository.get_content(job.document_id)
 
         if content:
             return content
 
-        # Perform OCR
         logger.info("No content found, performing OCR", document_id=job.document_id)
 
         if not self._r2_service:
@@ -98,13 +62,11 @@ class TitlePipeline:
         file_data = self._r2_service.get_file(job.r2_key)
         text_content = self._ocr_service.recognize(file_data)
 
-        # Save content for future use
         self._repository.update_content(job.document_id, text_content)
 
         return text_content
 
     def _generate_title(self, content: str, original_name: str | None) -> str:
-        """Generate title using AI."""
         if not self._classification_service:
             self._classification_service = get_classification_service()
 

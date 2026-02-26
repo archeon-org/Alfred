@@ -1,11 +1,4 @@
-# Docker Compose for standalone scribe-py development
-# For full-stack development, use /docker/docker-compose.local.yml from project root
-#
-# This file is for isolated scribe-py development only.
-# Credentials match the root /docker configuration for consistency.
-
 services:
-  # Scribe API Server
   scribe-api:
     build:
       context: ../..
@@ -40,7 +33,6 @@ services:
       - archeon-net
     restart: unless-stopped
 
-  # Scribe Celery Worker
   scribe-worker:
     build:
       context: ../..
@@ -72,7 +64,6 @@ services:
       - archeon-net
     restart: unless-stopped
 
-  # PostgreSQL Database (matches /docker/docker-compose.yml)
   postgres-archeon:
     image: ankane/pgvector:latest
     container_name: postgres-archeon
@@ -91,7 +82,6 @@ services:
     networks:
       - archeon-net
 
-  # Redis (matches /docker/docker-compose.yml)
   redis-archeon:
     image: redis:alpine
     container_name: redis-archeon

@@ -1,23 +1,21 @@
-"""Tasks module initialization."""
-
 from tasks.document import (
-    process_document,
     generate_title,
+    process_document,
 )
 from tasks.graphiti import (
+    delete_document_from_graph,
     ingest_document_to_graph,
     ingest_documents_bulk,
-    retrieve_context,
     initialize_graph,
+    retrieve_context,
 )
 
 __all__ = [
-    # Document tasks
     "process_document",
     "generate_title",
-    # Graphiti tasks
     "ingest_document_to_graph",
     "ingest_documents_bulk",
     "retrieve_context",
     "initialize_graph",
+    "delete_document_from_graph",
 ]

@@ -1,20 +1,13 @@
-"""
-Celery Worker Entry Point
-
-Start Celery workers with proper configuration.
-"""
-
 from core.celery_app import celery_app
 from core.config import get_settings
 from core.logging import get_logger, setup_logging
 
-# Initialize logging
+
 setup_logging()
 logger = get_logger(__name__)
 
 
 def main():
-    """Start the Celery worker."""
     settings = get_settings()
 
     logger.info(
@@ -23,7 +16,6 @@ def main():
         concurrency=settings.worker_concurrency,
     )
 
-    # Start worker with configuration
     celery_app.worker_main(
         [
             "worker",
@@ -32,9 +24,9 @@ def main():
             "--loglevel=INFO",
             "--queues=celery",
             "--prefetch-multiplier=1",
-            "--without-heartbeat",  # Reduce Redis connections
-            "--without-mingle",  # Don't sync with other workers on startup
-            "--without-gossip",  # Don't subscribe to worker events
+            "--without-heartbeat",
+            "--without-mingle",
+            "--without-gossip",
         ]
     )
 

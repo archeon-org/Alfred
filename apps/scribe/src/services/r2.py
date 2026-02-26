@@ -1,9 +1,3 @@
-"""
-R2 Service
-
-Cloudflare R2 (S3-compatible) storage operations.
-"""
-
 from io import BytesIO
 from typing import BinaryIO
 
@@ -18,8 +12,6 @@ logger = get_logger(__name__)
 
 
 class R2Service:
-    """Service for interacting with Cloudflare R2 storage."""
-
     def __init__(self) -> None:
         settings = get_settings()
         r2_settings = settings.r2
@@ -39,18 +31,6 @@ class R2Service:
         logger.info("R2 service initialized", bucket=self._bucket_name)
 
     def get_file(self, key: str) -> bytes:
-        """
-        Download a file from R2.
-
-        Args:
-            key: Object key in the bucket
-
-        Returns:
-            File contents as bytes
-
-        Raises:
-            ClientError: If download fails
-        """
         try:
             response = self._client.get_object(Bucket=self._bucket_name, Key=key)
             data = response["Body"].read()
@@ -66,17 +46,6 @@ class R2Service:
         data: bytes | BinaryIO,
         content_type: str = "application/octet-stream",
     ) -> None:
-        """
-        Upload a file to R2.
-
-        Args:
-            key: Object key in the bucket
-            data: File contents
-            content_type: MIME type
-
-        Raises:
-            ClientError: If upload fails
-        """
         try:
             if isinstance(data, bytes):
                 data = BytesIO(data)
@@ -93,15 +62,6 @@ class R2Service:
             raise
 
     def delete_file(self, key: str) -> None:
-        """
-        Delete a file from R2.
-
-        Args:
-            key: Object key in the bucket
-
-        Raises:
-            ClientError: If deletion fails
-        """
         try:
             self._client.delete_object(Bucket=self._bucket_name, Key=key)
             logger.info("Deleted file from R2", key=key)
@@ -110,19 +70,6 @@ class R2Service:
             raise
 
     def generate_presigned_url(self, key: str, expires_in: int = 3600) -> str:
-        """
-        Generate a presigned URL for downloading a file.
-
-        Args:
-            key: Object key in the bucket
-            expires_in: URL expiration time in seconds
-
-        Returns:
-            Presigned URL string
-
-        Raises:
-            ClientError: If URL generation fails
-        """
         try:
             url = self._client.generate_presigned_url(
                 "get_object",
@@ -135,15 +82,6 @@ class R2Service:
             raise
 
     def file_exists(self, key: str) -> bool:
-        """
-        Check if a file exists in R2.
-
-        Args:
-            key: Object key in the bucket
-
-        Returns:
-            True if file exists, False otherwise
-        """
         try:
             self._client.head_object(Bucket=self._bucket_name, Key=key)
             return True
@@ -151,12 +89,10 @@ class R2Service:
             return False
 
 
-# Singleton instance
 _r2_service: R2Service | None = None
 
 
 def get_r2_service() -> R2Service:
-    """Get or create R2 service singleton."""
     global _r2_service
     if _r2_service is None:
         _r2_service = R2Service()

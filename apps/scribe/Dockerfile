@@ -1,18 +1,3 @@
-# ==============================================================================
-# Archeon Scribe - Dockerfile
-# ==============================================================================
-# Single multi-stage Dockerfile for both API and Worker services.
-#
-# Usage:
-#   API:    docker build --target api -t scribe-api .
-#   Worker: docker build --target worker -t scribe-worker .
-#
-# In Coolify, set "Docker Build Stage Target" to "api" or "worker".
-# ==============================================================================
-
-# ------------------------------------------------------------------------------
-# Stage 1: Builder — install Python dependencies
-# ------------------------------------------------------------------------------
 FROM python:3.11-slim-bookworm AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -34,9 +19,6 @@ RUN pip install --upgrade pip && \
     pip install . --no-deps && \
     pip install .
 
-# ------------------------------------------------------------------------------
-# Stage 2: Base — shared runtime for API and Worker
-# ------------------------------------------------------------------------------
 FROM python:3.11-slim-bookworm AS base
 
 LABEL maintainer="Archeon Team" \
@@ -47,21 +29,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONFAULTHANDLER=1 \
     PATH="/opt/venv/bin:$PATH" \
-    PYTHONPATH=/app/src \
-    TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
+    PYTHONPATH=/app/src
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
-    tesseract-ocr \
-    tesseract-ocr-eng \
-    tesseract-ocr-fra \
-    tesseract-ocr-deu \
-    tesseract-ocr-spa \
-    tesseract-ocr-ara \
-    poppler-utils \
-    libmagic1 \
-    imagemagick \
-    libheif-dev \
     && apt-get upgrade -y \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -81,9 +52,6 @@ RUN mkdir -p /app/logs /app/tmp \
 
 USER scribe
 
-# ------------------------------------------------------------------------------
-# Stage 3a: API — FastAPI server
-# ------------------------------------------------------------------------------
 FROM base AS api
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
@@ -93,9 +61,6 @@ EXPOSE 8000
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--limit-concurrency", "1000", "--timeout-keep-alive", "5", "--backlog", "2048"]
 
-# ------------------------------------------------------------------------------
-# Stage 3b: Worker — Celery background worker
-# ------------------------------------------------------------------------------
 FROM base AS worker
 
 HEALTHCHECK --interval=30s --timeout=15s --start-period=30s --retries=3 \

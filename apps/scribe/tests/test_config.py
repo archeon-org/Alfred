@@ -17,7 +17,7 @@ class TestSettings:
                 "DATABASE_HOST": "testhost",
                 "DATABASE_PORT": "5433",
                 "DATABASE_NAME": "testdb",
-                "DATABASE_USER": "testuser",
+                "DATABASE_USERNAME": "testuser",
                 "DATABASE_PASSWORD": "testpass",
                 "DATABASE_SSL": "false",
                 "REDIS_HOST": "localhost",
@@ -37,7 +37,7 @@ class TestSettings:
             assert db_settings.host == "testhost"
             assert db_settings.port == 5433
             assert db_settings.name == "testdb"
-            assert db_settings.user == "testuser"
+            assert db_settings.username == "testuser"
             assert "testpass" in db_settings.url
             assert "postgresql://" in db_settings.url
 

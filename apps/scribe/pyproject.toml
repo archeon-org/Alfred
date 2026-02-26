@@ -41,12 +41,7 @@ dependencies = [
     
     # Document Chunking
     "chonkie>=1.5.1",
-    
-    # OCR
-    "pytesseract>=0.3.13",
-    "pdf2image>=1.17.0",
-    "Pillow>=11.0.0",
-    
+
     # Configuration & Validation
     "pydantic>=2.10.0",
     "pydantic-settings>=2.6.0",
@@ -74,11 +69,6 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "pre-commit>=4.0.0",
-]
-
-lightrag = [
-    "lightrag-hku>=1.0.0",
-    "nano-vectordb>=0.0.10",
 ]
 
 [project.scripts]
@@ -117,6 +107,9 @@ ignore = [
 
 [tool.mypy]
 python_version = "3.11"
+mypy_path = ["src"]
+namespace_packages = true
+explicit_package_bases = true
 strict = true
 warn_return_any = true
 warn_unused_ignores = true

@@ -2,7 +2,7 @@
 
 A production-grade document processing microservice built with **FastAPI** and **Celery**, designed to replace the NestJS scribe service. This service handles:
 
-- 📄 **OCR Text Extraction** - Tesseract-based OCR for images and PDFs
+- 📄 **OCR Text Extraction** - Mistral OCR for images and PDFs
 - 🤖 **AI Classification** - Document categorization using LLaMA via Fireworks AI
 - 🧠 **Knowledge Graph** - Graphiti-powered entity extraction and semantic search via Neo4j
 - 📬 **Task Queue** - Redis-backed Celery for distributed processing
@@ -97,6 +97,7 @@ cp .env.example .env
 | `NEO4J_USER` | Neo4j user | `neo4j` |
 | `NEO4J_PASSWORD` | Neo4j password | `archeon123` |
 | `FIREWORKS_API_KEY` | Fireworks AI API key | Required for AI features |
+| `MISTRAL_OCR_API_KEY` | Mistral OCR API key | Required for OCR |
 | `INTERNAL_API_KEY` | Gate ↔ Scribe auth | Must match Gate's key |
 
 ### Cloudflare R2 (File Storage)
@@ -108,6 +109,8 @@ cp .env.example .env
 | `R2_SECRET_ACCESS_KEY` | R2 secret key |
 | `R2_BUCKET_NAME` | Bucket name |
 | `R2_PUBLIC_URL` | Public bucket URL |
+| `MISTRAL_OCR_BASE_URL` | Mistral OCR API base URL |
+| `MISTRAL_OCR_MODEL` | Mistral OCR model name |
 
 ## Running Locally (Without Docker)
 
@@ -116,23 +119,17 @@ If you prefer running Scribe directly on your machine:
 ### 1. Prerequisites
 
 - Python 3.11+
-- Tesseract OCR installed
-- Poppler for PDF processing
+- Mistral OCR API key
 - PostgreSQL, Redis, and Neo4j running (or via Docker)
 
-### 2. Install System Dependencies
+### 2. Configure Mistral OCR
 
-**macOS:**
-```bash
-brew install tesseract poppler
-# Optional: additional language packs
-brew install tesseract-lang
-```
+Set these values in `.env`:
 
-**Ubuntu/Debian:**
 ```bash
-sudo apt-get update
-sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-fra poppler-utils imagemagick
+MISTRAL_OCR_BASE_URL=https://api.mistral.ai/v1
+MISTRAL_OCR_API_KEY=your_mistral_api_key
+MISTRAL_OCR_MODEL=mistral-ocr-latest
 ```
 
 ### 3. Start Infrastructure
@@ -200,6 +197,8 @@ All configuration is done via environment variables. See `.env.example` for the 
 | `R2_ACCESS_KEY_ID` | R2 access key | Required |
 | `R2_SECRET_ACCESS_KEY` | R2 secret key | Required |
 | `WORKER_CONCURRENCY` | Celery worker concurrency | `2` |
+| `METRICS_PUSH_ENABLED` | Enable pushing worker metrics to Pushgateway | `true` |
+| `PUSHGATEWAY_URL` | Pushgateway address | `pushgateway:9091` |
 
 ## Celery Tasks
 
@@ -273,6 +272,13 @@ ingest_document_to_graph.delay({
 - ✅ **Task acknowledgment** - Late ack for reliability
 
 ## Monitoring
+
+Pushgateway metric pushes can be toggled at runtime:
+
+```bash
+METRICS_PUSH_ENABLED=true
+PUSHGATEWAY_URL=pushgateway:9091
+```
 
 ### Celery Flower (Optional)
 
@@ -443,12 +449,10 @@ Task names used by Gate:
 
 **OCR not working:**
 ```bash
-# Verify Tesseract installation
-tesseract --version
-tesseract --list-langs
-
-# Check poppler for PDF support
-pdftoppm -v
+# Verify Mistral OCR configuration
+echo $MISTRAL_OCR_BASE_URL
+echo $MISTRAL_OCR_MODEL
+test -n "$MISTRAL_OCR_API_KEY" && echo "MISTRAL_OCR_API_KEY is set"
 ```
 
 **Redis connection refused:**

@@ -1,22 +1,7 @@
-"""
-Prompt Builder
-
-Single Responsibility: Construct prompts for LLM classification.
-KISS: Simple string formatting, no API logic.
-"""
-
 from services.classification.schemas import ClassificationConstants
 
 
 class PromptBuilder:
-    """
-    Builds prompts for document classification and title generation.
-
-    Single Responsibility: Only constructs prompt strings.
-    Separates prompt logic from API calls.
-    """
-
-    # System prompts
     CLASSIFICATION_SYSTEM_PROMPT = (
         "You are a document classification assistant. Respond only with valid JSON."
     )
@@ -29,18 +14,6 @@ class PromptBuilder:
         tags: list[dict[str, str]],
         original_filename: str | None = None,
     ) -> str:
-        """
-        Build the classification prompt.
-
-        Args:
-            content: Document text (already truncated)
-            categories: User's categories [{"id": "...", "name": "..."}]
-            tags: User's tags [{"id": "...", "name": "..."}]
-            original_filename: Optional filename for context
-
-        Returns:
-            Complete prompt string
-        """
         categories_str = self._format_categories(categories)
         tags_str = self._format_tags(tags)
         icons_preview = ", ".join(ClassificationConstants.AVAILABLE_ICONS[:10])
@@ -87,16 +60,6 @@ Available colors: {colors_preview}..."""
         content: str,
         original_filename: str | None = None,
     ) -> str:
-        """
-        Build a title-only generation prompt.
-
-        Args:
-            content: Document text (already truncated)
-            original_filename: Optional filename for context
-
-        Returns:
-            Complete prompt string
-        """
         filename_line = f'Original filename: "{original_filename}"' if original_filename else ""
 
         return f"""Generate a concise, descriptive title for this document (max 60 characters).
@@ -111,16 +74,6 @@ Respond with JSON: {{"title": "Your Title Here"}}"""
 
     @staticmethod
     def truncate_content(content: str, max_chars: int | None = None) -> str:
-        """
-        Truncate content for API, keeping beginning and end.
-
-        Args:
-            content: Full document text
-            max_chars: Maximum characters (default from constants)
-
-        Returns:
-            Truncated content
-        """
         if max_chars is None:
             max_chars = ClassificationConstants.MAX_CONTENT_CHARS
 
@@ -131,13 +84,11 @@ Respond with JSON: {{"title": "Your Title Here"}}"""
         return content[:half] + "\n...[truncated]...\n" + content[-half:]
 
     def _format_categories(self, categories: list[dict[str, str]]) -> str:
-        """Format categories list for prompt."""
         if not categories:
             return "(No categories defined yet)"
         return "\n".join(f"  - {c['id']}: {c['name']}" for c in categories)
 
     def _format_tags(self, tags: list[dict[str, str]]) -> str:
-        """Format tags list for prompt."""
         if not tags:
             return "(No tags defined yet)"
         return "\n".join(f"  - {t['id']}: {t['name']}" for t in tags)

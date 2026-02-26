@@ -1,47 +1,22 @@
-# =============================================================================
-# Development Dockerfile - Hot Reload Support
-# =============================================================================
-# This Dockerfile is optimized for local development with:
-# - uvicorn --reload for FastAPI hot reload
-# - watchfiles for Celery worker hot reload
-# - All dev dependencies included
-# =============================================================================
-
 FROM python:3.11-slim
 
-# Prevent Python from writing pyc files and buffering stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/src
 
-# Install system dependencies (Tesseract, Poppler for OCR, ImageMagick for HEIC)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    tesseract-ocr \
-    tesseract-ocr-eng \
-    tesseract-ocr-fra \
-    tesseract-ocr-deu \
-    tesseract-ocr-spa \
-    poppler-utils \
-    libmagic1 \
-    imagemagick \
-    libheif-dev \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy files needed for pip install (pyproject.toml needs README.md)
 COPY pyproject.toml README.md ./
 
-# Install Python dependencies including dev tools
 RUN pip install --no-cache-dir -e ".[dev]" && \
     pip install --no-cache-dir watchfiles
 
-# Copy source code (will be overwritten by volume mount in dev)
 COPY src/ ./src/
 
-# Expose API port
 EXPOSE 8000
 
-# Default command: Run FastAPI with hot reload
-# Note: PYTHONPATH=/app/src so import is just 'main' not 'scribe.main'
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/src"]

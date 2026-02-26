@@ -1,9 +1,3 @@
-"""
-Credit Service
-
-Manage user credits (refunds for failed operations).
-"""
-
 from enum import Enum
 
 from sqlalchemy import text
@@ -15,14 +9,11 @@ logger = get_logger(__name__)
 
 
 class CreditOperation(str, Enum):
-    """Credit operations matching the TypeScript enum."""
-
     AI_CLASSIFICATION = "AI_CLASSIFICATION"
     AI_TITLE_GENERATION = "AI_TITLE_GENERATION"
     AI_EMBEDDING = "AI_EMBEDDING"
 
 
-# Credit costs for each operation (must match TypeScript CREDIT_COSTS)
 CREDIT_COSTS: dict[CreditOperation, int] = {
     CreditOperation.AI_CLASSIFICATION: 5,
     CreditOperation.AI_TITLE_GENERATION: 2,
@@ -31,8 +22,6 @@ CREDIT_COSTS: dict[CreditOperation, int] = {
 
 
 class CreditService:
-    """Service for managing user credits."""
-
     def refund_credits(
         self,
         session: Session,
@@ -40,18 +29,6 @@ class CreditService:
         operation: CreditOperation,
         reason: str,
     ) -> int:
-        """
-        Refund credits to a user when an operation fails.
-
-        Args:
-            session: Database session
-            user_id: User UUID
-            operation: The operation that failed
-            reason: Reason for refund
-
-        Returns:
-            New credit balance
-        """
         cost = CREDIT_COSTS[operation]
 
         logger.info(
@@ -96,18 +73,6 @@ class CreditService:
         amount: int,
         reason: str,
     ) -> int:
-        """
-        Add credits to a user account.
-
-        Args:
-            session: Database session
-            user_id: User UUID
-            amount: Credits to add
-            reason: Reason for addition
-
-        Returns:
-            New credit balance
-        """
         logger.info(
             "Adding credits",
             user_id=user_id,
@@ -143,12 +108,10 @@ class CreditService:
         return new_balance
 
 
-# Singleton instance
 _credit_service: CreditService | None = None
 
 
 def get_credit_service() -> CreditService:
-    """Get or create credit service singleton."""
     global _credit_service
     if _credit_service is None:
         _credit_service = CreditService()

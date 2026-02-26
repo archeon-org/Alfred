@@ -1,22 +1,10 @@
-"""
-Classification Schemas and Constants
-
-Single Responsibility: Define static data for classification.
-"""
-
-
 class ClassificationConstants:
-    """Static constants for classification."""
-
-    # Maximum content length for API calls
     MAX_CONTENT_CHARS = 8000
     MAX_TITLE_CONTENT_CHARS = 4000
 
-    # Title constraints
     MAX_TITLE_LENGTH = 60
     MAX_CATEGORY_NAME_LENGTH = 25
 
-    # Available icons for category creation (Ionicons)
     AVAILABLE_ICONS = [
         "document-outline",
         "folder-outline",
@@ -40,7 +28,6 @@ class ClassificationConstants:
         "clipboard-outline",
     ]
 
-    # Available colors for category creation (hex codes)
     AVAILABLE_COLORS = [
         "#EF4444",
         "#F97316",
@@ -56,13 +43,11 @@ class ClassificationConstants:
         "#EC4899",
     ]
 
-    # Default values
     DEFAULT_ICON = "folder-outline"
     DEFAULT_COLOR = "#3B82F6"
     DEFAULT_TITLE = "Untitled Document"
 
 
-# JSON Schema for classification response (for reference/validation)
 CLASSIFICATION_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {

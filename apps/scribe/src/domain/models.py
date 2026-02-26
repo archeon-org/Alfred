@@ -1,18 +1,9 @@
-"""
-Domain Models
-
-Value objects and DTOs for the document processing pipeline.
-These are pure data containers with no external dependencies.
-"""
-
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
 
 class ProcessingStatus(str, Enum):
-    """Document processing status (matches PostgreSQL enum)."""
-
     PENDING = "PENDING"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
@@ -21,13 +12,6 @@ class ProcessingStatus(str, Enum):
 
 @dataclass(frozen=True)
 class DocumentContext:
-    """
-    Immutable context for document processing.
-
-    Contains all information needed to process a document.
-    Created once at the start of the pipeline and passed through.
-    """
-
     document_id: str
     user_id: str
     storage_key: str
@@ -40,17 +24,13 @@ class DocumentContext:
 
 @dataclass
 class NewCategory:
-    """Suggested new category from AI classification."""
-
     name: str
-    icon: str  # Ionicons icon name
-    color: str  # Hex color code
+    icon: str
+    color: str
 
 
 @dataclass
 class ClassificationResult:
-    """Result of AI document classification."""
-
     title: str
     category_id: str | None = None
     new_category: NewCategory | None = None
@@ -61,11 +41,9 @@ class ClassificationResult:
 
 @dataclass
 class OCRResult:
-    """Result of OCR text extraction."""
-
     text: str
     page_count: int = 1
-    method: str = "tesseract"  # "embedded", "tesseract"
+    method: str = "mistral"
 
     @property
     def char_count(self) -> int:
@@ -78,8 +56,6 @@ class OCRResult:
 
 @dataclass
 class ProcessingResult:
-    """Final result of document processing pipeline."""
-
     document_id: str
     content: str
     title: str
@@ -88,15 +64,8 @@ class ProcessingResult:
     status: ProcessingStatus = ProcessingStatus.COMPLETED
 
 
-# ============================================================================
-# Job Data (matches TypeScript interfaces from Gate)
-# ============================================================================
-
-
 @dataclass
 class ProcessDocumentJob:
-    """Job data for document processing task."""
-
     document_id: str
     user_id: str
     key: str
@@ -114,8 +83,6 @@ class ProcessDocumentJob:
 
 @dataclass
 class GraphIngestionJob:
-    """Job data for knowledge graph ingestion task."""
-
     document_id: str
     user_id: str
     document_name: str

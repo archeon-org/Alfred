@@ -1,9 +1,3 @@
-"""
-Logging Configuration
-
-Structured logging with structlog for production-ready log output.
-"""
-
 import logging
 import sys
 from typing import Any
@@ -15,17 +9,14 @@ from core.config import get_settings
 
 
 def setup_logging() -> None:
-    """Configure structured logging for the application."""
     settings = get_settings()
 
-    # Configure standard library logging
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
         level=getattr(logging, settings.log_level),
     )
 
-    # Define shared processors
     shared_processors: list[Processor] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
@@ -35,14 +26,12 @@ def setup_logging() -> None:
     ]
 
     if settings.is_production:
-        # Production: JSON output for log aggregation
         processors: list[Processor] = [
             *shared_processors,
             structlog.processors.dict_tracebacks,
             structlog.processors.JSONRenderer(),
         ]
     else:
-        # Development: Colored console output
         processors = [
             *shared_processors,
             structlog.dev.ConsoleRenderer(colors=True),
@@ -58,16 +47,6 @@ def setup_logging() -> None:
 
 
 def get_logger(name: str | None = None, **initial_context: Any) -> structlog.BoundLogger:
-    """
-    Get a structured logger instance.
-
-    Args:
-        name: Logger name (usually __name__)
-        **initial_context: Initial context values to bind
-
-    Returns:
-        Configured structlog BoundLogger
-    """
     logger = structlog.get_logger(name)
     if initial_context:
         logger = logger.bind(**initial_context)

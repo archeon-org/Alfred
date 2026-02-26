@@ -1,12 +1,3 @@
-"""
-Graphiti Configuration Module
-
-Centralized configuration for the Graphiti-powered Second Brain agent:
-- Neo4j connection credentials
-- OpenAI API configuration
-- LLM client encapsulation for easy provider swapping
-"""
-
 from functools import lru_cache
 from typing import Literal
 
@@ -15,8 +6,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Neo4jSettings(BaseSettings):
-    """Neo4j graph database configuration."""
-
     model_config = SettingsConfigDict(
         env_prefix="NEO4J_",
         extra="ignore",
@@ -27,12 +16,10 @@ class Neo4jSettings(BaseSettings):
         description="Neo4j connection URI (bolt:// or neo4j://)",
     )
     user: str = Field(default="neo4j", description="Neo4j username")
-    password: SecretStr = Field(default="password", description="Neo4j password")
+    password: SecretStr = Field(default=SecretStr("password"), description="Neo4j password")
 
 
 class OpenAISettings(BaseSettings):
-    """OpenAI API configuration for LLM and embeddings."""
-
     model_config = SettingsConfigDict(
         env_prefix="OPENAI_",
         extra="ignore",
@@ -58,8 +45,6 @@ class OpenAISettings(BaseSettings):
 
 
 class GraphitiSettings(BaseSettings):
-    """Graphiti service configuration."""
-
     model_config = SettingsConfigDict(
         env_prefix="GRAPHITI_",
         extra="ignore",
@@ -86,19 +71,10 @@ class GraphitiSettings(BaseSettings):
         description="Default number of search results to return",
     )
 
-    # Nested settings
     neo4j: Neo4jSettings = Field(default_factory=Neo4jSettings)
-    openai: OpenAISettings = Field(default_factory=OpenAISettings)
+    openai: OpenAISettings = Field(default_factory=OpenAISettings)  # type: ignore[arg-type]
 
 
 @lru_cache
 def get_graphiti_settings() -> GraphitiSettings:
-    """
-    Get cached Graphiti settings.
-
-    Returns
-    -------
-    GraphitiSettings
-        The Graphiti configuration loaded from environment variables.
-    """
     return GraphitiSettings()

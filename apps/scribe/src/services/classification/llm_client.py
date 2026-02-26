@@ -1,10 +1,3 @@
-"""
-LLM Client
-
-Single Responsibility: Handle LLM API communication.
-KISS: Simple wrapper around OpenAI client.
-"""
-
 import json
 import time
 from dataclasses import dataclass
@@ -20,8 +13,6 @@ logger = get_logger(__name__)
 
 @dataclass
 class LLMConfig:
-    """Configuration for LLM client."""
-
     api_key: str
     base_url: str
     model: str
@@ -30,13 +21,6 @@ class LLMConfig:
 
 
 class LLMClient:
-    """
-    Wrapper for LLM API calls.
-
-    Single Responsibility: Only handles API communication.
-    No prompt building or result parsing.
-    """
-
     def __init__(self, config: LLMConfig):
         self._client = OpenAI(
             api_key=config.api_key,
@@ -56,26 +40,10 @@ class LLMClient:
         operation: str = "classification",
         user_id: str = "unknown",
     ) -> dict[str, Any]:
-        """
-        Get a JSON response from the LLM.
-
-        Args:
-            system_prompt: System message for the LLM
-            user_prompt: User message/query
-            max_tokens: Override default max tokens
-            operation: Operation name for metrics (e.g., "classification", "qa", "extraction")
-            user_id: User ID for metrics tracking
-
-        Returns:
-            Parsed JSON response
-
-        Raises:
-            ValueError: If response is empty or invalid JSON
-        """
         start_time = time.time()
         input_tokens = 0
         output_tokens = 0
-        
+
         try:
             response = self._client.chat.completions.create(
                 model=self._model,
@@ -90,12 +58,10 @@ class LLMClient:
 
             duration = time.time() - start_time
 
-            # Track tokens
             if response.usage:
                 input_tokens = response.usage.prompt_tokens or 0
                 output_tokens = response.usage.completion_tokens or 0
 
-            # Record metrics
             record_llm_call(
                 model=self._model,
                 operation=operation,
@@ -112,11 +78,11 @@ class LLMClient:
                 raise ValueError("Empty response from LLM")
 
             return json.loads(result_text)
-            
+
         except Exception as e:
             duration = time.time() - start_time
             error_type = type(e).__name__
-            
+
             record_llm_call(
                 model=self._model,
                 operation=operation,
@@ -128,7 +94,7 @@ class LLMClient:
                 error_type=error_type,
             )
             push_metrics()
-            
+
             logger.error(
                 "LLM API call failed",
                 model=self._model,

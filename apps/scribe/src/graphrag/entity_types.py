@@ -1,24 +1,8 @@
-"""
-Optimized Entity and Relationship Types for Graphiti Knowledge Graph
-
-Streamlined to 18 entity types and 18 relationship types.
-Focused on cost efficiency while maintaining essential semantic relationships.
-
-Reduced from 27 + 33 to minimize token usage in LLM prompts.
-Each type reduction saves ~120 tokens per extraction call.
-"""
-
 from __future__ import annotations
 
 from pydantic import BaseModel
 
 
-# =============================================================================
-# CORE ENTITY TYPES (18 essential types)
-# =============================================================================
-
-
-# People & Organizations
 class Person(BaseModel):
     """Any individual - name, contact, author, family member, professional, patient."""
 
@@ -31,21 +15,18 @@ class Organization(BaseModel):
     pass
 
 
-# Places
 class Location(BaseModel):
     """Any place - address, city, country, building, venue, region, office."""
 
     pass
 
 
-# Documents & Content
 class Document(BaseModel):
     """Any document - contract, invoice, certificate, report, email, prescription, file."""
 
     pass
 
 
-# Time & Events
 class Event(BaseModel):
     """Time-bound occurrence - meeting, appointment, deadline, transaction, trip."""
 
@@ -58,14 +39,12 @@ class Date(BaseModel):
     pass
 
 
-# Products & Services
 class Product(BaseModel):
     """Physical products or services - equipment, devices, goods, software, consulting."""
 
     pass
 
 
-# Financial
 class Monetary(BaseModel):
     """Financial amounts - price, salary, payment, fee, tax, budget."""
 
@@ -78,14 +57,12 @@ class Account(BaseModel):
     pass
 
 
-# Work & Projects
 class Project(BaseModel):
     """Work or initiative - business project, research, campaign, development, task."""
 
     pass
 
 
-# Medical & Health
 class Condition(BaseModel):
     """Medical condition - diagnosis, symptom, illness, injury, treatment."""
 
@@ -98,7 +75,6 @@ class Medication(BaseModel):
     pass
 
 
-# Technology & Skills
 class Concept(BaseModel):
     """Abstract idea - skill, technology, methodology, topic, field of study."""
 
@@ -111,7 +87,6 @@ class Software(BaseModel):
     pass
 
 
-# Identification
 class Identifier(BaseModel):
     """Reference numbers - ID, account number, case number, tracking number, license."""
 
@@ -124,26 +99,18 @@ class Contact(BaseModel):
     pass
 
 
-# Education & Credentials
 class Education(BaseModel):
     """Educational background - degree, certification, course, training, qualification."""
 
     pass
 
 
-# Role & Position
 class Role(BaseModel):
     """Professional role or position - job title, responsibility, function."""
 
     pass
 
 
-# =============================================================================
-# RELATIONSHIP TYPES (18 essential types)
-# =============================================================================
-
-
-# Employment & Work
 class WORKS_FOR(BaseModel):
     """Person works for or is employed by Organization."""
 
@@ -156,14 +123,12 @@ class MANAGES(BaseModel):
     pass
 
 
-# Location
 class LOCATED_IN(BaseModel):
     """Entity is physically located in or based in Location."""
 
     pass
 
 
-# Ownership & Possession
 class OWNS(BaseModel):
     """Person or Organization owns something."""
 
@@ -176,7 +141,6 @@ class HAS(BaseModel):
     pass
 
 
-# Communication & Documents
 class HAS_CONTACT(BaseModel):
     """Entity has contact information."""
 
@@ -195,7 +159,6 @@ class REFERS_TO(BaseModel):
     pass
 
 
-# Financial
 class PAID(BaseModel):
     """Financial transaction - payment made by or to entity."""
 
@@ -208,14 +171,12 @@ class COSTS(BaseModel):
     pass
 
 
-# Structure & Hierarchy
 class PART_OF(BaseModel):
     """Entity is part of, member of, or belongs to another entity."""
 
     pass
 
 
-# Events & Time
 class PARTICIPATED_IN(BaseModel):
     """Person participated in or attended Event or Project."""
 
@@ -228,14 +189,12 @@ class SCHEDULED_FOR(BaseModel):
     pass
 
 
-# Products & Services
 class USES(BaseModel):
     """Entity uses, provides, or supplies Product, Service, or Software."""
 
     pass
 
 
-# Medical
 class DIAGNOSED_WITH(BaseModel):
     """Person diagnosed with or treated for Condition."""
 
@@ -248,7 +207,6 @@ class PRESCRIBED(BaseModel):
     pass
 
 
-# Education & Skills
 class HAS_SKILL(BaseModel):
     """Person has skill, expertise, or knowledge in Concept or Software."""
 
@@ -260,10 +218,6 @@ class HAS_EDUCATION(BaseModel):
 
     pass
 
-
-# =============================================================================
-# TYPE DICTIONARIES AND MAPPINGS
-# =============================================================================
 
 ENTITY_TYPES = {
     "Person": Person,
@@ -307,10 +261,8 @@ EDGE_TYPES = {
     "HAS_EDUCATION": HAS_EDUCATION,
 }
 
-# Edge type mappings: (source_entity_type, target_entity_type) -> [allowed_edge_types]
-# Simplified to support the reduced 18 edge types
+
 EDGE_TYPE_MAP = {
-    # Person relationships
     ("Person", "Organization"): ["WORKS_FOR", "PART_OF", "MANAGES"],
     ("Person", "Location"): ["LOCATED_IN"],
     ("Person", "Event"): ["PARTICIPATED_IN"],
@@ -326,7 +278,6 @@ EDGE_TYPE_MAP = {
     ("Person", "Software"): ["HAS_SKILL", "USES"],
     ("Person", "Education"): ["HAS_EDUCATION"],
     ("Person", "Role"): ["HAS"],
-    # Organization relationships
     ("Organization", "Location"): ["LOCATED_IN"],
     ("Organization", "Person"): ["WORKS_FOR"],
     ("Organization", "Product"): ["USES", "OWNS"],
@@ -334,53 +285,38 @@ EDGE_TYPE_MAP = {
     ("Organization", "Account"): ["HAS", "OWNS"],
     ("Organization", "Organization"): ["PART_OF", "OWNS"],
     ("Organization", "Education"): ["HAS_EDUCATION"],
-    # Document relationships
     ("Document", "Person"): ["CREATED_BY"],
     ("Document", "Organization"): ["CREATED_BY"],
     ("Document", "Document"): ["REFERS_TO"],
     ("Document", "Date"): ["SCHEDULED_FOR"],
     ("Document", "Monetary"): ["COSTS"],
-    # Event relationships
     ("Event", "Location"): ["LOCATED_IN"],
     ("Event", "Date"): ["SCHEDULED_FOR"],
     ("Event", "Person"): ["PARTICIPATED_IN"],
-    # Financial relationships
     ("Monetary", "Person"): ["PAID"],
     ("Monetary", "Organization"): ["PAID"],
     ("Account", "Person"): ["PART_OF", "OWNS"],
     ("Account", "Organization"): ["PART_OF"],
-    # Project & Work
     ("Project", "Person"): ["MANAGES", "PARTICIPATED_IN"],
     ("Project", "Organization"): ["PART_OF"],
-    # Medical
     ("Condition", "Person"): ["DIAGNOSED_WITH"],
     ("Medication", "Person"): ["PRESCRIBED"],
     ("Medication", "Condition"): ["USES"],
-    # Products & Services
     ("Product", "Organization"): ["USES"],
     ("Product", "Monetary"): ["COSTS"],
     ("Software", "Organization"): ["USES"],
     ("Software", "Person"): ["HAS_SKILL"],
-    # Universal fallback
     ("Entity", "Entity"): list(EDGE_TYPES.keys()),
 }
 
 
-# =============================================================================
-# HELPER FUNCTIONS
-# =============================================================================
-
-
 def get_entity_types() -> dict[str, type[BaseModel]]:
-    """Get the dictionary of all entity types."""
     return ENTITY_TYPES
 
 
 def get_edge_types() -> dict[str, type[BaseModel]]:
-    """Get the dictionary of all edge types."""
     return EDGE_TYPES
 
 
 def get_edge_type_map() -> dict[tuple[str, str], list[str]]:
-    """Get the edge type mapping."""
     return EDGE_TYPE_MAP
