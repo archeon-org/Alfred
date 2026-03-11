@@ -13,6 +13,8 @@ export const useCategoryScreenLogic = () => {
 
   const {
     categories,
+    categoryTree,
+    rootCategories,
     isLoading,
     isFetching,
     refetch,
@@ -41,12 +43,13 @@ export const useCategoryScreenLogic = () => {
     name: string;
     icon: string;
     color: string;
+    parentId?: string | null;
   }) => {
     try {
       if (editingCategory) {
         await editCategory(editingCategory.id, data);
       } else {
-        await addCategory(data.name, data.icon, data.color);
+        await addCategory(data.name, data.icon, data.color, data.parentId);
       }
       setModalVisible(false);
     } catch (error) {
@@ -66,9 +69,11 @@ export const useCategoryScreenLogic = () => {
 
   return {
     categories,
+    categoryTree,
     isLoading,
     isFetching,
     refetch,
+    rootCategories,
     modalVisible,
     editingCategory,
     handleOpenModal,

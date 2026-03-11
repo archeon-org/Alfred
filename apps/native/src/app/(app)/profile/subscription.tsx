@@ -43,7 +43,7 @@ export default function SubscriptionScreen() {
 
   const handleContactSupport = () => {
     Linking.openURL(
-      "mailto:support@archeon.app?subject=Subscription%20Inquiry"
+      "mailto:support@archeon.app?subject=Subscription%20Inquiry",
     );
   };
 
@@ -61,7 +61,7 @@ export default function SubscriptionScreen() {
       [
         { text: "Cancel", style: "cancel" },
         { text: "Contact Support", onPress: handleContactSupport },
-      ]
+      ],
     );
   };
 

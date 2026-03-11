@@ -26,8 +26,14 @@ export class CategoryEntity implements Category {
   @Column({ default: "#4F46E5" })
   color: string; // Hex Code
 
+  @Column({ type: "integer", default: 0 })
+  order: number;
+
   @Column({ default: true })
   isSystemDefault: boolean; // TRUE = Template/AI Created, FALSE = User Created
+
+  @Column({ nullable: true })
+  parentId?: string | null;
 
   // --- Relationships ---
   @Column({ nullable: true })
@@ -38,6 +44,16 @@ export class CategoryEntity implements Category {
   })
   @JoinColumn({ name: "userId" })
   user: UserEntity;
+
+  @ManyToOne(() => CategoryEntity, (category) => category.children, {
+    nullable: true,
+    onDelete: "SET NULL",
+  })
+  @JoinColumn({ name: "parentId" })
+  parent?: CategoryEntity | null;
+
+  @OneToMany(() => CategoryEntity, (category) => category.parent)
+  children?: CategoryEntity[];
 
   @OneToMany(() => DocumentEntity, (doc) => doc.category)
   documents: DocumentEntity[];

@@ -1,21 +1,11 @@
-from tasks.document import (
-    generate_title,
-    process_document,
-)
-from tasks.graphiti import (
-    delete_document_from_graph,
-    ingest_document_to_graph,
-    ingest_documents_bulk,
-    initialize_graph,
-    retrieve_context,
-)
+from tasks.document import generate_title, process_document, process_documents_bulk
+from tasks.rag import backfill_documents, delete_document_index, index_document
 
 __all__ = [
     "process_document",
+    "process_documents_bulk",
     "generate_title",
-    "ingest_document_to_graph",
-    "ingest_documents_bulk",
-    "retrieve_context",
-    "initialize_graph",
-    "delete_document_from_graph",
+    "index_document",
+    "delete_document_index",
+    "backfill_documents",
 ]

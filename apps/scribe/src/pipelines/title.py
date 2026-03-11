@@ -1,11 +1,12 @@
 from dataclasses import dataclass
+
 from sqlalchemy.orm import Session
 
 from core.logging import get_logger
 from repositories.document import DocumentRepository
-from services.r2 import get_r2_service
-from services.ocr import get_ocr_service
 from services.classification import get_classification_service
+from services.ocr import get_ocr_service
+from services.r2 import get_r2_service
 
 logger = get_logger(__name__)
 

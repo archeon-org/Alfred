@@ -101,8 +101,8 @@ export default function DocumentDetails() {
     handleOpenTitleModal,
     handleSaveTitle,
     handleGenerateAiTitle,
-    handleTriggerEmbedding,
-    isTriggeringEmbedding,
+    handleTriggerIndex,
+    isTriggeringIndex,
     isUpdating,
     isGeneratingTitle,
     fetchNextPage,
@@ -330,7 +330,7 @@ export default function DocumentDetails() {
           </View>
         )}
 
-        {/* Enable Search Alert - Show for manually classified documents without embedding */}
+        {/* AI Index Alert - Show for manually classified documents without index */}
         {document.classificationSource === "MANUAL" &&
           document.processingStatus === "COMPLETED" &&
           !document.hasEmbedding && (
@@ -341,25 +341,25 @@ export default function DocumentDetails() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-indigo-900 dark:text-indigo-100 font-bold text-base mb-0.5">
-                    Enable Search
+                    Index For AI Search
                   </Text>
                   <Text className="text-indigo-700 dark:text-indigo-300 text-sm">
-                    Make this document findable through search
+                    Create chunk embeddings and citations for this document
                   </Text>
                 </View>
               </View>
               <TouchableOpacity
-                onPress={handleTriggerEmbedding}
-                disabled={isTriggeringEmbedding}
+                onPress={handleTriggerIndex}
+                disabled={isTriggeringIndex}
                 className="bg-indigo-600 py-3 rounded-xl items-center flex-row justify-center gap-2"
               >
-                {isTriggeringEmbedding ? (
+                {isTriggeringIndex ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (
                   <>
                     <Ionicons name="flash" size={16} color="white" />
                     <Text className="text-white font-bold text-sm">
-                      Enable Search
+                      Start Indexing
                     </Text>
                   </>
                 )}
@@ -521,7 +521,7 @@ export default function DocumentDetails() {
                 <Text className="text-gray-900 dark:text-white text-sm font-medium">
                   {format(
                     new Date(document.createdAt),
-                    "MMMM d, yyyy 'at' h:mm a"
+                    "MMMM d, yyyy 'at' h:mm a",
                   )}
                 </Text>
               </View>

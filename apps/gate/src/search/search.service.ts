@@ -2,15 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { DocumentEntity } from '@archeon-org/database';
-import { GraphitiSearchService } from './graphiti-search.service';
+import { RagCitation, RagSearchMode, RagService } from './rag.service';
 
 export interface SearchResult {
   document: DocumentEntity;
   similarity: number;
   matchReason?: string;
-  matchDetails?: {
-    semantic?: number;
-  };
+  bestSnippet?: string;
+  citations: RagCitation[];
 }
 
 @Injectable()
@@ -20,61 +19,56 @@ export class SearchService {
   constructor(
     @InjectRepository(DocumentEntity)
     private readonly documentRepository: Repository<DocumentEntity>,
-    private readonly graphitiSearchService: GraphitiSearchService,
+    private readonly ragService: RagService,
   ) {}
 
   async hybridSearch(
     userId: string,
     query: string,
     limit: number = 10,
+    mode: RagSearchMode = 'hybrid',
   ): Promise<SearchResult[]> {
-    this.logger.log(`Hybrid search for user ${userId}: "${query}"`);
+    this.logger.log(`RAG search for user ${userId}: "${query}" mode=${mode}`);
 
-    const graphitiResults = await this.graphitiSearchService.searchDocuments(
+    const ragResults = await this.ragService.searchDocuments(
       userId,
       query,
       limit,
+      mode,
     );
 
-    if (graphitiResults.length === 0) {
-      this.logger.log('No results from Graphiti');
+    if (ragResults.length === 0) {
+      this.logger.log('No results from RAG');
       return [];
     }
 
-    const graphitiDocIds = graphitiResults
-      .map((r) => r.document_id)
-      .filter((id): id is string => !!id);
+    const docIds = Array.from(new Set(ragResults.map((r) => r.document_id)));
 
-    if (graphitiDocIds.length === 0) {
-      this.logger.log('No valid document IDs from Graphiti');
+    if (docIds.length === 0) {
+      this.logger.log('No valid document IDs from RAG');
       return [];
     }
 
     const documents = await this.documentRepository.find({
-      where: { id: In(graphitiDocIds) },
+      where: { id: In(docIds), userId },
     });
 
-    const results: SearchResult[] = [];
+    const mapped: SearchResult[] = [];
+    for (const result of ragResults) {
+      const document = documents.find((doc) => doc.id === result.document_id);
+      if (!document) {
+        continue;
+      }
 
-    for (const gResult of graphitiResults) {
-      if (!gResult.document_id) continue;
-
-      const doc = documents.find((d) => d.id === gResult.document_id);
-      if (!doc) continue;
-
-      results.push({
-        document: doc,
-        similarity: gResult.relevance,
-        matchReason:
-          gResult.matched_entities.length > 0
-            ? `Found via: ${gResult.matched_entities.join(', ')}`
-            : 'Found via semantic search',
-        matchDetails: {
-          semantic: gResult.relevance,
-        },
+      mapped.push({
+        document,
+        similarity: result.score,
+        matchReason: 'chunk-match',
+        bestSnippet: result.best_snippet,
+        citations: result.citations || [],
       });
     }
 
-    return results;
+    return mapped;
   }
 }

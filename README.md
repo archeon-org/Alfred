@@ -7,6 +7,10 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.11-blue.svg)](https://python.org/)
 [![TypeScript](https://img.shields.io/badge/typescript-%3E%3D5.0-blue.svg)](https://www.typescriptlang.org/)
+[![Coverage All](.github/badges/coverage-all.svg)](.github/badges/coverage-all.svg)
+[![Coverage Gate](.github/badges/coverage-gate.svg)](.github/badges/coverage-gate.svg)
+[![Coverage Scribe](.github/badges/coverage-scribe.svg)](.github/badges/coverage-scribe.svg)
+[![Coverage Native](.github/badges/coverage-native.svg)](.github/badges/coverage-native.svg)
 
 ---
 
@@ -24,11 +28,9 @@ Archeon is a full-stack document management and AI-powered knowledge platform th
 - 🔐 **Secure & Scalable** - JWT authentication, rate limiting (Redis), and production-ready architecture
 - 📱 **Mobile App** - Native React Native + Expo app for iOS and Android with offline support
 - 🚀 **Microservices** - Distributed architecture with Gate (NestJS) and Scribe (FastAPI)
-- 📈 **Full Observability** - Complete monitoring stack with Prometheus, Grafana, Loki, and Promtail
 - ⚡ **Async Processing** - Celery-based distributed task queue for OCR, AI classification, and graph indexing
 - 🔄 **Hot Reload** - Docker development environment with automatic code reloading for rapid development
 - 🎯 **OCR Support** - Tesseract-powered text extraction from images and scanned documents
-- 📊 **Real-time Metrics** - Prometheus exporters for Redis, PostgreSQL, and Celery workers with pre-built Grafana dashboards
 
 ---
 
@@ -86,18 +88,6 @@ Archeon is a full-stack document management and AI-powered knowledge platform th
 │   - Entities & facts │  - File uploads      │  - Rate limiting  │
 │   - Relationships    │  - Thumbnails        │  - Task queue     │
 └──────────────────────┴──────────────────────┴───────────────────┘
-             │
-             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  Observability & Monitoring                     │
-├──────────────────┬──────────────────┬────────────────┬──────────┤
-│   Prometheus     │   Grafana        │     Loki       │ Promtail │
-│   - Metrics      │   - Dashboards   │  - Log storage │ - Shipper│
-│   - Alerts       │   - Alerts       │  - Aggregation │ - Parser │
-│   - Time-series  │   - Queries      │  - Search      │ - Filter │
-└──────┬───────────┴──────────────────┴────────────────┴──────────┘
-       │
-       └─── Exporters: Redis, PostgreSQL, Pushgateway (Celery)
 ```
 
 ## 🚀 Getting Started from Zero
@@ -170,16 +160,6 @@ This command starts:
 - **archeon-scribe-api**: FastAPI processing service with hot reload (port 8000)
 - **archeon-scribe-worker**: Celery worker with watchfiles hot reload for async document processing
 
-**Monitoring & Observability Stack:**
-
-- **archeon-prometheus**: Prometheus metrics collection and time-series DB (port 9090)
-- **archeon-grafana**: Grafana dashboards and alerting (port 3001)
-- **archeon-loki**: Loki log aggregation and storage (port 3100)
-- **archeon-promtail**: Promtail log shipper for Docker containers
-- **archeon-pushgateway**: Prometheus Pushgateway for Celery worker metrics (port 9091)
-- **archeon-redis-exporter**: Redis metrics exporter for Prometheus (port 9121)
-- **archeon-postgres-exporter**: PostgreSQL metrics exporter for Prometheus (port 9187)
-
 #### Step 4: Wait for Services to be Ready
 
 The first startup takes a few minutes to:
@@ -221,9 +201,6 @@ docker exec -it archeon-gate sh -c "cd apps/gate && npm run migration:run"
 | **Scribe API**             | http://localhost:8000/api  | Document processing API                  |
 | **Scribe Docs**            | http://localhost:8000/docs | FastAPI auto docs                        |
 | **Neo4j Browser**          | http://localhost:7474      | Knowledge graph UI (neo4j/archeon123)    |
-| **Grafana**                | http://localhost:3001      | Monitoring dashboards (admin/archeon123) |
-| **Prometheus**             | http://localhost:9090      | Metrics and queries                      |
-| **Prometheus Pushgateway** | http://localhost:9091      | Celery worker metrics                    |
 
 ```bash
 # Test Gate API
@@ -356,147 +333,6 @@ yarn start:dev
 ```
 
 See [apps/native/README.md](apps/native/README.md) for detailed mobile setup instructions.
-
-### 📊 Monitoring & Observability
-
-Archeon includes a **production-grade observability stack** with Prometheus, Grafana, Loki, and Promtail. All metrics, logs, and traces are automatically collected from every service.
-
-#### 🎯 Overview
-
-The monitoring stack provides:
-
-- **Real-time metrics** from all services (API, workers, databases)
-- **Centralized logging** with full-text search and filtering
-- **Pre-built dashboards** for immediate insights
-- **Custom exporters** for Redis, PostgreSQL, and Celery workers
-- **Alerting capabilities** (configurable in Grafana)
-
-#### 🚀 Access Grafana
-
-Open **http://localhost:3001** in your browser and login with:
-
-- **Username**: `admin`
-- **Password**: `archeon123`
-
-#### 📈 Available Dashboards
-
-Navigate to **Dashboards** in Grafana to access:
-
-1. **Archeon Overview** - System health, request rates, response times, and error rates
-2. **API Services** - Detailed API metrics for Gate (NestJS) and Scribe (FastAPI)
-3. **Infrastructure** - Redis and PostgreSQL performance metrics
-4. **Celery Workers** - Task queue, worker health, task success/failure rates
-5. **Logs Explorer** - Centralized logs from all services with search and filtering
-
-All dashboards are pre-configured and ready to use.
-
-#### 🔧 Monitoring Components
-
-| Component             | Purpose            | Port | Details                            |
-| --------------------- | ------------------ | ---- | ---------------------------------- |
-| **Prometheus**        | Metrics collection | 9090 | Time-series database for metrics   |
-| **Grafana**           | Visualization      | 3001 | Dashboards, alerts, and queries    |
-| **Loki**              | Log aggregation    | 3100 | Centralized log storage and search |
-| **Promtail**          | Log shipping       | -    | Collects Docker container logs     |
-| **Pushgateway**       | Worker metrics     | 9091 | Celery worker metrics ingestion    |
-| **Redis Exporter**    | Redis metrics      | 9121 | Exposes Redis stats to Prometheus  |
-| **Postgres Exporter** | PostgreSQL metrics | 9187 | Exposes DB stats to Prometheus     |
-
-#### 📊 What's Being Monitored
-
-**API Metrics (Gate & Scribe):**
-
-- Request rate, response time, error rate
-- HTTP status code distribution
-- Endpoint-specific performance
-- Authentication success/failure rates
-
-**Database Metrics (PostgreSQL):**
-
-- Connection pool usage
-- Query performance and slow queries
-- Table sizes and index usage
-- Transaction throughput
-
-**Cache Metrics (Redis):**
-
-- Memory usage and evictions
-- Hit/miss ratio
-- Command statistics
-- Connection count
-
-**Worker Metrics (Celery):**
-
-- Task queue depth
-- Task execution time
-- Worker availability
-- Task success/failure rates
-- OCR, classification, and graph indexing performance
-
-**System Metrics:**
-
-- Container CPU and memory usage
-- Network I/O
-- Disk usage
-
-#### 🔍 Viewing Logs
-
-Archeon uses **Loki** for centralized log aggregation:
-
-1. Open Grafana at http://localhost:3001
-2. Navigate to **Explore** (compass icon)
-3. Select **Loki** as the data source
-4. Use LogQL queries to filter logs:
-
-```logql
-# All logs from Gate API
-{container_name="archeon-gate"}
-
-# Error logs only
-{container_name="archeon-gate"} |= "ERROR"
-
-# Scribe worker logs
-{container_name="archeon-scribe-worker"}
-
-# Search for specific text
-{container_name="archeon-scribe-api"} |= "OCR"
-```
-
-#### 📉 Accessing Prometheus Directly
-
-You can also access Prometheus directly at **http://localhost:9090** to:
-
-- Run PromQL queries
-- View raw metrics
-- Check target health
-- Configure alerts
-
-**Example queries:**
-
-```promql
-# API request rate
-rate(http_requests_total[5m])
-
-# Redis memory usage
-redis_memory_used_bytes
-
-# PostgreSQL active connections
-pg_stat_database_numbackends
-
-# Celery task execution time
-celery_task_duration_seconds
-```
-
-#### ⚙️ Customizing Dashboards
-
-All Grafana dashboards are stored in `docker/monitoring/grafana/dashboards/`. You can:
-
-- Modify existing dashboards
-- Add new panels and queries
-- Create custom alerts
-- Export and share dashboards
-
-Changes are automatically picked up on container restart.
 
 ### Troubleshooting
 

@@ -77,17 +77,44 @@ export class TemplateService {
     }
 
     this.logger.debug(`Copying ${template.categories.length} categories`);
-    const categoriesData = template.categories.map((cat) => ({
-      name: cat.name,
-      icon: cat.icon,
-      color: cat.color,
-    }));
-    await this.categoryService.createManySystem(categoriesData, userId);
+    const sortedCategories = [...template.categories].sort((a, b) => {
+      const levelDelta = (a.level ?? 1) - (b.level ?? 1);
+      if (levelDelta !== 0) {
+        return levelDelta;
+      }
+      const orderDelta = (a.order ?? 0) - (b.order ?? 0);
+      if (orderDelta !== 0) {
+        return orderDelta;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+    const templateToUserCategoryMap = new Map<string, string>();
+
+    for (const category of sortedCategories) {
+      const resolvedParentId = category.parentTemplateCategoryId
+        ? templateToUserCategoryMap.get(category.parentTemplateCategoryId)
+        : undefined;
+
+      const createdCategory = await this.categoryService.createSystem(
+        {
+          name: category.name,
+          icon: category.icon,
+          color: category.color,
+          order: category.order ?? 0,
+          parentId: resolvedParentId,
+        },
+        userId,
+      );
+
+      templateToUserCategoryMap.set(category.id, createdCategory.id);
+    }
 
     this.logger.debug(`Copying ${template.tags.length} tags`);
     const tagsData = template.tags.map((tag) => ({
       name: tag.name,
       color: tag.color,
+      order: tag.order ?? 0,
     }));
     await this.tagService.createManySystem(tagsData, userId);
 
@@ -105,8 +132,11 @@ export class TemplateService {
       this.templateCategoryRepo as any,
       {
         where: { template: { id: templateId } },
-        sortableColumns: ['order', 'name'],
-        defaultSortBy: [['order', 'ASC']],
+        sortableColumns: ['level', 'order', 'name'],
+        defaultSortBy: [
+          ['level', 'ASC'],
+          ['order', 'ASC'],
+        ],
         searchableColumns: ['name'],
       },
     );

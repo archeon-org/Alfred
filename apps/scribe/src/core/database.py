@@ -1,7 +1,7 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -9,6 +9,21 @@ from core.config import get_settings
 from core.logging import get_logger
 
 logger = get_logger(__name__)
+
+MANAGED_TABLES = frozenset(
+    {
+        "users",
+        "documents",
+        "document_chunks",
+        "categories",
+        "tags",
+        "document_tags",
+        "templates",
+        "template_categories",
+        "template_tags",
+        "notifications",
+    }
+)
 
 
 def get_sync_engine():
@@ -102,3 +117,42 @@ async def check_database_connection() -> bool:
     except Exception as e:
         logger.error("Database connection check failed", error=str(e))
         return False
+
+
+def validate_schema_sync() -> list[str]:
+    """Compare SQLAlchemy model columns against the live database.
+
+    Returns a list of drift descriptions. An empty list means
+    the models are in sync with the database.
+    """
+    import db.models  # noqa: F401 — ensure models are registered
+    from db.base import Base
+
+    engine = get_sync_engine()
+    inspector = inspect(engine)
+    drifts: list[str] = []
+
+    for table in Base.metadata.sorted_tables:
+        if table.name not in MANAGED_TABLES:
+            continue
+
+        db_columns = inspector.get_columns(table.name)
+        if not db_columns:
+            drifts.append(f"Table '{table.name}' does not exist in the database")
+            continue
+
+        db_col_names = {col["name"] for col in db_columns}
+        model_col_names = {col.name for col in table.columns}
+
+        missing_in_db = model_col_names - db_col_names
+        missing_in_model = db_col_names - model_col_names
+
+        for col in missing_in_db:
+            drifts.append(f"Column '{col}' exists in model '{table.name}' but not in the database")
+        for col in missing_in_model:
+            drifts.append(
+                f"Column '{col}' exists in database table '{table.name}' but not in the model"
+            )
+
+    engine.dispose()
+    return drifts

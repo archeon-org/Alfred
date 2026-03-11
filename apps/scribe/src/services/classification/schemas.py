@@ -4,6 +4,11 @@ class ClassificationConstants:
 
     MAX_TITLE_LENGTH = 60
     MAX_CATEGORY_NAME_LENGTH = 25
+    MAX_REASONING_LENGTH = 400
+
+    MAX_CLASSIFICATION_ATTEMPTS = 3
+    MAX_NETWORK_RETRIES = 4
+    NETWORK_RETRY_BASE_SECONDS = 0.5
 
     AVAILABLE_ICONS = [
         "document-outline",
@@ -61,6 +66,7 @@ CLASSIFICATION_RESPONSE_SCHEMA = {
                 "name": {"type": "string", "maxLength": 25},
                 "icon": {"type": "string"},
                 "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+                "parentCategoryId": {"type": ["string", "null"]},
             },
             "required": ["name", "icon", "color"],
         },
@@ -78,6 +84,7 @@ CLASSIFICATION_RESPONSE_SCHEMA = {
         },
         "reasoning": {
             "type": "string",
+            "maxLength": 400,
         },
     },
     "required": ["categoryId", "newCategory", "tagIds", "title", "confidence", "reasoning"],

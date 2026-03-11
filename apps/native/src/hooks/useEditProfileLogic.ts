@@ -85,7 +85,7 @@ export const useEditProfileLogic = () => {
           showError("Error", "Failed to update profile");
           console.error(error);
         },
-      }
+      },
     );
   };
 

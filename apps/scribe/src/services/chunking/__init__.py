@@ -1,6 +1,6 @@
 from services.chunking.chunker import (
-    DocumentChunker,
     DocumentChunk,
+    DocumentChunker,
     should_chunk_document,
 )
 

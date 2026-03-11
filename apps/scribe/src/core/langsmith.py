@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import os
 import logging
-from functools import wraps
-from typing import Any, Callable, TypeVar
+import os
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,6 @@ def create_langsmith_run(
         return nullcontext()
 
     try:
-        from langsmith import Client
         from langsmith.run_helpers import trace
 
         return trace(

@@ -23,7 +23,7 @@ export const Input = forwardRef<TextInput, InputProps>(
             "w-full rounded-2xl border border-gray-200 bg-surface px-5 py-4 text-gray-900 placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:bg-gray-900/50 dark:border-gray-700 dark:text-white",
             error &&
               "border-red-500 focus:border-red-500 focus:ring-red-500/20",
-            className
+            className,
           )}
           placeholderTextColor="#9CA3AF"
           {...props}
@@ -31,7 +31,7 @@ export const Input = forwardRef<TextInput, InputProps>(
         {error && <Text className="text-sm text-red-500">{error}</Text>}
       </View>
     );
-  }
+  },
 );
 
 Input.displayName = "Input";

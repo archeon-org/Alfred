@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
@@ -17,7 +17,7 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 EXPO_PUSH_TOKEN_PATTERN = re.compile(r"^ExponentPushToken\[.+\]$|^ExpoPushToken\[.+\]$")
 
 
-class NotificationType(str, Enum):
+class NotificationType(StrEnum):
     DOCUMENT_CLASSIFIED = "document_classified"
     DOCUMENT_ERROR = "document_error"
     TITLE_GENERATED = "title_generated"

@@ -32,7 +32,7 @@ export const StorageWidget = ({
     <View
       className={cn(
         "bg-primary dark:bg-primary-900 rounded-3xl p-5",
-        className
+        className,
       )}
       style={shadows.primary}
     >

@@ -6,7 +6,11 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { DocumentRepository } from './document.repository';
-import { DocumentEntity } from '@archeon-org/database';
+import {
+  DocumentChunkEntity,
+  DocumentEntity,
+  UserEntity,
+} from '@archeon-org/database';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import { R2Service } from '@archeon-org/module';
@@ -23,16 +27,41 @@ import { UserService } from '../user/user.service';
 import { QueueService } from '../queue/queue.service';
 import { SubscriptionService } from '../subscription/subscription.service';
 import { CreditOperation } from '@archeon-org/types';
-
 import { ProcessingStatus } from '@archeon-org/database';
+
+type ClassificationSource = 'AI' | 'MANUAL';
+
+interface UploadManyOptions {
+  useBulkWorkerTask?: boolean;
+}
+
+interface BulkUploadFailure {
+  originalName: string;
+  message: string;
+  code: 'UPLOAD_FAILED' | 'QUEUE_FAILED';
+}
+
+export interface DocumentBulkUploadResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  classificationSource: ClassificationSource;
+  documents: DocumentEntity[];
+  failures: BulkUploadFailure[];
+}
 
 @Injectable()
 export class DocumentService {
   private readonly logger = new Logger(DocumentService.name);
+  private readonly bulkUploadConcurrency = 4;
 
   constructor(
     @InjectRepository(DocumentEntity)
     private readonly documentRepo: Repository<DocumentEntity>,
+    @InjectRepository(DocumentChunkEntity)
+    private readonly documentChunkRepo: Repository<DocumentChunkEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepo: Repository<UserEntity>,
     private readonly documentRepository: DocumentRepository,
     private readonly r2Service: R2Service,
     private readonly userService: UserService,
@@ -44,69 +73,263 @@ export class DocumentService {
     userId: string,
     file: Express.Multer.File,
   ): Promise<DocumentEntity> {
-    const creditCheck = await this.subscriptionService.checkCredits(
-      userId,
-      CreditOperation.AI_CLASSIFICATION,
-    );
-
-    if (!creditCheck.canAfford) {
+    const result = await this.uploadMany(userId, [file], 'AI', {
+      useBulkWorkerTask: false,
+    });
+    if (result.documents.length === 0) {
       throw new BadRequestException(
-        `Insufficient credits for AI processing. Required: ${creditCheck.cost}, Available: ${creditCheck.currentCredits}. ` +
-          'Please purchase more credits or upload manually.',
+        result.failures[0]?.message || 'Failed to upload file',
       );
     }
-
-    const document = await this.handleFileUpload(userId, file, 'AI');
-
-    await this.subscriptionService.consumeCredits(
-      userId,
-      CreditOperation.AI_CLASSIFICATION,
-    );
-
-    await this.queueService.addDocumentProcessingJob({
-      documentId: document.id,
-      userId: document.userId,
-      key: document.path,
-      originalName: document.originalName,
-    });
-    this.logger.log(`Document queued for AI processing: ${document.id}`);
-
-    return document;
+    return result.documents[0];
   }
 
   async uploadManual(
     userId: string,
     file: Express.Multer.File,
   ): Promise<DocumentEntity> {
-    const document = await this.handleFileUpload(userId, file, 'MANUAL');
-    this.logger.log(
-      `Document uploaded manually, skipping AI processing: ${document.id}`,
-    );
-    return document;
+    const result = await this.uploadMany(userId, [file], 'MANUAL');
+    if (result.documents.length === 0) {
+      throw new BadRequestException(
+        result.failures[0]?.message || 'Failed to upload file',
+      );
+    }
+    return result.documents[0];
   }
 
-  private async handleFileUpload(
+  async uploadAiBulk(
+    userId: string,
+    files: Express.Multer.File[],
+  ): Promise<DocumentBulkUploadResult> {
+    return this.uploadMany(userId, files, 'AI', {
+      useBulkWorkerTask: true,
+    });
+  }
+
+  async uploadManualBulk(
+    userId: string,
+    files: Express.Multer.File[],
+  ): Promise<DocumentBulkUploadResult> {
+    return this.uploadMany(userId, files, 'MANUAL');
+  }
+
+  private async uploadMany(
+    userId: string,
+    files: Express.Multer.File[],
+    classificationSource: ClassificationSource,
+    options?: UploadManyOptions,
+  ): Promise<DocumentBulkUploadResult> {
+    if (!files?.length) {
+      throw new BadRequestException('At least one file is required');
+    }
+
+    const preparedFiles = files.filter(Boolean);
+    if (preparedFiles.length === 0) {
+      throw new BadRequestException('At least one valid file is required');
+    }
+
+    const totalSizeBytes = preparedFiles.reduce(
+      (total, file) => total + Math.max(0, Number(file.size) || 0),
+      0,
+    );
+
+    await this.reserveStorage(userId, totalSizeBytes);
+
+    let reservedCredits = 0;
+    let perFileCreditCost = 0;
+
+    try {
+      if (classificationSource === 'AI') {
+        const creditCheck = await this.subscriptionService.checkCredits(
+          userId,
+          CreditOperation.AI_CLASSIFICATION,
+        );
+
+        perFileCreditCost = creditCheck.cost;
+        reservedCredits = preparedFiles.length * perFileCreditCost;
+
+        if (creditCheck.currentCredits < reservedCredits) {
+          throw new BadRequestException(
+            `Insufficient credits for AI processing. Required: ${reservedCredits}, Available: ${creditCheck.currentCredits}.`,
+          );
+        }
+
+        await this.subscriptionService.consumeCreditsAmount(
+          userId,
+          reservedCredits,
+          `AI upload (${preparedFiles.length} document${preparedFiles.length === 1 ? '' : 's'})`,
+        );
+      }
+    } catch (error) {
+      await this.releaseStorage(userId, totalSizeBytes);
+      throw error;
+    }
+
+    const queue = [...preparedFiles];
+    const documents: DocumentEntity[] = [];
+    const failures: BulkUploadFailure[] = [];
+    let usedStorageBytes = 0;
+    const useBulkWorkerTask =
+      classificationSource === 'AI' &&
+      !!options?.useBulkWorkerTask &&
+      preparedFiles.length > 1;
+
+    const worker = async () => {
+      while (queue.length > 0) {
+        const file = queue.shift();
+        if (!file) {
+          return;
+        }
+
+        let document: DocumentEntity;
+        try {
+          document = await this.handleFileUploadWithoutAccounting(
+            userId,
+            file,
+            classificationSource,
+          );
+        } catch (error) {
+          failures.push({
+            originalName: file.originalname || 'document',
+            message: this.getUploadErrorMessage(error),
+            code: 'UPLOAD_FAILED',
+          });
+          continue;
+        }
+
+        if (classificationSource === 'AI' && !useBulkWorkerTask) {
+          try {
+            await this.queueService.addDocumentProcessingJob({
+              documentId: document.id,
+              userId: document.userId,
+              key: document.path,
+              originalName: document.originalName,
+            });
+            this.logger.log(
+              `Document queued for AI processing: ${document.id}`,
+            );
+          } catch (error) {
+            await this.cleanupFailedDocumentUpload(document);
+            this.logger.error(
+              `Failed to queue AI processing for document ${document.id}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            failures.push({
+              originalName:
+                file.originalname || document.originalName || 'document',
+              message: 'Failed to queue AI processing job',
+              code: 'QUEUE_FAILED',
+            });
+            continue;
+          }
+        } else if (classificationSource === 'MANUAL') {
+          this.logger.log(
+            `Document uploaded manually, skipping AI processing: ${document.id}`,
+          );
+        }
+
+        documents.push(document);
+        usedStorageBytes += Math.max(0, Number(file.size) || 0);
+      }
+    };
+
+    await Promise.all(
+      Array.from(
+        {
+          length: Math.min(this.bulkUploadConcurrency, preparedFiles.length),
+        },
+        () => worker(),
+      ),
+    );
+
+    if (
+      classificationSource === 'AI' &&
+      useBulkWorkerTask &&
+      documents.length > 0
+    ) {
+      try {
+        await this.queueService.addBulkDocumentProcessingJob({
+          userId,
+          documents: documents.map((document) => ({
+            documentId: document.id,
+            userId: document.userId,
+            key: document.path,
+            originalName: document.originalName,
+          })),
+          notifySummary: true,
+          suppressPerDocumentNotifications: true,
+        });
+        this.logger.log(
+          `Queued bulk AI processing for user ${userId} (${documents.length} documents)`,
+        );
+      } catch (error) {
+        const queuedDocuments = [...documents];
+        documents.length = 0;
+        usedStorageBytes = 0;
+
+        for (const document of queuedDocuments) {
+          await this.cleanupFailedDocumentUpload(document);
+          failures.push({
+            originalName: document.originalName || 'document',
+            message: 'Failed to queue bulk AI processing job',
+            code: 'QUEUE_FAILED',
+          });
+        }
+
+        this.logger.error(
+          `Failed to queue bulk AI processing for user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    const unusedStorageBytes = Math.max(0, totalSizeBytes - usedStorageBytes);
+    if (unusedStorageBytes > 0) {
+      try {
+        await this.releaseStorage(userId, unusedStorageBytes);
+      } catch (error) {
+        this.logger.error(
+          `Failed to release unused storage for user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    if (
+      classificationSource === 'AI' &&
+      failures.length > 0 &&
+      perFileCreditCost > 0
+    ) {
+      const refundAmount = failures.length * perFileCreditCost;
+      if (refundAmount > 0 && reservedCredits > 0) {
+        try {
+          await this.subscriptionService.addCredits(
+            userId,
+            refundAmount,
+            `Refund for ${failures.length} failed AI upload${failures.length === 1 ? '' : 's'}`,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Failed to refund credits for user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    }
+
+    return {
+      total: preparedFiles.length,
+      succeeded: documents.length,
+      failed: failures.length,
+      classificationSource,
+      documents,
+      failures,
+    };
+  }
+
+  private async handleFileUploadWithoutAccounting(
     userId: string,
     file: Express.Multer.File,
-    classificationSource: 'AI' | 'MANUAL',
+    classificationSource: ClassificationSource,
   ): Promise<DocumentEntity> {
     if (!file) {
       throw new BadRequestException('File is required');
-    }
-
-    const user = await this.userService.findById(userId);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const currentStorage = Number(user.storageUsed) || 0;
-    const storageLimit = Number(user.storageLimit) || 0;
-    const newStorageUsed = currentStorage + file.size;
-
-    if (newStorageUsed > storageLimit) {
-      throw new BadRequestException(
-        'Storage limit exceeded. Please upgrade your plan to upload more documents.',
-      );
     }
 
     const fileExtension = path.extname(file.originalname);
@@ -137,10 +360,6 @@ export class DocumentService {
         classificationSource,
       });
 
-      await this.userService.update(userId, {
-        storageUsed: newStorageUsed,
-      });
-
       this.logger.log(`Document uploaded successfully: ${document.id}`);
       return document;
     } catch (error) {
@@ -150,6 +369,113 @@ export class DocumentService {
       );
       throw new BadRequestException('Failed to upload file');
     }
+  }
+
+  private async reserveStorage(userId: string, bytes: number): Promise<void> {
+    const normalizedBytes = Math.max(0, Math.floor(bytes));
+    if (normalizedBytes === 0) {
+      return;
+    }
+
+    const result = await this.userRepo
+      .createQueryBuilder()
+      .update(UserEntity)
+      .set({
+        storageUsed: () => `"storageUsed" + ${normalizedBytes}`,
+      })
+      .where('id = :userId', { userId })
+      .andWhere(`"storageUsed" + :bytes <= "storageLimit"`, {
+        bytes: normalizedBytes,
+      })
+      .execute();
+
+    if (result.affected === 0) {
+      const user = await this.userService.findById(userId);
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+      throw new BadRequestException(
+        'Storage limit exceeded. Please upgrade your plan to upload more documents.',
+      );
+    }
+  }
+
+  private async releaseStorage(userId: string, bytes: number): Promise<void> {
+    const normalizedBytes = Math.max(0, Math.floor(bytes));
+    if (normalizedBytes === 0) {
+      return;
+    }
+
+    await this.userRepo
+      .createQueryBuilder()
+      .update(UserEntity)
+      .set({
+        storageUsed: () => `GREATEST(0, "storageUsed" - ${normalizedBytes})`,
+      })
+      .where('id = :userId', { userId })
+      .execute();
+  }
+
+  private async cleanupFailedDocumentUpload(
+    document: DocumentEntity,
+  ): Promise<void> {
+    try {
+      await this.r2Service.deleteFile(document.path);
+    } catch (error) {
+      this.logger.error(
+        `Failed cleanup R2 delete for document ${document.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    try {
+      await this.documentRepository.softDelete(document.id);
+    } catch (error) {
+      this.logger.error(
+        `Failed cleanup DB delete for document ${document.id}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private getUploadErrorMessage(error: unknown): string {
+    if (!error) {
+      return 'Failed to upload file';
+    }
+
+    if (error instanceof BadRequestException) {
+      const response = error.getResponse();
+      if (typeof response === 'string') {
+        return response;
+      }
+
+      if (
+        response &&
+        typeof response === 'object' &&
+        'message' in response &&
+        Array.isArray((response as { message?: unknown }).message)
+      ) {
+        const firstMessage = (response as { message: string[] }).message[0];
+        if (firstMessage) {
+          return firstMessage;
+        }
+      }
+
+      if (
+        response &&
+        typeof response === 'object' &&
+        'message' in response &&
+        typeof (response as { message?: unknown }).message === 'string'
+      ) {
+        return (response as { message: string }).message;
+      }
+
+      return error.message;
+    }
+
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return 'Failed to upload file';
   }
 
   async getUserDocuments(
@@ -197,8 +523,12 @@ export class DocumentService {
     }
 
     const url = await this.r2Service.getSignedUrl(document.path);
+    const hasEmbedding =
+      (await this.documentChunkRepo.count({
+        where: { documentId },
+      })) > 0;
     return {
-      document: { ...document, hasEmbedding: false },
+      document: { ...document, hasEmbedding },
       url,
     };
   }
@@ -288,26 +618,19 @@ export class DocumentService {
     }
 
     try {
-      await this.queueService.addGraphDeletionJob({
+      await this.queueService.addDocumentIndexDeletionJob({
         documentId,
         userId,
       });
-      this.logger.log(`Queued graph deletion for document ${documentId}`);
+      this.logger.log(`Queued chunk index deletion for document ${documentId}`);
     } catch (error) {
       this.logger.error(
-        `Failed to queue graph deletion for document ${documentId}: ${error.message}`,
+        `Failed to queue index deletion for document ${documentId}: ${error.message}`,
         error.stack,
       );
     }
 
-    const user = await this.userService.findById(userId);
-    if (user) {
-      const currentStorage = Number(user.storageUsed) || 0;
-      const newStorageUsed = Math.max(0, currentStorage - document.size);
-      await this.userService.update(userId, {
-        storageUsed: newStorageUsed,
-      });
-    }
+    await this.releaseStorage(userId, document.size);
 
     await this.documentRepository.softDelete(documentId);
   }
@@ -402,16 +725,12 @@ export class DocumentService {
     return document;
   }
 
-  /**
-   * Trigger knowledge graph ingestion for a document.
-   * This replaces the old embedding generation workflow.
-   */
-  async triggerGraphIngestion(
+  async triggerDocumentIndexing(
     userId: string,
     documentId: string,
   ): Promise<DocumentEntity> {
     this.logger.log(
-      `Triggering knowledge graph ingestion for document ${documentId} for user ${userId}`,
+      `Triggering document indexing for document ${documentId} for user ${userId}`,
     );
     const document = await this.documentRepository.findById(documentId);
 
@@ -425,7 +744,7 @@ export class DocumentService {
 
     if (!document.content) {
       throw new BadRequestException(
-        'Document must be processed before graph ingestion',
+        'Document must be processed before indexing',
       );
     }
 
@@ -445,12 +764,10 @@ export class DocumentService {
       CreditOperation.AI_EMBEDDING,
     );
 
-    await this.queueService.addGraphIngestionJob({
+    await this.queueService.addDocumentIndexingJob({
       documentId: document.id,
       userId: document.userId,
-      documentName: document.title || document.originalName || 'Untitled',
-      content: document.content,
-      referenceTime: null,
+      manualTrigger: true,
     });
 
     return document;

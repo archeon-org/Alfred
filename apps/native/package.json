@@ -25,7 +25,9 @@
     "submit:ios:store:prod": "eas submit --platform ios --profile production",
     "build:android:local:prod": "node scripts/release.js --build --platform android --local",
     "submit:android:store:prod": "eas submit --platform android --profile production",
-    "eas-build-post-install": "yarn build:packages"
+    "eas-build-post-install": "yarn build:packages",
+    "test": "jest",
+    "test:coverage": "jest --coverage --coverageDirectory ../coverage/native --coverageReporters=lcov --coverageReporters=text-summary"
   },
   "dependencies": {
     "@archeon-org/types": "*",

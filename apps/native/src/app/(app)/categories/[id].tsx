@@ -129,7 +129,7 @@ export default function CategoryDetails() {
                 onPress={() =>
                   handleRemoveFromCategory(
                     item.id,
-                    item.title || item.originalName
+                    item.title || item.originalName,
                   )
                 }
                 className="mr-4 p-2 rounded-full bg-red-50 dark:bg-red-900/20"

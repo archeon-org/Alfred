@@ -5,6 +5,14 @@ export interface ProcessDocumentJobData {
   originalName?: string;
 }
 
+export interface ProcessDocumentsBulkJobData {
+  userId: string;
+  documents: ProcessDocumentJobData[];
+  bulkOperationId?: string;
+  notifySummary?: boolean;
+  suppressPerDocumentNotifications?: boolean;
+}
+
 export interface GenerateTitleJobData {
   documentId: string;
   userId: string;
@@ -12,23 +20,20 @@ export interface GenerateTitleJobData {
   originalName?: string;
 }
 
-/**
- * @deprecated Use IngestDocumentGraphJobData instead
- */
-export interface GenerateEmbeddingJobData {
+export interface IndexDocumentJobData {
   documentId: string;
   userId: string;
-  key: string;
+  manualTrigger?: boolean;
+  bulkOperationId?: string;
+  suppressNotifications?: boolean;
 }
 
-/**
- * Data for knowledge graph ingestion task.
- * Replaces the old embedding generation workflow.
- */
-export interface IngestDocumentGraphJobData {
+export interface DeleteDocumentIndexJobData {
   documentId: string;
   userId: string;
-  documentName: string;
-  content: string;
-  referenceTime?: string | null;
+}
+
+export interface BackfillDocumentsJobData {
+  requestedBy?: string;
+  batchSize?: number;
 }

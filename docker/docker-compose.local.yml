@@ -44,32 +44,6 @@ services:
       timeout: 5s
       retries: 3
 
-  neo4j-archeon:
-    container_name: neo4j-archeon
-    image: neo4j:5.26.0-community
-    restart: unless-stopped
-    environment:
-      - NEO4J_AUTH=neo4j/archeon123
-      - NEO4J_PLUGINS=["apoc"]
-      - NEO4J_apoc_export_file_enabled=true
-      - NEO4J_apoc_import_file_enabled=true
-      - NEO4J_apoc_import_file_use__neo4j__config=true
-      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
-      - NEO4J_dbms_security_procedures_allowlist=apoc.*
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-    volumes:
-      - neo4j-archeon-data:/data
-      - neo4j-archeon-logs:/logs
-    networks:
-      - archeon-net
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7474"]
-      interval: 15s
-      timeout: 10s
-      retries: 5
-
   gate:
     container_name: archeon-gate
     image: node:22-alpine
@@ -89,6 +63,7 @@ services:
         yarn workspace @archeon-org/types build &&
         yarn workspace @archeon-org/database build &&
         yarn workspace @archeon-org/module build &&
+        yarn workspace gate migration:run &&
         yarn workspace gate start:dev
       "
     depends_on:
@@ -118,8 +93,6 @@ services:
         condition: service_healthy
       redis-archeon:
         condition: service_healthy
-      neo4j-archeon:
-        condition: service_healthy
     networks:
       - archeon-net
     restart: unless-stopped
@@ -143,122 +116,10 @@ services:
         condition: service_healthy
       redis-archeon:
         condition: service_healthy
-      neo4j-archeon:
-        condition: service_healthy
     networks:
       - archeon-net
     restart: unless-stopped
 
-  # =============================================================================
-  # Monitoring Stack (Prometheus + Grafana + Loki)
-  # =============================================================================
-
-  prometheus:
-    container_name: archeon-prometheus
-    image: prom/prometheus:latest
-    restart: unless-stopped
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/etc/prometheus/console_libraries"
-      - "--web.console.templates=/etc/prometheus/consoles"
-      - "--web.enable-lifecycle"
-    networks:
-      - archeon-net
-
-  grafana:
-    container_name: archeon-grafana
-    image: grafana/grafana:latest
-    restart: unless-stopped
-    ports:
-      - "3001:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=archeon123
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_ROOT_URL=http://localhost:3001
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    depends_on:
-      - prometheus
-      - loki
-    networks:
-      - archeon-net
-
-  loki:
-    container_name: archeon-loki
-    image: grafana/loki:latest
-    restart: unless-stopped
-    user: "0"
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
-      - loki-data:/loki
-    command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      - archeon-net
-
-  promtail:
-    container_name: archeon-promtail
-    image: grafana/promtail:latest
-    restart: unless-stopped
-    volumes:
-      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: -config.file=/etc/promtail/config.yml
-    depends_on:
-      - loki
-    networks:
-      - archeon-net
-
-  # Prometheus Pushgateway for Celery worker metrics
-  pushgateway:
-    container_name: archeon-pushgateway
-    image: prom/pushgateway:latest
-    restart: unless-stopped
-    ports:
-      - "9091:9091"
-    networks:
-      - archeon-net
-
-  # Redis Exporter for Prometheus
-  redis-exporter:
-    container_name: archeon-redis-exporter
-    image: oliver006/redis_exporter:latest
-    restart: unless-stopped
-    environment:
-      - REDIS_ADDR=redis://redis-archeon:6379
-      - REDIS_PASSWORD=RedisPassword123
-    ports:
-      - "9121:9121"
-    depends_on:
-      - redis-archeon
-    networks:
-      - archeon-net
-
-  # PostgreSQL Exporter for Prometheus
-  postgres-exporter:
-    container_name: archeon-postgres-exporter
-    image: prometheuscommunity/postgres-exporter:latest
-    restart: unless-stopped
-    environment:
-      - DATA_SOURCE_NAME=postgresql://postgres:postgres@postgres-archeon:5432/postgres?sslmode=disable
-    ports:
-      - "9187:9187"
-    depends_on:
-      postgres-archeon:
-        condition: service_healthy
-    networks:
-      - archeon-net
 
 networks:
   archeon-net:
@@ -267,11 +128,6 @@ networks:
 volumes:
   postgres-archeon-storage:
   redis-archeon-storage:
-  neo4j-archeon-data:
-  neo4j-archeon-logs:
   gate-node-modules:
   gate-app-node-modules:
   yarn-cache:
-  prometheus-data:
-  grafana-data:
-  loki-data:

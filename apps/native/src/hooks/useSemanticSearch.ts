@@ -21,10 +21,13 @@ export function useSemanticSearch(
   params: {
     query: string;
     limit?: number;
-    mode?: "semantic" | "hybrid";
+    mode?: "semantic" | "hybrid" | "keyword";
     enabled?: boolean;
   },
-  options?: Omit<UseQueryOptions<SearchResponse, Error>, "queryKey" | "queryFn">
+  options?: Omit<
+    UseQueryOptions<SearchResponse, Error>,
+    "queryKey" | "queryFn"
+  >,
 ) {
   return useQuery<SearchResponse, Error>({
     queryKey: [SEARCH_QUERY_KEY, params.query, params.limit, params.mode],

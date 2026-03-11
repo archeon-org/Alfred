@@ -3,6 +3,7 @@ import { config } from 'dotenv';
 import {
   UserEntity,
   DocumentEntity,
+  DocumentChunkEntity,
   CategoryEntity,
   TagEntity,
   TemplateEntity,
@@ -24,6 +25,7 @@ export const dataSourceOptions: DataSourceOptions = {
   entities: [
     UserEntity,
     DocumentEntity,
+    DocumentChunkEntity,
     CategoryEntity,
     TagEntity,
     TemplateEntity,

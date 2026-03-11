@@ -72,7 +72,7 @@ export function useQuestion(): UseQuestionReturn {
         history: messages,
       });
     },
-    [questionMutation, messages]
+    [questionMutation, messages],
   );
 
   const clearHistory = useCallback(() => {

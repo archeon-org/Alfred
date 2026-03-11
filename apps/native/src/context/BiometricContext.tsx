@@ -72,7 +72,7 @@ export const BiometricProvider = ({
       if (nextAppState === "active" && isEnabled && isInitialized) {
         // Check if we need to re-authenticate
         const lastAuth = await SecureStore.getItemAsync(
-          BIOMETRIC_LAST_AUTH_KEY
+          BIOMETRIC_LAST_AUTH_KEY,
         );
         const now = Date.now();
 
@@ -90,14 +90,14 @@ export const BiometricProvider = ({
         // Save the time when app went to background
         await SecureStore.setItemAsync(
           BIOMETRIC_LAST_AUTH_KEY,
-          Date.now().toString()
+          Date.now().toString(),
         );
       }
     };
 
     const subscription = AppState.addEventListener(
       "change",
-      handleAppStateChange
+      handleAppStateChange,
     );
     return () => subscription.remove();
   }, [isEnabled, isInitialized]);
@@ -118,7 +118,7 @@ export const BiometricProvider = ({
           await LocalAuthentication.supportedAuthenticationTypesAsync();
         if (
           types.includes(
-            LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION
+            LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION,
           )
         ) {
           setBiometricType("faceid");
@@ -167,7 +167,7 @@ export const BiometricProvider = ({
         await SecureStore.setItemAsync(BIOMETRIC_ENABLED_KEY, "true");
         await SecureStore.setItemAsync(
           BIOMETRIC_LAST_AUTH_KEY,
-          Date.now().toString()
+          Date.now().toString(),
         );
         setIsEnabled(true);
         setIsLocked(false);
@@ -216,7 +216,7 @@ export const BiometricProvider = ({
       if (result.success) {
         await SecureStore.setItemAsync(
           BIOMETRIC_LAST_AUTH_KEY,
-          Date.now().toString()
+          Date.now().toString(),
         );
         return true;
       }

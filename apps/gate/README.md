@@ -4,7 +4,7 @@ The main API gateway for Archeon, built with **NestJS** and **TypeScript**. Gate
 
 - 🔐 **Authentication** - JWT-based auth with Google OAuth support
 - 📄 **Document Management** - Upload, organize, and manage documents
-- 🔍 **Search** - Semantic, keyword, and graph-based search
+- 🔍 **Search** - Hybrid semantic + keyword chunk retrieval
 - 🧠 **Second Brain Q&A** - AI-powered question answering from your documents
 - 📊 **User Management** - Profiles, subscriptions, and credits
 - ⚡ **Rate Limiting** - Redis-backed request throttling
@@ -26,13 +26,13 @@ Gate is the public-facing API that coordinates between:
 │   Port: 3000        │      │   Port: 8000        │
 │   - Auth            │      │   - OCR             │
 │   - Documents CRUD  │      │   - AI Classification│
-│   - Search          │      │   - Knowledge Graph  │
+│   - Search          │      │   - Chunk RAG Index  │
 └──────────┬──────────┘      └─────────────────────┘
            │
            ▼
 ┌─────────────────────┐
 │   PostgreSQL        │
-│   + Redis + Neo4j   │
+│   + Redis + pgvector│
 └─────────────────────┘
 ```
 

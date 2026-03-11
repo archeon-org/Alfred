@@ -24,6 +24,7 @@ export default function ScanScreen() {
   const {
     scannedImages,
     isUploading,
+    isFileBatch,
     scanDocument,
     pickDocument,
     pickFromGallery,
@@ -79,7 +80,7 @@ export default function ScanScreen() {
           <ScanPreview
             scannedImages={scannedImages}
             onRemovePage={removePage}
-            onAddMore={pickFromGallery}
+            onAddMore={isFileBatch ? pickDocument : pickFromGallery}
           />
         ) : (
           /* Empty State with Upload Options */
@@ -139,7 +140,11 @@ export default function ScanScreen() {
               onPress={() => setClassificationModalVisible(true)}
               disabled={isUploading}
               isLoading={isUploading}
-              title={`Upload PDF (${scannedImages.length} ${scannedImages.length === 1 ? "page" : "pages"})`}
+              title={
+                isFileBatch
+                  ? `Upload ${scannedImages.length} ${scannedImages.length === 1 ? "Document" : "Documents"}`
+                  : `Upload PDF (${scannedImages.length} ${scannedImages.length === 1 ? "page" : "pages"})`
+              }
               icon={
                 !isUploading && (
                   <Ionicons name="cloud-upload" size={24} color="white" />
@@ -149,7 +154,7 @@ export default function ScanScreen() {
                 isUploading
                   ? "bg-gray-400 dark:bg-gray-600"
                   : "bg-secondary dark:bg-secondary-600",
-                "rounded-3xl"
+                "rounded-3xl",
               )}
               style={!isUploading ? shadows.primary : undefined}
               textClassName="text-lg font-bold ml-2"
@@ -185,7 +190,9 @@ export default function ScanScreen() {
                   Classification
                 </Text>
                 <Text className="text-sm text-gray-500 dark:text-gray-400 text-center mt-2">
-                  How would you like to classify this document?
+                  {isFileBatch
+                    ? "How would you like to classify these documents?"
+                    : "How would you like to classify this document?"}
                 </Text>
               </View>
             </View>
@@ -206,7 +213,9 @@ export default function ScanScreen() {
                     Auto (AI)
                   </Text>
                   <Text className="text-sm text-gray-500 dark:text-gray-400">
-                    Let AI classify your document
+                    {isFileBatch
+                      ? "Let AI classify your documents"
+                      : "Let AI classify your document"}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
@@ -231,7 +240,9 @@ export default function ScanScreen() {
                     Manual
                   </Text>
                   <Text className="text-sm text-gray-500 dark:text-gray-400">
-                    Choose a category yourself
+                    {isFileBatch
+                      ? "Choose categories yourself"
+                      : "Choose a category yourself"}
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />

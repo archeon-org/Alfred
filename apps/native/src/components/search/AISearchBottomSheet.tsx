@@ -16,7 +16,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useChatSearch } from "../../hooks/useChatSearch";
 import { useCanAiSearch } from "../../hooks/useSubscription";
-import { DocumentSuggestion } from "../../services/search";
+import {
+  DocumentSuggestion,
+  RagAgentMode,
+  RagCitation,
+} from "../../services/search";
 import Config from "../../constants/Config";
 import { DocumentPreviewSheet } from "./DocumentPreviewSheet";
 
@@ -32,12 +36,17 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
   const insets = useSafeAreaInsets();
   const [inputText, setInputText] = useState("");
   const [previewDocId, setPreviewDocId] = useState<string | null>(null);
+  const [agentMode, setAgentMode] = useState<RagAgentMode>("normal");
+  const [showModeMenu, setShowModeMenu] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
 
   const {
     messages,
     isLoading,
+    streamStage,
+    streamSteps,
+    streamAnswer,
     sendMessage,
     excludeDoc,
     clearChat,
@@ -69,6 +78,7 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
   const handleClose = useCallback(() => {
     clearChat();
     setInputText("");
+    setShowModeMenu(false);
     onClose();
   }, [clearChat, onClose]);
 
@@ -87,7 +97,7 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
         setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 100);
-      }
+      },
     );
 
     const keyboardWillHide = Keyboard.addListener(
@@ -99,7 +109,7 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
           duration: Platform.OS === "ios" ? e.duration : 250,
           useNativeDriver: false,
         }).start();
-      }
+      },
     );
 
     return () => {
@@ -138,12 +148,13 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
 
     const message = inputText.trim();
     setInputText("");
+    setShowModeMenu(false);
 
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 50);
 
-    await sendMessage(message);
+    await sendMessage(message, agentMode);
   };
 
   const handleDocumentPress = (docId: string) => {
@@ -156,7 +167,7 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
 
   const handleExcludeDocument = async (docId: string) => {
     await excludeDoc(docId);
-    await sendMessage("That's not the one, show me other options");
+    await sendMessage("That's not the one, show me other options", agentMode);
   };
 
   const formatSimilarity = (similarity: number) => {
@@ -243,6 +254,27 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
     </View>
   );
 
+  const renderCitationCard = (citation: RagCitation, index: number) => (
+    <TouchableOpacity
+      key={`${citation.chunkId}-${index}`}
+      onPress={() => handleDocumentPress(citation.documentId)}
+      className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 mb-2"
+    >
+      <View className="flex-row items-start">
+        <Ionicons name="document-text-outline" size={14} color="#6B7280" />
+        <Text
+          className="ml-2 flex-1 text-xs text-gray-700 dark:text-gray-300"
+          numberOfLines={2}
+        >
+          {citation.snippet}
+        </Text>
+      </View>
+      <Text className="mt-1 text-[10px] text-gray-400">
+        Match score: {Math.round(citation.score * 100)}%
+      </Text>
+    </TouchableOpacity>
+  );
+
   const renderMessage = (message: (typeof messages)[0], index: number) => {
     const isUser = message.role === "user";
 
@@ -286,6 +318,16 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
               </View>
             );
           })()}
+
+        {!isUser && message.citations && message.citations.length > 0 && (
+          <View className="w-full mt-2">
+            <Text className="text-xs text-gray-500 dark:text-gray-400 mb-2 ml-1">
+              {message.citations.length} citation
+              {message.citations.length > 1 ? "s" : ""}:
+            </Text>
+            {message.citations.slice(0, 2).map(renderCitationCard)}
+          </View>
+        )}
       </View>
     );
   };
@@ -344,6 +386,7 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
         </View>
 
         {/* Messages */}
+
         <ScrollView
           ref={scrollViewRef}
           className="flex-1 px-4"
@@ -406,14 +449,50 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
           {/* Loading indicator */}
           {isLoading && (
             <View className="items-start mb-4">
-              <View className="bg-surface dark:bg-surface-dark border border-gray-100 dark:border-gray-800 rounded-2xl rounded-bl-sm px-4 py-3">
-                <View className="flex-row items-center">
+              <View className="max-w-[85%] rounded-2xl rounded-bl-sm border border-gray-100 bg-surface px-4 py-3 dark:border-gray-800 dark:bg-surface-dark">
+                <View className="mb-2 flex-row items-center">
                   <ActivityIndicator size="small" color={primaryColor} />
-                  <Text className="text-gray-500 dark:text-gray-400 ml-2 font-medium">
-                    Searching...
+                  <Text className="ml-2 font-medium text-gray-500 dark:text-gray-400">
+                    {streamStage || "Searching..."}
                   </Text>
                 </View>
+
+                {!!streamAnswer && (
+                  <Text className="text-base text-gray-900 dark:text-white">
+                    {streamAnswer}
+                  </Text>
+                )}
+
+                {streamSteps.length > 0 && (
+                  <View className="mt-2">
+                    {streamSteps.slice(-4).map((step, index) => (
+                      <View
+                        key={`${step}-${index}`}
+                        className="mb-1 flex-row items-start"
+                      >
+                        <Text className="mr-2 text-[11px] text-gray-500 dark:text-gray-400">
+                          •
+                        </Text>
+                        <Text className="flex-1 text-[11px] leading-4 text-gray-500 dark:text-gray-400">
+                          {step}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                {!streamAnswer && streamSteps.length === 0 && (
+                  <Text className="text-xs text-gray-400">
+                    Waiting for retrieval updates...
+                  </Text>
+                )}
               </View>
+              {!!streamAnswer && (
+                <View className="mt-2 ml-1">
+                  <Text className="text-[10px] text-gray-500">
+                    Streaming answer
+                  </Text>
+                </View>
+              )}
             </View>
           )}
         </ScrollView>
@@ -448,37 +527,106 @@ export const AISearchBottomSheet: React.FC<AISearchBottomSheetProps> = ({
 
             return (
               // Normal input
-              <View className="flex-row items-end bg-surface dark:bg-surface-dark border border-gray-100 dark:border-gray-800 rounded-2xl px-4 py-2">
-                <TextInput
-                  ref={inputRef}
-                  placeholder="Describe what you're looking for..."
-                  placeholderTextColor="#9CA3AF"
-                  className="flex-1 text-base text-gray-900 dark:text-white max-h-24 py-2"
-                  value={inputText}
-                  onChangeText={setInputText}
-                  multiline
-                  onSubmitEditing={handleSend}
-                  returnKeyType="send"
-                  blurOnSubmit={false}
-                  autoCorrect={false}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <TouchableOpacity
-                  onPress={handleSend}
-                  disabled={!inputText.trim() || isLoading}
-                  className={`ml-2 w-10 h-10 rounded-full items-center justify-center ${
-                    inputText.trim() && !isLoading
-                      ? "bg-primary"
-                      : "bg-gray-200 dark:bg-gray-700"
-                  }`}
-                >
-                  <Ionicons
-                    name="send"
-                    size={18}
-                    color={inputText.trim() && !isLoading ? "white" : "#9CA3AF"}
+              <View className="relative">
+                {showModeMenu && (
+                  <View className="absolute bottom-14 left-0 z-20 w-56 rounded-2xl border border-gray-200 bg-surface p-1 shadow-lg dark:border-gray-700 dark:bg-surface-dark">
+                    <TouchableOpacity
+                      onPress={() => {
+                        setAgentMode("normal");
+                        setShowModeMenu(false);
+                      }}
+                      disabled={isLoading}
+                      className={`rounded-xl px-3 py-2 ${
+                        agentMode === "normal"
+                          ? "bg-primary/10 dark:bg-primary/20"
+                          : "bg-transparent"
+                      }`}
+                    >
+                      <Text
+                        className={`text-sm ${
+                          agentMode === "normal"
+                            ? "font-semibold text-primary"
+                            : "text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        Fast mode
+                      </Text>
+                      <Text className="text-[11px] text-gray-500 dark:text-gray-400">
+                        Lower latency search
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setAgentMode("reasoning");
+                        setShowModeMenu(false);
+                      }}
+                      disabled={isLoading}
+                      className={`mt-1 rounded-xl px-3 py-2 ${
+                        agentMode === "reasoning"
+                          ? "bg-primary/10 dark:bg-primary/20"
+                          : "bg-transparent"
+                      }`}
+                    >
+                      <Text
+                        className={`text-sm ${
+                          agentMode === "reasoning"
+                            ? "font-semibold text-primary"
+                            : "text-gray-700 dark:text-gray-300"
+                        }`}
+                      >
+                        Deep mode
+                      </Text>
+                      <Text className="text-[11px] text-gray-500 dark:text-gray-400">
+                        Broader retrieval and cross-checks
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <View className="flex-row items-end bg-surface dark:bg-surface-dark border border-gray-100 dark:border-gray-800 rounded-2xl px-4 py-2">
+                  <TextInput
+                    ref={inputRef}
+                    placeholder="Describe what you're looking for..."
+                    placeholderTextColor="#9CA3AF"
+                    className="flex-1 text-base text-gray-900 dark:text-white max-h-24 py-2"
+                    value={inputText}
+                    onChangeText={setInputText}
+                    onFocus={() => setShowModeMenu(false)}
+                    multiline
+                    onSubmitEditing={handleSend}
+                    returnKeyType="send"
+                    blurOnSubmit={false}
+                    autoCorrect={false}
+                    autoComplete="off"
+                    spellCheck={false}
                   />
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowModeMenu((prev) => !prev)}
+                    disabled={isLoading}
+                    className="ml-2 h-9 rounded-full border border-gray-200 dark:border-gray-700 px-3 items-center justify-center"
+                  >
+                    <Text className="text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+                      {agentMode === "reasoning" ? "Deep" : "Fast"}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleSend}
+                    disabled={!inputText.trim() || isLoading}
+                    className={`ml-2 w-10 h-10 rounded-full items-center justify-center ${
+                      inputText.trim() && !isLoading
+                        ? "bg-primary"
+                        : "bg-gray-200 dark:bg-gray-700"
+                    }`}
+                  >
+                    <Ionicons
+                      name="send"
+                      size={18}
+                      color={
+                        inputText.trim() && !isLoading ? "white" : "#9CA3AF"
+                      }
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })()}

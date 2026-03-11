@@ -128,14 +128,18 @@ and intelligent search powered by RAG (Retrieval-Augmented Generation).
       },
       'Internal-auth',
     )
+    .addTag('admin', 'Administrative Operations')
     .addTag('auth', 'Authentication & Authorization')
-    .addTag('documents', 'Document Management & File Upload')
-    .addTag('search', 'Intelligent Search & RAG')
-    .addTag('user', 'User Profile Management')
     .addTag('categories', 'Document Categories')
-    .addTag('tags', 'Document Tags')
-    .addTag('subscription', 'Subscription & Billing')
+    .addTag('documents', 'Document Management & File Upload')
     .addTag('health', 'Health Checks')
+    .addTag('notifications', 'Notification Center')
+    .addTag('question', 'Question Answering')
+    .addTag('search', 'Intelligent Search & RAG')
+    .addTag('subscription', 'Subscription & Billing')
+    .addTag('tags', 'Document Tags')
+    .addTag('templates', 'Templates & Onboarding Presets')
+    .addTag('user', 'User Profile Management')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

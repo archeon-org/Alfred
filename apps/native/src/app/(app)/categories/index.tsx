@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,9 @@ import {
   RefreshControl,
   TextInput,
   Switch,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -44,6 +47,8 @@ export default function CategoriesScreen() {
 
   const {
     categories,
+    categoryTree,
+    rootCategories,
     isLoading,
     isFetching,
     refetch,
@@ -61,9 +66,87 @@ export default function CategoriesScreen() {
     hideEmpty,
     setHideEmpty,
   } = useCategoryScreenLogic();
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(
+    new Set(),
+  );
+
+  useEffect(() => {
+    if (
+      Platform.OS === "android" &&
+      UIManager.setLayoutAnimationEnabledExperimental
+    ) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
+  const childByParentId = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const root of categoryTree) {
+      if (root.children?.length) {
+        map.set(
+          root.id,
+          root.children.map((child) => child.id),
+        );
+      }
+    }
+    return map;
+  }, [categoryTree]);
+
+  useEffect(() => {
+    const validParentIds = new Set(childByParentId.keys());
+    setExpandedParents((prev) => {
+      const next = new Set([...prev].filter((id) => validParentIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [childByParentId]);
+
+  const parentIdByChildId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const root of categoryTree) {
+      for (const child of root.children || []) {
+        map.set(child.id, root.id);
+      }
+    }
+    return map;
+  }, [categoryTree]);
+
+  const visibleCategories = useMemo(() => {
+    if (search.trim().length > 0) {
+      return categories;
+    }
+
+    const ordered: typeof categories = [];
+    for (const root of categoryTree) {
+      ordered.push({ ...root, children: undefined });
+
+      if (expandedParents.has(root.id)) {
+        for (const child of root.children || []) {
+          ordered.push({ ...child, children: undefined });
+        }
+      }
+    }
+
+    return ordered;
+  }, [categories, categoryTree, expandedParents, search]);
+
+  const isHierarchyMode = search.trim().length === 0;
+  const effectiveViewMode = viewMode;
+
+  const toggleParentFolder = (categoryId: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(categoryId)) {
+        next.delete(categoryId);
+      } else {
+        next.add(categoryId);
+      }
+      return next;
+    });
+  };
 
   // Only show skeleton on initial load when there's no data yet
-  const showSkeleton = isLoading && categories.length === 0;
+  const showSkeleton = isLoading && visibleCategories.length === 0;
 
   if (showSkeleton) {
     return (
@@ -143,26 +226,43 @@ export default function CategoriesScreen() {
       </View>
 
       <FlatList
-        key={viewMode} // Force re-render when mode changes
-        data={categories}
+        key={effectiveViewMode} // Force re-render when mode changes
+        data={visibleCategories}
         renderItem={({ item }) =>
-          viewMode === "grid" ? (
+          effectiveViewMode === "grid" ? (
             <CategoryGridItem
               item={item}
               onPress={(category) => router.push(`/categories/${category.id}`)}
               onLongPress={handleOpenModal}
+              isExpandable={isHierarchyMode && childByParentId.has(item.id)}
+              isExpanded={expandedParents.has(item.id)}
+              onToggleExpand={
+                isHierarchyMode
+                  ? (category) => toggleParentFolder(category.id)
+                  : undefined
+              }
             />
           ) : (
             <CategoryItem
               item={item}
               onPress={(category) => router.push(`/categories/${category.id}`)}
               onLongPress={handleOpenModal}
+              depth={parentIdByChildId.has(item.id) ? 1 : 0}
+              isExpandable={isHierarchyMode && childByParentId.has(item.id)}
+              isExpanded={expandedParents.has(item.id)}
+              onToggleExpand={
+                isHierarchyMode
+                  ? (category) => toggleParentFolder(category.id)
+                  : undefined
+              }
             />
           )
         }
         keyExtractor={(item) => item.id}
-        numColumns={viewMode === "grid" ? 2 : 1}
-        columnWrapperStyle={viewMode === "grid" ? { gap: GRID_GAP } : undefined}
+        numColumns={effectiveViewMode === "grid" ? 2 : 1}
+        columnWrapperStyle={
+          effectiveViewMode === "grid" ? { gap: GRID_GAP } : undefined
+        }
         contentContainerStyle={{ paddingBottom: 120, paddingHorizontal: 16 }}
         refreshControl={
           <RefreshControl
@@ -204,6 +304,7 @@ export default function CategoriesScreen() {
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}
         category={editingCategory}
+        rootCategories={rootCategories}
       />
     </SafeAreaView>
   );

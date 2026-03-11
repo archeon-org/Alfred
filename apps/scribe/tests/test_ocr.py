@@ -43,7 +43,6 @@ class TestOCRServiceIntegration:
     @pytest.mark.skip(reason="Requires Mistral API key")
     def test_recognize_simple_image(self):
         """Test OCR on a simple image."""
-        from services.ocr import get_ocr_service
 
         # This would require an actual test image and API key
         pass

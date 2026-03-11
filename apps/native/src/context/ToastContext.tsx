@@ -36,7 +36,7 @@ interface ToastContextValue {
     type: ToastType,
     title: string,
     message?: string,
-    duration?: number
+    duration?: number,
   ) => void;
   success: (title: string, message?: string) => void;
   error: (title: string, message?: string) => void;
@@ -101,35 +101,35 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({
         duration,
       });
     },
-    []
+    [],
   );
 
   const success = useCallback(
     (title: string, message?: string) => {
       showToast("success", title, message);
     },
-    [showToast]
+    [showToast],
   );
 
   const error = useCallback(
     (title: string, message?: string) => {
       showToast("error", title, message, 4000);
     },
-    [showToast]
+    [showToast],
   );
 
   const info = useCallback(
     (title: string, message?: string) => {
       showToast("info", title, message);
     },
-    [showToast]
+    [showToast],
   );
 
   const warning = useCallback(
     (title: string, message?: string) => {
       showToast("warning", title, message);
     },
-    [showToast]
+    [showToast],
   );
 
   const hideConfirmation = useCallback(() => {
@@ -164,7 +164,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({
         isLoading: false,
       });
     },
-    [hideConfirmation]
+    [hideConfirmation],
   );
 
   const confirmDelete = useCallback(
@@ -182,7 +182,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({
         onConfirm: options.onConfirm,
       });
     },
-    [confirm]
+    [confirm],
   );
 
   return (

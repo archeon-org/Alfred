@@ -44,49 +44,59 @@ def build_title_failed_notification(
     )
 
 
-def build_graphiti_success_notification(
+def build_document_indexed_notification(
     user_id: str,
     document_id: str,
-    document_name: str,
-    node_count: int,
-    edge_count: int,
-    graphiti_disabled: bool,
+    chunk_count: int,
 ) -> CreateNotificationDTO:
-    if graphiti_disabled:
-        message = f'"{document_name}" has been processed and classified.'
-    else:
-        message = (
-            f'"{document_name}" has been processed. Extracted '
-            f"{node_count} entities and {edge_count} relationships."
-        )
     return CreateNotificationDTO(
         user_id=user_id,
-        title="Document Processed",
-        message=message,
+        title="Search Enabled",
+        message=f"Your document has been indexed into {chunk_count} chunks for AI search.",
         redirect=f"/(app)/documents/{document_id}",
-        notification_type=NotificationType.DOCUMENT_CLASSIFIED,
-        data={
-            "documentId": document_id,
-            "nodeCount": node_count,
-            "edgeCount": edge_count,
-        },
+        notification_type=NotificationType.SEARCH_ENABLED,
+        data={"documentId": document_id, "chunkCount": chunk_count},
     )
 
 
-def build_graphiti_failure_notification(
+def build_document_index_failed_notification(
     user_id: str,
     document_id: str,
-    document_name: str,
-    error_message: str | None,
+    refunded: bool,
 ) -> CreateNotificationDTO:
-    message = f'"{document_name}" was classified but knowledge graph sync encountered an issue.'
-    if error_message:
-        message = f"{message} ({error_message})"
+    message = "There was an error enabling search for this document."
+    if refunded:
+        message += " Your embedding credits have been refunded."
     return CreateNotificationDTO(
         user_id=user_id,
-        title="Document Processing Issue",
+        title="Search Indexing Failed",
         message=message,
         redirect=f"/(app)/documents/{document_id}",
         notification_type=NotificationType.DOCUMENT_ERROR,
         data={"documentId": document_id},
+    )
+
+
+def build_bulk_processing_summary_notification(
+    user_id: str,
+    total: int,
+    succeeded: int,
+    failed: int,
+    bulk_operation_id: str | None = None,
+) -> CreateNotificationDTO:
+    return CreateNotificationDTO(
+        user_id=user_id,
+        title="Bulk Processing Complete",
+        message=(
+            f"Processed {total} documents: {succeeded} succeeded, {failed} failed. "
+            "Search indexing has been queued for successful documents."
+        ),
+        redirect="/(app)/documents",
+        notification_type=NotificationType.DOCUMENT_CLASSIFIED,
+        data={
+            "bulkOperationId": bulk_operation_id,
+            "total": total,
+            "succeeded": succeeded,
+            "failed": failed,
+        },
     )

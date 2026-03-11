@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from prometheus_fastapi_instrumentator import Instrumentator
 
 from api.errors import api_service_error_handler
 from api.health import router as health_router
@@ -11,8 +10,7 @@ from api.middleware import (
     RequestTimingMiddleware,
     SecurityHeadersMiddleware,
 )
-from api.question import router as question_router
-from api.search import router as search_router
+from api.rag import router as rag_router
 from application.api.errors import ApiServiceError
 from core.config import get_settings
 from core.logging import get_logger, setup_logging
@@ -40,23 +38,7 @@ async def lifespan(app: FastAPI):
     except Exception as error:
         logger.debug(f"LangSmith initialization skipped: {error}")
 
-    try:
-        from graphrag import initialize_graphiti
-
-        await initialize_graphiti()
-        logger.info("Graphiti knowledge graph initialized")
-    except Exception as error:
-        logger.warning(f"Graphiti initialization failed (search may not work): {error}")
-
     yield
-
-    try:
-        from graphrag import close_graphiti
-
-        await close_graphiti()
-        logger.info("Graphiti connection closed")
-    except Exception as error:
-        logger.warning(f"Graphiti cleanup error: {error}")
 
     logger.info("Shutting down Scribe API")
 
@@ -68,16 +50,15 @@ def create_app() -> FastAPI:
         description="""
 Overview
 Scribe is the internal document processing microservice for Archeon.
-It handles knowledge graph operations, document indexing, and AI-powered search.
+It handles document indexing and AI-powered chunk-level retrieval.
 
 Authentication
 All endpoints (except health checks) require the X-Internal-API-Key header
 for service-to-service authentication.
 
 Features
-- Knowledge Graph Search: Graphiti-powered semantic, keyword, and graph traversal search
-- Second Brain Q&A: Ask questions and get AI-generated answers based on your documents
-- Entity Management: Browse and manage entities extracted from documents
+- RAG Search: pgvector and full-text hybrid retrieval over document chunks
+- Chat and Q&A: chunk-cited AI answers over indexed user documents
 
 Rate Limits
 This is an internal service with no rate limiting.
@@ -95,11 +76,7 @@ The caller (Gate API) is responsible for rate limiting user requests.
         openapi_url="/openapi.json" if not settings.is_production else None,
         openapi_tags=[
             {"name": "Health", "description": "Service health and readiness checks"},
-            {"name": "Search", "description": "Graphiti-powered knowledge graph search"},
-            {
-                "name": "Question",
-                "description": "Second Brain Q&A - ask questions about your documents",
-            },
+            {"name": "RAG", "description": "Chunk-level retrieval and answer orchestration"},
         ],
         lifespan=lifespan,
     )
@@ -115,11 +92,8 @@ The caller (Gate API) is responsible for rate limiting user requests.
     app.add_middleware(RequestSizeLimitMiddleware)
 
     app.include_router(health_router, prefix="/api")
-    app.include_router(search_router, prefix="/api")
-    app.include_router(question_router, prefix="/api")
+    app.include_router(rag_router, prefix="/api")
     app.add_exception_handler(ApiServiceError, api_service_error_handler)  # type: ignore[arg-type]
-
-    Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
     @app.get("/")
     async def root():

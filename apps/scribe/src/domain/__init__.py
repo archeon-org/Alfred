@@ -1,8 +1,8 @@
 from domain.models import (
-    DocumentContext,
-    ProcessingResult,
     ClassificationResult,
+    DocumentContext,
     NewCategory,
+    ProcessingResult,
     ProcessingStatus,
 )
 

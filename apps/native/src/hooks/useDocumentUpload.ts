@@ -1,27 +1,62 @@
 import { useMutation } from "@tanstack/react-query";
-import { uploadDocument } from "../services/document";
+import {
+  BulkUploadInput,
+  uploadDocument,
+  uploadDocumentsBulk,
+} from "../services/document";
 
 export const useDocumentUpload = () => {
-  const { mutateAsync, isPending, error, isSuccess } = useMutation({
+  const {
+    mutateAsync: uploadSingle,
+    isPending: isSingleUploading,
+    error: singleError,
+    isSuccess: isSingleSuccess,
+  } = useMutation({
     mutationFn: ({
       uri,
       classificationSource,
       originalFilename,
+      mimeType,
     }: {
       uri: string;
       classificationSource?: "AI" | "MANUAL";
       originalFilename?: string;
-    }) => uploadDocument(uri, classificationSource, originalFilename),
+      mimeType?: string;
+    }) => uploadDocument(uri, classificationSource, originalFilename, mimeType),
+  });
+
+  const {
+    mutateAsync: uploadBulkMutation,
+    isPending: isBulkUploading,
+    error: bulkError,
+    isSuccess: isBulkSuccess,
+  } = useMutation({
+    mutationFn: ({
+      documents,
+      classificationSource,
+      concurrency,
+    }: {
+      documents: BulkUploadInput[];
+      classificationSource?: "AI" | "MANUAL";
+      concurrency?: number;
+    }) => uploadDocumentsBulk(documents, classificationSource, concurrency),
   });
 
   return {
     upload: (
       uri: string,
       classificationSource?: "AI" | "MANUAL",
-      originalFilename?: string
-    ) => mutateAsync({ uri, classificationSource, originalFilename }),
-    isUploading: isPending,
-    error,
-    isSuccess,
+      originalFilename?: string,
+      mimeType?: string,
+    ) =>
+      uploadSingle({ uri, classificationSource, originalFilename, mimeType }),
+    uploadBulk: (
+      documents: BulkUploadInput[],
+      classificationSource?: "AI" | "MANUAL",
+      concurrency?: number,
+    ) => uploadBulkMutation({ documents, classificationSource, concurrency }),
+    isUploading: isSingleUploading || isBulkUploading,
+    error: singleError || bulkError,
+    isSuccess: isSingleSuccess || isBulkSuccess,
   };
 };

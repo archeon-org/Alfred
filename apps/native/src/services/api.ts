@@ -17,11 +17,19 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (timezone) {
+        config.headers["X-Timezone"] = timezone;
+      }
+    } catch {
+      // Ignore timezone resolution failures on unsupported runtimes.
+    }
     return config;
   },
   (error) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 // Add a response interceptor to handle errors globally
@@ -40,7 +48,7 @@ api.interceptors.response.use(
     // Critical errors (network/server) will be caught and displayed by the calling code
 
     return Promise.reject(appError);
-  }
+  },
 );
 
 export default api;

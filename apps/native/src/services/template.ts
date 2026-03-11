@@ -4,7 +4,7 @@ import { Template, Category } from "@archeon-org/types";
 export const getTemplates = async (
   page = 1,
   limit = 10,
-  search = ""
+  search = "",
 ): Promise<{ data: Template[]; meta: any }> => {
   const params = new URLSearchParams({
     page: page.toString(),
@@ -24,10 +24,10 @@ export const applyTemplate = async (templateId: string): Promise<void> => {
 export const getTemplateCategories = async (
   templateId: string,
   page = 1,
-  limit = 20
+  limit = 20,
 ): Promise<{ data: Category[]; meta: any }> => {
   const response = await api.get(
-    `/templates/${templateId}/categories?page=${page}&limit=${limit}`
+    `/templates/${templateId}/categories?page=${page}&limit=${limit}`,
   );
   return response.data;
 };

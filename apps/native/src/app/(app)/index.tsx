@@ -32,7 +32,7 @@ export default function HomeScreen() {
     refetch: refetchActionRequired,
   } = useActionRequiredDocuments(3);
   const {
-    categories,
+    rootCategories,
     isLoading: isLoadingCategories,
     refetch: refetchCategories,
   } = useCategories();
@@ -117,7 +117,10 @@ export default function HomeScreen() {
 
         <QuickActions onSearchPress={() => setAiSearchVisible(true)} />
 
-        <CategoryList categories={categories} isLoading={isLoadingCategories} />
+        <CategoryList
+          categories={rootCategories}
+          isLoading={isLoadingCategories}
+        />
 
         <RecentDocuments
           documents={recentDocs || []}

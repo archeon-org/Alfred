@@ -18,7 +18,7 @@ export const useOnboarding = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
-    null
+    null,
   );
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
 

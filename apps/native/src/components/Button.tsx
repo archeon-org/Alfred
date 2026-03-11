@@ -53,7 +53,7 @@ export const Button: React.FC<ButtonProps> = ({
         "flex-row items-center justify-center rounded-2xl px-6 py-4",
         variants[variant],
         (isLoading || disabled) && "opacity-60",
-        className
+        className,
       )}
       // Using native shadows instead of NativeWind to avoid React Navigation context conflicts
       style={

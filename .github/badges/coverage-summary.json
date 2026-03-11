@@ -1,0 +1,30 @@
+{
+  "all": {
+    "percentage": 85.93,
+    "covered": 5442,
+    "total": 6333,
+    "badgePath": ".github/badges/coverage-all.svg",
+    "lcovPath": "apps/coverage/lcov.info"
+  },
+  "gate": {
+    "percentage": 86.29,
+    "covered": 2090,
+    "total": 2422,
+    "badgePath": ".github/badges/coverage-gate.svg",
+    "lcovPath": "apps/coverage/gate/lcov.info"
+  },
+  "scribe": {
+    "percentage": 85.63,
+    "covered": 2633,
+    "total": 3075,
+    "badgePath": ".github/badges/coverage-scribe.svg",
+    "lcovPath": "apps/coverage/scribe.lcov"
+  },
+  "native": {
+    "percentage": 86,
+    "covered": 719,
+    "total": 836,
+    "badgePath": ".github/badges/coverage-native.svg",
+    "lcovPath": "apps/coverage/native/lcov.info"
+  }
+}

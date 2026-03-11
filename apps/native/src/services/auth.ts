@@ -5,7 +5,7 @@ export const verifyGoogleToken = async (
   firstName: string | null,
   lastName: string | null,
   picture: string | null,
-  googleAccessToken: string
+  googleAccessToken: string,
 ) => {
   const response = await api.post("/auth/google/verify", {
     email,

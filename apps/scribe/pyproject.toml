@@ -34,10 +34,9 @@ dependencies = [
     
     # AI / LLM
     "openai>=1.57.0",
-    
-    # Knowledge Graph (Graphiti)
-    "graphiti-core>=0.5.0",
-    "neo4j>=5.20.0",
+    "langchain>=0.3.19",
+    "langchain-openai>=0.3.8",
+    "langgraph>=0.2.67",
     
     # Document Chunking
     "chonkie>=1.5.1",
@@ -53,9 +52,6 @@ dependencies = [
     # Utilities
     "structlog>=24.4.0",
     "httpx>=0.28.0",
-    
-    # Monitoring
-    "prometheus-fastapi-instrumentator>=7.0.0",
     
     # LangSmith for LLM observability
     "langsmith>=0.1.0",

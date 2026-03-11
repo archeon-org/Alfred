@@ -8,22 +8,37 @@ interface CategoryItemProps {
   item: Category;
   onPress: (category: Category) => void;
   onLongPress: (category: Category) => void;
+  depth?: number;
+  isExpandable?: boolean;
+  isExpanded?: boolean;
+  onToggleExpand?: (category: Category) => void;
 }
 
 export const CategoryItem = ({
   item,
   onPress,
   onLongPress,
+  depth = 0,
+  isExpandable = false,
+  isExpanded = false,
+  onToggleExpand,
 }: CategoryItemProps) => {
   const documentCount = item.documentCount ?? 0;
+  const handlePress = () => {
+    if (isExpandable && onToggleExpand) {
+      onToggleExpand(item);
+      return;
+    }
+    onPress(item);
+  };
 
   return (
     <TouchableOpacity
-      onPress={() => onPress(item)}
+      onPress={handlePress}
       onLongPress={() => onLongPress(item)}
       className="flex-row items-center p-4 bg-surface dark:bg-surface-dark rounded-3xl mb-3 border border-gray-100 dark:border-gray-800"
       // Using native shadow instead of NativeWind to avoid React Navigation context conflicts
-      style={shadows.sm}
+      style={[shadows.sm, depth > 0 ? { marginLeft: 18 * depth } : undefined]}
     >
       <View
         className="p-4 rounded-2xl mr-4 relative"
@@ -45,12 +60,27 @@ export const CategoryItem = ({
         <Text className="font-bold text-gray-900 dark:text-white text-lg">
           {item.name}
         </Text>
+        {item.parentId ? (
+          <Text className="text-xs text-indigo-500 dark:text-indigo-300 mt-0.5 font-semibold">
+            Subfolder
+          </Text>
+        ) : null}
         <Text className="text-gray-500 dark:text-gray-400 text-sm mt-1 font-medium">
           {documentCount} {documentCount === 1 ? "document" : "documents"}
         </Text>
       </View>
       <View className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center">
-        <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+        <Ionicons
+          name={
+            isExpandable
+              ? isExpanded
+                ? "chevron-up"
+                : "chevron-down"
+              : "chevron-forward"
+          }
+          size={20}
+          color="#9CA3AF"
+        />
       </View>
     </TouchableOpacity>
   );

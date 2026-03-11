@@ -8,7 +8,7 @@ import { SubscriptionTier, CreditPack, StoragePack } from "@archeon-org/types";
 export const useUsers = (
   page: number = 1,
   limit: number = 20,
-  search?: string
+  search?: string,
 ) => {
   return useQuery({
     queryKey: ["admin", "users", page, limit, search],

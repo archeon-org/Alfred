@@ -5,6 +5,7 @@ export interface Tag {
   id: string;
   name: string;
   color: string;
+  order?: number;
   isSystemDefault: boolean;
   userId: string;
   user?: User;

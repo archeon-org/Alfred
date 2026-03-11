@@ -1,11 +1,13 @@
 import { useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  streamChatMessage,
   sendChatMessage,
   excludeDocument,
   ChatMessage,
   ChatContext,
   ChatResponse,
+  RagAgentMode,
   SearchLimitInfo,
 } from "../services/search";
 import { SUBSCRIPTION_QUERY_KEY } from "./useSubscription";
@@ -16,7 +18,10 @@ export interface UseChatSearchReturn {
   isLoading: boolean;
   error: Error | null;
   searchLimitInfo: SearchLimitInfo | null;
-  sendMessage: (message: string) => Promise<void>;
+  streamStage: string | null;
+  streamSteps: string[];
+  streamAnswer: string;
+  sendMessage: (message: string, agentMode?: RagAgentMode) => Promise<void>;
   excludeDoc: (documentId: string) => Promise<void>;
   clearChat: () => void;
 }
@@ -44,15 +49,54 @@ export function useChatSearch(): UseChatSearchReturn {
   const [context, setContext] = useState<ChatContext | null>(null);
   const [searchLimitInfo, setSearchLimitInfo] =
     useState<SearchLimitInfo | null>(null);
+  const [streamStage, setStreamStage] = useState<string | null>(null);
+  const [streamSteps, setStreamSteps] = useState<string[]>([]);
+  const [streamAnswer, setStreamAnswer] = useState("");
   const queryClient = useQueryClient();
 
   const chatMutation = useMutation<
     ChatResponse,
     Error,
-    { message: string; history: ChatMessage[]; ctx: ChatContext | undefined }
+    {
+      message: string;
+      history: ChatMessage[];
+      ctx: ChatContext | undefined;
+      agentMode: RagAgentMode;
+    }
   >({
-    mutationFn: ({ message, history, ctx }) =>
-      sendChatMessage(message, history, ctx),
+    mutationFn: async ({ message, history, ctx, agentMode }) => {
+      try {
+        return await streamChatMessage(
+          message,
+          history,
+          ctx,
+          agentMode,
+          (event) => {
+            if (event.type === "event") {
+              const step = event.message || "Searching...";
+              setStreamStage(step);
+              setStreamSteps((prev) =>
+                prev[prev.length - 1] === step
+                  ? prev
+                  : [...prev, step].slice(-8),
+              );
+              return;
+            }
+
+            if (event.type === "answer_delta" && event.delta) {
+              setStreamAnswer((prev) => `${prev}${event.delta || ""}`);
+            }
+          },
+        );
+      } catch {
+        return sendChatMessage(message, history, ctx, agentMode);
+      }
+    },
+    onMutate: () => {
+      setStreamStage("Preparing retrieval plan...");
+      setStreamSteps(["Preparing retrieval plan..."]);
+      setStreamAnswer("");
+    },
     onSuccess: (data, variables) => {
       // Add user message
       const userMessage: ChatMessage = {
@@ -72,6 +116,11 @@ export function useChatSearch(): UseChatSearchReturn {
         queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
       }
     },
+    onSettled: () => {
+      setStreamStage(null);
+      setStreamSteps([]);
+      setStreamAnswer("");
+    },
   });
 
   const excludeMutation = useMutation<
@@ -86,14 +135,15 @@ export function useChatSearch(): UseChatSearchReturn {
   });
 
   const sendMessage = useCallback(
-    async (message: string) => {
+    async (message: string, agentMode: RagAgentMode = "normal") => {
       await chatMutation.mutateAsync({
         message,
         history: messages,
         ctx: context || undefined,
+        agentMode,
       });
     },
-    [chatMutation, messages, context]
+    [chatMutation, messages, context],
   );
 
   const excludeDoc = useCallback(
@@ -101,13 +151,16 @@ export function useChatSearch(): UseChatSearchReturn {
       if (!context) return;
       await excludeMutation.mutateAsync({ documentId, ctx: context });
     },
-    [excludeMutation, context]
+    [excludeMutation, context],
   );
 
   const clearChat = useCallback(() => {
     setMessages([]);
     setContext(null);
     setSearchLimitInfo(null);
+    setStreamStage(null);
+    setStreamSteps([]);
+    setStreamAnswer("");
   }, []);
 
   return {
@@ -116,6 +169,9 @@ export function useChatSearch(): UseChatSearchReturn {
     isLoading: chatMutation.isPending || excludeMutation.isPending,
     error: chatMutation.error || excludeMutation.error,
     searchLimitInfo,
+    streamStage,
+    streamSteps,
+    streamAnswer,
     sendMessage,
     excludeDoc,
     clearChat,

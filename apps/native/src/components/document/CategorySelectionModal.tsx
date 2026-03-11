@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   View,
   Text,
@@ -43,6 +43,17 @@ export const CategorySelectionModal: React.FC<CategorySelectionModalProps> = ({
 }) => {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const categoriesById = useMemo(
+    () =>
+      categories.reduce(
+        (acc, category) => {
+          acc[category.id] = category;
+          return acc;
+        },
+        {} as Record<string, Category>,
+      ),
+    [categories],
+  );
 
   return (
     <Modal
@@ -176,6 +187,11 @@ export const CategorySelectionModal: React.FC<CategorySelectionModalProps> = ({
             }
             renderItem={({ item }) => {
               const isSelected = currentCategoryId === item.id;
+              const isSubfolder = !!item.parentId;
+              const parentName = item.parentId
+                ? categoriesById[item.parentId]?.name
+                : undefined;
+
               return (
                 <TouchableOpacity
                   className={`flex-row items-center p-4 mb-2 rounded-2xl border ${
@@ -183,6 +199,7 @@ export const CategorySelectionModal: React.FC<CategorySelectionModalProps> = ({
                       ? "bg-primary/10 dark:bg-primary/20 border-primary/30"
                       : "bg-surface dark:bg-surface-dark border-gray-100 dark:border-gray-800"
                   }`}
+                  style={{ marginLeft: isSubfolder ? 16 : 0 }}
                   onPress={() => onSelect(item)}
                   activeOpacity={0.7}
                 >
@@ -196,15 +213,22 @@ export const CategorySelectionModal: React.FC<CategorySelectionModalProps> = ({
                       color={item.color}
                     />
                   </View>
-                  <Text
-                    className={`text-base font-semibold flex-1 ${
-                      isSelected
-                        ? "text-primary dark:text-primary"
-                        : "text-gray-900 dark:text-white"
-                    }`}
-                  >
-                    {item.name}
-                  </Text>
+                  <View className="flex-1">
+                    {isSubfolder ? (
+                      <Text className="text-xs text-indigo-500 dark:text-indigo-300 font-medium mb-0.5">
+                        {parentName ? `${parentName} /` : "Subfolder"}
+                      </Text>
+                    ) : null}
+                    <Text
+                      className={`text-base font-semibold ${
+                        isSelected
+                          ? "text-primary dark:text-primary"
+                          : "text-gray-900 dark:text-white"
+                      }`}
+                    >
+                      {item.name}
+                    </Text>
+                  </View>
                   {isSelected && (
                     <View className="w-6 h-6 rounded-full bg-primary items-center justify-center">
                       <Ionicons name="checkmark" size={16} color="white" />

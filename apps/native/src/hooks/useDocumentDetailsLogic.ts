@@ -38,8 +38,8 @@ export const useDocumentDetailsLogic = () => {
     isTriggeringAi,
     generateAiTitle,
     isGeneratingTitle,
-    triggerEmbedding,
-    isTriggeringEmbedding,
+    triggerIndex,
+    isTriggeringIndex,
   } = useDocumentMutations();
   const { tags: allTags } = useTags();
   const { createTag, isCreating: isCreatingTag } = useTagMutations();
@@ -68,11 +68,11 @@ export const useDocumentDetailsLogic = () => {
   }, [openCategoryModal]);
 
   const filteredTags = allTags.filter((t) =>
-    t.name.toLowerCase().includes(tagSearch.toLowerCase())
+    t.name.toLowerCase().includes(tagSearch.toLowerCase()),
   );
 
   const filteredCategories = categories.filter((c) =>
-    c.name.toLowerCase().includes(categorySearch.toLowerCase())
+    c.name.toLowerCase().includes(categorySearch.toLowerCase()),
   );
 
   const handleUpdateCategory = async (category: Category) => {
@@ -134,7 +134,7 @@ export const useDocumentDetailsLogic = () => {
       const newCategory = await addCategory(
         categorySearch.trim(),
         "folder-outline",
-        "#4F46E5"
+        "#4F46E5",
       );
 
       await updateDocument({
@@ -213,11 +213,11 @@ export const useDocumentDetailsLogic = () => {
     }
   };
 
-  const handleTriggerEmbedding = async () => {
+  const handleTriggerIndex = async () => {
     if (!data?.document) return;
     try {
-      await triggerEmbedding(data.document.id);
-      info("Search Enabling Started", "You'll be notified when it's ready");
+      await triggerIndex(data.document.id);
+      info("Indexing Started", "You'll be notified when search is enabled");
     } catch (err) {
       handleAiError(err, "Failed to enable search");
     }
@@ -255,8 +255,11 @@ export const useDocumentDetailsLogic = () => {
     handleOpenTitleModal,
     handleSaveTitle,
     handleGenerateAiTitle,
-    handleTriggerEmbedding,
-    isTriggeringEmbedding,
+    handleTriggerIndex,
+    isTriggeringIndex,
+    // Backward-compatible aliases
+    handleTriggerEmbedding: handleTriggerIndex,
+    isTriggeringEmbedding: isTriggeringIndex,
     isUpdating,
     isGeneratingTitle,
     fetchNextPage,

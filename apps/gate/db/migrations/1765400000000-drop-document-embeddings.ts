@@ -3,12 +3,11 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 /**
  * Migration to drop the document_embeddings table.
  *
- * REASON: Document embeddings in PostgreSQL/pgvector are no longer used.
- * Search now uses Graphiti knowledge graph with embeddings stored in Neo4j.
+ * REASON: Legacy full-document embeddings are replaced by chunk-level indexing.
+ * Search now uses document_chunks in PostgreSQL/pgvector for RAG retrieval.
  *
  * The old approach stored full-document embeddings in pgvector for similarity search.
- * The new Graphiti approach extracts entities and relationships, storing their
- * embeddings in Neo4j for hybrid search (BM25 + vector + graph traversal).
+ * The new approach stores chunk embeddings and FTS indices for hybrid search.
  */
 export class DropDocumentEmbeddings1765400000000 implements MigrationInterface {
   name = 'DropDocumentEmbeddings1765400000000';

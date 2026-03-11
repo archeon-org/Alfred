@@ -6,8 +6,12 @@ export interface Category {
   name: string;
   icon: string;
   color: string;
+  order?: number;
   isSystemDefault: boolean;
   userId: string;
+  parentId?: string | null;
+  parent?: Category | null;
+  children?: Category[];
   user?: User;
   documents?: Document[];
   documentCount?: number;

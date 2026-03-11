@@ -4,6 +4,10 @@ export interface TemplateCategory {
   icon: string;
   color: string;
   order: number;
+  parentTemplateCategoryId?: string | null;
+  level?: number;
+  parentCategory?: TemplateCategory | null;
+  childCategories?: TemplateCategory[];
   templateId?: string;
   template?: Template;
   createdAt: Date;

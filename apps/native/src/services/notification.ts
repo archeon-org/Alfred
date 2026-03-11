@@ -24,7 +24,7 @@ export interface PaginatedNotifications {
 
 export const getNotifications = async (
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<PaginatedNotifications> => {
   const response = await api.get("/notifications", {
     params: { page, limit },

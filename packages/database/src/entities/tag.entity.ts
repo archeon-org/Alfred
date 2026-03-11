@@ -23,6 +23,9 @@ export class TagEntity implements Tag {
   @Column({ default: "#94A3B8" })
   color: string;
 
+  @Column({ type: "integer", default: 0 })
+  order: number;
+
   @Column({ default: true })
   isSystemDefault: boolean;
 

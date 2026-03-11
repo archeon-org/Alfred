@@ -1,3 +1,5 @@
+from typing import Any
+
 from services.classification.schemas import ClassificationConstants
 
 
@@ -10,8 +12,8 @@ class PromptBuilder:
     def build_classification_prompt(
         self,
         content: str,
-        categories: list[dict[str, str]],
-        tags: list[dict[str, str]],
+        categories: list[dict[str, Any]],
+        tags: list[dict[str, Any]],
         original_filename: str | None = None,
     ) -> str:
         categories_str = self._format_categories(categories)
@@ -37,15 +39,16 @@ DOCUMENT CONTENT:
 ---
 
 INSTRUCTIONS:
-1. Choose an existing category if possible (preferred)
-2. Only suggest a new category if nothing fits
-3. Select all relevant tags
-4. Generate a concise title (max 60 chars)
+1. Prefer an existing category. Use the most specific folder (leaf level) when possible.
+2. Category hierarchy has max 2 levels. Child folders are more specific than root folders.
+3. Only suggest a new category if nothing fits. If possible, attach it to an existing root via parentCategoryId.
+4. Select only relevant tags from the provided IDs.
+5. Generate a concise title (max 60 chars).
 
 Respond with JSON:
 {{
   "categoryId": "uuid-or-null",
-  "newCategory": null or {{"name": "...", "icon": "...-outline", "color": "#..."}},
+  "newCategory": null or {{"name": "...", "icon": "...-outline", "color": "#...", "parentCategoryId": "uuid-or-null"}},
   "tagIds": ["uuid1", "uuid2"],
   "title": "Document Title",
   "confidence": "high|medium|low",
@@ -53,7 +56,7 @@ Respond with JSON:
 }}
 
 Available icons: {icons_preview}...
-Available colors: {colors_preview}..."""
+Available colors: {colors_preview}..."""  # noqa: S608
 
     def build_title_prompt(
         self,
@@ -83,12 +86,24 @@ Respond with JSON: {{"title": "Your Title Here"}}"""
         half = max_chars // 2
         return content[:half] + "\n...[truncated]...\n" + content[-half:]
 
-    def _format_categories(self, categories: list[dict[str, str]]) -> str:
+    def _format_categories(self, categories: list[dict[str, Any]]) -> str:
         if not categories:
             return "(No categories defined yet)"
-        return "\n".join(f"  - {c['id']}: {c['name']}" for c in categories)
+        lines: list[str] = []
+        for category in categories:
+            category_id = category.get("id")
+            name = category.get("name")
+            path = category.get("path") or name
+            level = category.get("level") or 1
+            is_leaf = bool(category.get("isLeaf", True))
+            parent_id = category.get("parentId")
+            lines.append(
+                f"  - id={category_id} | level={level} | leaf={is_leaf} | "
+                f"path={path} | parentId={parent_id} | name={name}"
+            )
+        return "\n".join(lines)
 
-    def _format_tags(self, tags: list[dict[str, str]]) -> str:
+    def _format_tags(self, tags: list[dict[str, Any]]) -> str:
         if not tags:
             return "(No tags defined yet)"
         return "\n".join(f"  - {t['id']}: {t['name']}" for t in tags)

@@ -91,8 +91,8 @@ class AISettings(BaseSettings):
         default="accounts/fireworks/models/deepseek-v3p1",
         alias="CLASSIFICATION_MODEL",
     )
-    embedding_model: str = Field(default="nomic-ai/nomic-embed-text-v1.5", alias="EMBEDDING_MODEL")
-    embedding_dimensions: int = Field(default=768, alias="EMBEDDING_DIMENSIONS")
+    embedding_model: str = Field(default="fireworks/qwen3-embedding-8b", alias="EMBEDDING_MODEL")
+    embedding_dimensions: int = Field(default=1536, alias="EMBEDDING_DIMENSIONS")
 
 
 class OCRSettings(BaseSettings):
@@ -113,7 +113,12 @@ class OCRSettings(BaseSettings):
     )
     mistral_extract_header: bool = Field(default=False, alias="MISTRAL_OCR_EXTRACT_HEADER")
     mistral_extract_footer: bool = Field(default=False, alias="MISTRAL_OCR_EXTRACT_FOOTER")
-    pdf_max_pages: int = Field(default=10, ge=1, le=100, alias="PDF_MAX_PAGES")
+    pdf_max_pages: int = Field(
+        default=0,
+        ge=0,
+        alias="PDF_MAX_PAGES",
+        description="Maximum PDF pages to OCR. Set 0 for no page cap.",
+    )
 
 
 class CelerySettings(BaseSettings):
@@ -142,7 +147,7 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False)
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
 
-    api_host: str = Field(default="0.0.0.0")
+    api_host: str = Field(default="0.0.0.0")  # noqa: S104
     api_port: int = Field(default=8000, ge=1, le=65535)
 
     uvicorn_workers: int = Field(
@@ -175,7 +180,7 @@ class Settings(BaseSettings):
     )
 
     max_request_size: int = Field(
-        default=52428800,
+        default=20971520,
         ge=1048576,
         le=104857600,
         alias="MAX_REQUEST_SIZE",
@@ -184,17 +189,6 @@ class Settings(BaseSettings):
 
     worker_host: str = Field(default="scribe-worker-1")
     worker_concurrency: int = Field(default=2, ge=1, le=16)
-
-    metrics_push_enabled: bool = Field(
-        default=True,
-        alias="METRICS_PUSH_ENABLED",
-        description="Enable pushing worker metrics to Prometheus Pushgateway",
-    )
-    pushgateway_url: str = Field(
-        default="pushgateway:9091",
-        alias="PUSHGATEWAY_URL",
-        description="Prometheus Pushgateway address",
-    )
 
     trusted_hosts: str = Field(default="localhost,127.0.0.1")
 

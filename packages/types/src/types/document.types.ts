@@ -33,7 +33,7 @@ export interface Document {
   categoryId?: string;
   category?: Category;
   tags?: Tag[];
-  /** Whether the document has a generated embedding for semantic search */
+  /** Whether the document has chunk embeddings indexed for RAG search */
   hasEmbedding?: boolean;
 }
 

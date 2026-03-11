@@ -139,6 +139,51 @@ export class SubscriptionService {
     return newCredits;
   }
 
+  async consumeCreditsAmount(
+    userId: string,
+    amount: number,
+    reason: string,
+  ): Promise<number> {
+    const normalizedAmount = Math.max(0, Math.floor(amount));
+    if (normalizedAmount === 0) {
+      return this.getCredits(userId);
+    }
+
+    const result = await this.userRepository
+      .createQueryBuilder()
+      .update(UserEntity)
+      .set({
+        credits: () => `credits - ${normalizedAmount}`,
+      })
+      .where('id = :userId', { userId })
+      .andWhere('credits >= :amount', { amount: normalizedAmount })
+      .returning(['credits'])
+      .execute();
+
+    if (result.affected === 0) {
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+        select: ['id', 'credits'],
+      });
+
+      if (!user) {
+        throw new BadRequestException('User not found');
+      }
+
+      throw new BadRequestException(
+        `Insufficient credits. Required: ${normalizedAmount}, Available: ${user.credits}`,
+      );
+    }
+
+    const newCredits = result.raw[0]?.credits ?? 0;
+
+    this.logger.log(
+      `User ${userId} consumed ${normalizedAmount} credits (${reason}). New balance: ${newCredits}`,
+    );
+
+    return newCredits;
+  }
+
   async addCredits(
     userId: string,
     amount: number,

@@ -5,7 +5,7 @@ import { DocumentEntity, CategoryEntity } from '@archeon-org/database';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 import { ChatSearchService } from './chat-search.service';
-import { GraphitiSearchService } from './graphiti-search.service';
+import { RagService } from './rag.service';
 import { SubscriptionModule } from '../subscription/subscription.module';
 
 @Module({
@@ -15,7 +15,7 @@ import { SubscriptionModule } from '../subscription/subscription.module';
     SubscriptionModule,
   ],
   controllers: [SearchController],
-  providers: [SearchService, ChatSearchService, GraphitiSearchService],
-  exports: [SearchService, ChatSearchService, GraphitiSearchService],
+  providers: [SearchService, ChatSearchService, RagService],
+  exports: [SearchService, ChatSearchService, RagService],
 })
 export class SearchModule {}

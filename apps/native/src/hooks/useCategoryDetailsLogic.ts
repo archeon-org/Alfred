@@ -66,7 +66,7 @@ export const useCategoryDetailsLogic = () => {
 
   const handleRemoveFromCategory = async (
     documentId: string,
-    documentName: string
+    documentName: string,
   ) => {
     Alert.alert(
       "Remove from Category",
@@ -90,7 +90,7 @@ export const useCategoryDetailsLogic = () => {
             }
           },
         },
-      ]
+      ],
     );
   };
 

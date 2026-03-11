@@ -14,6 +14,8 @@ import { SUBSCRIPTION_QUERY_KEY } from "./useSubscription";
 interface ScannedDocument {
   uri: string;
   originalFilename?: string;
+  mimeType?: string;
+  source: "file" | "image";
 }
 
 /**
@@ -41,50 +43,89 @@ const isStorageLimitError = (message: string): boolean => {
 
 export const useDocumentScanner = (
   initialDocUri?: string,
-  initialDocName?: string
+  initialDocName?: string,
 ) => {
   const [scannedDocuments, setScannedDocuments] = useState<ScannedDocument[]>(
-    []
+    [],
   );
-  const { isUploading, upload } = useDocumentUpload();
+  const { isUploading, upload, uploadBulk } = useDocumentUpload();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { success, warning, error: showError } = useToast();
 
-  // For backward compatibility, expose just the URIs
   const scannedImages = scannedDocuments.map((doc) => doc.uri);
+  const hasFiles = scannedDocuments.some((doc) => doc.source === "file");
+  const hasImages = scannedDocuments.some((doc) => doc.source === "image");
+  const isFileBatch = scannedDocuments.length > 0 && !hasImages;
 
   useEffect(() => {
     if (initialDocUri) {
       setScannedDocuments((prev) => {
-        // Prevent adding duplicates if the same URI is passed
         if (prev.some((doc) => doc.uri === initialDocUri)) return prev;
         return [
           ...prev,
-          { uri: initialDocUri, originalFilename: initialDocName },
+          {
+            uri: initialDocUri,
+            originalFilename: initialDocName,
+            source: "file",
+          },
         ];
       });
     }
   }, [initialDocUri, initialDocName]);
 
+  const handleUploadError = (message: string) => {
+    if (isInsufficientCreditsError(message)) {
+      queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
+      router.push({
+        pathname: "/(app)/profile/subscription",
+        params: { reason: "insufficient_credits" },
+      });
+      return;
+    }
+
+    if (isStorageLimitError(message)) {
+      queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
+      router.push({
+        pathname: "/(app)/profile/subscription",
+        params: { reason: "insufficient_storage" },
+      });
+      return;
+    }
+
+    showError("Failed to process document", message);
+  };
+
   const scanDocument = async () => {
+    if (hasFiles) {
+      warning(
+        "Mixed Selection",
+        "Please clear your selected files first, or upload them before scanning pages.",
+      );
+      return;
+    }
+
     if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
       warning(
         "Not Available",
-        "Document scanning is not available in Expo Go. Please use a development build or upload from files."
+        "Document scanning is not available in Expo Go. Please use a development build or upload from files.",
       );
       return;
     }
 
     try {
-      // Dynamically require the module to avoid crashes in Expo Go
       const DocumentScanner =
         require("react-native-document-scanner-plugin").default;
       const { scannedImages: newScannedImages } =
         await DocumentScanner.scanDocument();
+
       if (newScannedImages && newScannedImages.length > 0) {
-        // Scanned images don't have original filenames
-        setScannedDocuments(newScannedImages.map((uri: string) => ({ uri })));
+        setScannedDocuments(
+          newScannedImages.map((uri: string) => ({
+            uri,
+            source: "image",
+          })),
+        );
       }
     } catch (error) {
       console.error("Error scanning document:", error);
@@ -94,21 +135,31 @@ export const useDocumentScanner = (
   };
 
   const pickDocument = async () => {
+    if (hasImages) {
+      warning(
+        "Mixed Selection",
+        "Please clear your scanned/gallery pages first, or upload them as one PDF before adding files.",
+      );
+      return;
+    }
+
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ["application/pdf", "image/*"],
         copyToCacheDirectory: true,
-      });
+        multiple: true,
+      } as any);
 
       if (result.canceled) return;
 
-      const asset = result.assets[0];
+      const newDocuments = result.assets.map((asset) => ({
+        uri: asset.uri,
+        originalFilename: asset.name,
+        mimeType: asset.mimeType || undefined,
+        source: "file" as const,
+      }));
 
-      // Store both URI and original filename
-      setScannedDocuments((prev) => [
-        ...prev,
-        { uri: asset.uri, originalFilename: asset.name },
-      ]);
+      setScannedDocuments((prev) => [...prev, ...newDocuments]);
     } catch (error) {
       console.error("Error picking document:", error);
       const appError = parseApiError(error);
@@ -117,14 +168,21 @@ export const useDocumentScanner = (
   };
 
   const pickFromGallery = async () => {
+    if (hasFiles) {
+      warning(
+        "Mixed Selection",
+        "Please clear your selected files first, or upload them before adding gallery images.",
+      );
+      return;
+    }
+
     try {
-      // Request permissions
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         warning(
           "Permission Required",
-          "Please grant access to your photo library to upload images."
+          "Please grant access to your photo library to upload images.",
         );
         return;
       }
@@ -138,10 +196,10 @@ export const useDocumentScanner = (
 
       if (result.canceled) return;
 
-      // Add all selected images
       const newDocuments = result.assets.map((asset) => ({
         uri: asset.uri,
         originalFilename: asset.fileName || undefined,
+        source: "image" as const,
       }));
 
       setScannedDocuments((prev) => [...prev, ...newDocuments]);
@@ -155,45 +213,66 @@ export const useDocumentScanner = (
   const handleUpload = async (autoClassify = true) => {
     if (scannedDocuments.length === 0) return;
 
+    const classificationSource = autoClassify ? "AI" : "MANUAL";
+
     try {
-      // Check if we have a single PDF file to upload directly
-      // This avoids converting an existing PDF to images and back to PDF (which breaks it)
-      if (
-        scannedDocuments.length === 1 &&
-        scannedDocuments[0].uri.toLowerCase().endsWith(".pdf")
-      ) {
-        const doc = scannedDocuments[0];
-        const classificationSource = autoClassify ? "AI" : "MANUAL";
-        const result = await upload(
-          doc.uri,
+      if (isFileBatch) {
+        const result = await uploadBulk(
+          scannedDocuments.map((doc) => ({
+            uri: doc.uri,
+            originalFilename: doc.originalFilename,
+            mimeType: doc.mimeType,
+          })),
           classificationSource,
-          doc.originalFilename
+          3,
         );
 
-        if (result) {
-          setScannedDocuments([]);
-          if (autoClassify) {
-            success("Upload Complete", "Document sent for AI classification!");
-            router.back();
-          } else {
-            router.push({
-              pathname: `/(app)/documents/${result.id}`,
-              params: { openCategoryModal: "true" },
-            } as any);
-          }
+        const successCount = result.succeeded.length;
+        const failedCount = result.failed.length;
+
+        if (successCount === 0 && failedCount > 0) {
+          handleUploadError(result.failed[0].message);
+          return;
         }
+
+        queryClient.invalidateQueries({ queryKey: ["documents"] });
+        queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
+
+        if (successCount > 0) {
+          setScannedDocuments([]);
+        }
+
+        if (failedCount > 0) {
+          warning(
+            "Bulk Upload Partial",
+            `${successCount} uploaded, ${failedCount} failed. First error: ${result.failed[0].message}`,
+          );
+        } else {
+          success(
+            "Upload Complete",
+            autoClassify
+              ? `${successCount} documents sent for AI classification!`
+              : `${successCount} documents uploaded successfully!`,
+          );
+        }
+
+        if (!autoClassify && successCount === 1 && failedCount === 0) {
+          router.push({
+            pathname: `/(app)/documents/${result.succeeded[0].id}`,
+            params: { openCategoryModal: "true" },
+          } as any);
+        } else {
+          router.back();
+        }
+
         return;
       }
 
-      // Generate HTML for all pages
       const pagesHtmlPromises = scannedDocuments.map(async (doc) => {
         const base64 = await readAsStringAsync(doc.uri, {
           encoding: "base64",
         });
-        // Check if it's a PDF or Image to render correctly
-        // For simplicity, we assume images for now as that's what the scanner returns
-        // If pickDocument returns a PDF, we might need to handle it differently
-        // But for now, let's assume we are converting images to PDF
+
         return `
           <div style="width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; page-break-after: always;">
             <img src="data:image/jpeg;base64,${base64}" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
@@ -203,7 +282,6 @@ export const useDocumentScanner = (
 
       const pagesHtml = (await Promise.all(pagesHtmlPromises)).join("");
 
-      // Note: We keep the PDF background white explicitly for printing purposes
       const html = `
         <html>
           <body style="margin: 0; padding: 0; background-color: white;">
@@ -212,33 +290,30 @@ export const useDocumentScanner = (
         </html>
       `;
 
-      // Convert to PDF
       const { uri: pdfUri } = await Print.printToFileAsync({
         html,
         base64: false,
       });
 
-      // For scanned documents, use a descriptive name based on date
-      // since they don't have original filenames
       const scannedFilename = `Scanned Document ${new Date().toLocaleDateString()}.pdf`;
 
-      // Upload
-      const classificationSource = autoClassify ? "AI" : "MANUAL";
       const result = await upload(
         pdfUri,
         classificationSource,
-        scannedFilename
+        scannedFilename,
+        "application/pdf",
       );
 
       if (result) {
-        // Clear images after successful upload
         setScannedDocuments([]);
+
+        queryClient.invalidateQueries({ queryKey: ["documents"] });
+        queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
 
         if (autoClassify) {
           success("Upload Complete", "Document sent for AI classification!");
           router.back();
         } else {
-          // Direct redirect for manual classification
           router.push({
             pathname: `/(app)/documents/${result.id}`,
             params: { openCategoryModal: "true" },
@@ -248,24 +323,7 @@ export const useDocumentScanner = (
     } catch (error) {
       console.error("Error converting/uploading:", error);
       const appError = parseApiError(error);
-
-      // Handle insufficient credits - redirect to subscription page
-      if (isInsufficientCreditsError(appError.message)) {
-        queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
-        router.push({
-          pathname: "/(app)/profile/subscription",
-          params: { reason: "insufficient_credits" },
-        });
-      } else if (isStorageLimitError(appError.message)) {
-        // Handle storage limit exceeded - redirect to subscription page
-        queryClient.invalidateQueries({ queryKey: SUBSCRIPTION_QUERY_KEY });
-        router.push({
-          pathname: "/(app)/profile/subscription",
-          params: { reason: "insufficient_storage" },
-        });
-      } else {
-        showError("Failed to process document", appError.message);
-      }
+      handleUploadError(appError.message);
     }
   };
 
@@ -278,6 +336,7 @@ export const useDocumentScanner = (
   return {
     scannedImages,
     isUploading,
+    isFileBatch,
     scanDocument,
     pickDocument,
     pickFromGallery,

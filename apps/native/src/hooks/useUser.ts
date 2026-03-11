@@ -38,13 +38,13 @@ export const useUpdateUser = () => {
         if (newData.preferences) {
           updatedUser.preferences = mergePreferences(
             previousUser.preferences,
-            newData.preferences
+            newData.preferences,
           );
         }
 
         queryClient.setQueryData<UserWithSubscription>(
           USER_QUERY_KEY,
-          updatedUser as UserWithSubscription
+          updatedUser as UserWithSubscription,
         );
       }
 

@@ -80,7 +80,7 @@ class OCRService:
         if not isinstance(pages, list):
             raise RuntimeError("Invalid OCR response format: pages is not a list")
 
-        selected_pages = pages[: self._max_pages]
+        selected_pages = pages if self._max_pages <= 0 else pages[: self._max_pages]
         chunks: list[str] = []
         for page in selected_pages:
             if isinstance(page, dict):
@@ -91,6 +91,7 @@ class OCRService:
         text = "\n\n".join(chunks).strip()
         logger.info(
             "OCR completed",
+            pages_total=len(pages),
             pages=len(selected_pages),
             chars=len(text),
             input_type=input_type,

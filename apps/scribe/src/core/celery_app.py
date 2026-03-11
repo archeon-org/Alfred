@@ -1,12 +1,11 @@
 from typing import Any
 
 from celery import Celery
-from celery.signals import task_prerun, task_postrun, task_failure, worker_process_init
+from celery.signals import task_failure, task_postrun, task_prerun, worker_process_init
 from kombu import Exchange, Queue
 
 from core.config import get_settings
 from core.logging import get_logger, setup_logging
-
 
 setup_logging()
 logger = get_logger(__name__)
@@ -18,7 +17,7 @@ celery_app = Celery(
     "scribe",
     broker=settings.redis.celery_broker_url,
     backend=None,
-    include=["tasks.document", "tasks.graphiti"],
+    include=["tasks.document", "tasks.rag"],
 )
 
 

@@ -1,12 +1,15 @@
 from dataclasses import dataclass
+from typing import Any
+
 from sqlalchemy.orm import Session
 
+from core.config import get_settings
 from core.logging import get_logger
-from domain.models import ProcessingStatus, ProcessingResult, ClassificationResult
+from domain.models import ClassificationResult, ProcessingResult, ProcessingStatus
 from repositories.document import DocumentRepository
-from services.r2 import get_r2_service
-from services.ocr import get_ocr_service
 from services.classification import get_classification_service
+from services.ocr import get_ocr_service
+from services.r2 import get_r2_service
 
 logger = get_logger(__name__)
 
@@ -17,12 +20,16 @@ class DocumentJob:
     user_id: str
     r2_key: str
     original_name: str | None
+    bulk_operation_id: str | None = None
+    suppress_notifications: bool = False
 
 
 class DocumentPipeline:
     def __init__(self, session: Session):
+        settings = get_settings()
         self._session = session
         self._repository = DocumentRepository(session)
+        self._max_file_size = settings.max_request_size
 
         self._r2_service = None
         self._ocr_service = None
@@ -60,11 +67,11 @@ class DocumentPipeline:
             classification.tag_ids,
         )
 
-        self._queue_graph_ingestion(
+        self._queue_document_indexing(
             job.document_id,
             job.user_id,
-            classification.title or job.original_name or "Untitled",
-            text_content,
+            bulk_operation_id=job.bulk_operation_id,
+            suppress_notifications=job.suppress_notifications,
         )
 
         logger.info(
@@ -86,7 +93,13 @@ class DocumentPipeline:
         logger.info("Downloading file from R2", key=key)
         if not self._r2_service:
             self._r2_service = get_r2_service()
-        return self._r2_service.get_file(key)
+        file_data = self._r2_service.get_file(key)
+        if len(file_data) > self._max_file_size:
+            raise ValueError(
+                f"Document exceeds max size of {self._max_file_size} bytes "
+                f"(received {len(file_data)} bytes)"
+            )
+        return file_data
 
     def _extract_text(self, file_data: bytes, mimetype: str | None) -> str:
         logger.info("Performing OCR", mimetype=mimetype)
@@ -100,8 +113,8 @@ class DocumentPipeline:
     def _classify_document(
         self,
         content: str,
-        categories: list[dict[str, str]],
-        tags: list[dict[str, str]],
+        categories: list[dict[str, Any]],
+        tags: list[dict[str, Any]],
         original_name: str | None,
     ) -> ClassificationResult:
         logger.info("Starting AI classification")
@@ -123,7 +136,13 @@ class DocumentPipeline:
         if classification.new_category:
             nc = classification.new_category
             logger.info("Creating new category", name=nc.name)
-            return self._repository.create_category(user_id, nc.name, nc.icon, nc.color)
+            return self._repository.create_category(
+                user_id,
+                nc.name,
+                nc.icon,
+                nc.color,
+                parent_id=nc.parent_category_id,
+            )
 
         return None
 
@@ -142,29 +161,29 @@ class DocumentPipeline:
         if tag_ids:
             self._repository.update_tags(document_id, tag_ids)
 
-    def _queue_graph_ingestion(
+    def _queue_document_indexing(
         self,
         document_id: str,
         user_id: str,
-        document_name: str,
-        content: str,
+        bulk_operation_id: str | None = None,
+        suppress_notifications: bool = False,
     ) -> None:
-        logger.info("Queueing graph ingestion", document_id=document_id)
+        logger.info("Queueing document indexing", document_id=document_id)
         try:
-            from tasks.graphiti import ingest_document_to_graph
+            from tasks.rag import index_document
 
-            ingest_document_to_graph.delay(  # type: ignore[attr-defined]
+            index_document.delay(  # type: ignore[attr-defined]
                 {
                     "documentId": document_id,
                     "userId": user_id,
-                    "documentName": document_name,
-                    "content": content,
-                    "referenceTime": None,
+                    "manualTrigger": False,
+                    "bulkOperationId": bulk_operation_id,
+                    "suppressNotifications": suppress_notifications,
                 }
             )
         except Exception as e:
             logger.warning(
-                "Failed to queue graph ingestion",
+                "Failed to queue document indexing",
                 document_id=document_id,
                 error=str(e),
             )

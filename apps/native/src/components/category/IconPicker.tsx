@@ -32,7 +32,7 @@ export const IconPicker = ({
   const filteredIcons = useMemo(() => {
     if (!search) return iconNames;
     return iconNames.filter((name) =>
-      name.toLowerCase().includes(search.toLowerCase())
+      name.toLowerCase().includes(search.toLowerCase()),
     );
   }, [search, iconNames]);
 

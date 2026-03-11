@@ -52,6 +52,7 @@ export class GoogleVerifyDto {
     description: 'User first name from Google profile',
     example: 'John',
   })
+  @IsOptional()
   @IsString()
   firstName?: string;
 
@@ -59,6 +60,7 @@ export class GoogleVerifyDto {
     description: 'User last name from Google profile',
     example: 'Doe',
   })
+  @IsOptional()
   @IsString()
   lastName?: string;
 
@@ -66,6 +68,7 @@ export class GoogleVerifyDto {
     description: 'Profile picture URL from Google',
     example: 'https://lh3.googleusercontent.com/a/...',
   })
+  @IsOptional()
   @IsString()
   picture?: string;
 

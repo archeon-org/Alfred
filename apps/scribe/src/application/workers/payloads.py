@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any
 
 Payload = dict[str, Any]
@@ -11,14 +12,46 @@ class DocumentTaskPayload:
     user_id: str
     key: str
     original_name: str | None
+    bulk_operation_id: str | None
+    suppress_notifications: bool
 
     @classmethod
-    def from_dict(cls, data: Payload) -> "DocumentTaskPayload":
+    def from_dict(cls, data: Payload) -> DocumentTaskPayload:
         return cls(
             document_id=data["documentId"],
             user_id=data["userId"],
             key=data["key"],
             original_name=data.get("originalName"),
+            bulk_operation_id=data.get("bulkOperationId"),
+            suppress_notifications=bool(data.get("suppressNotifications", False)),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BulkDocumentTaskPayload:
+    user_id: str
+    documents: list[DocumentTaskPayload]
+    bulk_operation_id: str | None
+    notify_summary: bool
+    suppress_per_document_notifications: bool
+
+    @classmethod
+    def from_dict(cls, data: Payload) -> BulkDocumentTaskPayload:
+        documents_raw = data.get("documents")
+        if not isinstance(documents_raw, list) or not documents_raw:
+            raise ValueError("Bulk document payload requires a non-empty documents array")
+
+        documents = [DocumentTaskPayload.from_dict(item) for item in documents_raw]
+        user_id = str(data.get("userId") or documents[0].user_id)
+
+        return cls(
+            user_id=user_id,
+            documents=documents,
+            bulk_operation_id=data.get("bulkOperationId"),
+            notify_summary=bool(data.get("notifySummary", True)),
+            suppress_per_document_notifications=bool(
+                data.get("suppressPerDocumentNotifications", True)
+            ),
         )
 
 
@@ -30,7 +63,7 @@ class TitleTaskPayload:
     original_name: str | None
 
     @classmethod
-    def from_dict(cls, data: Payload) -> "TitleTaskPayload":
+    def from_dict(cls, data: Payload) -> TitleTaskPayload:
         return cls(
             document_id=data["documentId"],
             user_id=data["userId"],
@@ -40,53 +73,45 @@ class TitleTaskPayload:
 
 
 @dataclass(frozen=True, slots=True)
-class GraphitiIngestPayload:
+class IndexDocumentPayload:
     document_id: str
     user_id: str
-    document_name: str
-    content: str
-    reference_time_raw: str | None
+    manual_trigger: bool
+    bulk_operation_id: str | None
+    suppress_notifications: bool
 
     @classmethod
-    def from_dict(cls, data: Payload) -> "GraphitiIngestPayload":
+    def from_dict(cls, data: Payload) -> IndexDocumentPayload:
         return cls(
             document_id=data["documentId"],
             user_id=data["userId"],
-            document_name=data["documentName"],
-            content=data["content"],
-            reference_time_raw=data.get("referenceTime"),
+            manual_trigger=bool(data.get("manualTrigger", False)),
+            bulk_operation_id=data.get("bulkOperationId"),
+            suppress_notifications=bool(data.get("suppressNotifications", False)),
         )
 
 
 @dataclass(frozen=True, slots=True)
-class GraphitiDeletePayload:
+class DeleteDocumentIndexPayload:
     document_id: str
     user_id: str
 
     @classmethod
-    def from_dict(cls, data: Payload) -> "GraphitiDeletePayload":
+    def from_dict(cls, data: Payload) -> DeleteDocumentIndexPayload:
         return cls(
             document_id=data["documentId"],
             user_id=data["userId"],
         )
 
 
-def parse_reference_time(reference_time_raw: str | None) -> datetime | None:
-    if not reference_time_raw:
-        return None
-    try:
-        return datetime.fromisoformat(reference_time_raw)
-    except ValueError:
-        return None
+@dataclass(frozen=True, slots=True)
+class BackfillDocumentsPayload:
+    requested_by: str
+    batch_size: int
 
-
-def parse_bulk_document(document: Payload) -> Payload:
-    parsed_document: Payload = {"name": document["name"], "content": document["content"]}
-    reference_time_raw = document.get("referenceTime")
-    if not isinstance(reference_time_raw, str):
-        return parsed_document
-    try:
-        parsed_document["reference_time"] = datetime.fromisoformat(reference_time_raw)
-    except ValueError:
-        return parsed_document
-    return parsed_document
+    @classmethod
+    def from_dict(cls, data: Payload) -> BackfillDocumentsPayload:
+        return cls(
+            requested_by=str(data.get("requestedBy") or "system"),
+            batch_size=max(1, int(data.get("batchSize") or 100)),
+        )

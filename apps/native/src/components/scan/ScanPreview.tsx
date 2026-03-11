@@ -92,7 +92,7 @@ export const ScanPreview: React.FC<ScanPreviewProps> = ({
           showsHorizontalScrollIndicator={false}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-            { useNativeDriver: true, listener: handleScroll }
+            { useNativeDriver: true, listener: handleScroll },
           )}
           scrollEventThrottle={16}
           decelerationRate="fast"

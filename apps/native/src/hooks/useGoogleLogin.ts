@@ -34,7 +34,7 @@ export const useGoogleLogin = () => {
           "https://www.googleapis.com/userinfo/v2/me",
           {
             headers: { Authorization: `Bearer ${googleAccessToken}` },
-          }
+          },
         );
 
         const userInfo = userInfoResponse.data;
@@ -45,7 +45,7 @@ export const useGoogleLogin = () => {
           userInfo.given_name,
           userInfo.family_name,
           userInfo.picture,
-          googleAccessToken
+          googleAccessToken,
         );
 
         await signIn(accessToken);
@@ -57,7 +57,7 @@ export const useGoogleLogin = () => {
         setIsLoading(false);
       }
     },
-    [signIn, showError]
+    [signIn, showError],
   );
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export const useGoogleLogin = () => {
     if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
       warning(
         "Not Supported in Expo Go",
-        "Google Login requires a development build or production build."
+        "Google Login requires a development build or production build.",
       );
       return;
     }

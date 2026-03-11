@@ -34,10 +34,10 @@ export function useNotifications() {
             return {
               ...old,
               data: old.data.map((n) =>
-                n.id === notificationId ? { ...n, isRead: true } : n
+                n.id === notificationId ? { ...n, isRead: true } : n,
               ),
             };
-          }
+          },
         );
       }
 
@@ -49,7 +49,7 @@ export function useNotifications() {
       if (context?.previousNotifications) {
         queryClient.setQueryData(
           ["notifications"],
-          context.previousNotifications
+          context.previousNotifications,
         );
       }
     },
@@ -75,7 +75,7 @@ export function useNotifications() {
               ...old,
               data: old.data.map((n) => ({ ...n, isRead: true })),
             };
-          }
+          },
         );
       }
       return { previousNotifications };
@@ -84,7 +84,7 @@ export function useNotifications() {
       if (context?.previousNotifications) {
         queryClient.setQueryData(
           ["notifications"],
-          context.previousNotifications
+          context.previousNotifications,
         );
       }
     },
@@ -109,7 +109,7 @@ export function useNotifications() {
               ...old,
               data: old.data.filter((n) => n.id !== notificationId),
             };
-          }
+          },
         );
       }
       return { previousNotifications };
@@ -118,7 +118,7 @@ export function useNotifications() {
       if (context?.previousNotifications) {
         queryClient.setQueryData(
           ["notifications"],
-          context.previousNotifications
+          context.previousNotifications,
         );
       }
     },

@@ -13,6 +13,8 @@ class ResultParser:
             new_category=new_category,
             tag_ids=result.get("tagIds", []),
             title=self._safe_title(result.get("title")),
+            confidence=self._safe_confidence(result.get("confidence")),
+            reasoning=self._safe_reasoning(result.get("reasoning")),
         )
 
     def parse_title(self, result: dict[str, Any]) -> str:
@@ -26,6 +28,7 @@ class ResultParser:
             name=self._safe_category_name(data.get("name")),
             icon=data.get("icon", ClassificationConstants.DEFAULT_ICON),
             color=self._safe_color(data.get("color")),
+            parent_category_id=self._safe_parent_category_id(data.get("parentCategoryId")),
         )
 
     def _safe_title(self, title: str | None) -> str:
@@ -46,3 +49,18 @@ class ResultParser:
             return color
 
         return ClassificationConstants.DEFAULT_COLOR
+
+    def _safe_confidence(self, confidence: str | None) -> str:
+        if confidence in {"high", "medium", "low"}:
+            return confidence
+        return "medium"
+
+    def _safe_reasoning(self, reasoning: str | None) -> str:
+        if not reasoning:
+            return ""
+        return reasoning[: ClassificationConstants.MAX_REASONING_LENGTH]
+
+    def _safe_parent_category_id(self, parent_category_id: str | None) -> str | None:
+        if not parent_category_id:
+            return None
+        return str(parent_category_id)

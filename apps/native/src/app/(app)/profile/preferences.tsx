@@ -73,7 +73,7 @@ export default function PreferencesScreen() {
   const handleUpdatePreference = (
     category: "home" | "notifications" | "display",
     key: string,
-    value: boolean
+    value: boolean,
   ) => {
     updateUser({
       preferences: {
@@ -180,7 +180,7 @@ export default function PreferencesScreen() {
                 handleUpdatePreference(
                   "notifications",
                   "onDocumentClassified",
-                  value
+                  value,
                 )
               }
               disabled={isPending}
@@ -196,7 +196,7 @@ export default function PreferencesScreen() {
                 handleUpdatePreference(
                   "notifications",
                   "onDocumentError",
-                  value
+                  value,
                 )
               }
               disabled={isPending}

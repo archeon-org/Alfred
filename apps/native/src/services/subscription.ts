@@ -43,7 +43,7 @@ export const getCredits = async (): Promise<{ credits: number }> => {
  * Check if user can afford an operation
  */
 export const checkCredits = async (
-  operation: CreditOperation
+  operation: CreditOperation,
 ): Promise<{ canAfford: boolean; cost: number; currentCredits: number }> => {
   const response = await api.post<{
     canAfford: boolean;
@@ -60,7 +60,7 @@ export const getSubscriptionTiers = async (): Promise<
   Record<SubscriptionTier, TierLimits>
 > => {
   const response = await api.get<Record<SubscriptionTier, TierLimits>>(
-    "/subscription/tiers"
+    "/subscription/tiers",
   );
   return response.data;
 };
@@ -70,7 +70,7 @@ export const getSubscriptionTiers = async (): Promise<
  * Note: In production, this should handle payment first
  */
 export const upgradeTier = async (
-  tier: SubscriptionTier
+  tier: SubscriptionTier,
 ): Promise<SubscriptionStatus> => {
   const response = await api.post<SubscriptionStatus>("/subscription/upgrade", {
     tier,

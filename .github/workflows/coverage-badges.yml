@@ -1,0 +1,52 @@
+name: Coverage Badges
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-badges-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update-coverage-badges:
+    name: Update coverage badges
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+      - name: Install JS dependencies
+        run: yarn install --frozen-lockfile
+      - name: Sync Scribe dependencies
+        run: cd apps/scribe && uv sync --frozen --extra dev
+      - name: Run merged coverage
+        run: yarn coverage:all
+      - name: Generate badges
+        run: yarn coverage:badges
+      - name: Commit updated badges
+        run: |
+          if git diff --quiet -- .github/badges; then
+            echo "No badge changes."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/badges
+          git commit -m "chore(ci): update coverage badges [skip ci]"
+          git push

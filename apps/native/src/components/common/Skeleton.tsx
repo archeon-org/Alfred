@@ -22,7 +22,7 @@ export const Skeleton = ({ className, style, ...props }: SkeletonProps) => {
           duration: 800,
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
 
     animation.start();

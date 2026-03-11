@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -8,15 +8,15 @@ from core.logging import get_logger
 logger = get_logger(__name__)
 
 
-class CreditOperation(str, Enum):
-    AI_CLASSIFICATION = "AI_CLASSIFICATION"
-    AI_TITLE_GENERATION = "AI_TITLE_GENERATION"
-    AI_EMBEDDING = "AI_EMBEDDING"
+class CreditOperation(StrEnum):
+    AI_CLASSIFICATION = "ai_classification"
+    AI_TITLE_GENERATION = "ai_title_generation"
+    AI_EMBEDDING = "ai_embedding"
 
 
 CREDIT_COSTS: dict[CreditOperation, int] = {
-    CreditOperation.AI_CLASSIFICATION: 5,
-    CreditOperation.AI_TITLE_GENERATION: 2,
+    CreditOperation.AI_CLASSIFICATION: 2,
+    CreditOperation.AI_TITLE_GENERATION: 1,
     CreditOperation.AI_EMBEDDING: 1,
 }
 

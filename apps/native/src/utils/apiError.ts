@@ -48,7 +48,7 @@ export const parseApiError = (error: unknown): AppError => {
       return new AppError(
         "Network error. Please check your internet connection.",
         0,
-        error
+        error,
       );
     }
   }

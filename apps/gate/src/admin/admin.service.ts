@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
 import { UserEntity } from '@archeon-org/database';
 import { SubscriptionService } from '../subscription/subscription.service';
+import { QueueService } from '../queue/queue.service';
 import {
   SubscriptionTier,
   CreditPack,
@@ -19,6 +20,7 @@ export class AdminService {
 
   constructor(
     private readonly subscriptionService: SubscriptionService,
+    private readonly queueService: QueueService,
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
   ) {}
@@ -173,8 +175,8 @@ export class AdminService {
       `Admin setting custom credits for user ${userId}: credits=${credits}. Reason: ${reason}`,
     );
 
-    // Always set credits (even if 0)
-    await this.userRepository.update(userId, { credits });
+    // Always set values (even if 0)
+    await this.userRepository.update(userId, { credits, bonusSearches });
 
     return this.getUserDetails(userId);
   }
@@ -326,5 +328,20 @@ export class AdminService {
     }
 
     return stats;
+  }
+
+  async triggerRagBackfill(
+    requestedBy: string,
+    batchSize: number = 100,
+  ): Promise<{ queued: boolean; batchSize: number; requestedBy: string }> {
+    await this.queueService.addBackfillDocumentsJob({
+      requestedBy,
+      batchSize,
+    });
+    return {
+      queued: true,
+      batchSize,
+      requestedBy,
+    };
   }
 }

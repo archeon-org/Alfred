@@ -76,7 +76,7 @@ export function usePushNotifications() {
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
   const handleNotificationResponse = async (
-    response: Notifications.NotificationResponse
+    response: Notifications.NotificationResponse,
   ) => {
     const data = response.notification.request.content.data as {
       notificationId?: string;
@@ -117,7 +117,7 @@ export function usePushNotifications() {
 
   useEffect(() => {
     registerForPushNotificationsAsync().then((token) =>
-      setExpoPushToken(token)
+      setExpoPushToken(token),
     );
 
     // Handle cold start (app launched from killed state)
@@ -134,7 +134,7 @@ export function usePushNotifications() {
 
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener(
-        handleNotificationResponse
+        handleNotificationResponse,
       );
 
     return () => {
@@ -169,7 +169,7 @@ export function usePushNotifications() {
         "Skipping push token update. Token:",
         expoPushToken,
         "User ID:",
-        user?.id
+        user?.id,
       );
     }
   }, [expoPushToken, user?.id, user?.pushToken]);

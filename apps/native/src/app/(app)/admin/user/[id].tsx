@@ -153,7 +153,7 @@ export default function UserDetailScreen() {
           },
         })),
         { text: "Cancel", style: "cancel" as const },
-      ]
+      ],
     );
   };
 
@@ -245,7 +245,7 @@ export default function UserDetailScreen() {
             resetDailySearchMutation.mutate({ userId: id });
           },
         },
-      ]
+      ],
     );
   };
 
@@ -297,7 +297,7 @@ export default function UserDetailScreen() {
   const tierColors = getTierColor(user.subscription.tier);
   const roleColors = getRoleColor(user.role);
   const storagePercent = Math.round(
-    (user.subscription.storageUsed / user.subscription.storageLimit) * 100
+    (user.subscription.storageUsed / user.subscription.storageLimit) * 100,
   );
 
   return (

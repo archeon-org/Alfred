@@ -64,7 +64,7 @@ export default function SecurityScreen() {
         if (!success) {
           Alert.alert(
             "Authentication Failed",
-            "Could not enable biometric authentication. Please try again."
+            "Could not enable biometric authentication. Please try again.",
           );
         }
       }

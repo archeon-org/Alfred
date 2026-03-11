@@ -18,7 +18,7 @@ interface SwipeableNotificationItemProps {
 
 // Get notification icon based on title/type
 const getNotificationIcon = (
-  title: string
+  title: string,
 ): { name: string; color: string; bgColor: string } => {
   const lowerTitle = title.toLowerCase();
 
@@ -75,7 +75,7 @@ export const SwipeableNotificationItem = ({
 
   const renderRightActions = (
     progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
+    dragX: Animated.AnimatedInterpolation<number>,
   ) => {
     const translateX = progress.interpolate({
       inputRange: [0, 1],

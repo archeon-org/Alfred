@@ -55,7 +55,7 @@ export const useUpgradeTier = () => {
       // Update the subscription cache with new data
       queryClient.setQueryData<SubscriptionStatus>(
         SUBSCRIPTION_QUERY_KEY,
-        data
+        data,
       );
     },
   });

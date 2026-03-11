@@ -8,7 +8,7 @@ export const useDocumentsList = (
     processingStatus?: string;
     classificationSource?: string;
     tagId?: string;
-  }
+  },
 ) => {
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
 
@@ -31,7 +31,7 @@ export const useDocumentsList = (
         search,
         filters?.processingStatus,
         filters?.classificationSource,
-        filters?.tagId
+        filters?.tagId,
       ),
     getNextPageParam: (lastPage) => {
       if (lastPage.meta.currentPage < lastPage.meta.totalPages) {
@@ -45,7 +45,7 @@ export const useDocumentsList = (
 
   const allDocuments = data?.pages.flatMap((page) => page.data) || [];
   const documents = Array.from(
-    new Map(allDocuments.map((item) => [item.id, item])).values()
+    new Map(allDocuments.map((item) => [item.id, item])).values(),
   );
 
   return {
@@ -79,7 +79,7 @@ export const useActionRequiredDocumentsList = () => {
         undefined,
         undefined,
         ["PENDING", "FAILED"],
-        undefined
+        undefined,
       ),
     getNextPageParam: (lastPage) => {
       if (lastPage.meta.currentPage < lastPage.meta.totalPages) {
@@ -92,7 +92,7 @@ export const useActionRequiredDocumentsList = () => {
 
   const allDocuments = data?.pages.flatMap((page) => page.data) || [];
   const documents = Array.from(
-    new Map(allDocuments.map((item) => [item.id, item])).values()
+    new Map(allDocuments.map((item) => [item.id, item])).values(),
   );
 
   return {

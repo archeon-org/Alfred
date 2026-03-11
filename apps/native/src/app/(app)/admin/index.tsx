@@ -202,7 +202,7 @@ export default function AdminScreen() {
   const { data, isLoading, refetch, isFetching } = useUsers(
     page,
     20,
-    searchQuery
+    searchQuery,
   );
 
   const handleSearch = useCallback(() => {
@@ -227,7 +227,7 @@ export default function AdminScreen() {
         onPress={() => router.push(`/(app)/admin/user/${item.id}`)}
       />
     ),
-    [router]
+    [router],
   );
 
   return (

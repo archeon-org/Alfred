@@ -4,6 +4,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   UpdateDateColumn,
   CreateDateColumn,
@@ -27,9 +28,25 @@ export class TemplateCategoryEntity implements TemplateCategory {
   @Column({ type: "integer" })
   order: number;
 
+  @Column({ type: "integer", default: 1 })
+  level: number;
+
+  @Column({ nullable: true })
+  parentTemplateCategoryId?: string | null;
+
   @ManyToOne(() => TemplateEntity, (t) => t.categories, { onDelete: "CASCADE" })
   @JoinColumn({ name: "templateId" })
   template: TemplateEntity;
+
+  @ManyToOne(() => TemplateCategoryEntity, (cat) => cat.childCategories, {
+    nullable: true,
+    onDelete: "SET NULL",
+  })
+  @JoinColumn({ name: "parentTemplateCategoryId" })
+  parentCategory?: TemplateCategoryEntity | null;
+
+  @OneToMany(() => TemplateCategoryEntity, (cat) => cat.parentCategory)
+  childCategories?: TemplateCategoryEntity[];
 
   @CreateDateColumn()
   createdAt: Date;

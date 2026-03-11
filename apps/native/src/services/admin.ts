@@ -75,7 +75,7 @@ export interface SubscriptionStats {
 export const getUsers = async (
   page: number = 1,
   limit: number = 20,
-  search?: string
+  search?: string,
 ): Promise<UsersResponse> => {
   const params = new URLSearchParams({
     page: String(page),
@@ -85,7 +85,7 @@ export const getUsers = async (
     params.append("search", search);
   }
   const response = await api.get<UsersResponse>(
-    `/admin/users?${params.toString()}`
+    `/admin/users?${params.toString()}`,
   );
   return response.data;
 };
@@ -94,7 +94,7 @@ export const getUsers = async (
  * Get user details (admin only)
  */
 export const getUserDetails = async (
-  userId: string
+  userId: string,
 ): Promise<AdminUserDetails> => {
   const response = await api.get<AdminUserDetails>(`/admin/users/${userId}`);
   return response.data;
@@ -105,11 +105,11 @@ export const getUserDetails = async (
  */
 export const setUserTier = async (
   userId: string,
-  tier: SubscriptionTier
+  tier: SubscriptionTier,
 ): Promise<AdminUserDetails> => {
   const response = await api.post<AdminUserDetails>(
     `/admin/users/${userId}/upgrade-tier`,
-    { tier }
+    { tier },
   );
   return response.data;
 };
@@ -119,11 +119,11 @@ export const setUserTier = async (
  */
 export const addCreditPack = async (
   userId: string,
-  pack: CreditPack
+  pack: CreditPack,
 ): Promise<AdminUserDetails> => {
   const response = await api.post<AdminUserDetails>(
     `/admin/users/${userId}/add-credits`,
-    { pack }
+    { pack },
   );
   return response.data;
 };
@@ -135,11 +135,11 @@ export const addCustomCredits = async (
   userId: string,
   credits: number,
   bonusSearches: number = 0,
-  reason: string = "Admin adjustment"
+  reason: string = "Admin adjustment",
 ): Promise<AdminUserDetails> => {
   const response = await api.post<AdminUserDetails>(
     `/admin/users/${userId}/add-credits-custom`,
-    { credits, bonusSearches, reason }
+    { credits, bonusSearches, reason },
   );
   return response.data;
 };
@@ -150,11 +150,11 @@ export const addCustomCredits = async (
 export const addCustomBonusSearches = async (
   userId: string,
   bonusSearches: number,
-  reason: string = "Admin adjustment"
+  reason: string = "Admin adjustment",
 ): Promise<AdminUserDetails> => {
   const response = await api.post<AdminUserDetails>(
     `/admin/users/${userId}/set-bonus-searches`,
-    { bonusSearches, reason }
+    { bonusSearches, reason },
   );
   return response.data;
 };
@@ -164,11 +164,11 @@ export const addCustomBonusSearches = async (
  */
 export const setStoragePack = async (
   userId: string,
-  pack: StoragePack
+  pack: StoragePack,
 ): Promise<AdminUserDetails> => {
   const response = await api.post<AdminUserDetails>(
     `/admin/users/${userId}/set-storage`,
-    { pack }
+    { pack },
   );
   return response.data;
 };
@@ -179,11 +179,11 @@ export const setStoragePack = async (
 export const setCustomStorage = async (
   userId: string,
   storageGb: number,
-  reason: string = "Admin adjustment"
+  reason: string = "Admin adjustment",
 ): Promise<AdminUserDetails> => {
   const response = await api.post<AdminUserDetails>(
     `/admin/users/${userId}/set-storage-custom`,
-    { storageGb, reason }
+    { storageGb, reason },
   );
   return response.data;
 };
@@ -192,10 +192,10 @@ export const setCustomStorage = async (
  * Reset daily search usage for a user (admin only)
  */
 export const resetDailySearch = async (
-  userId: string
+  userId: string,
 ): Promise<AdminUserDetails> => {
   const response = await api.post<AdminUserDetails>(
-    `/admin/users/${userId}/reset-daily-search`
+    `/admin/users/${userId}/reset-daily-search`,
   );
   return response.data;
 };

@@ -66,10 +66,7 @@ class DocumentChunker:
                 )
             ]
 
-        if self.chunker:
-            chunks = self._chunk_with_chonkie(text)
-        else:
-            chunks = self._chunk_simple(text)
+        chunks = self._chunk_with_chonkie(text) if self.chunker else self._chunk_simple(text)
 
         total_chunks = len(chunks)
         result = []
@@ -90,7 +87,7 @@ class DocumentChunker:
             )
 
         logger.info(
-            f"\ud83e\udd9b Chonkie chunked document: {document_name}",
+            "Chonkie chunked document",
             extra={
                 "document_name": document_name,
                 "document_id": document_id,

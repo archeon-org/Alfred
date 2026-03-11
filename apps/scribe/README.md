@@ -4,7 +4,7 @@ A production-grade document processing microservice built with **FastAPI** and *
 
 - 📄 **OCR Text Extraction** - Mistral OCR for images and PDFs
 - 🤖 **AI Classification** - Document categorization using LLaMA via Fireworks AI
-- 🧠 **Knowledge Graph** - Graphiti-powered entity extraction and semantic search via Neo4j
+- 🧠 **Chunk RAG** - pgvector + PostgreSQL chunk indexing with citation-based retrieval
 - 📬 **Task Queue** - Redis-backed Celery for distributed processing
 
 ## Architecture
@@ -22,15 +22,15 @@ A production-grade document processing microservice built with **FastAPI** and *
 │  │  Worker 1   │  │  Worker 2   │  │  Worker N   │      │
 │  │ - OCR       │  │ - OCR       │  │ - OCR       │      │
 │  │ - Classify  │  │ - Classify  │  │ - Classify  │      │
-│  │ - GraphRAG  │  │ - GraphRAG  │  │ - GraphRAG  │      │
+│  │ - Chunk RAG │  │ - Chunk RAG │  │ - Chunk RAG │      │
 │  └─────────────┘  └─────────────┘  └─────────────┘      │
 └─────────────────────────────────────────────────────────┘
                        │
                        ▼
         ┌──────────────────────────────┐
-        │   PostgreSQL + Neo4j         │
-        │   - Documents (PostgreSQL)   │
-        │   - Knowledge Graph (Neo4j)  │
+        │          PostgreSQL          │
+        │   - Documents                │
+        │   - document_chunks (vector) │
         └──────────────────────────────┘
 ```
 
@@ -93,9 +93,6 @@ cp .env.example .env
 | `REDIS_HOST` | Redis host | `redis-archeon` |
 | `REDIS_PORT` | Redis port | `6379` |
 | `REDIS_PASSWORD` | Redis password | `RedisPassword123` |
-| `NEO4J_URI` | Neo4j bolt URI | `bolt://neo4j-archeon:7687` |
-| `NEO4J_USER` | Neo4j user | `neo4j` |
-| `NEO4J_PASSWORD` | Neo4j password | `archeon123` |
 | `FIREWORKS_API_KEY` | Fireworks AI API key | Required for AI features |
 | `MISTRAL_OCR_API_KEY` | Mistral OCR API key | Required for OCR |
 | `INTERNAL_API_KEY` | Gate ↔ Scribe auth | Must match Gate's key |
@@ -120,7 +117,7 @@ If you prefer running Scribe directly on your machine:
 
 - Python 3.11+
 - Mistral OCR API key
-- PostgreSQL, Redis, and Neo4j running (or via Docker)
+- PostgreSQL and Redis running (or via Docker)
 
 ### 2. Configure Mistral OCR
 
@@ -136,7 +133,7 @@ MISTRAL_OCR_MODEL=mistral-ocr-latest
 
 ```bash
 # From project root - start only databases
-docker-compose -f docker/docker-compose.local.yml up -d postgres-archeon redis-archeon neo4j-archeon
+docker-compose -f docker/docker-compose.local.yml up -d postgres-archeon redis-archeon
 ```
 
 ### 4. Create Virtual Environment
@@ -164,7 +161,6 @@ DATABASE_HOST=localhost
 DATABASE_PORT=5432
 REDIS_HOST=localhost
 REDIS_PORT=6378  # Note: Docker exposes Redis on 6378
-NEO4J_URI=bolt://localhost:7687
 ```
 
 ### 6. Run the Services
@@ -197,8 +193,6 @@ All configuration is done via environment variables. See `.env.example` for the 
 | `R2_ACCESS_KEY_ID` | R2 access key | Required |
 | `R2_SECRET_ACCESS_KEY` | R2 secret key | Required |
 | `WORKER_CONCURRENCY` | Celery worker concurrency | `2` |
-| `METRICS_PUSH_ENABLED` | Enable pushing worker metrics to Pushgateway | `true` |
-| `PUSHGATEWAY_URL` | Pushgateway address | `pushgateway:9091` |
 
 ## Celery Tasks
 
@@ -209,7 +203,7 @@ Full document processing pipeline:
 2. OCR text extraction
 3. AI classification (category, tags, title)
 4. Database update
-5. Knowledge graph ingestion (Graphiti)
+5. Queue chunk indexing in pgvector
 6. User notification
 
 ```python
@@ -235,19 +229,17 @@ generate_title.delay({
 })
 ```
 
-### Task: `ingest_document_to_graph`
+### Task: `index_document`
 
-Ingest document into Graphiti knowledge graph:
+Index document chunks into PostgreSQL pgvector:
 
 ```python
-from tasks.graphiti import ingest_document_to_graph
+from tasks.rag import index_document
 
-ingest_document_to_graph.delay({
+index_document.delay({
     "documentId": "uuid",
     "userId": "uuid",
-    "documentName": "Invoice from Acme",
-    "content": "extracted text content...",
-    "referenceTime": None  # Optional ISO datetime
+    "manualTrigger": False
 })
 ```
 
@@ -270,15 +262,6 @@ ingest_document_to_graph.delay({
 - ✅ **Secrets in environment** - No hardcoded credentials
 - ✅ **Connection pooling** - Efficient database connections
 - ✅ **Task acknowledgment** - Late ack for reliability
-
-## Monitoring
-
-Pushgateway metric pushes can be toggled at runtime:
-
-```bash
-METRICS_PUSH_ENABLED=true
-PUSHGATEWAY_URL=pushgateway:9091
-```
 
 ### Celery Flower (Optional)
 
@@ -441,7 +424,9 @@ The Gate service needs to be updated to use `celery-node` to send tasks to this 
 Task names used by Gate:
 - `scribe.tasks.document.process_document`
 - `scribe.tasks.document.generate_title`
-- `scribe.tasks.graphiti.ingest_document_to_graph`
+- `scribe.tasks.rag.index_document`
+- `scribe.tasks.rag.delete_document_index`
+- `scribe.tasks.rag.backfill_documents`
 
 ## Troubleshooting
 

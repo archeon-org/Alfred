@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { config } from 'dotenv';
 
 import templatesData from './templates.json';
@@ -22,6 +22,65 @@ const AppDataSource = new DataSource({
   synchronize: false,
 });
 
+type SeedCategory = {
+  name: string;
+  icon: string;
+  color: string;
+  order: number;
+  children?: SeedCategory[];
+};
+
+type SeedTag = {
+  name: string;
+  color: string;
+  order: number;
+};
+
+type SeedTemplate = {
+  name: string;
+  description: string;
+  icon: string;
+  order: number;
+  categories: SeedCategory[];
+  tags: SeedTag[];
+};
+
+const seedTemplates = templatesData as SeedTemplate[];
+
+const createTemplateCategories = async (
+  categoryRepo: Repository<TemplateCategoryEntity>,
+  template: TemplateEntity,
+  categories: SeedCategory[],
+) => {
+  const createNode = async (
+    category: SeedCategory,
+    parentTemplateCategoryId: string | null,
+    level: number,
+  ): Promise<void> => {
+    const createdCategory = categoryRepo.create({
+      name: category.name,
+      icon: category.icon,
+      color: category.color,
+      order: category.order,
+      level,
+      parentTemplateCategoryId,
+      template,
+    });
+
+    const savedCategory = await categoryRepo.save(createdCategory);
+
+    if (category.children?.length) {
+      for (const child of category.children.sort((a, b) => a.order - b.order)) {
+        await createNode(child, savedCategory.id, Math.min(level + 1, 2));
+      }
+    }
+  };
+
+  for (const rootCategory of categories.sort((a, b) => a.order - b.order)) {
+    await createNode(rootCategory, null, 1);
+  }
+};
+
 const seed = async () => {
   console.log('🌱 Connecting to Database...');
   await AppDataSource.initialize();
@@ -38,7 +97,7 @@ const seed = async () => {
   const existingTemplates = await templateRepo.find({
     relations: ['categories', 'tags'],
   });
-  const seedTemplateNames = templatesData.map((t) => t.name);
+  const seedTemplateNames = seedTemplates.map((t) => t.name);
 
   // 2. Remove templates that are not in the seed data
   const templatesToRemove = existingTemplates.filter(
@@ -52,7 +111,7 @@ const seed = async () => {
   }
 
   // 3. Create or Update templates
-  for (const tplData of templatesData) {
+  for (const tplData of seedTemplates) {
     let template = await templateRepo.findOne({
       where: { name: tplData.name },
       relations: ['categories', 'tags'],
@@ -68,10 +127,7 @@ const seed = async () => {
 
       // Reconcile Categories (Delete all and recreate for simplicity and consistency)
       await categoryRepo.delete({ template: { id: template.id } });
-      const categories = tplData.categories.map((c) =>
-        categoryRepo.create({ ...c, template }),
-      );
-      await categoryRepo.save(categories);
+      await createTemplateCategories(categoryRepo, template, tplData.categories);
 
       // Reconcile Tags (Delete all and recreate)
       await tagRepo.delete({ template: { id: template.id } });
@@ -88,10 +144,11 @@ const seed = async () => {
       });
       const savedTemplate = await templateRepo.save(template);
 
-      const categories = tplData.categories.map((c) =>
-        categoryRepo.create({ ...c, template: savedTemplate }),
+      await createTemplateCategories(
+        categoryRepo,
+        savedTemplate,
+        tplData.categories,
       );
-      await categoryRepo.save(categories);
 
       const tags = tplData.tags.map((t) =>
         tagRepo.create({ ...t, template: savedTemplate }),
