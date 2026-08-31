@@ -1,0 +1,45 @@
+[project]
+name = "alfred-agent"
+version = "0.1.0"
+description = "LangGraph application for Alfred agent orchestration."
+requires-python = ">=3.12"
+dependencies = [
+  "langchain-core>=0.3.74",
+  "langgraph>=0.6.6"
+]
+
+[dependency-groups]
+dev = [
+  "langgraph-cli[inmem]>=0.4.30",
+  "pip-audit>=2.9.0",
+  "pytest>=8.4.1",
+  "pytest-cov>=6.2.1",
+  "pyright>=1.1.403",
+  "ruff>=0.12.10"
+]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = [
+  "--strict-config",
+  "--strict-markers",
+  "--cov=alfred_agent",
+  "--cov-report=term-missing",
+  "--cov-fail-under=80"
+]

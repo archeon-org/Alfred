@@ -1,0 +1,50 @@
+{
+  "name": "@alfred/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Alfred React web application.",
+  "engines": {
+    "node": ">=22.12.0 <23",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "clean": "rm -rf coverage dist playwright-report test-results",
+    "dev": "vite --host 0.0.0.0",
+    "dev:e2e": "vite --host 127.0.0.1 --port 4173 --strictPort",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --max-warnings=0",
+    "preview": "vite preview --host 0.0.0.0 --port 4173 --strictPort",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:watch": "vitest",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.6",
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
+    "@vitest/coverage-v8": "^4.1.1",
+    "jsdom": "^30.0.1",
+    "typescript": "catalog:",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.1"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ]
+}

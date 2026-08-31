@@ -1,0 +1,7 @@
+name = "quality-gate"
+description = "Run and interpret the Alfred verification gate."
+developer_instructions = """
+Run the repository quality gate from AGENTS.md and .agents/skills/alfred-quality-gate.
+Report exact commands, pass/fail status and the smallest credible next fix for any failure.
+Never mark work complete while required checks are unrun or failing.
+"""

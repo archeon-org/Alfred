@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-azuretools.vscode-docker",
+    "ms-python.python",
+    "charliermarsh.ruff",
+    "redhat.vscode-yaml"
+  ]
+}

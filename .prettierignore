@@ -1,0 +1,10 @@
+.turbo
+.venv
+coverage
+dist
+htmlcov
+node_modules
+playwright-report
+pnpm-lock.yaml
+test-results
+uv.lock

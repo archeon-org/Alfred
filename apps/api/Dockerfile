@@ -1,0 +1,63 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:22.23.2-alpine3.23 AS tooling
+
+ENV HUSKY=0 \
+    PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+
+WORKDIR /workspace
+
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
+
+FROM tooling AS dependencies
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/package.json
+
+RUN --mount=type=cache,id=alfred-pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter @alfred/api...
+
+FROM dependencies AS build
+
+COPY tsconfig.base.json ./tsconfig.base.json
+COPY apps/api ./apps/api
+
+RUN pnpm --filter @alfred/api prisma:generate \
+    && pnpm --filter @alfred/api build
+
+FROM tooling AS production-dependencies
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/package.json
+COPY apps/api/prisma ./apps/api/prisma
+
+RUN --mount=type=cache,id=alfred-pnpm,target=/pnpm/store \
+    pnpm install --prod --frozen-lockfile --ignore-scripts --filter @alfred/api... \
+    && pnpm --filter @alfred/api prisma:generate
+
+FROM node:22.23.2-alpine3.23 AS runtime
+
+ENV API_HOST=0.0.0.0 \
+    API_PORT=3000 \
+    NODE_ENV=production
+
+WORKDIR /app/apps/api
+
+RUN addgroup --system --gid 10001 alfred \
+    && adduser --system --uid 10001 --ingroup alfred alfred
+
+COPY --from=production-dependencies --chown=alfred:alfred /workspace/node_modules /app/node_modules
+COPY --from=production-dependencies --chown=alfred:alfred /workspace/apps/api/package.json ./package.json
+COPY --from=production-dependencies --chown=alfred:alfred /workspace/apps/api/node_modules ./node_modules
+COPY --from=production-dependencies --chown=alfred:alfred /workspace/apps/api/prisma ./prisma
+COPY --from=build --chown=alfred:alfred /workspace/apps/api/dist ./dist
+
+USER alfred
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:3000/health/live || exit 1
+
+CMD ["node", "dist/main.js"]

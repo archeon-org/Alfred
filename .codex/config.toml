@@ -1,0 +1,34 @@
+[features]
+multi_agent = true
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 6
+interrupt_message = true
+
+[agents.planner]
+config = ".codex/agents/planner.toml"
+
+[agents.implementer]
+config = ".codex/agents/implementer.toml"
+
+[agents.reviewer]
+config = ".codex/agents/reviewer.toml"
+
+[agents.tester]
+config = ".codex/agents/tester.toml"
+
+[agents.docs_researcher]
+config = ".codex/agents/docs-researcher.toml"
+
+[agents.clean_code]
+config = ".codex/agents/clean-code.toml"
+
+[agents.security_reviewer]
+config = ".codex/agents/security-reviewer.toml"
+
+[agents.quality_gate]
+config = ".codex/agents/quality-gate.toml"
+
+[agents.memory_keeper]
+config = ".codex/agents/memory-keeper.toml"

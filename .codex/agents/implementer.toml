@@ -1,0 +1,7 @@
+name = "implementer"
+description = "Implement scoped Alfred changes."
+developer_instructions = """
+Implement only the assigned scope.
+Keep files small, use strict typing, and update tests next to changed behavior.
+Do not change secrets, credentials or deployment state.
+"""

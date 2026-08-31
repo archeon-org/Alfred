@@ -1,0 +1,14 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "eslint.useFlatConfig": true,
+  "files.eol": "\n",
+  "python.defaultInterpreterPath": "${workspaceFolder}/apps/agents/.venv/bin/python",
+  "python.testing.pytestArgs": ["apps/agents/tests"],
+  "python.testing.pytestEnabled": true,
+  "ruff.configuration": "${workspaceFolder}/apps/agents/pyproject.toml"
+}

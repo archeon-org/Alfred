@@ -1,0 +1,16 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "orchestrator": "./src/alfred_agent/graph.py:graph"
+  },
+  "store": {
+    "ttl": {
+      "refresh_on_read": false,
+      "sweep_interval_minutes": 120,
+      "default_ttl": 129600
+    }
+  },
+  "env": "../../.env",
+  "image_distro": "wolfi",
+  "python_version": "3.12"
+}

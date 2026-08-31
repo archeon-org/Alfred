@@ -1,0 +1,87 @@
+name: alfred
+
+services:
+  postgres:
+    build:
+      context: ./infra/postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-alfred_api}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-env}
+      POSTGRES_USER: ${POSTGRES_USER:-alfred}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-alfred} -d ${POSTGRES_DB:-alfred_api}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:5173}
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+      API_PREFIX: ${API_PREFIX:-api}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-alfred}:${POSTGRES_PASSWORD:-change-me-in-env}@postgres:5432/${POSTGRES_DB:-alfred_api}?schema=public
+      NODE_ENV: production
+    ports:
+      - '${API_PORT:-3000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+    ports:
+      - '${WEB_PORT:-5173}:8080'
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: ./apps/agent
+      dockerfile: Dockerfile.dev
+    environment:
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+    ports:
+      - '127.0.0.1:${AGENT_PORT:-2024}:2024'
+    volumes:
+      - agent-data:/app/.langgraph_api
+    init: true
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  agent-data:

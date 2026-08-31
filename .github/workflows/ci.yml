@@ -1,117 +1,106 @@
 name: CI
 
 on:
-  pull_request:
   push:
+    branches: [develop, main]
+  pull_request:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  HUSKY: '0'
+
 jobs:
-  style-gate:
-    name: Style (gate)
+  node:
+    name: TypeScript quality gate
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-      - name: Run ESLint
-        run: yarn --cwd apps/gate eslint "{src,test}/**/*.ts" --max-warnings=0
+    timeout-minutes: 20
 
-  style-native:
-    name: Style (native)
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-      - name: Run Prettier checks
-        run: >
-          yarn prettier --check
-          "apps/native/src/**/*.{ts,tsx}"
-          "apps/native/test/**/*.{ts,tsx}"
-          "apps/native/scripts/**/*.js"
-          "apps/native/*.js"
-          "apps/native/*.ts"
-          "apps/native/*.json"
 
-  style-scribe:
-    name: Style (scribe)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: pnpm/action-setup@v4
         with:
-          python-version: "3.11"
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
-      - name: Sync dependencies
-        run: cd apps/scribe && uv sync --frozen --extra dev
-      - name: Run Ruff format check
-        run: cd apps/scribe && uv run --frozen ruff format --check src tests
-      - name: Run Ruff lint
-        run: cd apps/scribe && uv run --frozen ruff check src tests
+          version: 10.33.0
 
-  test-gate:
-    name: Test (gate)
-    needs:
-      - style-gate
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: yarn
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-      - name: Run tests
-        run: yarn --cwd apps/gate test --runInBand
+          node-version-file: .node-version
+          cache: pnpm
 
-  test-native:
-    name: Test (native)
-    needs:
-      - style-native
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile
-      - name: Run tests
-        run: yarn --cwd apps/native test --runInBand
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @alfred/api prisma:generate
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test:coverage
+      - run: pnpm build
+      - run: pnpm format:check
+      - run: pnpm memory:check
 
-  test-scribe:
-    name: Test (scribe)
-    needs:
-      - style-scribe
+  agent:
+    name: LangGraph quality gate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/agent
+
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
+
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.11"
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v5
-      - name: Sync dependencies
-        run: cd apps/scribe && uv sync --frozen --extra dev
-      - name: Run tests
-        run: cd apps/scribe && PYTHONPATH=src uv run --frozen pytest -q
+          version: '0.10.9'
+          enable-cache: true
+
+      - run: uv sync --frozen
+      - run: uv run --frozen ruff check .
+      - run: uv run --frozen pyright
+      - run: uv run --frozen pytest -q
+
+  e2e:
+    name: Browser smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @alfred/web exec playwright install --with-deps
+      - run: pnpm test:e2e
+
+      - name: Upload browser artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
+
+  containers:
+    name: Container build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker compose config --quiet
+      - run: docker compose build

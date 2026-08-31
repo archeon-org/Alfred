@@ -1,0 +1,45 @@
+name: Security
+
+on:
+  pull_request:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HUSKY: '0'
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.10.9'
+
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --project apps/agent --frozen --all-groups
+      - name: Audit JavaScript dependencies
+        run: pnpm audit --audit-level high
+      - name: Audit Python dependencies
+        run: uv run --frozen --project apps/agent pip-audit
