@@ -11,6 +11,8 @@ Keep each change owned by one application whenever possible. The browser calls `
 
 1. Use the repository knowledge graph to locate the owning module and affected callers. Fall back to text search only when the graph lacks the needed config or literal.
 2. Add the smallest test that expresses the missing behavior and run it to capture a genuine failing result.
+   Place it in the owning app's external `test` tree and choose `unit`, `integration`, `contract`,
+   `architecture` or `e2e` according to the boundary being proved; never add tests under `src`.
 3. Implement the minimum production change that makes that test pass. Validate public inputs and environment variables at their boundary; never expose private values through `VITE_` variables.
 4. Refactor only after the focused test is green. Preserve immutable data transformations and the three application boundaries.
 5. Run the focused app checks, then use `alfred-quality-gate` before declaring the change complete.

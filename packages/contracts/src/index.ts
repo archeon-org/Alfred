@@ -1,6 +1,7 @@
 import { z } from 'zod/mini';
 
 const nonEmptyString = z.string().check(z.trim(), z.minLength(1));
+const authProviderId = z.string().check(z.regex(/^[a-z][a-z0-9-]*$/u), z.maxLength(64));
 
 export const userRoleSchema = z.enum(['admin', 'user']);
 export type UserRole = z.infer<typeof userRoleSchema>;
@@ -23,6 +24,15 @@ export const sessionDataSchema = z.readonly(
   }),
 );
 export type SessionData = z.infer<typeof sessionDataSchema>;
+
+export const authProviderSchema = z.readonly(
+  z.object({
+    displayName: nonEmptyString.check(z.maxLength(80)),
+    id: authProviderId,
+  }),
+);
+export type AuthProvider = z.infer<typeof authProviderSchema>;
+export const authProvidersSchema = z.readonly(z.array(authProviderSchema));
 
 export const FEATURE_FLAG_NAMES = Object.freeze([
   'agentRuntime',

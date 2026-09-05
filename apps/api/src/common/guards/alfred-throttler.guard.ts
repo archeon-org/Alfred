@@ -77,12 +77,12 @@ abstract class RouteIpThrottlerGuard extends NamedThrottlerGuard {
 }
 
 @Injectable()
-export class GoogleOauthStartThrottlerGuard extends RouteIpThrottlerGuard {
+export class OauthStartThrottlerGuard extends RouteIpThrottlerGuard {
   protected readonly throttlerName = 'oauth-start-ip';
 }
 
 @Injectable()
-export class GoogleOauthCallbackThrottlerGuard extends RouteIpThrottlerGuard {
+export class OauthCallbackThrottlerGuard extends RouteIpThrottlerGuard {
   protected readonly throttlerName = 'oauth-callback-ip';
 }
 

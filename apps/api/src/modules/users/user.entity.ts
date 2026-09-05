@@ -9,7 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import type { UserRole } from '../../common/auth/auth-principal';
-import { RefreshSessionEntity } from '../auth/entities/refresh-session.entity';
+import { RefreshSessionEntity } from '../auth/infrastructure/persistence/entities/refresh-session.entity';
 import { UserIdentityEntity } from './user-identity.entity';
 
 export type UserStatus = 'active' | 'disabled';

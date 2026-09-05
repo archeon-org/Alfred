@@ -1,9 +1,12 @@
 import type { PublicUser } from '@alfred/contracts';
-import type { UserEntity } from './user.entity';
 
 export type { PublicUser } from '@alfred/contracts';
 
-export function toPublicUser(user: UserEntity): PublicUser {
+type PresentableUser = Pick<PublicUser, 'displayName' | 'email' | 'id' | 'role'> & {
+  readonly avatarUrl: string | null;
+};
+
+export function toPublicUser(user: PresentableUser): PublicUser {
   return Object.freeze({
     ...(user.avatarUrl === null ? {} : { avatarUrl: user.avatarUrl }),
     displayName: user.displayName,

@@ -4,21 +4,25 @@ import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SameOriginGuard } from '../../common/guards/same-origin.guard';
 import {
-  GoogleOauthCallbackThrottlerGuard,
-  GoogleOauthStartThrottlerGuard,
+  OauthCallbackThrottlerGuard,
+  OauthStartThrottlerGuard,
   RefreshThrottlerGuard,
 } from '../../common/guards/alfred-throttler.guard';
 import { UsersModule } from '../users/users.module';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { OauthLoginStateEntity } from './entities/oauth-login-state.entity';
-import { RefreshSessionEntity } from './entities/refresh-session.entity';
-import { AuthCookieService } from './services/auth-cookie.service';
-import { GoogleOidcService } from './services/google-oidc.service';
-import { OauthStateService } from './services/oauth-state.service';
-import { RefreshSessionService } from './services/refresh-session.service';
-import { RefreshSessionCleanupService } from './services/refresh-session-cleanup.service';
-import { SessionTokenService } from './services/session-token.service';
+import { AuthController } from './api/auth.controller';
+import { AuthCookieService } from './api/cookies/auth-cookie.service';
+import { AuthService } from './application/auth.service';
+import { IdentityProviderRegistry } from './application/identity-provider.registry';
+import { IDENTITY_PROVIDERS, type IdentityProvider } from './domain/ports/identity-provider';
+import { OAUTH_STATE_PORT } from './domain/ports/oauth-state.port';
+import { SESSION_PORT } from './domain/ports/session.port';
+import { GoogleOidcService } from './infrastructure/identity/google-oidc.service';
+import { OauthLoginStateEntity } from './infrastructure/persistence/entities/oauth-login-state.entity';
+import { RefreshSessionEntity } from './infrastructure/persistence/entities/refresh-session.entity';
+import { OauthStateService } from './infrastructure/persistence/oauth-state.service';
+import { RefreshSessionCleanupService } from './infrastructure/persistence/refresh-session-cleanup.service';
+import { RefreshSessionService } from './infrastructure/persistence/refresh-session.service';
+import { SessionTokenService } from './infrastructure/security/session-token.service';
 
 @Module({
   imports: [
@@ -46,11 +50,20 @@ import { SessionTokenService } from './services/session-token.service';
     AuthCookieService,
     AuthService,
     GoogleOidcService,
-    GoogleOauthCallbackThrottlerGuard,
-    GoogleOauthStartThrottlerGuard,
+    {
+      provide: IDENTITY_PROVIDERS,
+      inject: [GoogleOidcService],
+      useFactory: (google: GoogleOidcService): readonly IdentityProvider[] =>
+        Object.freeze([google]),
+    },
+    IdentityProviderRegistry,
+    OauthCallbackThrottlerGuard,
+    OauthStartThrottlerGuard,
     OauthStateService,
+    { provide: OAUTH_STATE_PORT, useExisting: OauthStateService },
     RefreshSessionCleanupService,
     RefreshSessionService,
+    { provide: SESSION_PORT, useExisting: RefreshSessionService },
     RefreshThrottlerGuard,
     SameOriginGuard,
     SessionTokenService,

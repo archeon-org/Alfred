@@ -24,6 +24,12 @@ Work only in `apps/api` plus directly related contracts and documentation.
   exception details.
 - Keep AG-UI transport behind the stream module; do not invent a streaming implementation before its
   contract is requested.
+- Structure substantial feature modules as `api`, `application`, `domain` and `infrastructure`.
+  Keep controllers/DTOs in `api`, orchestration in `application`, pure rules and ports in `domain`,
+  and TypeORM/JWT/remote clients in `infrastructure`; the module file is the composition root.
+- Keep every test outside `src`, under `test/unit`, `test/integration`, `test/contract`,
+  `test/architecture`, `test/e2e` or `test/support`. Unit paths mirror the source responsibility
+  they exercise; E2E uses its dedicated runner configuration.
 
 ## Delivery
 

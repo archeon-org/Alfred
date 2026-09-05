@@ -22,3 +22,5 @@ Use this skill when adding or changing platform structure.
 3. Treat the API as the boundary between UI and backend persistence.
 4. Prefer explicit env variables over implicit local defaults.
 5. Add an ADR when a structural decision changes.
+6. Apply ADR 0009: responsibility-visible React layers, four-layer NestJS feature internals and
+   external test suites with executable topology checks.

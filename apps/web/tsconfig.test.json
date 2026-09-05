@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "jsx": "react-jsx",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.test.tsbuildinfo",
+    "types": ["node", "vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src", "test"]
+}

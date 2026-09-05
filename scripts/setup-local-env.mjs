@@ -34,6 +34,8 @@ const managedSecretKeys = new Set([
   'GOOGLE_OAUTH_CLIENT_SECRET',
 ]);
 const placeholderFragments = ['change-me', 'changeme', 'placeholder', 'replace-with'];
+const legacyGoogleCallbackUrl = 'http://localhost:3000/api/auth/google/callback';
+const defaultGoogleCallbackUrl = 'http://localhost:3000/api/auth/providers/google/callback';
 
 function parseEnvironmentFile(content) {
   return Object.fromEntries(
@@ -106,6 +108,9 @@ function shouldReplaceManagedValue(key, value, expectedValue) {
   if (value.trim() === '') return expectedValue.trim() !== '';
   if (managedSecretKeys.has(key)) return !isUsableSecret(value);
   if (key === 'GOOGLE_OAUTH_CLIENT_ID') return !isConfiguredValue(value);
+  if (key === 'GOOGLE_OAUTH_CALLBACK_URL') {
+    return value === legacyGoogleCallbackUrl && value !== expectedValue;
+  }
   if (expectedValue.trim() === '') return false;
   if (key === 'DATABASE_URL' || key === 'REDIS_URL') {
     return !hasExpectedRuntimeLocation(value, expectedValue);
@@ -249,17 +254,21 @@ const secrets = Object.freeze({
   metrics: firstUsableSecret('OBSERVABILITY_METRICS_TOKEN', environments),
 });
 
+const configuredGoogleCallbackUrl = firstNonEmptyValue(
+  'GOOGLE_OAUTH_CALLBACK_URL',
+  environments,
+  defaultGoogleCallbackUrl,
+);
 const google = Object.freeze({
   clientId: firstNonEmptyValue('GOOGLE_OAUTH_CLIENT_ID', environments),
   clientSecret:
     environments
       .map((environment) => environment.GOOGLE_OAUTH_CLIENT_SECRET)
       .find(isUsableSecret) ?? '',
-  callbackUrl: firstNonEmptyValue(
-    'GOOGLE_OAUTH_CALLBACK_URL',
-    environments,
-    'http://localhost:3000/api/auth/google/callback',
-  ),
+  callbackUrl:
+    configuredGoogleCallbackUrl === legacyGoogleCallbackUrl
+      ? defaultGoogleCallbackUrl
+      : configuredGoogleCallbackUrl,
   workspaceDomain: firstNonEmptyValue('GOOGLE_WORKSPACE_DOMAIN', environments),
 });
 
@@ -303,6 +312,7 @@ const rootContent = renderEnvironment([
   `REDIS_API_PASSWORD=${secrets.apiRedis}`,
   `AGENT_REDIS_PASSWORD=${secrets.agentRedis}`,
   `REDIS_PORT=${ports.redis}`,
+  `REDIS_URL=redis://default:${secrets.apiRedis}@localhost:${ports.redis}/0`,
   '',
   '# NestJS and browser session',
   `API_PORT=${ports.api}`,
@@ -421,6 +431,7 @@ await Promise.all([
 
 await Promise.all([
   synchronizeEnvironmentContract(envPaths.root, [
+    ['NODE_ENV', 'development'],
     ['POSTGRES_USER', firstValue('POSTGRES_USER', environments, 'alfred')],
     ['POSTGRES_PASSWORD', secrets.postgres],
     ['MIGRATOR_DATABASE_PASSWORD', secrets.migratorDatabase],
@@ -428,6 +439,7 @@ await Promise.all([
     ['AGENT_DATABASE_PASSWORD', secrets.agentDatabase],
     ['REDIS_API_PASSWORD', secrets.apiRedis],
     ['AGENT_REDIS_PASSWORD', secrets.agentRedis],
+    ['REDIS_URL', `redis://default:${secrets.apiRedis}@localhost:${ports.redis}/0`],
     ['AUTH_JWT_SECRET', secrets.jwt],
     ['AUTH_SESSION_CLEANUP_INTERVAL_SECONDS', '3600'],
     ['AUTH_SESSION_RETENTION_SECONDS', '2592000'],

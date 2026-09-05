@@ -23,7 +23,7 @@ pnpm setup:env
 Docker Compose interpolates the root `.env`; `apps/api/.env` is loaded by `pnpm dev:api`. After
 editing only `apps/api/.env`, run `pnpm setup:env` so missing Google settings are synchronized to the
 root file. For the local Google web client, authorize `http://localhost:5173` as a JavaScript origin
-and `http://localhost:3000/api/auth/google/callback` as the redirect URI.
+and `http://localhost:3000/api/auth/providers/google/callback` as the redirect URI.
 
 `.env` is ignored by Git. Do not put credentials in `.env.example` or Docker build arguments.
 
