@@ -46,6 +46,20 @@ Route delegated work by ownership:
 
 Give coding agents disjoint write scopes. A reviewer must not silently rewrite implementation, and a quality gate must report failures rather than weakening checks.
 
+## User-Facing Explanatory Documents
+
+- Write user-facing explanations, beginner guides, walkthroughs and learning reports as Markdown
+  files under the repository-root `tmp/` directory (lowercase). Create it if it does not exist.
+- Use the user's requested language and knowledge level. Prefer clear examples and useful diagrams;
+  distinguish implemented behavior from proposals and unverified capabilities.
+- Keep `tmp/` ignored by Git and verify generated files with `git check-ignore`. Never force-add
+  these files. Ignored files are not encrypted; do not include secrets or sensitive personal data.
+- Reply in chat with a short summary and a link to the explanatory file. Follow an explicit request
+  for another location or format, including an answer directly in chat.
+- Keep canonical team documentation, ADRs, runbooks and neutral agent memory in their existing
+  tracked locations. Do not move or overwrite them to produce a user-facing explanation, and do
+  not duplicate that explanation in the memory bank.
+
 ## Memory Bank Protocol
 
 - Read the memory bank before substantial repository work, starting with `docs/memory-bank/index.json`, then the indexed project, architecture, decisions, active-context and progress documents.
