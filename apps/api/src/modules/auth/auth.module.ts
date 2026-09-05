@@ -3,6 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SameOriginGuard } from '../../common/guards/same-origin.guard';
+import {
+  GoogleOauthCallbackThrottlerGuard,
+  GoogleOauthStartThrottlerGuard,
+  RefreshThrottlerGuard,
+} from '../../common/guards/alfred-throttler.guard';
 import { UsersModule } from '../users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -41,9 +46,12 @@ import { SessionTokenService } from './services/session-token.service';
     AuthCookieService,
     AuthService,
     GoogleOidcService,
+    GoogleOauthCallbackThrottlerGuard,
+    GoogleOauthStartThrottlerGuard,
     OauthStateService,
     RefreshSessionCleanupService,
     RefreshSessionService,
+    RefreshThrottlerGuard,
     SameOriginGuard,
     SessionTokenService,
   ],

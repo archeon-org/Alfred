@@ -32,6 +32,7 @@ describe('entity schema contract', () => {
     ).toEqual([
       'idx_refresh_sessions_expiry',
       'idx_refresh_sessions_family',
+      'idx_refresh_sessions_replacement',
       'idx_refresh_sessions_user',
       'uq_refresh_sessions_token_hash',
     ]);

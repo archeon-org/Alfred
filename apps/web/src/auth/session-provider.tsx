@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from
 
 import { logoutSession, refreshSession, type SessionData } from './auth-api';
 import { SessionContext, type SessionContextValue } from './session-context';
+import { coordinateSessionRefresh } from './session-refresh-coordinator';
 
 type SessionState = Pick<SessionContextValue, 'accessToken' | 'status' | 'user'>;
 
@@ -14,6 +15,12 @@ const anonymousSession: SessionState = Object.freeze({
 const loadingSession: SessionState = Object.freeze({
   accessToken: null,
   status: 'loading',
+  user: null,
+});
+
+const unavailableSession: SessionState = Object.freeze({
+  accessToken: null,
+  status: 'error',
   user: null,
 });
 
@@ -36,16 +43,16 @@ export function SessionProvider({ children }: PropsWithChildren) {
     revision.current = requestRevision;
 
     try {
-      const refreshed = await refreshSession();
+      const refreshed = await coordinateSessionRefresh(refreshSession);
       if (mounted.current && revision.current === requestRevision) {
         setSession(refreshed === null ? anonymousSession : authenticatedSession(refreshed));
       }
       return refreshed;
-    } catch {
+    } catch (error) {
       if (mounted.current && revision.current === requestRevision) {
-        setSession(anonymousSession);
+        setSession(unavailableSession);
       }
-      return null;
+      throw error;
     }
   }, []);
 
@@ -56,11 +63,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     const request = performRefresh();
     inFlightRefresh.current = request;
-    void request.finally(() => {
+    const clearRequest = () => {
       if (inFlightRefresh.current === request) {
         inFlightRefresh.current = null;
       }
-    });
+    };
+    void request.then(clearRequest, clearRequest);
     return request;
   }, [performRefresh]);
 
@@ -76,7 +84,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     mounted.current = true;
-    void refresh();
+    void refresh().catch(() => undefined);
 
     return () => {
       mounted.current = false;

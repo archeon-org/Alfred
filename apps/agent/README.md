@@ -11,6 +11,7 @@ runtime boundary, not a second application backend.
   its dedicated Redis instance.
 - Runtime memory is scoped by trusted user and conversation identity, bounded, redacted, TTL-based
   and explicitly deletable. Recent recall uses a bounded recency index rather than a namespace scan.
+
 ## Deliberately deferred
 
 The graph is still a tested foundation. Product tools, the Enterprise agent library adapter, AG-UI event

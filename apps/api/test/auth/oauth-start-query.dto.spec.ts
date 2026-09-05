@@ -15,5 +15,6 @@ describe('OauthStartQueryDto', () => {
     await expect(isValidReturnTo('https://attacker.example/path')).resolves.toBe(false);
     await expect(isValidReturnTo('//attacker.example/path')).resolves.toBe(false);
     await expect(isValidReturnTo('/\\attacker.example/path')).resolves.toBe(false);
+    await expect(isValidReturnTo('/\t//attacker.example/path')).resolves.toBe(false);
   });
 });

@@ -3,11 +3,13 @@ import { ConfigModule } from '@nestjs/config';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { APP_FILTER } from '@nestjs/core';
-import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
-import { AlfredThrottlerGuard } from './common/guards/alfred-throttler.guard';
+import {
+  AuthenticatedThrottlerGuard,
+  IpThrottlerGuard,
+} from './common/guards/alfred-throttler.guard';
 import { AccessTokenGuard } from './common/guards/access-token.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { validateEnv } from './config/configuration';
@@ -21,8 +23,42 @@ import { HealthModule } from './modules/health/health.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { StreamModule } from './modules/stream/stream.module';
 import { UsersModule } from './modules/users/users.module';
-import { HttpObservabilityInterceptor } from './observability/http-observability.interceptor';
 import { ObservabilityModule } from './observability/observability.module';
+
+const THROTTLE_WINDOW_MS = 60_000;
+
+export function createThrottlerOptions(storage: RedisThrottlerStorage, config: ConfigService) {
+  return {
+    storage,
+    throttlers: [
+      {
+        limit: config.getOrThrow<number>('AUTH_IP_RATE_LIMIT_PER_MINUTE'),
+        name: 'ip',
+        ttl: THROTTLE_WINDOW_MS,
+      },
+      {
+        limit: config.getOrThrow<number>('AUTH_USER_RATE_LIMIT_PER_MINUTE'),
+        name: 'authenticated',
+        ttl: THROTTLE_WINDOW_MS,
+      },
+      {
+        limit: config.getOrThrow<number>('AUTH_OAUTH_START_IP_RATE_LIMIT_PER_MINUTE'),
+        name: 'oauth-start-ip',
+        ttl: THROTTLE_WINDOW_MS,
+      },
+      {
+        limit: config.getOrThrow<number>('AUTH_OAUTH_CALLBACK_IP_RATE_LIMIT_PER_MINUTE'),
+        name: 'oauth-callback-ip',
+        ttl: THROTTLE_WINDOW_MS,
+      },
+      {
+        limit: config.getOrThrow<number>('AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE'),
+        name: 'refresh-ip',
+        ttl: THROTTLE_WINDOW_MS,
+      },
+    ],
+  };
+}
 
 @Module({
   imports: [
@@ -34,11 +70,8 @@ import { ObservabilityModule } from './observability/observability.module';
     ObservabilityModule,
     ThrottlerModule.forRootAsync({
       imports: [RedisModule],
-      inject: [RedisThrottlerStorage],
-      useFactory: (storage: RedisThrottlerStorage) => ({
-        storage,
-        throttlers: [{ limit: 120, ttl: 60_000 }],
-      }),
+      inject: [RedisThrottlerStorage, ConfigService],
+      useFactory: createThrottlerOptions,
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -54,10 +87,10 @@ import { ObservabilityModule } from './observability/observability.module';
   providers: [
     { provide: APP_FILTER, useClass: ApiExceptionFilter },
     { provide: APP_GUARD, useClass: FeatureFlagGuard },
+    { provide: APP_GUARD, useClass: IpThrottlerGuard },
     { provide: APP_GUARD, useClass: AccessTokenGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
-    { provide: APP_GUARD, useClass: AlfredThrottlerGuard },
-    { provide: APP_INTERCEPTOR, useClass: HttpObservabilityInterceptor },
+    { provide: APP_GUARD, useClass: AuthenticatedThrottlerGuard },
   ],
 })
 export class AppModule {}

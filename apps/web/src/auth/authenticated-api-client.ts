@@ -27,9 +27,10 @@ export function createAuthenticatedApiClient(
     if (inFlightRefresh !== null) return inFlightRefresh;
     const request = options.refresh();
     inFlightRefresh = request;
-    void request.finally(() => {
+    const clearRequest = () => {
       if (inFlightRefresh === request) inFlightRefresh = null;
-    });
+    };
+    void request.then(clearRequest, clearRequest);
     return request;
   };
 

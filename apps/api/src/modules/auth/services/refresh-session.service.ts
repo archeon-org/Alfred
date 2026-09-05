@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DataSource } from 'typeorm';
+import { DataSource, type EntityManager, type FindOptionsSelect, type Repository } from 'typeorm';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import type { PublicUser } from '../../users/user.presenter';
 import { toPublicUser } from '../../users/user.presenter';
@@ -23,6 +23,11 @@ type RotationOutcome =
       readonly refreshToken: string;
       readonly user: UserEntity;
     };
+
+interface LockedRefreshSession {
+  readonly repository: Repository<RefreshSessionEntity>;
+  readonly session: RefreshSessionEntity;
+}
 
 @Injectable()
 export class RefreshSessionService {
@@ -63,14 +68,9 @@ export class RefreshSessionService {
     const now = new Date();
 
     const outcome = await this.dataSource.transaction<RotationOutcome>(async (manager) => {
-      const repository = manager.getRepository(RefreshSessionEntity);
-      const current = await repository.findOne({
-        where: { tokenHash },
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (current === null) {
-        return { kind: 'invalid' };
-      }
+      const locked = await this.lockRefreshSession(manager, tokenHash);
+      if (locked === null) return { kind: 'invalid' };
+      const { repository, session: current } = locked;
 
       if (current.rotatedAt !== null) {
         await repository.update({ familyId: current.familyId }, { revokedAt: now });
@@ -123,16 +123,37 @@ export class RefreshSessionService {
     if (rawToken === undefined) return;
     const tokenHash = this.tokens.hashRefreshToken(rawToken);
     await this.dataSource.transaction(async (manager) => {
-      const repository = manager.getRepository(RefreshSessionEntity);
-      const session = await repository.findOne({
+      const locked = await this.lockRefreshSession(manager, tokenHash, {
         select: { familyId: true, id: true },
-        where: { tokenHash },
-        lock: { mode: 'pessimistic_write' },
       });
-      if (session !== null) {
-        await repository.update({ familyId: session.familyId }, { revokedAt: new Date() });
-      }
+      if (locked === null) return;
+      await locked.repository.update(
+        { familyId: locked.session.familyId },
+        { revokedAt: new Date() },
+      );
     });
+  }
+
+  private async lockRefreshSession(
+    manager: EntityManager,
+    tokenHash: string,
+    options: { readonly select?: FindOptionsSelect<RefreshSessionEntity> } = {},
+  ): Promise<LockedRefreshSession | null> {
+    const repository = manager.getRepository(RefreshSessionEntity);
+    const lookup = await repository.findOne({
+      ...(options.select === undefined ? {} : { select: options.select }),
+      where: { tokenHash },
+    });
+    if (lookup === null) return null;
+
+    await manager.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [lookup.familyId]);
+    const session = await repository.findOne({
+      lock: { mode: 'pessimistic_write' },
+      ...(options.select === undefined ? {} : { select: options.select }),
+      where: { id: lookup.id },
+    });
+
+    return session === null ? null : { repository, session };
   }
 
   private buildIssuedSession(

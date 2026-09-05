@@ -204,6 +204,7 @@ SQL
 
 protect_agent_extension_schema() {
   psql --username "$POSTGRES_USER" --dbname alfred_langgraph --set=ON_ERROR_STOP=1 \
+    --set=agent_role=alfred_agent \
     --set=bootstrap_role="$POSTGRES_USER" <<'SQL'
 BEGIN;
 SELECT pg_advisory_xact_lock(
@@ -219,13 +220,17 @@ SELECT format(
 )
 FROM pg_namespace AS namespace
 CROSS JOIN LATERAL aclexplode(namespace.nspacl) AS privilege
-LEFT JOIN pg_roles AS grantee ON grantee.oid = privilege.grantee
+JOIN pg_roles AS grantee ON grantee.oid = privilege.grantee
 WHERE namespace.nspname = 'public'
+  -- OID 0 is the pseudo-role PUBLIC and has no pg_roles row. Its privileges are revoked by the
+  -- explicit statement below instead of being formatted as a nullable SQL identifier here.
+  AND privilege.grantee <> 0
   AND privilege.grantee <> namespace.nspowner
 GROUP BY namespace.nspname, grantee.rolname
 \gexec
 
 REVOKE ALL PRIVILEGES ON SCHEMA public FROM PUBLIC CASCADE;
+GRANT USAGE, CREATE ON SCHEMA public TO :"agent_role";
 COMMIT;
 SQL
 }
@@ -325,18 +330,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE :"migration_role" IN SCHEMA public
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO :"runtime_role";
 ALTER DEFAULT PRIVILEGES FOR ROLE :"migration_role" IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO :"runtime_role";
-
--- The runtime can mutate application tables, but never TypeORM's migration ledger. This command
--- becomes effective after the one-shot migration job creates the ledger and this script is rerun
--- by postgres-runtime-grants.
-SELECT format(
-  'REVOKE ALL PRIVILEGES ON TABLE %I.%I FROM %I',
-  'public',
-  'migrations',
-  :'runtime_role'
-)
-WHERE to_regclass('public.migrations') IS NOT NULL
-\gexec
 SQL
 }
 

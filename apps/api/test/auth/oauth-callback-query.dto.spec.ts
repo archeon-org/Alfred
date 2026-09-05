@@ -38,6 +38,30 @@ describe('OauthCallbackQueryDto', () => {
     ).resolves.toEqual([]);
   });
 
+  it('rejects callbacks that contain both a code and an authorization error', async () => {
+    const errors = await validateCallback({
+      code: 'authorization-code',
+      error: 'access_denied',
+      state: googleCallback.state,
+    });
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.property).toBe('state');
+    expect(errors[0]?.constraints).toEqual({
+      oauthCallbackOutcome: 'OAuth callback must contain exactly one of code or error',
+    });
+  });
+
+  it('rejects callbacks that contain neither a code nor an authorization error', async () => {
+    const errors = await validateCallback({ state: googleCallback.state });
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.property).toBe('state');
+    expect(errors[0]?.constraints).toEqual({
+      oauthCallbackOutcome: 'OAuth callback must contain exactly one of code or error',
+    });
+  });
+
   it('rejects oversized untrusted callback metadata', async () => {
     const errors = await validateCallback({
       error: 'access_denied',

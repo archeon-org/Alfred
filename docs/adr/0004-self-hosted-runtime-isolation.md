@@ -14,15 +14,21 @@ upgrade without destructive recreation.
 - Docker Compose keeps web, API and LangGraph as separate application containers. The base file runs
   the in-memory LangGraph development server; an explicit overlay selects standalone Agent Server.
 - A repeatable `postgres-bootstrap` job creates logical databases, required extensions and restricted
-  login roles on both fresh and retained PostgreSQL volumes.
+  login roles on both fresh and retained PostgreSQL volumes. PostgreSQL uses the pinned pgvector
+  distribution so the standalone Agent Server extension contract is available without runtime
+  installation.
 - `alfred_migrator` owns the API/blob/test schemas and is available only to migration jobs.
   `alfred_api` can connect only to those databases with DML privileges and no schema creation
   right. `alfred_agent` can connect only to `alfred_langgraph`. Application containers never
-  receive the PostgreSQL bootstrap or migration credential.
+  receive the PostgreSQL bootstrap or migration credential. A post-migration one-shot job revokes
+  runtime DML on the TypeORM migration ledger before API replicas start.
 - API Redis and Agent Server Redis are separate password-protected instances on separate internal
   networks. Docker's Redis database number is not treated as an authorization boundary.
-- Published development ports bind to loopback. Application containers run without root, drop Linux
-  capabilities and use read-only filesystems where the runtime contract has been verified.
+- Published development ports bind to loopback. The production-like overlay removes API, Agent
+  Server, PostgreSQL and Redis host publication, keeps data services on internal networks, isolates
+  Agent Server from the web/API network, forces runtime feature flags off until service
+  authentication exists and disables vendor tracing. Application containers run without root, drop
+  Linux capabilities and use read-only filesystems where the runtime contract has been verified.
 - Deployable base images are pinned by digest. A production platform must mirror and scan them in the
   Enterprise-approved registry before promotion.
 

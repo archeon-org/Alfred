@@ -1,4 +1,9 @@
-import { BadRequestException, type ArgumentsHost, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  type ArgumentsHost,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -40,6 +45,31 @@ describe('ApiExceptionFilter', () => {
     expect(JSON.stringify(json.mock.calls)).not.toContain('secret-user');
     expect(json).toHaveBeenCalledWith({
       error: { code: 'HTTP_500', message: 'Internal server error' },
+      success: false,
+    });
+  });
+
+  it('returns bounded readiness statuses without logging an expected dependency outage as unhandled', () => {
+    const { host, json, status } = responseHost();
+    const filter = new ApiExceptionFilter();
+    const log = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+    filter.catch(
+      new ServiceUnavailableException({
+        details: { database: { status: 'up' }, redis: { status: 'down' } },
+        status: 'error',
+      }),
+      host,
+    );
+
+    expect(status).toHaveBeenCalledWith(503);
+    expect(log).not.toHaveBeenCalled();
+    expect(json).toHaveBeenCalledWith({
+      error: {
+        code: 'HTTP_503',
+        details: { database: { status: 'up' }, redis: { status: 'down' } },
+        message: 'Internal server error',
+      },
       success: false,
     });
   });

@@ -20,7 +20,11 @@ services:
       - api-data
       - host-access
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready --username "$${POSTGRES_USER}" --dbname postgres']
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready --host 127.0.0.1 --username "$${POSTGRES_USER}" --dbname postgres',
+        ]
       interval: 5s
       timeout: 5s
       retries: 12
@@ -96,14 +100,11 @@ services:
       target: runtime
     command: ['node', 'dist/database/run-migrations.js']
     environment:
-      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
-      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Set AUTH_JWT_SECRET to at least 32 characters}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
       DATABASE_SSL: ${DATABASE_SSL:-false}
       DATABASE_URL: postgresql://alfred_migrator:${MIGRATOR_DATABASE_PASSWORD:?Set MIGRATOR_DATABASE_PASSWORD in .env}@postgres:5432/alfred_app?schema=public
       HOME: /tmp
       NODE_ENV: development
-      WEB_APP_URL: ${WEB_APP_URL:-http://localhost:5173}
     depends_on:
       postgres-bootstrap:
         condition: service_completed_successfully
@@ -122,6 +123,32 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  postgres-runtime-grants:
+    build:
+      context: ./infra/postgres
+    entrypoint: ['/bin/sh', '-ec']
+    command: ['/usr/local/bin/revoke-runtime-migration-ledger.sh']
+    environment:
+      PGHOST: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    networks:
+      - api-data
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: postgres
+    restart: 'no'
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
   api:
     build:
       context: .
@@ -133,12 +160,17 @@ services:
       API_PREFIX: ${API_PREFIX:-api}
       AUTH_ACCESS_TOKEN_TTL_SECONDS: ${AUTH_ACCESS_TOKEN_TTL_SECONDS:-300}
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_IP_RATE_LIMIT_PER_MINUTE: ${AUTH_IP_RATE_LIMIT_PER_MINUTE:-6000}
+      AUTH_OAUTH_START_IP_RATE_LIMIT_PER_MINUTE: ${AUTH_OAUTH_START_IP_RATE_LIMIT_PER_MINUTE:-300}
+      AUTH_OAUTH_CALLBACK_IP_RATE_LIMIT_PER_MINUTE: ${AUTH_OAUTH_CALLBACK_IP_RATE_LIMIT_PER_MINUTE:-600}
+      AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE: ${AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE:-1200}
       AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-alfred-web}
       AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:-alfred-api}
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Set AUTH_JWT_SECRET to at least 32 characters}
       AUTH_REFRESH_TOKEN_TTL_SECONDS: ${AUTH_REFRESH_TOKEN_TTL_SECONDS:-2592000}
       AUTH_SESSION_CLEANUP_INTERVAL_SECONDS: ${AUTH_SESSION_CLEANUP_INTERVAL_SECONDS:-3600}
-      AUTH_SESSION_RETENTION_SECONDS: ${AUTH_SESSION_RETENTION_SECONDS:-604800}
+      AUTH_SESSION_RETENTION_SECONDS: ${AUTH_SESSION_RETENTION_SECONDS:-2592000}
+      AUTH_USER_RATE_LIMIT_PER_MINUTE: ${AUTH_USER_RATE_LIMIT_PER_MINUTE:-120}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
       DATABASE_SSL: ${DATABASE_SSL:-false}
       DATABASE_URL: postgresql://alfred_api:${API_DATABASE_PASSWORD:?Set API_DATABASE_PASSWORD in .env}@postgres:5432/alfred_app?schema=public
@@ -165,7 +197,7 @@ services:
     ports:
       - '127.0.0.1:${API_PORT:-3000}:3000'
     depends_on:
-      migrate:
+      postgres-runtime-grants:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy

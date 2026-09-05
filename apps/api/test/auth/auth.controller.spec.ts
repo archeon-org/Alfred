@@ -1,4 +1,5 @@
 import { HttpStatus, UnauthorizedException } from '@nestjs/common';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import type { Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -68,6 +69,24 @@ describe('AuthController', () => {
     expect(Reflect.getMetadata(REQUIRED_FEATURE_FLAGS_KEY, callbackHandler)).toEqual([
       'googleOAuth',
     ]);
+  });
+
+  it('applies independent NAT-tolerant IP buckets to sensitive public routes', () => {
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const startHandler = AuthController.prototype.startGoogleLogin;
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const callbackHandler = AuthController.prototype.completeGoogleLogin;
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const refreshHandler = AuthController.prototype.refresh;
+
+    const guardNames = (handler: object): readonly string[] =>
+      (Reflect.getMetadata(GUARDS_METADATA, handler) as readonly { readonly name: string }[]).map(
+        ({ name }) => name,
+      );
+
+    expect(guardNames(startHandler)).toEqual(['GoogleOauthStartThrottlerGuard']);
+    expect(guardNames(callbackHandler)).toEqual(['GoogleOauthCallbackThrottlerGuard']);
+    expect(guardNames(refreshHandler)).toEqual(['SameOriginGuard', 'RefreshThrottlerGuard']);
   });
 
   it('sets the OAuth state cookie before redirecting to Google', async () => {

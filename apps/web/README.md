@@ -7,8 +7,9 @@ React 19 and Vite 8 browser application for the Alfred workspace.
 - React Router exposes the public `/login` and `/auth/callback` routes and protects `/app`.
 - `SessionProvider` restores the session with `POST /auth/refresh` and keeps the short-lived access
   token in React memory only. The refresh cookie is sent with `credentials: include`.
-- The authenticated API client accepts only same-origin relative paths, deduplicates concurrent
-  refreshes and retries safe reads once. Mutations are never replayed implicitly.
+- The authenticated API client accepts only same-origin relative paths, serializes refreshes across
+  tabs with Web Locks and retries safe reads once. Tokens are never persisted or broadcast, and
+  mutations are never replayed implicitly.
 - Google login is displayed only when the public `GET /features` manifest reports
   `googleOAuth=true`. OAuth starts through the API at `/auth/google/start`; the backend feature guard
   rejects that route when disabled, and no provider secret or client credential is embedded in the
@@ -29,9 +30,13 @@ React 19 and Vite 8 browser application for the Alfred workspace.
 - `pnpm --filter @alfred/web test:e2e` runs the Playwright browser suite.
 - `docker build -f apps/web/Dockerfile .` builds the unprivileged Nginx image.
 
+Playwright serves a fresh production build through Vite preview, so its session/StrictMode timing
+matches the shipped bundle rather than the development-only effect replay.
+
 Only variables prefixed with `VITE_` are exposed to browser code. They must never contain secrets.
 
-`VITE_API_URL` is a public API base URL. When omitted, browser requests use `/api`: the Vite
-development server proxies that path to `ALFRED_DEV_API_PROXY_TARGET` (default
-`http://127.0.0.1:3000`). A production deployment that keeps the relative fallback must provide the
-equivalent reverse-proxy route. The Compose image instead compiles an explicit public API URL.
+`VITE_API_URL` may only be a same-origin relative base path and defaults to `/api`; absolute URLs are
+rejected at build time. The Vite development server proxies that path to the server-only
+`ALFRED_DEV_API_PROXY_TARGET` (default `http://127.0.0.1:3000`). Production must provide the
+equivalent same-origin reverse-proxy route. Compose compiles `/api` and does not expose the upstream
+API origin to browser code.

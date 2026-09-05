@@ -3,7 +3,7 @@ import type { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CreateIdentityFoundation1788464265141 } from '../../src/database/migrations/1788464265141-create-identity-foundation';
+import { databaseMigrations } from '../../src/database/migrations';
 import { databaseEntities } from '../../src/database/typeorm.options';
 import { RefreshSessionEntity } from '../../src/modules/auth/entities/refresh-session.entity';
 import { RefreshSessionCleanupService } from '../../src/modules/auth/services/refresh-session-cleanup.service';
@@ -13,14 +13,21 @@ import { UserEntity } from '../../src/modules/users/user.entity';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const migrationDatabaseUrl = process.env.TEST_MIGRATION_DATABASE_URL;
+const adminDatabaseUrl = process.env.TEST_DATABASE_ADMIN_URL;
 const requiresDatabase = process.env.REQUIRE_DATABASE_E2E === 'true';
-if (requiresDatabase && (databaseUrl === undefined || migrationDatabaseUrl === undefined)) {
+if (
+  requiresDatabase &&
+  (databaseUrl === undefined ||
+    migrationDatabaseUrl === undefined ||
+    adminDatabaseUrl === undefined)
+) {
   throw new Error(
-    'REQUIRE_DATABASE_E2E=true requires TEST_DATABASE_URL and TEST_MIGRATION_DATABASE_URL',
+    'REQUIRE_DATABASE_E2E=true requires TEST_DATABASE_URL, TEST_MIGRATION_DATABASE_URL and TEST_DATABASE_ADMIN_URL',
   );
 }
 const describeWithPostgres =
   databaseUrl === undefined || migrationDatabaseUrl === undefined ? describe.skip : describe;
+const itWithDatabaseAdmin = adminDatabaseUrl === undefined ? it.skip : it;
 
 function requireDatabaseUrl(value: string | undefined, name: string): string {
   if (value === undefined) throw new Error(`${name} is required`);
@@ -32,23 +39,32 @@ function hashToken(value: string): string {
 }
 
 describeWithPostgres('refresh-session PostgreSQL contract', () => {
+  let adminDataSource: DataSource | undefined;
   let dataSource: DataSource;
+  let migrationDataSource: DataSource;
 
   beforeAll(async () => {
-    const migrationDataSource = new DataSource({
+    migrationDataSource = new DataSource({
       type: 'postgres',
       url: requireDatabaseUrl(migrationDatabaseUrl, 'TEST_MIGRATION_DATABASE_URL'),
       entities: [...databaseEntities],
       installExtensions: false,
-      migrations: [CreateIdentityFoundation1788464265141],
+      migrations: [...databaseMigrations],
       migrationsRun: false,
       synchronize: false,
     });
     await migrationDataSource.initialize();
-    try {
-      await migrationDataSource.runMigrations({ transaction: 'all' });
-    } finally {
-      await migrationDataSource.destroy();
+    await migrationDataSource.runMigrations({ transaction: 'each' });
+
+    if (adminDatabaseUrl !== undefined) {
+      adminDataSource = new DataSource({
+        type: 'postgres',
+        url: adminDatabaseUrl,
+        installExtensions: false,
+        migrationsRun: false,
+        synchronize: false,
+      });
+      await adminDataSource.initialize();
     }
 
     dataSource = new DataSource({
@@ -70,7 +86,57 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
 
   afterAll(async () => {
     if (dataSource?.isInitialized) await dataSource.destroy();
+    if (migrationDataSource?.isInitialized) await migrationDataSource.destroy();
+    if (adminDataSource?.isInitialized) await adminDataSource.destroy();
   });
+
+  it('applies every registered migration including the refresh replacement index', async () => {
+    await expect(
+      dataSource.query<{ indexname: string }[]>(
+        `SELECT indexname
+         FROM pg_indexes
+         WHERE schemaname = 'public'
+           AND tablename = 'refresh_sessions'
+           AND indexname = 'idx_refresh_sessions_replacement'`,
+      ),
+    ).resolves.toEqual([{ indexname: 'idx_refresh_sessions_replacement' }]);
+  });
+
+  itWithDatabaseAdmin(
+    'repairs a matching invalid concurrent index through the real migration runner',
+    async () => {
+      if (adminDataSource === undefined) throw new Error('Admin test database is required');
+
+      await adminDataSource.query(
+        `UPDATE pg_catalog.pg_index
+         SET indisvalid = false
+         WHERE indexrelid = 'public.idx_refresh_sessions_replacement'::regclass`,
+      );
+      await adminDataSource.query(
+        `DELETE FROM public.migrations
+         WHERE name = 'IndexRefreshSessionReplacement1788515667301'`,
+      );
+
+      const appliedMigrations = await migrationDataSource.runMigrations({ transaction: 'each' });
+      const [result] = await migrationDataSource.query<
+        { isValid: boolean; migrationCount: string }[]
+      >(
+        `SELECT
+           index_record.indisvalid AS "isValid",
+           COUNT(migration.id)::text AS "migrationCount"
+         FROM pg_catalog.pg_index AS index_record
+         CROSS JOIN public.migrations AS migration
+         WHERE index_record.indexrelid = 'public.idx_refresh_sessions_replacement'::regclass
+           AND migration.name = 'IndexRefreshSessionReplacement1788515667301'
+         GROUP BY index_record.indisvalid`,
+      );
+
+      expect(appliedMigrations.map(({ name }) => name)).toContain(
+        'IndexRefreshSessionReplacement1788515667301',
+      );
+      expect(result).toEqual({ isValid: true, migrationCount: '1' });
+    },
+  );
 
   it('locks only the refresh row and rotates a real persisted session', async () => {
     const userRepository = dataSource.getRepository(UserEntity);
@@ -276,6 +342,65 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
 
     const family = await sessionRepository.findBy({ familyId: currentSession.familyId });
     expect(family.length).toBeGreaterThanOrEqual(1);
+    expect(family.every(({ revokedAt }) => revokedAt !== null)).toBe(true);
+  });
+
+  it('serializes family revocation against rotation from a different session row', async () => {
+    const userRepository = dataSource.getRepository(UserEntity);
+    const sessionRepository = dataSource.getRepository(RefreshSessionEntity);
+    const user = await userRepository.save(
+      userRepository.create({
+        avatarUrl: null,
+        displayName: 'Family Lock Contract User',
+        email: 'family-lock-contract@example.test',
+        identities: [],
+        lastLoginAt: new Date(),
+        role: 'user',
+        status: 'active',
+      }),
+    );
+    const familyId = randomUUID();
+    const previousRawToken = 'family-lock-previous-refresh-token';
+    const currentRawToken = 'family-lock-current-refresh-token';
+    const currentSessionId = randomUUID();
+    await sessionRepository.save([
+      sessionRepository.create({
+        expiresAt: new Date(Date.now() + 60_000),
+        familyId,
+        id: randomUUID(),
+        replacedBySessionId: currentSessionId,
+        revokedAt: null,
+        rotatedAt: new Date(),
+        tokenHash: hashToken(previousRawToken),
+        userId: user.id,
+      }),
+      sessionRepository.create({
+        expiresAt: new Date(Date.now() + 60_000),
+        familyId,
+        id: currentSessionId,
+        replacedBySessionId: null,
+        revokedAt: null,
+        rotatedAt: null,
+        tokenHash: hashToken(currentRawToken),
+        userId: user.id,
+      }),
+    ]);
+    const nextRawToken = 'family-lock-next-refresh-token';
+    const tokens = {
+      createRefreshToken: vi.fn().mockReturnValue({
+        hash: hashToken(nextRawToken),
+        raw: nextRawToken,
+      }),
+      hashRefreshToken: vi.fn((value: string) => hashToken(value)),
+      issueAccessToken: vi.fn().mockResolvedValue('family-lock-access-token'),
+    } as unknown as SessionTokenService;
+    const config = { getOrThrow: vi.fn().mockReturnValue(3600) } as unknown as ConfigService;
+    const service = new RefreshSessionService(dataSource, tokens, config);
+
+    await Promise.allSettled([service.rotate(currentRawToken), service.revoke(previousRawToken)]);
+
+    const family = await sessionRepository.findBy({ familyId });
+    expect(family.length).toBeGreaterThanOrEqual(2);
     expect(family.every(({ revokedAt }) => revokedAt !== null)).toBe(true);
   });
 

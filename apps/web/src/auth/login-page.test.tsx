@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const session: { status: 'anonymous' | 'authenticated' } = vi.hoisted(() => ({
+const refresh = vi.hoisted(() => vi.fn().mockResolvedValue(null));
+const session: { status: 'anonymous' | 'authenticated' | 'error' } = vi.hoisted(() => ({
   status: 'anonymous',
 }));
 
@@ -10,7 +11,7 @@ vi.mock('./use-session', () => ({
   useSession: () => ({
     accessToken: null,
     logout: vi.fn(),
-    refresh: vi.fn(),
+    refresh,
     user: null,
     ...session,
   }),
@@ -29,6 +30,7 @@ import { LoginPage } from './login-page';
 describe('LoginPage return path', () => {
   beforeEach(() => {
     session.status = 'anonymous';
+    refresh.mockClear();
   });
 
   it('forwards the protected route to the OAuth start endpoint', () => {
@@ -58,5 +60,20 @@ describe('LoginPage return path', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Team destination' })).toBeVisible();
+  });
+
+  it('offers a retry without exposing login controls during a session outage', () => {
+    session.status = 'error';
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/vérifier votre session/u);
+    expect(screen.queryByRole('link', { name: /continuer avec google/u })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /réessayer/iu }));
+    expect(refresh).toHaveBeenCalledOnce();
   });
 });

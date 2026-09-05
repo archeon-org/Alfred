@@ -1,6 +1,8 @@
 name: Security
 
 on:
+  push:
+    branches: [develop, main]
   pull_request:
   schedule:
     - cron: '17 5 * * 1'
@@ -17,6 +19,26 @@ env:
   HUSKY: '0'
 
 jobs:
+  committed-secret-history:
+    name: Git history secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan the complete Git history with Gitleaks
+        run: |
+          docker run --rm \
+            --env GIT_CONFIG_COUNT=1 \
+            --env GIT_CONFIG_KEY_0=safe.directory \
+            --env GIT_CONFIG_VALUE_0=/repo \
+            --volume "$PWD:/repo:ro" \
+            ghcr.io/gitleaks/gitleaks:v8.30.0@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9 \
+            git --redact --no-banner /repo
+
   dependency-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -74,7 +96,7 @@ jobs:
         with:
           exit-code: '1'
           format: table
-          ignore-unfixed: true
+          ignore-unfixed: false
           scan-ref: .
           scan-type: fs
           scanners: vuln,secret,misconfig

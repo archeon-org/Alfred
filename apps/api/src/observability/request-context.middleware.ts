@@ -7,6 +7,9 @@ const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/u;
 const TRACEPARENT_PATTERN = /^00-([a-f0-9]{32})-([a-f0-9]{16})-([a-f0-9]{2})$/u;
 const ZERO_TRACE_ID = '0'.repeat(32);
 const ZERO_SPAN_ID = '0'.repeat(16);
+const REQUEST_CONTEXT_INITIALIZED = Symbol('request-context-initialized');
+
+type ContextRequest = Request & { [REQUEST_CONTEXT_INITIALIZED]?: true };
 
 function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -39,7 +42,12 @@ function createTraceContext(incoming: string | undefined): {
 export class RequestContextMiddleware implements NestMiddleware {
   constructor(private readonly context: RequestContextService) {}
 
-  use(request: Request, response: Response, next: NextFunction): void {
+  use(request: ContextRequest, response: Response, next: NextFunction): void {
+    if (request[REQUEST_CONTEXT_INITIALIZED] === true) {
+      next();
+      return;
+    }
+    request[REQUEST_CONTEXT_INITIALIZED] = true;
     const incomingRequestId = firstHeader(request.headers['x-request-id']);
     const requestId =
       incomingRequestId !== undefined && REQUEST_ID_PATTERN.test(incomingRequestId)

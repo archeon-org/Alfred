@@ -27,11 +27,16 @@ describe('parseEnvironment', () => {
       AUTH_ACCESS_TOKEN_TTL_SECONDS: 300,
       AUTH_COOKIE_SECURE: false,
       AUTH_JWT_AUDIENCE: 'alfred-web',
+      AUTH_IP_RATE_LIMIT_PER_MINUTE: 6000,
       AUTH_JWT_ISSUER: 'alfred-api',
       AUTH_JWT_SECRET: 'test-only-secret-that-is-longer-than-32-characters',
+      AUTH_OAUTH_CALLBACK_IP_RATE_LIMIT_PER_MINUTE: 600,
+      AUTH_OAUTH_START_IP_RATE_LIMIT_PER_MINUTE: 300,
+      AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE: 1200,
       AUTH_REFRESH_TOKEN_TTL_SECONDS: 2_592_000,
       AUTH_SESSION_CLEANUP_INTERVAL_SECONDS: 3_600,
-      AUTH_SESSION_RETENTION_SECONDS: 604_800,
+      AUTH_SESSION_RETENTION_SECONDS: 2_592_000,
+      AUTH_USER_RATE_LIMIT_PER_MINUTE: 120,
       DATABASE_POOL_MAX: 20,
       DATABASE_SSL: false,
       DATABASE_URL: 'postgresql://alfred:local-password@localhost:5432/alfred_app?schema=public',
@@ -112,6 +117,37 @@ describe('parseEnvironment', () => {
     ).toThrow(/AUTH_JWT_SECRET/u);
   });
 
+  it('keeps the shared IP ceiling above the per-user ceiling', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        AUTH_IP_RATE_LIMIT_PER_MINUTE: '120',
+        AUTH_USER_RATE_LIMIT_PER_MINUTE: '120',
+      }),
+    ).toThrow(/AUTH_IP_RATE_LIMIT_PER_MINUTE/u);
+  });
+
+  it('rejects invalid route-specific pre-authentication limits', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        AUTH_OAUTH_CALLBACK_IP_RATE_LIMIT_PER_MINUTE: '0',
+      }),
+    ).toThrow(/AUTH_OAUTH_CALLBACK_IP_RATE_LIMIT_PER_MINUTE/u);
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        AUTH_OAUTH_START_IP_RATE_LIMIT_PER_MINUTE: '1000001',
+      }),
+    ).toThrow(/AUTH_OAUTH_START_IP_RATE_LIMIT_PER_MINUTE/u);
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE: '1.5',
+      }),
+    ).toThrow(/AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE/u);
+  });
+
   it('requires the complete Google OAuth configuration when the provider is enabled', () => {
     expect(() =>
       parseEnvironment({
@@ -158,6 +194,7 @@ describe('parseEnvironment', () => {
       GOOGLE_OAUTH_CLIENT_ID: 'client-id.apps.googleusercontent.com',
       GOOGLE_OAUTH_CLIENT_SECRET: 'a-real-secret-from-the-runtime-vault',
       NODE_ENV: 'production',
+      REDIS_URL: 'redis://default:a-real-redis-password@redis:6379/0',
       WEB_APP_URL: 'https://alfred.example',
     });
 
@@ -193,6 +230,29 @@ describe('parseEnvironment', () => {
     ).toThrow(/placeholder/u);
   });
 
+  it('requires a credentialed non-placeholder Redis URL in production', () => {
+    const productionEnvironment = {
+      ...validEnvironment,
+      API_CORS_ORIGINS: 'https://alfred.example',
+      AUTH_COOKIE_SECURE: 'true',
+      NODE_ENV: 'production',
+      WEB_APP_URL: 'https://alfred.example',
+    };
+
+    expect(() =>
+      parseEnvironment({
+        ...productionEnvironment,
+        REDIS_URL: 'redis://redis:6379/0',
+      }),
+    ).toThrow(/REDIS_URL/u);
+    expect(() =>
+      parseEnvironment({
+        ...productionEnvironment,
+        REDIS_URL: 'redis://default:replace-with-a-random-password@redis:6379/0',
+      }),
+    ).toThrow(/placeholder/u);
+  });
+
   it('bounds the access-token revocation window to fifteen minutes', () => {
     expect(() =>
       parseEnvironment({
@@ -200,6 +260,24 @@ describe('parseEnvironment', () => {
         AUTH_ACCESS_TOKEN_TTL_SECONDS: '901',
       }),
     ).toThrow(/AUTH_ACCESS_TOKEN_TTL_SECONDS/u);
+  });
+
+  it('keeps replay tombstones for at least one refresh-token lifetime', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        AUTH_REFRESH_TOKEN_TTL_SECONDS: '2592000',
+        AUTH_SESSION_RETENTION_SECONDS: '604800',
+      }),
+    ).toThrow(/AUTH_SESSION_RETENTION_SECONDS/u);
+
+    expect(
+      parseEnvironment({
+        ...validEnvironment,
+        AUTH_REFRESH_TOKEN_TTL_SECONDS: '2592000',
+        AUTH_SESSION_RETENTION_SECONDS: '2592000',
+      }).AUTH_SESSION_RETENTION_SECONDS,
+    ).toBe(2_592_000);
   });
 
   it('rejects invalid feature flag values instead of enabling them implicitly', () => {

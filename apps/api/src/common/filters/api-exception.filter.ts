@@ -12,9 +12,46 @@ const INTERNAL_SERVER_ERROR_STATUS = 500;
 interface ErrorBody {
   readonly error: {
     readonly code: string;
+    readonly details?: Readonly<Record<string, { readonly status: 'down' | 'up' }>>;
     readonly message: string | readonly string[];
   };
   readonly success: false;
+}
+
+function safeOperationalDetails(
+  exception: HttpException,
+): Readonly<Record<string, { readonly status: 'down' | 'up' }>> | undefined {
+  const body: unknown = exception.getResponse();
+  if (typeof body !== 'object' || body === null) {
+    return undefined;
+  }
+  const candidate = body as Record<string, unknown>;
+  const details = candidate.details;
+  if (candidate.status !== 'error' || typeof details !== 'object' || details === null) {
+    return undefined;
+  }
+
+  const entries = Object.entries(details as Record<string, unknown>);
+  if (entries.length === 0 || entries.length > 16) return undefined;
+
+  const safeEntries: Array<readonly [string, { readonly status: 'down' | 'up' }]> = [];
+  for (const [name, value] of entries) {
+    if (!/^[a-z][a-z0-9_-]{0,63}$/u.test(name)) return undefined;
+    if (typeof value !== 'object' || value === null) {
+      return undefined;
+    }
+    const dependency = value as Record<string, unknown>;
+    const dependencyStatus = dependency.status;
+    if (
+      Object.keys(dependency).length !== 1 ||
+      (dependencyStatus !== 'down' && dependencyStatus !== 'up')
+    ) {
+      return undefined;
+    }
+    safeEntries.push([name, Object.freeze({ status: dependencyStatus })]);
+  }
+
+  return Object.freeze(Object.fromEntries(safeEntries));
 }
 
 function safeHttpMessage(exception: HttpException): string | readonly string[] {
@@ -40,12 +77,17 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const response = host.switchToHttp().getResponse<Response>();
     const isHttpException = exception instanceof HttpException;
     const status = isHttpException ? exception.getStatus() : INTERNAL_SERVER_ERROR_STATUS;
+    const operationalDetails = isHttpException ? safeOperationalDetails(exception) : undefined;
     const message =
       isHttpException && status < INTERNAL_SERVER_ERROR_STATUS
         ? safeHttpMessage(exception)
         : 'Internal server error';
 
-    if (!isHttpException || status >= INTERNAL_SERVER_ERROR_STATUS) {
+    const isExpectedOperationalOutage = status === 503 && operationalDetails !== undefined;
+    if (
+      !isHttpException ||
+      (status >= INTERNAL_SERVER_ERROR_STATUS && !isExpectedOperationalOutage)
+    ) {
       this.logger.error(
         'Unhandled API exception',
         exception instanceof Error ? exception.stack : undefined,
@@ -53,7 +95,11 @@ export class ApiExceptionFilter implements ExceptionFilter {
     }
 
     const body: ErrorBody = Object.freeze({
-      error: Object.freeze({ code: `HTTP_${status}`, message }),
+      error: Object.freeze({
+        code: `HTTP_${status}`,
+        ...(operationalDetails === undefined ? {} : { details: operationalDetails }),
+        message,
+      }),
       success: false,
     });
     response.status(status).json(body);

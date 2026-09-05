@@ -11,10 +11,14 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { ok } from '../../common/api-response';
 import { Public } from '../../common/decorators/public.decorator';
+import {
+  GoogleOauthCallbackThrottlerGuard,
+  GoogleOauthStartThrottlerGuard,
+  RefreshThrottlerGuard,
+} from '../../common/guards/alfred-throttler.guard';
 import { SameOriginGuard } from '../../common/guards/same-origin.guard';
 import { RequiresFeature } from '../feature-flags/requires-feature.decorator';
 import { AuthService } from './auth.service';
@@ -31,7 +35,7 @@ export class AuthController {
 
   @Public()
   @RequiresFeature('googleOAuth')
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @UseGuards(GoogleOauthStartThrottlerGuard)
   @Get('google/start')
   async startGoogleLogin(
     @Query() query: OauthStartQueryDto,
@@ -44,7 +48,7 @@ export class AuthController {
 
   @Public()
   @RequiresFeature('googleOAuth')
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @UseGuards(GoogleOauthCallbackThrottlerGuard)
   @Get('google/callback')
   async completeGoogleLogin(
     @Query() query: OauthCallbackQueryDto,
@@ -80,8 +84,7 @@ export class AuthController {
   }
 
   @Public()
-  @UseGuards(SameOriginGuard)
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @UseGuards(SameOriginGuard, RefreshThrottlerGuard)
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
   async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {

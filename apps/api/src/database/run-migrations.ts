@@ -3,7 +3,9 @@ import applicationDataSource from './data-source';
 async function runMigrations(): Promise<void> {
   await applicationDataSource.initialize();
   try {
-    await applicationDataSource.runMigrations({ transaction: 'all' });
+    // Run ordinary migrations atomically one by one while allowing explicitly
+    // non-transactional migrations to use PostgreSQL CONCURRENTLY operations.
+    await applicationDataSource.runMigrations({ transaction: 'each' });
   } finally {
     await applicationDataSource.destroy();
   }

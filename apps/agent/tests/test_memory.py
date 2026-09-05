@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import pytest
 from langgraph.runtime import ExecutionInfo, Runtime, ServerInfo
+from langgraph.store.base import Item
 from langgraph.store.memory import InMemoryStore
 
 from alfred_agent.graph import authenticated_memory_context, build_graph
@@ -20,6 +21,45 @@ from alfred_agent.memory import (
     shared_memory_namespace,
     store_memory,
 )
+
+
+class StaleIndexReadStore(InMemoryStore):
+    """Model two concurrent writers that read the same legacy index snapshot."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._stale_index_reads_remaining = 2
+
+    def get(
+        self,
+        namespace: tuple[str, ...],
+        key: str,
+        *,
+        refresh_ttl: bool | None = None,
+    ) -> Item | None:
+        is_legacy_index = (
+            namespace[:2] == ("alfred", "indexes") and key == "recent-episodes-v1"
+        )
+        if is_legacy_index and self._stale_index_reads_remaining > 0:
+            self._stale_index_reads_remaining -= 1
+            return None
+        return super().get(namespace, key, refresh_ttl=refresh_ttl)
+
+
+class CountingStore(InMemoryStore):
+    def __init__(self) -> None:
+        super().__init__()
+        self.get_calls: list[tuple[tuple[str, ...], str]] = []
+
+    def get(
+        self,
+        namespace: tuple[str, ...],
+        key: str,
+        *,
+        refresh_ttl: bool | None = None,
+    ) -> Item | None:
+        self.get_calls.append((namespace, key))
+        return super().get(namespace, key, refresh_ttl=refresh_ttl)
 
 
 def test_memory_context_builds_an_isolated_user_namespace() -> None:
@@ -122,6 +162,92 @@ def test_recall_returns_the_latest_episodes_after_the_namespace_exceeds_the_limi
         "Objective 7",
         "Objective 6",
         "Objective 5",
+    ]
+
+
+def test_concurrent_memory_writes_do_not_lose_recency_index_entries() -> None:
+    store = StaleIndexReadStore()
+    context = MemoryContext(user_id="user-123", conversation_id="conversation-456")
+    records = [
+        build_memory_record(
+            context=context,
+            objective=f"Concurrent objective {index}",
+            outcome="Stored",
+            steps=["planner"],
+        )
+        for index in range(2)
+    ]
+
+    for record in records:
+        store_memory(store, context, record)
+
+    recalled = recall_memories(store, context, limit=2)
+
+    assert {record["objective"] for record in recalled} == {
+        "Concurrent objective 0",
+        "Concurrent objective 1",
+    }
+
+
+def test_invalid_index_timestamp_does_not_leave_a_partial_memory_record() -> None:
+    store = InMemoryStore()
+    context = MemoryContext(user_id="user-123", conversation_id="conversation-456")
+    record = build_memory_record(
+        context=context,
+        objective="Invalid timestamp",
+        outcome="Must not be partially stored",
+        steps=["planner"],
+    )
+
+    with pytest.raises(ValueError, match="timezone"):
+        store_memory(store, context, {**record, "created_at": "2026-09-03T10:00:00"})
+
+    assert store.search(memory_namespace(context)) == []
+
+
+def test_recall_reads_only_the_requested_number_of_memory_records() -> None:
+    store = CountingStore()
+    context = MemoryContext(user_id="user-123", conversation_id="conversation-456")
+
+    for index in range(12):
+        record = build_memory_record(
+            context=context,
+            objective=f"Objective {index}",
+            outcome=f"Outcome {index}",
+            steps=["planner"],
+        )
+        store_memory(
+            store,
+            context,
+            {**record, "created_at": f"2026-09-03T10:{index:02d}:00+00:00"},
+        )
+
+    store.get_calls.clear()
+    recalled = recall_memories(store, context, limit=3)
+
+    record_reads = [call for call in store.get_calls if call[0] == memory_namespace(context)]
+    assert len(recalled) == 3
+    assert len(record_reads) <= 3
+
+
+def test_repeated_episode_content_at_different_times_remains_distinct() -> None:
+    store = InMemoryStore()
+    context = MemoryContext(user_id="user-123", conversation_id="conversation-456")
+
+    for created_at in ("2026-09-03T10:00:00+00:00", "2026-09-03T11:00:00+00:00"):
+        record = build_memory_record(
+            context=context,
+            objective="Repeated objective",
+            outcome="Repeated outcome",
+            steps=["planner"],
+        )
+        store_memory(store, context, {**record, "created_at": created_at})
+
+    recalled = recall_memories(store, context, limit=2)
+
+    assert [record["created_at"] for record in recalled] == [
+        "2026-09-03T11:00:00+00:00",
+        "2026-09-03T10:00:00+00:00",
     ]
 
 
@@ -252,7 +378,10 @@ def test_server_runtime_uses_authenticated_identity_and_thread() -> None:
         server_info=ServerInfo(
             assistant_id="assistant",
             graph_id="graph",
-            user=cast(Any, SimpleNamespace(identity="authenticated-user")),
+            user=cast(
+                Any,
+                SimpleNamespace(identity="authenticated-user", is_authenticated=True),
+            ),
         ),
         execution_info=ExecutionInfo(
             checkpoint_id="checkpoint",
@@ -284,6 +413,55 @@ def test_server_runtime_without_authenticated_user_disables_memory() -> None:
     assert authenticated_memory_context(runtime) is None
 
 
+def test_graph_without_runtime_context_disables_memory_instead_of_crashing() -> None:
+    result = build_graph().invoke(
+        {"objective": "Run without context", "tasks": [], "summary": ""}
+    )
+
+    assert result["memory_written"] is False
+
+
+def test_server_runtime_rejects_explicitly_unauthenticated_user() -> None:
+    runtime = Runtime(
+        context=MemoryContext(user_id="spoofed", conversation_id="spoofed"),
+        server_info=ServerInfo(
+            assistant_id="assistant",
+            graph_id="graph",
+            user=cast(
+                Any,
+                SimpleNamespace(identity="authenticated-user", is_authenticated=False),
+            ),
+        ),
+        execution_info=ExecutionInfo(
+            checkpoint_id="checkpoint",
+            checkpoint_ns="",
+            task_id="task",
+            thread_id="trusted-thread",
+        ),
+    )
+
+    assert authenticated_memory_context(runtime) is None
+
+
+def test_server_runtime_rejects_invalid_identity_without_crashing() -> None:
+    runtime = Runtime(
+        context=MemoryContext(user_id="spoofed", conversation_id="spoofed"),
+        server_info=ServerInfo(
+            assistant_id="assistant",
+            graph_id="graph",
+            user=cast(Any, SimpleNamespace(identity="   ", is_authenticated=True)),
+        ),
+        execution_info=ExecutionInfo(
+            checkpoint_id="checkpoint",
+            checkpoint_ns="",
+            task_id="task",
+            thread_id="trusted-thread",
+        ),
+    )
+
+    assert authenticated_memory_context(runtime) is None
+
+
 def test_forget_memories_deletes_conversation_and_optional_shared_history() -> None:
     store = InMemoryStore()
     context = MemoryContext(
@@ -302,3 +480,20 @@ def test_forget_memories_deletes_conversation_and_optional_shared_history() -> N
     assert forget_memories(store, context, include_shared=True) == 2
     assert store.search(memory_namespace(context)) == []
     assert store.search(shared_memory_namespace(context)) == []
+
+
+def test_forget_memories_deletes_more_than_one_search_batch() -> None:
+    store = InMemoryStore()
+    context = MemoryContext(user_id="user-123", conversation_id="conversation-456")
+    namespace = memory_namespace(context)
+    record = build_memory_record(
+        context=context,
+        objective="Forget all batches",
+        outcome="Stored",
+        steps=["planner"],
+    )
+    for index in range(1_001):
+        store.put(namespace, f"memory-{index}", dict(record))
+
+    assert forget_memories(store, context) == 1_001
+    assert store.search(namespace) == []

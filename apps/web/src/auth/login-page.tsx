@@ -22,7 +22,7 @@ function isLoginLocationState(value: unknown): value is { readonly from: string 
 }
 
 export function LoginPage() {
-  const { status } = useSession();
+  const { refresh, status } = useSession();
   const featureFlags = useFeatureFlags();
   const location = useLocation();
   const locationState: unknown = location.state;
@@ -37,6 +37,7 @@ export function LoginPage() {
     <main
       className="relative grid min-h-dvh overflow-hidden bg-canvas px-5 py-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(24rem,0.9fr)] lg:px-10"
       id="main-content"
+      tabIndex={-1}
     >
       <div
         aria-hidden="true"
@@ -96,8 +97,12 @@ export function LoginPage() {
           </p>
 
           <div className="mt-7" aria-live="polite">
-            {status === 'loading' || featureFlags.status === 'loading' ? (
-              <div className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line text-sm text-muted">
+            {status === 'loading' ||
+            (status === 'anonymous' && featureFlags.status === 'loading') ? (
+              <div
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line text-sm text-muted"
+                role="status"
+              >
                 <LoaderCircle
                   aria-hidden="true"
                   className="animate-spin motion-reduce:animate-none"
@@ -107,7 +112,24 @@ export function LoginPage() {
               </div>
             ) : null}
 
-            {status === 'anonymous' && featureFlags.flags.googleOAuth ? (
+            {status === 'error' ? (
+              <div className="space-y-3" role="alert">
+                <p className="text-sm leading-6 text-danger-700">
+                  Impossible de vérifier votre session pour le moment.
+                </p>
+                <button
+                  className={cn(buttonVariants({ variant: 'outline' }), 'w-full')}
+                  onClick={() => void refresh().catch(() => undefined)}
+                  type="button"
+                >
+                  Réessayer
+                </button>
+              </div>
+            ) : null}
+
+            {status === 'anonymous' &&
+            featureFlags.status === 'ready' &&
+            featureFlags.flags.googleOAuth ? (
               <a className={cn(buttonVariants(), 'w-full')} href={getGoogleLoginUrl(returnTo)}>
                 Continuer avec Google
               </a>

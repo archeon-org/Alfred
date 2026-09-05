@@ -1,9 +1,14 @@
 import { UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import type { DataSource, EntityManager } from 'typeorm';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { OauthLoginStateEntity } from '../../src/modules/auth/entities/oauth-login-state.entity';
 import { OauthStateService } from '../../src/modules/auth/services/oauth-state.service';
+
+function hashState(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
 
 function persistedState(overrides: Partial<OauthLoginStateEntity> = {}): OauthLoginStateEntity {
   return {
@@ -44,10 +49,18 @@ describe('OauthStateService', () => {
   });
 
   it('consumes a matching unexpired state exactly once under a database lock', async () => {
-    const state = persistedState();
+    const state = persistedState({ stateHash: hashState('matching-state') });
+    const update = vi
+      .fn<
+        (
+          criteria: Partial<OauthLoginStateEntity>,
+          value: Partial<OauthLoginStateEntity>,
+        ) => Promise<{ affected: number }>
+      >()
+      .mockResolvedValue({ affected: 1 });
     const repository = {
       findOne: vi.fn().mockResolvedValue(state),
-      update: vi.fn().mockResolvedValue({ affected: 1 }),
+      update,
     };
     const dataSource = {
       transaction: vi.fn((work: (manager: EntityManager) => unknown) =>
@@ -56,17 +69,23 @@ describe('OauthStateService', () => {
     } as unknown as DataSource;
     const service = new OauthStateService(dataSource);
 
-    await expect(service.consume('matching-state', 'matching-state')).resolves.toMatchObject({
-      ...state,
-      consumedAt: expect.any(Date),
+    const consumed = await service.consume('matching-state', 'matching-state');
+
+    expect(consumed).toMatchObject({
+      codeVerifier: state.codeVerifier,
+      expiresAt: state.expiresAt,
+      nonce: state.nonce,
+      returnTo: state.returnTo,
+      stateHash: state.stateHash,
     });
+    expect(consumed.consumedAt).toBeInstanceOf(Date);
     expect(repository.findOne).toHaveBeenCalledWith(
       expect.objectContaining({ lock: { mode: 'pessimistic_write' } }),
     );
-    expect(repository.update).toHaveBeenCalledWith(
-      { stateHash: state.stateHash },
-      { consumedAt: expect.any(Date) },
-    );
+    expect(update).toHaveBeenCalledOnce();
+    const updateCall = update.mock.calls[0];
+    expect(updateCall?.[0]).toEqual({ stateHash: state.stateHash });
+    expect(updateCall?.[1].consumedAt).toBeInstanceOf(Date);
   });
 
   it('rejects cookie mismatches before querying persistence', async () => {

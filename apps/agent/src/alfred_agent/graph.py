@@ -1,6 +1,7 @@
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false
 
 from dataclasses import replace
+from typing import cast
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -20,8 +21,10 @@ def authenticated_memory_context(
     runtime: Runtime[MemoryContext],
 ) -> MemoryContext | None:
     """Resolve memory ownership from trusted server metadata when deployed."""
-    context = runtime.context
-    if not context.memory_enabled:
+    # Runtime defaults context to None even though its generic attribute is typed
+    # as ContextT by the upstream SDK.
+    context = cast(MemoryContext | None, runtime.context)
+    if context is None or not context.memory_enabled:
         return None
 
     server_info = runtime.server_info
@@ -29,18 +32,24 @@ def authenticated_memory_context(
         # Open-source/local execution has no server identity provider. Its caller is
         # trusted and supplies the scope directly (tests and loopback development).
         return context
-    if server_info.user is None:
+    user = server_info.user
+    if user is None or not user.is_authenticated:
         return None
 
     execution_info = runtime.execution_info
     thread_id = execution_info.thread_id if execution_info is not None else None
     if thread_id is None:
         return None
-    return replace(
-        context,
-        user_id=server_info.user.identity,
-        conversation_id=thread_id,
-    )
+    try:
+        return replace(
+            context,
+            user_id=user.identity,
+            conversation_id=thread_id,
+        )
+    except ValueError:
+        # A custom Agent Server authentication handler can return a malformed
+        # identity. Memory must fail closed without taking down the graph run.
+        return None
 
 
 def recall_memory(state: OrchestratorState, runtime: Runtime[MemoryContext]) -> OrchestratorState:

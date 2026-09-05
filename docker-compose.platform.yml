@@ -1,4 +1,12 @@
 services:
+  postgres:
+    ports: !reset []
+    networks: !override [agent-data, api-data]
+
+  redis:
+    ports: !reset []
+    networks: !override [api-data]
+
   migrate:
     environment:
       NODE_ENV: production
@@ -8,6 +16,9 @@ services:
     environment:
       AUTH_COOKIE_SECURE: 'true'
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Set AUTH_JWT_SECRET to at least 32 characters}
+      FEATURE_AGENT_RUNTIME_ENABLED: 'false'
+      FEATURE_AG_UI_STREAMING_ENABLED: 'false'
+      FEATURE_RUNTIME_MEMORY_ENABLED: 'false'
       NODE_ENV: production
 
   agent-redis:
@@ -42,6 +53,7 @@ services:
     build:
       context: ./apps/agent
       dockerfile: Dockerfile
+    ports: !reset []
     environment:
       DATABASE_URI: postgres://alfred_agent:${AGENT_DATABASE_PASSWORD:?Set AGENT_DATABASE_PASSWORD in .env}@postgres:5432/alfred_langgraph?sslmode=disable
       LANGCHAIN_TRACING_V2: 'false'
@@ -55,9 +67,7 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-    networks:
-      - app
-      - agent-data
+    networks: !override [agent-data]
 
 volumes:
   agent-redis-data:

@@ -21,12 +21,19 @@ and safe when several API replicas serve concurrent users.
 - The browser keeps a five-minute access JWT in React memory. Configuration may shorten it but may
   not exceed fifteen minutes.
 - The refresh credential is a random opaque token in an HttpOnly, Secure production cookie. Only
-  its SHA-256 hash is stored. Rotation occurs under a pessimistic PostgreSQL lock; replay revokes
-  the complete token family.
-- TypeORM is the only NestJS ORM. Entities never synchronize the schema at runtime. A compiled,
-  transactional, one-shot migration runs before API replicas start.
-- Entity constraints and migration objects use stable names and must produce an empty TypeORM
-  schema diff after a clean migration.
+  its SHA-256 hash is stored. Rotation acquires a transaction-scoped advisory lock for the token
+  family before the session row lock; replay strictly revokes the complete token family. Browser
+  tabs serialize refresh through Web Locks without sharing the token through web storage or
+  broadcast channels.
+- Revoked, expired and rotated rows remain as replay tombstones for a retention period that is
+  validated to be at least the configured refresh-token lifetime.
+- TypeORM is the only NestJS ORM. Entities never synchronize the schema at runtime. Compiled,
+  one-shot migrations run atomically one by one before API replicas start. A migration may
+  explicitly opt out only for PostgreSQL operations such as `CREATE INDEX CONCURRENTLY` that cannot
+  run in a transaction and protect live write traffic.
+- Entity constraints and migration objects use stable names, are registered through one explicit
+  migration list and must produce an empty TypeORM schema diff after a clean migration. Runtime API
+  credentials have no DML permission on the TypeORM migration ledger.
 
 ## Consequences
 

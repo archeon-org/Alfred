@@ -12,6 +12,7 @@ import { UserEntity } from '../../users/user.entity';
 @Entity({ name: 'refresh_sessions' })
 @Index('idx_refresh_sessions_expiry', ['expiresAt'])
 @Index('idx_refresh_sessions_family', ['familyId'])
+@Index('idx_refresh_sessions_replacement', ['replacedBySessionId'])
 @Index('idx_refresh_sessions_user', ['userId'])
 @Index('uq_refresh_sessions_token_hash', ['tokenHash'], { unique: true })
 export class RefreshSessionEntity {

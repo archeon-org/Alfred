@@ -26,6 +26,14 @@ const usesHttps = (value: string): boolean => {
   }
 };
 
+const hasUrlPassword = (value: string): boolean => {
+  try {
+    return new URL(value).password.length > 0;
+  } catch {
+    return false;
+  }
+};
+
 const environmentSchema = z
   .object({
     API_CORS_ORIGINS: commaSeparatedOrigins.prefault('http://localhost:5173'),
@@ -38,9 +46,28 @@ const environmentSchema = z
       .pipe(z.string().min(1)),
     AUTH_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(300),
     AUTH_COOKIE_SECURE: booleanFromEnvironment.default(false),
+    AUTH_IP_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(120).max(1_000_000).default(6_000),
     AUTH_JWT_AUDIENCE: z.string().min(1).default('alfred-web'),
     AUTH_JWT_ISSUER: z.string().min(1).default('alfred-api'),
     AUTH_JWT_SECRET: z.string().min(32),
+    AUTH_OAUTH_CALLBACK_IP_RATE_LIMIT_PER_MINUTE: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(1_000_000)
+      .default(600),
+    AUTH_OAUTH_START_IP_RATE_LIMIT_PER_MINUTE: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(1_000_000)
+      .default(300),
+    AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(1_000_000)
+      .default(1_200),
     AUTH_REFRESH_TOKEN_TTL_SECONDS: z.coerce
       .number()
       .int()
@@ -53,7 +80,13 @@ const environmentSchema = z
       .min(60)
       .max(86_400)
       .default(3_600),
-    AUTH_SESSION_RETENTION_SECONDS: z.coerce.number().int().min(0).max(7_776_000).default(604_800),
+    AUTH_SESSION_RETENTION_SECONDS: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(31_536_000)
+      .default(2_592_000),
+    AUTH_USER_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100_000).default(120),
     DATABASE_POOL_MAX: z.coerce.number().int().min(2).max(100).default(20),
     DATABASE_SSL: booleanFromEnvironment.default(false),
     DATABASE_URL: z
@@ -133,18 +166,32 @@ const environmentSchema = z
       });
     }
 
-    if (
-      environment.NODE_ENV === 'production' &&
-      (containsCommittedPlaceholder(environment.AUTH_JWT_SECRET) ||
-        containsCommittedPlaceholder(environment.DATABASE_URL) ||
-        containsCommittedPlaceholder(environment.GOOGLE_OAUTH_CLIENT_ID) ||
-        containsCommittedPlaceholder(environment.GOOGLE_OAUTH_CLIENT_SECRET))
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Committed placeholder credentials are forbidden in production',
-        path: ['AUTH_JWT_SECRET'],
-      });
+    if (environment.NODE_ENV === 'production') {
+      const credentials = {
+        AUTH_JWT_SECRET: environment.AUTH_JWT_SECRET,
+        DATABASE_URL: environment.DATABASE_URL,
+        GOOGLE_OAUTH_CLIENT_ID: environment.GOOGLE_OAUTH_CLIENT_ID,
+        GOOGLE_OAUTH_CLIENT_SECRET: environment.GOOGLE_OAUTH_CLIENT_SECRET,
+        REDIS_URL: environment.REDIS_URL,
+      } as const;
+
+      for (const [key, value] of Object.entries(credentials)) {
+        if (containsCommittedPlaceholder(value)) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Committed placeholder credentials are forbidden in production',
+            path: [key],
+          });
+        }
+      }
+
+      if (!hasUrlPassword(environment.REDIS_URL)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'REDIS_URL must include a password in production',
+          path: ['REDIS_URL'],
+        });
+      }
     }
 
     if (environment.FEATURE_GOOGLE_OAUTH_ENABLED) {
@@ -185,6 +232,22 @@ const environmentSchema = z
         code: 'custom',
         message: 'OBSERVABILITY_METRICS_TOKEN is required when metrics are enabled',
         path: ['OBSERVABILITY_METRICS_TOKEN'],
+      });
+    }
+
+    if (environment.AUTH_SESSION_RETENTION_SECONDS < environment.AUTH_REFRESH_TOKEN_TTL_SECONDS) {
+      context.addIssue({
+        code: 'custom',
+        message: 'AUTH_SESSION_RETENTION_SECONDS must be at least AUTH_REFRESH_TOKEN_TTL_SECONDS',
+        path: ['AUTH_SESSION_RETENTION_SECONDS'],
+      });
+    }
+
+    if (environment.AUTH_IP_RATE_LIMIT_PER_MINUTE <= environment.AUTH_USER_RATE_LIMIT_PER_MINUTE) {
+      context.addIssue({
+        code: 'custom',
+        message: 'AUTH_IP_RATE_LIMIT_PER_MINUTE must exceed AUTH_USER_RATE_LIMIT_PER_MINUTE',
+        path: ['AUTH_IP_RATE_LIMIT_PER_MINUTE'],
       });
     }
 

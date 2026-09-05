@@ -68,7 +68,8 @@ pnpm docker:recreate
 
 `docker:recreate` runs Compose with `--force-recreate --no-build`: it reloads container environment
 values and preserves named volumes, but it does not include source-code changes in existing images.
-Because `VITE_API_URL` is a web build argument, changing that value still requires `pnpm docker:up`.
+Because `VITE_API_URL` is a web build argument, changing its same-origin relative path still
+requires `pnpm docker:up`; absolute API origins are rejected by the web build.
 
 The startup order is deliberate:
 
@@ -76,9 +77,10 @@ The startup order is deliberate:
 2. `postgres-bootstrap` idempotently creates/configures the four logical databases, including on
    a retained volume created by an older Alfred version. Only `alfred_app` and `alfred_test`
    receive the required `citext` extension.
-3. `migrate` runs the compiled TypeORM migration runner once with the schema-owner role.
-4. The API starts only after that migration exits successfully.
-5. The web container waits for API readiness.
+3. `migrate` runs the compiled TypeORM migration registry once with the schema-owner role.
+4. `postgres-runtime-grants` revokes API-runtime DML on the TypeORM migration ledger.
+5. The API starts only after both one-shot jobs exit successfully.
+6. The web container waits for API readiness.
 
 The local `agent` service runs `langgraph dev`, listens on port `8000` inside the container and is
 available at `http://127.0.0.1:2024`. It does not receive an Agent Server licence,
@@ -95,6 +97,10 @@ docker compose --env-file .env up -d postgres postgres-bootstrap redis
 PostgreSQL and the API Redis publish only on `127.0.0.1`. Containers reach them through
 `api-data`; the production-like Agent Server uses a different `agent-data` network and a separate
 Redis instance. Named volumes are persistent:
+
+These loopback publications exist only in the base local-development Compose file. The production
+overlay resets both data-service port lists and removes `host-access`, leaving PostgreSQL and Redis
+reachable only through their internal Docker networks.
 
 - `postgres-data` contains `alfred_app`, `alfred_blobs`, `alfred_langgraph` and `alfred_test`;
 - `redis-data` contains the Redis append-only file, flushed with `appendfsync everysec`.

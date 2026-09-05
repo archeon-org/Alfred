@@ -10,8 +10,11 @@ from langgraph.store.base import BaseStore
 MEMORY_SCHEMA_VERSION: Literal[1] = 1
 MAX_MEMORY_TEXT_LENGTH = 500
 MEMORY_RECALL_LIMIT = 5
-MEMORY_INDEX_CAPACITY = 256
 MEMORY_INDEX_KEY = "recent-episodes-v1"
+MEMORY_DELETE_BATCH_SIZE = 256
+
+_MEMORY_INDEX_TIMESTAMP_CEILING_MICROSECONDS = 10**18 - 1
+_UNIX_EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 _IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}")
 _TOKEN_PATTERN = re.compile(
@@ -117,7 +120,12 @@ def build_memory_record(
 
 def memory_key(record: MemoryRecord) -> str:
     identity = "\0".join(
-        (record["conversation_id"], record["objective"], record["outcome"])
+        (
+            record["conversation_id"],
+            record["objective"],
+            record["outcome"],
+            record["created_at"],
+        )
     ).encode()
     return f"episode-{sha256(identity).hexdigest()[:24]}"
 
@@ -135,7 +143,11 @@ def recall_memories(
     if context.share_across_conversations:
         namespaces.append(shared_memory_namespace(context))
 
-    records = [record for namespace in namespaces for record in _recall_namespace(store, namespace)]
+    records = [
+        record
+        for namespace in namespaces
+        for record in _recall_namespace(store, namespace, limit=limit)
+    ]
     deduplicated = {memory_key(record): record for record in records}
     return sorted(deduplicated.values(), key=lambda record: record["created_at"], reverse=True)[
         :limit
@@ -161,10 +173,17 @@ def forget_memories(
 
     deleted = 0
     for namespace in namespaces:
-        for item in store.search(namespace, limit=1_000):
-            store.delete(namespace, item.key)
-            deleted += 1
+        while items := store.search(namespace, limit=MEMORY_DELETE_BATCH_SIZE):
+            for item in items:
+                store.delete(item.namespace, item.key)
+                deleted += 1
         store.delete(_memory_index_namespace(namespace), MEMORY_INDEX_KEY)
+        index_entries_namespace = _memory_index_entries_namespace(namespace)
+        while index_items := store.search(
+            index_entries_namespace, limit=MEMORY_DELETE_BATCH_SIZE
+        ):
+            for item in index_items:
+                store.delete(item.namespace, item.key)
     return deleted
 
 
@@ -172,32 +191,88 @@ def _store_in_namespace(
     store: BaseStore, namespace: tuple[str, ...], record: MemoryRecord
 ) -> None:
     key = memory_key(record)
+    entry: MemoryIndexEntry = {"key": key, "created_at": record["created_at"]}
+    entry_namespace = _memory_index_entry_namespace(namespace, entry)
+
     store.put(namespace, key, dict(record))
-
-    index_namespace = _memory_index_namespace(namespace)
-    index_item = store.get(index_namespace, MEMORY_INDEX_KEY)
-    entries = _parse_memory_index(index_item.value) if index_item is not None else []
-    by_key = {entry["key"]: entry for entry in entries}
-    by_key[key] = {"key": key, "created_at": record["created_at"]}
-    recent = sorted(by_key.values(), key=lambda entry: entry["created_at"], reverse=True)[
-        :MEMORY_INDEX_CAPACITY
-    ]
-    store.put(index_namespace, MEMORY_INDEX_KEY, {"entries": recent})
+    store.put(
+        entry_namespace,
+        MEMORY_INDEX_KEY,
+        dict(entry),
+        index=False,
+    )
 
 
-def _recall_namespace(store: BaseStore, namespace: tuple[str, ...]) -> list[MemoryRecord]:
-    index_item = store.get(_memory_index_namespace(namespace), MEMORY_INDEX_KEY)
-    if index_item is None:
-        items = store.search(namespace, limit=MEMORY_INDEX_CAPACITY)
+def _recall_namespace(
+    store: BaseStore, namespace: tuple[str, ...], *, limit: int
+) -> list[MemoryRecord]:
+    if limit <= 0:
+        return []
+
+    entries = _read_memory_index_entries(store, namespace, limit=limit)
+    if entries:
+        items = [
+            item
+            for entry in entries[:limit]
+            if (item := store.get(namespace, entry["key"])) is not None
+        ]
     else:
-        entries = _parse_memory_index(index_item.value)
-        items = [item for entry in entries if (item := store.get(namespace, entry["key"]))]
+        items = store.search(namespace, limit=limit)
 
     return [
         record
         for record in (_parse_memory_record(item.value) for item in items)
         if record is not None
     ]
+
+
+def _memory_index_entries_namespace(namespace: tuple[str, ...]) -> tuple[str, ...]:
+    return (*_memory_index_namespace(namespace), "entries")
+
+
+def _memory_index_entry_namespace(
+    namespace: tuple[str, ...], entry: MemoryIndexEntry
+) -> tuple[str, ...]:
+    created_at = datetime.fromisoformat(entry["created_at"])
+    if created_at.tzinfo is None:
+        raise ValueError("memory created_at must include a timezone")
+
+    elapsed = created_at.astimezone(UTC) - _UNIX_EPOCH
+    timestamp_microseconds = (
+        elapsed.days * 86_400_000_000 + elapsed.seconds * 1_000_000 + elapsed.microseconds
+    )
+    reverse_timestamp = _MEMORY_INDEX_TIMESTAMP_CEILING_MICROSECONDS - timestamp_microseconds
+    if timestamp_microseconds < 0 or reverse_timestamp < 0:
+        raise ValueError("memory created_at is outside the supported range")
+
+    sort_key = f"{reverse_timestamp:018d}-{entry['key']}"
+    return (*_memory_index_entries_namespace(namespace), sort_key)
+
+
+def _read_memory_index_entries(
+    store: BaseStore, namespace: tuple[str, ...], *, limit: int
+) -> list[MemoryIndexEntry]:
+    entries_namespace = _memory_index_entries_namespace(namespace)
+    entry_namespaces = store.list_namespaces(
+        prefix=entries_namespace,
+        max_depth=len(entries_namespace) + 1,
+        limit=limit,
+    )
+    entries = [
+        entry
+        for entry_namespace in entry_namespaces
+        if (item := store.get(entry_namespace, MEMORY_INDEX_KEY)) is not None
+        if (entry := _parse_memory_index_entry(item.value)) is not None
+    ]
+
+    # Read the former single-document index during its TTL window so deployments
+    # can move to append-only entries without losing existing memories.
+    legacy_item = store.get(_memory_index_namespace(namespace), MEMORY_INDEX_KEY)
+    if legacy_item is not None:
+        entries.extend(_parse_memory_index(legacy_item.value)[:limit])
+
+    by_key = {entry["key"]: entry for entry in entries}
+    return sorted(by_key.values(), key=lambda entry: entry["created_at"], reverse=True)[:limit]
 
 
 def _parse_memory_index(value: Mapping[str, object]) -> list[MemoryIndexEntry]:
@@ -215,6 +290,14 @@ def _parse_memory_index(value: Mapping[str, object]) -> list[MemoryIndexEntry]:
         if isinstance(key, str) and isinstance(created_at, str):
             entries.append({"key": key, "created_at": created_at})
     return entries
+
+
+def _parse_memory_index_entry(value: Mapping[str, object]) -> MemoryIndexEntry | None:
+    key = value.get("key")
+    created_at = value.get("created_at")
+    if not isinstance(key, str) or not isinstance(created_at, str):
+        return None
+    return {"key": key, "created_at": created_at}
 
 
 def _parse_memory_record(value: Mapping[str, object]) -> MemoryRecord | None:

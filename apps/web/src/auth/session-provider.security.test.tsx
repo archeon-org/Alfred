@@ -55,7 +55,7 @@ describe('SessionProvider security boundaries', () => {
     expect(storageWrite).not.toHaveBeenCalled();
   });
 
-  it('fails closed when refresh is unavailable', async () => {
+  it('fails closed without presenting a refresh outage as an anonymous session', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
 
     const wrapper = ({ children }: PropsWithChildren) => (
@@ -63,8 +63,48 @@ describe('SessionProvider security boundaries', () => {
     );
     const { result } = renderHook(() => useSession(), { wrapper });
 
-    await waitFor(() => expect(result.current.status).toBe('anonymous'));
+    await waitFor(() => expect(result.current.status).toBe('error'));
     expect(result.current.accessToken).toBeNull();
+  });
+
+  it('recovers an unavailable session after an explicit retry', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              accessToken: 'recovered-token',
+              user: {
+                displayName: 'Ada Lovelace',
+                email: 'ada@example.test',
+                id: '21dd1aaa-d564-4a45-9a07-dbc5777d25d5',
+                role: 'user',
+              },
+            },
+            success: true,
+          }),
+          { headers: { 'content-type': 'application/json' }, status: 200 },
+        ),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <SessionProvider>{children}</SessionProvider>
+    );
+    const { result } = renderHook(() => useSession(), { wrapper });
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    await act(async () => {
+      await result.current.refresh();
+    });
+
+    expect(result.current).toMatchObject({
+      accessToken: 'recovered-token',
+      status: 'authenticated',
+      user: { email: 'ada@example.test' },
+    });
   });
 
   it('keeps the visible session when the server cannot confirm logout', async () => {

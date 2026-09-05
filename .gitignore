@@ -15,6 +15,7 @@ test-results/
 .turbo/
 .vite/
 pnpm-debug.log*
+.pnpm-store/
 
 apps/agent/.venv/
 apps/agent/.langgraph_api/

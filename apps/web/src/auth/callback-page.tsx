@@ -26,13 +26,17 @@ export function CallbackPage() {
     }
 
     attempted.current = true;
-    void refresh().then((restored) => {
-      if (restored !== null) {
-        void navigate(returnTo, { replace: true });
-      } else {
+    void refresh()
+      .then((restored) => {
+        if (restored !== null) {
+          void navigate(returnTo, { replace: true });
+        } else {
+          setFailed(true);
+        }
+      })
+      .catch(() => {
         setFailed(true);
-      }
-    });
+      });
   }, [navigate, providerError, refresh, returnTo, status]);
 
   if (status === 'authenticated') {
@@ -40,7 +44,11 @@ export function CallbackPage() {
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-canvas px-5 py-10" id="main-content">
+    <main
+      className="grid min-h-dvh place-items-center bg-canvas px-5 py-10"
+      id="main-content"
+      tabIndex={-1}
+    >
       <Card className="w-full max-w-md p-8 text-center">
         {failed ? (
           <>

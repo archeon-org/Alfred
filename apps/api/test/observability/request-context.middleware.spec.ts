@@ -52,4 +52,21 @@ describe('RequestContextMiddleware', () => {
       expect.stringMatching(/^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/u),
     );
   });
+
+  it('initializes one context when Nest mounts it twice for an excluded route', () => {
+    const context = new RequestContextService();
+    const middleware = new RequestContextMiddleware(context);
+    const request = { headers: {} } as unknown as Request;
+    const setHeader = vi.fn();
+    const response = { setHeader } as unknown as Response;
+    const run = vi.spyOn(context, 'run');
+    const next = vi.fn();
+
+    middleware.use(request, response, next);
+    middleware.use(request, response, next);
+
+    expect(next).toHaveBeenCalledTimes(2);
+    expect(run).toHaveBeenCalledOnce();
+    expect(setHeader).toHaveBeenCalledTimes(2);
+  });
 });

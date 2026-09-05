@@ -27,8 +27,14 @@ describe('createTypeOrmOptions', () => {
       ssl: false,
       synchronize: false,
       type: 'postgres',
+      uuidExtension: 'pgcrypto',
     });
-    expect(options.extra).toMatchObject({ max: 24 });
+    expect(options.extra).toMatchObject({
+      connectionTimeoutMillis: 10_000,
+      lock_timeout: 5_000,
+      max: 24,
+      statement_timeout: 30_000,
+    });
   });
 
   it('requires certificate validation when PostgreSQL TLS is enabled', () => {

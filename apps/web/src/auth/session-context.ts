@@ -2,7 +2,7 @@ import { createContext } from 'react';
 
 import type { SessionData, SessionUser } from './auth-api';
 
-export type SessionStatus = 'anonymous' | 'authenticated' | 'loading';
+export type SessionStatus = 'anonymous' | 'authenticated' | 'error' | 'loading';
 
 export interface SessionContextValue {
   readonly accessToken: string | null;

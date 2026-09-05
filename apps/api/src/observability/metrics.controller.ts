@@ -6,7 +6,7 @@ import { MetricsService } from './metrics.service';
 
 @Controller('metrics')
 @Public()
-@SkipThrottle()
+@SkipThrottle({ authenticated: true, ip: true })
 @UseGuards(MetricsAccessGuard)
 export class MetricsController {
   constructor(private readonly metrics: MetricsService) {}

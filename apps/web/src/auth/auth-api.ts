@@ -4,6 +4,13 @@ import { buildApiUrl } from '../lib/api-url';
 export type SessionUser = PublicUser;
 export type { SessionData } from '@alfred/contracts';
 
+function hasAsciiControlCharacter(value: string): boolean {
+  return [...value].some((character) => {
+    const codePoint = character.codePointAt(0);
+    return codePoint !== undefined && (codePoint <= 0x1f || codePoint === 0x7f);
+  });
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -39,7 +46,7 @@ export async function refreshSession(): Promise<SessionData | null> {
     method: 'POST',
   });
 
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     return null;
   }
   if (!response.ok) {
@@ -72,7 +79,10 @@ export async function logoutSession() {
 }
 
 export function safeReturnTo(value: string | null | undefined) {
-  return value?.startsWith('/') === true && !value.startsWith('//') && !value.includes('\\')
+  return value?.startsWith('/') === true &&
+    !value.startsWith('//') &&
+    !value.includes('\\') &&
+    !hasAsciiControlCharacter(value)
     ? value
     : '/app';
 }

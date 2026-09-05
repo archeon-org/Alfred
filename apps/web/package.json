@@ -12,7 +12,7 @@
     "build": "tsc -b && vite build",
     "clean": "rm -rf coverage dist playwright-report test-results",
     "dev": "vite --host 127.0.0.1",
-    "dev:e2e": "vite --host 127.0.0.1 --port 4173 --strictPort",
+    "dev:e2e": "pnpm build && vite preview --host 127.0.0.1 --port 4173 --strictPort",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings=0",
