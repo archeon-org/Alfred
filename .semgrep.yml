@@ -1,0 +1,78 @@
+# Local, offline Semgrep CE rules. These detect dangerous API usage, not complete
+# data-flow vulnerabilities; they do not provide CodeQL-equivalent coverage.
+rules:
+  - id: alfred-js-dynamic-code
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Avoid dynamic code evaluation; parse data or use explicit functions instead.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+      - pattern: Function(...)
+  - id: alfred-js-shell-command
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Avoid shell execution; use execFile or spawn with an argument array and shell disabled.
+    pattern-either:
+      - pattern: child_process.exec(...)
+      - pattern: child_process.execSync(...)
+      - pattern: 'child_process.spawn(..., { ..., shell: true, ... })'
+      - pattern: 'child_process.spawnSync(..., { ..., shell: true, ... })'
+      - patterns:
+          - pattern-inside: |
+              import { exec } from 'node:child_process';
+              ...
+          - pattern: exec(...)
+      - patterns:
+          - pattern-inside: |
+              import { execSync } from 'node:child_process';
+              ...
+          - pattern: execSync(...)
+      - patterns:
+          - pattern-inside: |
+              import { spawn } from 'node:child_process';
+              ...
+          - pattern: 'spawn(..., { ..., shell: true, ... })'
+      - patterns:
+          - pattern-inside: |
+              import { spawnSync } from 'node:child_process';
+              ...
+          - pattern: 'spawnSync(..., { ..., shell: true, ... })'
+  - id: alfred-python-dynamic-code
+    languages: [python]
+    severity: ERROR
+    message: Avoid eval and exec; parse structured data or call explicit functions instead.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: exec(...)
+  - id: alfred-python-shell-command
+    languages: [python]
+    severity: ERROR
+    message: Avoid shell execution; pass an argument list to subprocess with shell disabled.
+    pattern-either:
+      - pattern: os.system(...)
+      - pattern: os.popen(...)
+      - pattern: subprocess.$CALL(..., shell=True, ...)
+  - id: alfred-python-unsafe-yaml
+    languages: [python]
+    severity: ERROR
+    message: Use yaml.safe_load or SafeLoader; unsafe YAML constructors can execute code.
+    pattern-either:
+      - pattern: yaml.unsafe_load(...)
+      - pattern: yaml.unsafe_load_all(...)
+      - patterns:
+          - pattern-either:
+              - pattern: yaml.load(...)
+              - pattern: yaml.load_all(...)
+          - pattern-not: yaml.load(..., Loader=yaml.SafeLoader, ...)
+          - pattern-not: yaml.load(..., Loader=yaml.CSafeLoader, ...)
+          - pattern-not: yaml.load_all(..., Loader=yaml.SafeLoader, ...)
+          - pattern-not: yaml.load_all(..., Loader=yaml.CSafeLoader, ...)
+  - id: alfred-python-pickle-load
+    languages: [python]
+    severity: ERROR
+    message: Pickle deserialization can execute code; use validated JSON for external data.
+    pattern-either:
+      - pattern: pickle.load(...)
+      - pattern: pickle.loads(...)
+      - pattern: pickle.Unpickler(...)

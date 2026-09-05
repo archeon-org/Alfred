@@ -37,7 +37,7 @@ jobs:
             --env GIT_CONFIG_VALUE_0=/repo \
             --volume "$PWD:/repo:ro" \
             ghcr.io/gitleaks/gitleaks:v8.30.0@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9 \
-            git --redact --no-banner /repo
+            git --redact --verbose --no-banner /repo
 
   dependency-audit:
     runs-on: ubuntu-latest
@@ -66,24 +66,32 @@ jobs:
       - name: Audit Python dependencies
         run: uv run --frozen --project apps/agent pip-audit
 
-  codeql:
-    name: CodeQL (${{ matrix.language }})
+  sast:
+    name: Source security scan (Semgrep CE)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [javascript-typescript, python]
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: github/codeql-action/init@5ba2889ada762081db2c4f32a729827dce632c7b # v3
         with:
-          languages: ${{ matrix.language }}
-      - uses: github/codeql-action/analyze@5ba2889ada762081db2c4f32a729827dce632c7b # v3
+          persist-credentials: false
+      - name: Pull the pinned scanner
+        run: docker pull semgrep/semgrep:1.176.0@sha256:12672acdb0949e19f9f6a4c2b288edd0b404f268f0ca7738a2c06f372f50362e
+      - name: Test local security rules and scan source without network access
+        run: |
+          scan() {
+            docker run --rm --network none --read-only \
+              --cap-drop ALL --security-opt no-new-privileges \
+              --tmpfs /tmp:rw,nosuid,size=1g --env HOME=/tmp \
+              --volume "$PWD:/src:ro" --workdir /src \
+              --volume "$PWD/.semgrep.yml:/rules/security.yml:ro" \
+              --volume "$PWD/scripts/security/security.ts:/rules/security.ts:ro" \
+              --volume "$PWD/scripts/security/security.py:/rules/security.py:ro" \
+              semgrep/semgrep:1.176.0@sha256:12672acdb0949e19f9f6a4c2b288edd0b404f268f0ca7738a2c06f372f50362e \
+              semgrep scan --metrics off --disable-version-check "$@"
+          }
+          scan --test /rules
+          scan --strict --error --config .semgrep.yml --exclude scripts/security apps packages scripts
 
   repository-scan:
     name: Vulnerability, secret and configuration scan
