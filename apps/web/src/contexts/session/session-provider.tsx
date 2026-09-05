@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState, type PropsWithChildren } from
 
 import { SessionContext, type SessionContextValue } from '@/contexts/session/session-context';
 import { logoutSession, refreshSession, type SessionData } from '@/services/auth/auth.service';
-import { coordinateSessionRefresh } from '@/services/auth/session-refresh-coordinator';
+import {
+  coordinateSessionLogout,
+  coordinateSessionRefresh,
+} from '@/services/auth/session-refresh-coordinator';
 
 type SessionState = Pick<SessionContextValue, 'accessToken' | 'status' | 'user'>;
 
@@ -37,6 +40,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   const mounted = useRef(false);
   const revision = useRef(0);
   const inFlightRefresh = useRef<Promise<SessionData | null> | null>(null);
+  const inFlightLogout = useRef<Promise<void> | null>(null);
 
   const performRefresh = useCallback(async () => {
     const requestRevision = revision.current + 1;
@@ -44,9 +48,8 @@ export function SessionProvider({ children }: PropsWithChildren) {
 
     try {
       const refreshed = await coordinateSessionRefresh(refreshSession);
-      if (mounted.current && revision.current === requestRevision) {
-        setSession(refreshed === null ? anonymousSession : authenticatedSession(refreshed));
-      }
+      if (!mounted.current || revision.current !== requestRevision) return null;
+      setSession(refreshed === null ? anonymousSession : authenticatedSession(refreshed));
       return refreshed;
     } catch (error) {
       if (mounted.current && revision.current === requestRevision) {
@@ -57,6 +60,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
   }, []);
 
   const refresh = useCallback(() => {
+    if (inFlightLogout.current !== null) return Promise.resolve(null);
     if (inFlightRefresh.current !== null) {
       return inFlightRefresh.current;
     }
@@ -72,15 +76,28 @@ export function SessionProvider({ children }: PropsWithChildren) {
     return request;
   }, [performRefresh]);
 
-  const logout = useCallback(async () => {
+  const performLogout = useCallback(async () => {
     const requestRevision = revision.current + 1;
     revision.current = requestRevision;
 
-    await logoutSession();
+    // Let a rotating response settle before clearing the shared refresh cookie, even without Web Locks.
+    await inFlightRefresh.current?.catch(() => undefined);
+    await coordinateSessionLogout(logoutSession);
     if (mounted.current && revision.current === requestRevision) {
       setSession(anonymousSession);
     }
   }, []);
+
+  const logout = useCallback(() => {
+    if (inFlightLogout.current !== null) return inFlightLogout.current;
+    const request = performLogout();
+    inFlightLogout.current = request;
+    const clearRequest = () => {
+      if (inFlightLogout.current === request) inFlightLogout.current = null;
+    };
+    void request.then(clearRequest, clearRequest);
+    return request;
+  }, [performLogout]);
 
   useEffect(() => {
     mounted.current = true;

@@ -5,7 +5,10 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 const BEARER_AUTH_NAME = 'bearerAuth';
 
 export function isOpenApiEnabled(config: ConfigService): boolean {
-  return config.getOrThrow<string>('NODE_ENV') !== 'production';
+  return (
+    config.getOrThrow<string>('NODE_ENV') !== 'production' &&
+    config.getOrThrow<boolean>('FEATURE_OPENAPI_ENABLED')
+  );
 }
 
 export function configureOpenApi(app: INestApplication): void {

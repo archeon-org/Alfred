@@ -54,6 +54,45 @@ function currentSession(overrides: Partial<RefreshSessionEntity> = {}): RefreshS
 }
 
 describe('RefreshSessionService', () => {
+  it('rejects a token that expires while waiting for its database lock', async () => {
+    vi.useFakeTimers();
+    try {
+      const current = currentSession();
+      const repository = {
+        create: vi.fn((value: Partial<RefreshSessionEntity>) => value),
+        findOne: vi
+          .fn()
+          .mockResolvedValueOnce(current)
+          .mockImplementationOnce(() => {
+            vi.setSystemTime(current.expiresAt);
+            return Promise.resolve(current);
+          }),
+        findOneBy: vi.fn().mockResolvedValue(user),
+        save: vi.fn(),
+        update: vi.fn(),
+      };
+      const manager = { getRepository: () => repository, query: vi.fn().mockResolvedValue([]) };
+      const dataSource = {
+        transaction: vi.fn((work: (value: EntityManager) => unknown) =>
+          Promise.resolve(work(manager as unknown as EntityManager)),
+        ),
+      } as unknown as DataSource;
+      const tokens = tokenService();
+      const service = new RefreshSessionService(
+        dataSource,
+        tokens as unknown as SessionTokenService,
+        configService(),
+      );
+
+      await expect(service.rotate('expiring-token')).rejects.toThrow('Invalid refresh session');
+      expect(tokens.issueAccessToken).not.toHaveBeenCalled();
+      expect(repository.save).not.toHaveBeenCalled();
+      expect(repository.update).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('stores only the refresh-token hash and returns a short-lived access token', async () => {
     const create = vi.fn((value: Partial<RefreshSessionEntity>) => value as RefreshSessionEntity);
     const save = vi.fn((value: RefreshSessionEntity) =>

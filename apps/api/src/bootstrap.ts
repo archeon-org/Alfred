@@ -3,6 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import type { NextFunction, Request, Response } from 'express';
+
+function preventResponseCaching(_request: Request, response: Response, next: NextFunction): void {
+  response.setHeader('Cache-Control', 'no-store');
+  next();
+}
 
 export function configureApplication(app: INestApplication): void {
   const config = app.get(ConfigService);
@@ -14,6 +20,7 @@ export function configureApplication(app: INestApplication): void {
   }
 
   app.use(helmet());
+  app.use(preventResponseCaching);
   app.use(cookieParser());
   app.enableCors({
     credentials: true,

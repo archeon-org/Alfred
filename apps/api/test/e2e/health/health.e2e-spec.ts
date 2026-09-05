@@ -11,6 +11,7 @@ import { configureApplication } from '@api/bootstrap';
 import { ApiExceptionFilter } from '@api/common/filters/api-exception.filter';
 import { IpThrottlerGuard } from '@api/common/guards/alfred-throttler.guard';
 import { validateEnv } from '@api/config/configuration';
+import { FeatureFlagsService } from '@api/modules/feature-flags/feature-flags.service';
 import { DatabaseHealthIndicator } from '@api/modules/health/database-health.indicator';
 import { HealthController } from '@api/modules/health/health.controller';
 import { HealthService } from '@api/modules/health/health.service';
@@ -25,6 +26,10 @@ describe('operational health module', () => {
   const query = vi.fn();
   const checkRedis = vi.fn();
   const throttleIncrement = vi.fn();
+  const isRateLimitingEnabled = vi.fn((feature: string) => feature === 'rateLimiting');
+  const featureFlags = {
+    isEnabled: isRateLimitingEnabled,
+  } as unknown as FeatureFlagsService;
 
   beforeAll(async () => {
     vi.stubEnv('NODE_ENV', 'test');
@@ -63,6 +68,7 @@ describe('operational health module', () => {
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
         { provide: APP_GUARD, useClass: IpThrottlerGuard },
         { provide: DataSource, useValue: { query } },
+        { provide: FeatureFlagsService, useValue: featureFlags },
         { provide: RedisHealthIndicator, useValue: { check: checkRedis } },
       ],
     }).compile();
@@ -82,6 +88,7 @@ describe('operational health module', () => {
     query.mockResolvedValue([{ result: 1 }]);
     checkRedis.mockReset();
     checkRedis.mockResolvedValue({ redis: { status: 'up' } });
+    isRateLimitingEnabled.mockImplementation((feature: string) => feature === 'rateLimiting');
     throttleIncrement.mockReset();
     throttleIncrement.mockRejectedValue(new Error('throttling storage unavailable'));
   });
@@ -161,6 +168,22 @@ describe('operational health module', () => {
       success: false,
     });
     expect(checkRedis).toHaveBeenCalledOnce();
+    expect(throttleIncrement).not.toHaveBeenCalled();
+  });
+
+  it('keeps readiness up and reports Redis disabled when rate limiting is disabled', async () => {
+    isRateLimitingEnabled.mockReturnValue(false);
+
+    const response = await fetch(`${baseUrl}/health/ready`);
+    const body: unknown = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      details: { database: { status: 'up' }, redis: { status: 'disabled' } },
+      status: 'ok',
+    });
+    expect(query).toHaveBeenCalledOnce();
+    expect(checkRedis).not.toHaveBeenCalled();
     expect(throttleIncrement).not.toHaveBeenCalled();
   });
 });

@@ -6,6 +6,7 @@ import {
   type PublicUser,
   type SessionData,
 } from '@alfred/contracts';
+import { withSessionTimeout } from '@/services/auth/session-timeout';
 import { buildApiUrl } from '@/services/http/api-url';
 import { publicApiClient } from '@/services/http/http-client';
 
@@ -51,35 +52,41 @@ async function readJson(response: Response) {
 }
 
 export async function refreshSession(): Promise<SessionData | null> {
-  const response = await publicApiClient.request('/auth/refresh', {
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
-    method: 'POST',
+  return withSessionTimeout(async (signal) => {
+    const response = await publicApiClient.request('/auth/refresh', {
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+      method: 'POST',
+      signal,
+    });
+
+    if (response.status === 401) {
+      return null;
+    }
+    if (!response.ok) {
+      throw new Error('La session ne peut pas être restaurée.');
+    }
+
+    const data = responseData(await readJson(response));
+    if (typeof data.accessToken !== 'string' || data.accessToken.trim() === '') {
+      throw new Error("Le jeton d'accès de session est invalide.");
+    }
+
+    return Object.freeze({ accessToken: data.accessToken, user: parseUser(data.user) });
   });
-
-  if (response.status === 401) {
-    return null;
-  }
-  if (!response.ok) {
-    throw new Error('La session ne peut pas être restaurée.');
-  }
-
-  const data = responseData(await readJson(response));
-  if (typeof data.accessToken !== 'string' || data.accessToken.trim() === '') {
-    throw new Error("Le jeton d'accès de session est invalide.");
-  }
-
-  return Object.freeze({ accessToken: data.accessToken, user: parseUser(data.user) });
 }
 
 export async function logoutSession(): Promise<void> {
   let response: Response;
   try {
-    response = await publicApiClient.request('/auth/logout', {
-      credentials: 'include',
-      headers: { Accept: 'application/json' },
-      method: 'POST',
-    });
+    response = await withSessionTimeout((signal) =>
+      publicApiClient.request('/auth/logout', {
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+        method: 'POST',
+        signal,
+      }),
+    );
   } catch {
     throw new Error('La déconnexion distante a échoué.');
   }

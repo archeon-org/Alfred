@@ -12,7 +12,8 @@ the future AG-UI stream gateway; the LangGraph service remains a separate agent 
   retains pre-authentication abuse protection without giving one user the entire shared budget.
   OAuth start, OAuth callback and refresh also use independent configurable IP buckets, defaulting
   to 300, 600 and 1,200 requests per minute respectively, so one public flow cannot consume the
-  budget of another.
+  budget of another. `FEATURE_RATE_LIMITING_ENABLED=false` explicitly bypasses all NestJS
+  throttlers and removes Redis from API readiness.
 - Google OAuth uses authorization code, PKCE, state and nonce. Provider credentials and provider
   tokens stay server-side. It is an optional external/commercial provider controlled by
   `FEATURE_GOOGLE_OAUTH_ENABLED`; a Workspace domain restriction is optional.
@@ -49,13 +50,19 @@ credentials. Optional capabilities are declared through validated `FEATURE_*_ENA
 Operational endpoints are intentionally outside the `/api` prefix:
 
 - `GET /health/live`: process liveness without a database dependency.
-- `GET /health/ready`: PostgreSQL and Redis readiness.
+- `GET /health/ready`: PostgreSQL readiness plus Redis readiness while rate limiting is enabled.
 - `GET /api/features`: public read-only feature manifest containing booleans only.
 - `GET /metrics`: hidden while disabled; otherwise protected by its dedicated bearer token.
 
+`FEATURE_OPENAPI_ENABLED` controls Swagger UI and JSON in development/test. It defaults to true;
+production always disables documentation. All application responses use `Cache-Control: no-store`,
+including session responses, rejected requests and the feature manifest. Flag changes require an
+API restart/recreation, not a frontend rebuild.
+
 The stream boundary is reserved at authenticated `GET /api/stream/capabilities`; no placeholder
 SSE implementation is exposed before the AG-UI event and cancellation contract is settled. The
-route is unavailable unless `FEATURE_AG_UI_STREAMING_ENABLED=true`.
+route remains unavailable while AG-UI is reserved, including when its configuration flag is true.
+The effective public manifest combines configuration with implemented capability availability.
 
 ## Container and migrations
 

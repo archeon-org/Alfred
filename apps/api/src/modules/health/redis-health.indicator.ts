@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { RedisClientService } from '../../infrastructure/redis/redis-client.service';
 
 export interface RedisHealth {
-  readonly redis: { readonly status: 'down' | 'up' };
+  readonly redis: { readonly status: 'disabled' | 'down' | 'up' };
 }
 
 @Injectable()

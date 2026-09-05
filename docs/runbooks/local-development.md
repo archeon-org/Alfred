@@ -38,6 +38,8 @@ FEATURE_FILE_UPLOADS_ENABLED=false
 FEATURE_GENERATIVE_UI_ENABLED=false
 FEATURE_GOOGLE_OAUTH_ENABLED=false
 FEATURE_MCP_APPS_ENABLED=false
+FEATURE_RATE_LIMITING_ENABLED=true
+FEATURE_OPENAPI_ENABLED=true
 FEATURE_RUNTIME_MEMORY_ENABLED=false
 FEATURE_SKILLS_ENABLED=false
 FEATURE_TEAMS_ENABLED=false
@@ -45,11 +47,13 @@ FEATURE_TEAMS_ENABLED=false
 
 Flags are read at API startup; restart the API after changing one. A `true` value only unlocks an
 implemented capability—it does not install missing infrastructure or credentials. NestJS enforces
-route requirements, while React reads the same public boolean manifest from `/api/features` and
-fails closed if it is malformed or unavailable.
+route requirements, while React reads only public product flags from `/api/features` and fails
+closed if that manifest is malformed or unavailable. `FEATURE_RATE_LIMITING_ENABLED` is a private
+operational flag: it defaults on, and disabling it bypasses every throttler without changing the
+authentication or authorization path.
 
-Authentication, authorization, validation and audit controls are security invariants, not optional
-feature flags.
+Authentication, authorization, validation, same-origin mutation checks and audit controls are
+security invariants, not optional feature flags.
 
 ## Start the complete local stack
 
@@ -79,7 +83,8 @@ The startup order is deliberate:
    receive the required `citext` extension.
 3. `migrate` runs the compiled TypeORM migration registry once with the schema-owner role.
 4. `postgres-runtime-grants` revokes API-runtime DML on the TypeORM migration ledger.
-5. The API starts only after both one-shot jobs exit successfully.
+5. The API starts only after both PostgreSQL one-shot jobs exit successfully; Redis readiness is
+   evaluated by the API only when rate limiting is enabled.
 6. The web container waits for API readiness.
 
 The local `agent` service runs `langgraph dev`, listens on port `8000` inside the container and is
@@ -121,12 +126,17 @@ troubleshooting step.
 | OpenAPI JSON         | `http://localhost:3000/api/docs-json` |
 | LangGraph dev health | `http://localhost:2024/ok`            |
 
-Swagger UI and its JSON document are mounted only in development and test environments; production
-does not expose these routes.
+Swagger UI and its JSON document are mounted only in development and test environments when
+`FEATURE_OPENAPI_ENABLED=true`. Set it to false to remove both routes without changing the API.
+Production never exposes them, including when the flag is true.
 
-The API receives an authenticated Redis URL targeting the `redis` service. Redis is part of API
-readiness and backs the distributed rate limiter. No Agent Server URL is injected until the AG-UI
-invocation adapter exists.
+The API receives an authenticated Redis URL targeting the `redis` service. Redis backs the
+distributed rate limiter and is part of readiness only while `FEATURE_RATE_LIMITING_ENABLED=true`.
+When the flag is false, readiness reports Redis as `disabled` and requests never touch the limiter
+storage. No Agent Server URL is injected until the AG-UI invocation adapter exists.
+
+Disabling the limiter does not remove Redis from Compose: the base stack still provisions the
+service and requires `REDIS_API_PASSWORD`. Keep its generated credential configured.
 
 ## Proxy and metrics
 

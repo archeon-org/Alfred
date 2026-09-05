@@ -17,7 +17,7 @@ export class FeatureFlagGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredFeatures = this.reflector.getAllAndOverride<readonly FeatureFlagName[]>(
+    const requiredFeatures = this.reflector.getAllAndMerge<readonly FeatureFlagName[]>(
       REQUIRED_FEATURE_FLAGS_KEY,
       [context.getHandler(), context.getClass()],
     );

@@ -18,6 +18,19 @@ const examplePaths = [
 ];
 const generatedPaths = ['.env', 'apps/api/.env', 'apps/web/.env', 'apps/agent/.env'];
 
+test('preserves explicit per-file rate-limit choices while adding missing flags', async (context) => {
+  const workspace = await createWorkspace(context);
+  await writeFile(join(workspace, '.env'), 'FEATURE_RATE_LIMITING_ENABLED=true\n');
+  await writeFile(join(workspace, 'apps/api/.env'), 'FEATURE_RATE_LIMITING_ENABLED=false\n');
+
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+
+  const root = parseEnvironment(await readFile(join(workspace, '.env'), 'utf8'));
+  const api = parseEnvironment(await readFile(join(workspace, 'apps/api/.env'), 'utf8'));
+  assert.equal(root.FEATURE_RATE_LIMITING_ENABLED, 'true');
+  assert.equal(api.FEATURE_RATE_LIMITING_ENABLED, 'false');
+});
+
 function parseEnvironment(content) {
   return Object.fromEntries(
     content
@@ -97,4 +110,6 @@ test('migrates generated local environment files to the current contract', async
   );
   assert.equal(rootEnvironment.AUTH_IP_RATE_LIMIT_PER_MINUTE, '6000');
   assert.equal(apiEnvironment.AUTH_IP_RATE_LIMIT_PER_MINUTE, '6000');
+  assert.equal(rootEnvironment.FEATURE_RATE_LIMITING_ENABLED, 'true');
+  assert.equal(apiEnvironment.FEATURE_RATE_LIMITING_ENABLED, 'true');
 });

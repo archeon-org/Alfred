@@ -24,6 +24,34 @@ function persistedState(overrides: Partial<OauthLoginStateEntity> = {}): OauthLo
 }
 
 describe('OauthStateService', () => {
+  it('rejects a state that expires while waiting for its database lock', async () => {
+    vi.useFakeTimers();
+    try {
+      const state = persistedState({ stateHash: hashState('matching-state') });
+      const repository = {
+        delete: vi.fn().mockResolvedValue({ affected: 1 }),
+        findOne: vi.fn().mockImplementation(() => {
+          vi.setSystemTime(state.expiresAt);
+          return Promise.resolve(state);
+        }),
+        update: vi.fn(),
+      };
+      const service = new OauthStateService({
+        transaction: vi.fn((work: (manager: EntityManager) => unknown) =>
+          Promise.resolve(work({ getRepository: () => repository } as unknown as EntityManager)),
+        ),
+      } as unknown as DataSource);
+
+      await expect(service.consume('google', 'matching-state', 'matching-state')).rejects.toThrow(
+        'Expired or reused OAuth state',
+      );
+      expect(repository.delete).toHaveBeenCalledWith({ stateHash: state.stateHash });
+      expect(repository.update).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('persists only a hash of the browser state challenge', async () => {
     const create = vi.fn((value: Partial<OauthLoginStateEntity>) => value as OauthLoginStateEntity);
     const repository = {

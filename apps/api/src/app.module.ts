@@ -19,6 +19,7 @@ import { RedisThrottlerStorage } from './infrastructure/redis/redis-throttler.st
 import { AuthModule } from './modules/auth/auth.module';
 import { FeatureFlagGuard } from './modules/feature-flags/feature-flag.guard';
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
+import { FeatureFlagsService } from './modules/feature-flags/feature-flags.service';
 import { HealthModule } from './modules/health/health.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { StreamModule } from './modules/stream/stream.module';
@@ -27,8 +28,14 @@ import { ObservabilityModule } from './observability/observability.module';
 
 const THROTTLE_WINDOW_MS = 60_000;
 
-export function createThrottlerOptions(storage: RedisThrottlerStorage, config: ConfigService) {
+export function createThrottlerOptions(
+  storage: RedisThrottlerStorage,
+  config: ConfigService,
+  featureFlags: FeatureFlagsService,
+) {
+  const rateLimitingEnabled = featureFlags.isEnabled('rateLimiting');
   return {
+    skipIf: () => !rateLimitingEnabled,
     storage,
     throttlers: [
       {
@@ -69,8 +76,8 @@ export function createThrottlerOptions(storage: RedisThrottlerStorage, config: C
     RedisModule,
     ObservabilityModule,
     ThrottlerModule.forRootAsync({
-      imports: [RedisModule],
-      inject: [RedisThrottlerStorage, ConfigService],
+      imports: [RedisModule, FeatureFlagsModule],
+      inject: [RedisThrottlerStorage, ConfigService, FeatureFlagsService],
       useFactory: createThrottlerOptions,
     }),
     TypeOrmModule.forRootAsync({

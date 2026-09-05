@@ -101,6 +101,8 @@ const environmentSchema = z
     FEATURE_GENERATIVE_UI_ENABLED: booleanFromEnvironment.default(false),
     FEATURE_GOOGLE_OAUTH_ENABLED: booleanFromEnvironment.default(false),
     FEATURE_MCP_APPS_ENABLED: booleanFromEnvironment.default(false),
+    FEATURE_OPENAPI_ENABLED: booleanFromEnvironment.default(true),
+    FEATURE_RATE_LIMITING_ENABLED: booleanFromEnvironment.default(true),
     FEATURE_RUNTIME_MEMORY_ENABLED: booleanFromEnvironment.default(false),
     FEATURE_SKILLS_ENABLED: booleanFromEnvironment.default(false),
     FEATURE_TEAMS_ENABLED: booleanFromEnvironment.default(false),
@@ -170,9 +172,13 @@ const environmentSchema = z
       const credentials = {
         AUTH_JWT_SECRET: environment.AUTH_JWT_SECRET,
         DATABASE_URL: environment.DATABASE_URL,
-        GOOGLE_OAUTH_CLIENT_ID: environment.GOOGLE_OAUTH_CLIENT_ID,
-        GOOGLE_OAUTH_CLIENT_SECRET: environment.GOOGLE_OAUTH_CLIENT_SECRET,
-        REDIS_URL: environment.REDIS_URL,
+        ...(environment.FEATURE_GOOGLE_OAUTH_ENABLED
+          ? {
+              GOOGLE_OAUTH_CLIENT_ID: environment.GOOGLE_OAUTH_CLIENT_ID,
+              GOOGLE_OAUTH_CLIENT_SECRET: environment.GOOGLE_OAUTH_CLIENT_SECRET,
+            }
+          : {}),
+        ...(environment.FEATURE_RATE_LIMITING_ENABLED ? { REDIS_URL: environment.REDIS_URL } : {}),
       } as const;
 
       for (const [key, value] of Object.entries(credentials)) {
@@ -185,7 +191,7 @@ const environmentSchema = z
         }
       }
 
-      if (!hasUrlPassword(environment.REDIS_URL)) {
+      if (environment.FEATURE_RATE_LIMITING_ENABLED && !hasUrlPassword(environment.REDIS_URL)) {
         context.addIssue({
           code: 'custom',
           message: 'REDIS_URL must include a password in production',
@@ -253,6 +259,7 @@ const environmentSchema = z
 
     if (
       environment.NODE_ENV === 'production' &&
+      environment.OBSERVABILITY_METRICS_ENABLED &&
       containsCommittedPlaceholder(environment.OBSERVABILITY_METRICS_TOKEN)
     ) {
       context.addIssue({

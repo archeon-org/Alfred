@@ -115,7 +115,13 @@ The API receives the complete current backend contract from Compose:
   `AUTH_OAUTH_CALLBACK_IP_RATE_LIMIT_PER_MINUTE` and `AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE`;
   size every IP ceiling for the measured enterprise NAT/proxy fan-in and provider/database
   capacity;
+- rate-limit mode: `FEATURE_RATE_LIMITING_ENABLED` defaults to `true`; setting it to `false`
+  bypasses all global and route-specific throttlers, removes Redis from API readiness and therefore
+  deliberately removes abuse protection. Compose still provisions Redis and requires
+  `REDIS_API_PASSWORD` in this mode;
 - feature flags: every validated `FEATURE_*_ENABLED` switch listed in `.env.example`;
+- API documentation: `FEATURE_OPENAPI_ENABLED` defaults on for development/test but production
+  always leaves Swagger UI and JSON unavailable;
 - OAuth: `FEATURE_GOOGLE_OAUTH_ENABLED`, `GOOGLE_OAUTH_CLIENT_ID`,
   `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_CALLBACK_URL`, and optional
   `GOOGLE_WORKSPACE_DOMAIN`;
@@ -144,7 +150,8 @@ Only `.env.example` placeholders are committed. Never pass JWT, OAuth, PostgreSQ
 secrets as image build arguments or public `VITE_` variables.
 
 Feature flags are deployment-time configuration. Changing one requires an API restart or rollout.
-The API is authoritative: hiding a React component is never treated as authorization.
+The API is authoritative: hiding a React component is never treated as authorization. Private
+operational flags such as rate limiting are not returned by the public feature manifest.
 
 The current Google start, Google callback and cookie-refresh routes keep the aggregate IP ceiling
 and add route-specific IP buckets. Their initial defaults are respectively 300, 600 and 1,200

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseEnvironment } from '@api/config/environment';
+import { FEATURE_FLAG_ENVIRONMENT_KEYS } from '@api/modules/feature-flags/feature-flags.types';
 
 const validEnvironment = Object.freeze({
   API_CORS_ORIGINS: 'http://localhost:5173,https://app.alfred.dev',
@@ -16,6 +17,30 @@ const validEnvironment = Object.freeze({
 });
 
 describe('parseEnvironment', () => {
+  it.each(Object.values(FEATURE_FLAG_ENVIRONMENT_KEYS))(
+    'rejects ambiguous values for %s',
+    (key) => {
+      expect(() => parseEnvironment({ ...validEnvironment, [key]: 'off' })).toThrow(key);
+    },
+  );
+
+  it('does not require usable credentials for explicitly disabled optional integrations', () => {
+    const environment = parseEnvironment({
+      ...validEnvironment,
+      API_CORS_ORIGINS: 'https://alfred.example',
+      AUTH_COOKIE_SECURE: true,
+      FEATURE_GOOGLE_OAUTH_ENABLED: false,
+      FEATURE_RATE_LIMITING_ENABLED: false,
+      NODE_ENV: 'production',
+      WEB_APP_URL: 'https://alfred.example',
+      GOOGLE_OAUTH_CLIENT_ID: 'replace-with-client-id',
+      GOOGLE_OAUTH_CLIENT_SECRET: 'replace-with-google-client-secret',
+      OBSERVABILITY_METRICS_ENABLED: false,
+      OBSERVABILITY_METRICS_TOKEN: 'replace-with-metrics-token-at-least-32-characters',
+    });
+    expect(environment.FEATURE_GOOGLE_OAUTH_ENABLED).toBe(false);
+    expect(environment.OBSERVABILITY_METRICS_ENABLED).toBe(false);
+  });
   it('returns an immutable, normalized and typed configuration', () => {
     const environment = parseEnvironment(validEnvironment);
 
@@ -46,6 +71,8 @@ describe('parseEnvironment', () => {
       FEATURE_GENERATIVE_UI_ENABLED: false,
       FEATURE_GOOGLE_OAUTH_ENABLED: false,
       FEATURE_MCP_APPS_ENABLED: false,
+      FEATURE_OPENAPI_ENABLED: true,
+      FEATURE_RATE_LIMITING_ENABLED: true,
       FEATURE_RUNTIME_MEMORY_ENABLED: false,
       FEATURE_SKILLS_ENABLED: false,
       FEATURE_TEAMS_ENABLED: false,
@@ -287,6 +314,12 @@ describe('parseEnvironment', () => {
         FEATURE_SKILLS_ENABLED: 'yes',
       }),
     ).toThrow(/FEATURE_SKILLS_ENABLED/u);
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FEATURE_RATE_LIMITING_ENABLED: 'off',
+      }),
+    ).toThrow(/FEATURE_RATE_LIMITING_ENABLED/u);
   });
 
   it('accepts only an explicit bounded number of trusted reverse-proxy hops', () => {
@@ -310,5 +343,20 @@ describe('parseEnvironment', () => {
         OBSERVABILITY_METRICS_TOKEN: 'metrics-only-secret-that-is-longer-than-32-characters',
       }).OBSERVABILITY_METRICS_ENABLED,
     ).toBe(true);
+  });
+
+  it('allows production startup without Redis credentials when rate limiting is explicitly disabled', () => {
+    const environment = parseEnvironment({
+      ...validEnvironment,
+      API_CORS_ORIGINS: 'https://alfred.example',
+      AUTH_COOKIE_SECURE: 'true',
+      FEATURE_RATE_LIMITING_ENABLED: 'false',
+      NODE_ENV: 'production',
+      REDIS_URL: 'redis://redis:6379/0',
+      WEB_APP_URL: 'https://alfred.example',
+    });
+
+    expect(environment.FEATURE_RATE_LIMITING_ENABLED).toBe(false);
+    expect(environment.REDIS_URL).toBe('redis://redis:6379/0');
   });
 });

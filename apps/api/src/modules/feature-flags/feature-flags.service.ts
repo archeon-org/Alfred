@@ -2,33 +2,54 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   FEATURE_FLAG_ENVIRONMENT_KEYS,
+  type BackendFeatureFlagName,
+  type BackendFeatureFlags,
   type FeatureFlagName,
   type FeatureFlags,
 } from './feature-flags.types';
 
+// Promote only with a real execution path and enabled/disabled contract tests.
+const IMPLEMENTED_PUBLIC_FEATURES = Object.freeze({
+  agentRuntime: false,
+  agUiStreaming: false,
+  fileUploads: false,
+  generativeUi: false,
+  googleOAuth: true,
+  mcpApps: false,
+  runtimeMemory: false,
+  skills: false,
+  teams: false,
+} as const satisfies Readonly<Record<FeatureFlagName, boolean>>);
+
 @Injectable()
 export class FeatureFlagsService {
-  private readonly flags: FeatureFlags;
+  private readonly flags: BackendFeatureFlags;
+  private readonly publicFlags: FeatureFlags;
 
   constructor(config: ConfigService) {
+    this.publicFlags = Object.freeze(
+      Object.fromEntries(
+        Object.entries(IMPLEMENTED_PUBLIC_FEATURES).map(([feature, implemented]) => [
+          feature,
+          implemented &&
+            config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS[feature as FeatureFlagName]),
+        ]),
+      ) as FeatureFlags,
+    );
     this.flags = Object.freeze({
-      agentRuntime: config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.agentRuntime),
-      agUiStreaming: config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.agUiStreaming),
-      fileUploads: config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.fileUploads),
-      generativeUi: config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.generativeUi),
-      googleOAuth: config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.googleOAuth),
-      mcpApps: config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.mcpApps),
-      runtimeMemory: config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.runtimeMemory),
-      skills: config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.skills),
-      teams: config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.teams),
+      ...this.publicFlags,
+      openApi:
+        config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.openApi) &&
+        config.getOrThrow<string>('NODE_ENV') !== 'production',
+      rateLimiting: config.getOrThrow<boolean>(FEATURE_FLAG_ENVIRONMENT_KEYS.rateLimiting),
     });
   }
 
   getPublicFlags(): FeatureFlags {
-    return this.flags;
+    return this.publicFlags;
   }
 
-  isEnabled(feature: FeatureFlagName): boolean {
+  isEnabled(feature: BackendFeatureFlagName): boolean {
     return this.flags[feature];
   }
 }

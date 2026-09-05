@@ -112,6 +112,46 @@ test('serializes refresh rotation across two tabs', async ({ context, page }) =>
   expect(maximumActiveRefreshes).toBe(1);
 });
 
+test('waits for another tab refresh before confirming logout', async ({ context, page }) => {
+  let activeRefreshes = 0;
+  let logoutOverlappedRefresh = false;
+  let releaseRefresh!: () => void;
+  const refreshReleased = new Promise<void>((resolve) => {
+    releaseRefresh = resolve;
+  });
+  let refreshCalls = 0;
+  await context.route('**/api/auth/refresh', async (route) => {
+    refreshCalls += 1;
+    activeRefreshes += 1;
+    if (refreshCalls > 1) await refreshReleased;
+    await route.fulfill({
+      contentType: 'application/json',
+      json: authenticatedSession,
+      status: 200,
+    });
+    activeRefreshes -= 1;
+  });
+  await context.route('**/api/auth/logout', async (route) => {
+    logoutOverlappedRefresh = activeRefreshes > 0;
+    await route.fulfill({ status: 204 });
+  });
+  await page.goto('/app');
+  const logoutButton = page.getByRole('button', { name: 'Se déconnecter' });
+  await expect(logoutButton).toBeVisible();
+  const secondPage = await context.newPage();
+  await secondPage.goto('/app');
+  await expect.poll(() => activeRefreshes).toBe(1);
+
+  await logoutButton.click();
+  await expect(logoutButton).toBeDisabled();
+  releaseRefresh();
+  await expect(page.getByRole('heading', { name: 'Bienvenue sur Alfred' })).toBeVisible();
+  expect(logoutOverlappedRefresh).toBe(false);
+  await expect
+    .poll(() => page.evaluate(() => [localStorage.length, sessionStorage.length]))
+    .toEqual([0, 0]);
+});
+
 test('moves keyboard focus to the main content after route navigation', async ({ page }) => {
   await page.route('**/api/auth/refresh', async (route) =>
     route.fulfill({ body: '', status: 401 }),

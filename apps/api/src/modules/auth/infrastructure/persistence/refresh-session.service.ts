@@ -61,12 +61,13 @@ export class RefreshSessionService implements SessionPort {
   async rotate(rawToken: string): Promise<IssuedSession> {
     const nextToken = this.tokens.createRefreshToken();
     const tokenHash = this.tokens.hashRefreshToken(rawToken);
-    const now = new Date();
 
     const outcome = await this.dataSource.transaction<RotationOutcome>(async (manager) => {
       const locked = await this.lockRefreshSession(manager, tokenHash);
       if (locked === null) return { kind: 'invalid' };
       const { repository, session: current } = locked;
+      // Lock contention must not extend a credential's validity window.
+      const now = new Date();
 
       if (current.rotatedAt !== null) {
         await repository.update({ familyId: current.familyId }, { revokedAt: now });

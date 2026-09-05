@@ -50,16 +50,28 @@ matrix and exact Google OAuth setup checklist.
 
 ## Feature flags
 
-Optional product capabilities are controlled by `FEATURE_*_ENABLED` variables in the backend
-environment. They are disabled by default, enforced by a global NestJS guard and exposed to React
-through the public, read-only `/api/features` manifest. Google OAuth is intended for external or
-commercial deployments and remains disabled in the Enterprise profile.
+Capabilities are controlled by validated `FEATURE_*_ENABLED` variables in the backend environment.
+Optional product capabilities default off, are enforced by NestJS and may be exposed to React
+through the public, read-only `/api/features` manifest. Operational flags remain server-only;
+rate limiting defaults on and can be explicitly disabled without blocking the API on Redis.
+`FEATURE_OPENAPI_ENABLED=false` removes local Swagger UI and its JSON endpoint; production keeps
+both disabled regardless of that flag. Environment flags are startup snapshots, not live toggles.
+Reserved product flags stay false in the public manifest until their execution path exists, even
+when an environment profile sets the variable to `true`.
+Google OAuth is intended for external or commercial deployments and remains disabled in the Enterprise
+profile.
+
+Reserved capabilities remain effectively disabled even when their environment switch is true;
+only implemented execution paths can be advertised. See the
+[capability delivery contract](docs/development/capability-delivery.md) for ownership, fallback
+semantics and required checks. `pnpm architecture:check` enforces source boundaries and file size.
 
 The Compose stack starts:
 
 - `postgres`: application database.
 - `postgres-bootstrap`: idempotent logical-database and extension provisioning.
-- `redis`: API readiness and distributed throttling backing service.
+- `redis`: distributed throttling backing service; required for readiness only while rate limiting
+  is enabled.
 - `api`: NestJS API.
 - `web`: Vite production bundle served by Nginx.
 - `agent`: LangGraph development server for local graph iteration.

@@ -18,6 +18,8 @@ const featureFlagKeys = Object.freeze([
   'FEATURE_GENERATIVE_UI_ENABLED',
   'FEATURE_GOOGLE_OAUTH_ENABLED',
   'FEATURE_MCP_APPS_ENABLED',
+  'FEATURE_OPENAPI_ENABLED',
+  'FEATURE_RATE_LIMITING_ENABLED',
   'FEATURE_RUNTIME_MEMORY_ENABLED',
   'FEATURE_SKILLS_ENABLED',
   'FEATURE_TEAMS_ENABLED',
@@ -124,13 +126,15 @@ function renderEnvironment(lines) {
 
 function renderFeatureFlags(flags) {
   return [
-    '# Feature flags: optional product capabilities are disabled by default.',
+    '# Feature flags: optional product capabilities default off; operational safety defaults on.',
     `FEATURE_AGENT_RUNTIME_ENABLED=${flags.agentRuntime}`,
     `FEATURE_AG_UI_STREAMING_ENABLED=${flags.agUiStreaming}`,
     `FEATURE_FILE_UPLOADS_ENABLED=${flags.fileUploads}`,
     `FEATURE_GENERATIVE_UI_ENABLED=${flags.generativeUi}`,
     `FEATURE_GOOGLE_OAUTH_ENABLED=${flags.googleOAuth}`,
     `FEATURE_MCP_APPS_ENABLED=${flags.mcpApps}`,
+    `FEATURE_OPENAPI_ENABLED=${flags.openApi}`,
+    `FEATURE_RATE_LIMITING_ENABLED=${flags.rateLimiting}`,
     `FEATURE_RUNTIME_MEMORY_ENABLED=${flags.runtimeMemory}`,
     `FEATURE_SKILLS_ENABLED=${flags.skills}`,
     `FEATURE_TEAMS_ENABLED=${flags.teams}`,
@@ -170,7 +174,13 @@ async function synchronizeFeatureFlags(path, flags) {
     .join('\n')
     .replace(/\n{3,}/gu, '\n\n')
     .trimEnd();
-  const synchronized = `${preservedLines}\n\n${renderFeatureFlags(flags).join('\n')}\n`;
+  const configuredLines = renderFeatureFlags(flags).map((line) => {
+    const key = line.match(/^([A-Z][A-Z0-9_]*)=/u)?.[1];
+    return key !== undefined && environment[key] !== undefined
+      ? `${key}=${environment[key]}`
+      : line;
+  });
+  const synchronized = `${preservedLines}\n\n${configuredLines.join('\n')}\n`;
 
   await writeFile(path, synchronized, { encoding: 'utf8', mode: 0o600 });
   console.log(`updated feature flags in ${path.slice(workspaceRoot.length + 1) || '.env'}`);
@@ -283,6 +293,8 @@ const featureFlags = Object.freeze({
     firstValue('GOOGLE_OAUTH_ENABLED', environments, 'false'),
   ),
   mcpApps: firstValue('FEATURE_MCP_APPS_ENABLED', environments, 'false'),
+  rateLimiting: firstValue('FEATURE_RATE_LIMITING_ENABLED', environments, 'true'),
+  openApi: firstValue('FEATURE_OPENAPI_ENABLED', environments, 'true'),
   runtimeMemory: firstValue('FEATURE_RUNTIME_MEMORY_ENABLED', environments, 'false'),
   skills: firstValue('FEATURE_SKILLS_ENABLED', environments, 'false'),
   teams: firstValue('FEATURE_TEAMS_ENABLED', environments, 'false'),

@@ -54,7 +54,8 @@ export class AuthenticatedThrottlerGuard extends NamedThrottlerGuard {
   protected override shouldSkip(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<ThrottledRequest>();
     const userId = request.user?.id;
-    return Promise.resolve(typeof userId !== 'string' || userId.trim() === '');
+    if (typeof userId !== 'string' || userId.trim() === '') return Promise.resolve(true);
+    return super.shouldSkip(context);
   }
 
   protected override getTracker(request: Record<string, unknown>): Promise<string> {

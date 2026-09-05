@@ -1,5 +1,5 @@
 import type { AddressInfo } from 'node:net';
-import { Controller, Get, type INestApplication } from '@nestjs/common';
+import { Controller, Get, UnauthorizedException, type INestApplication } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { Test } from '@nestjs/testing';
@@ -16,6 +16,11 @@ class OpenApiProbeController {
   getProbe(): { status: string } {
     return { status: 'ok' };
   }
+
+  @Get('private')
+  getPrivate(): never {
+    throw new UnauthorizedException();
+  }
 }
 
 describe('OpenAPI HTTP documentation', () => {
@@ -30,8 +35,21 @@ describe('OpenAPI HTTP documentation', () => {
   ] as const;
 
   it('keeps the documentation disabled in production', () => {
-    expect(isOpenApiEnabled(new ConfigService({ NODE_ENV: 'production' }))).toBe(false);
-    expect(isOpenApiEnabled(new ConfigService({ NODE_ENV: 'development' }))).toBe(true);
+    expect(
+      isOpenApiEnabled(
+        new ConfigService({ NODE_ENV: 'production', FEATURE_OPENAPI_ENABLED: true }),
+      ),
+    ).toBe(false);
+    expect(
+      isOpenApiEnabled(
+        new ConfigService({ NODE_ENV: 'development', FEATURE_OPENAPI_ENABLED: true }),
+      ),
+    ).toBe(true);
+    expect(
+      isOpenApiEnabled(
+        new ConfigService({ NODE_ENV: 'development', FEATURE_OPENAPI_ENABLED: false }),
+      ),
+    ).toBe(false);
   });
 
   beforeAll(async () => {
@@ -71,6 +89,38 @@ describe('OpenAPI HTTP documentation', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/html');
     expect(html).toContain('id="swagger-ui"');
+  });
+
+  it('prevents caching of application responses, authentication failures and missing routes', async () => {
+    for (const path of ['openapi-probe', 'openapi-probe/private', 'missing']) {
+      const response = await fetch(`${baseUrl}/api/${path}`);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    }
+  });
+
+  it('removes both documentation endpoints without disabling application routes', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          validate: (input) => validateEnv({ ...input, FEATURE_OPENAPI_ENABLED: false }),
+        }),
+      ],
+      controllers: [OpenApiProbeController],
+    }).compile();
+    const disabledApp = moduleRef.createNestApplication();
+    try {
+      configureApplication(disabledApp);
+      configureOpenApi(disabledApp);
+      await disabledApp.listen(0, '127.0.0.1');
+      const address = (disabledApp.getHttpServer() as { address(): AddressInfo }).address();
+      const origin = `http://127.0.0.1:${address.port}`;
+      expect((await fetch(`${origin}/api/docs`)).status).toBe(404);
+      expect((await fetch(`${origin}/api/docs-json`)).status).toBe(404);
+      expect((await fetch(`${origin}/api/openapi-probe`)).status).toBe(200);
+    } finally {
+      await disabledApp.close();
+    }
   });
 
   it('publishes a prefixed OpenAPI document with an available bearer scheme and no secrets', async () => {

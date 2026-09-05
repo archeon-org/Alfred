@@ -17,5 +17,5 @@ export function useAuthProvidersQuery() {
   }, [refetch]);
   const status: AuthProvidersQueryStatus = isPending ? 'loading' : isError ? 'error' : 'ready';
 
-  return Object.freeze({ providers: data ?? [], reload, status });
+  return Object.freeze({ providers: status === 'ready' ? (data ?? []) : [], reload, status });
 }

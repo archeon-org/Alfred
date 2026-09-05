@@ -18,5 +18,9 @@ export function useFeatureFlagsQuery() {
   }, [refetch]);
   const status: FeatureFlagsQueryStatus = isPending ? 'loading' : isError ? 'error' : 'ready';
 
-  return Object.freeze({ flags: data ?? DISABLED_FEATURE_FLAGS, reload, status });
+  return Object.freeze({
+    flags: status === 'ready' ? (data ?? DISABLED_FEATURE_FLAGS) : DISABLED_FEATURE_FLAGS,
+    reload,
+    status,
+  });
 }

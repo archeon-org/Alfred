@@ -39,11 +39,12 @@ export class OauthStateService implements OauthStatePort {
     const stateHash = this.hash(queryState);
     const outcome = await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(OauthLoginStateEntity);
-      const consumedAt = new Date();
       const state = await repository.findOne({
         where: { stateHash },
         lock: { mode: 'pessimistic_write' },
       });
+      // Evaluate expiration after the potentially blocking row lock is acquired.
+      const consumedAt = new Date();
       if (state === null || state.expiresAt.getTime() <= consumedAt.getTime()) {
         if (state !== null) await repository.delete({ stateHash });
         return null;

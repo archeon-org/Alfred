@@ -1,4 +1,5 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { RedisHealthIndicator } from './redis-health.indicator';
 
@@ -7,6 +8,7 @@ export class HealthService {
   constructor(
     private readonly database: DatabaseHealthIndicator,
     private readonly redis: RedisHealthIndicator,
+    private readonly featureFlags: FeatureFlagsService,
   ) {}
 
   getHealth() {
@@ -22,7 +24,13 @@ export class HealthService {
   }
 
   async checkReadiness() {
-    const [database, redis] = await Promise.all([this.database.check(), this.redis.check()]);
+    const rateLimitingEnabled = this.featureFlags.isEnabled('rateLimiting');
+    const [database, redis] = await Promise.all([
+      this.database.check(),
+      rateLimitingEnabled
+        ? this.redis.check()
+        : Promise.resolve({ redis: { status: 'disabled' as const } }),
+    ]);
     const details = { ...database, ...redis };
     if (database.database.status === 'down' || redis.redis.status === 'down') {
       throw new ServiceUnavailableException({ details, status: 'error' });
