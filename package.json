@@ -33,6 +33,9 @@
     "docker:config": "docker compose config --quiet",
     "docker:recreate": "docker compose --env-file .env up -d --force-recreate --no-build",
     "docker:up": "docker compose up --build -d",
+    "docker:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d",
+    "docker:dev:web": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d --no-deps web",
+    "docker:dev:logs": "docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f web",
     "docker:down": "docker compose down",
     "prepare": "husky",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:coverage && pnpm build && pnpm format:check && pnpm agent:lint && pnpm agent:typecheck && pnpm agent:test && pnpm memory:check"

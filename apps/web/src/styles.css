@@ -1,58 +1,154 @@
 @import 'tailwindcss';
 
-@theme {
-  --color-canvas: #f4f5f1;
-  --color-panel: #fffefa;
-  --color-ink: #17211f;
-  --color-muted: #65716d;
-  --color-line: #d9dfda;
-  --color-brand-50: #eff8f5;
-  --color-brand-100: #d9eee8;
-  --color-brand-200: #b7ddd3;
-  --color-brand-300: #86c1b2;
-  --color-brand-700: #176653;
-  --color-brand-800: #145244;
-  --color-brand-900: #123f36;
-  --color-danger-50: #fff1f0;
-  --color-danger-700: #a5362f;
+/* A dark OS must not activate isolated dark controls before a complete theme exists. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-canvas: var(--canvas);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@theme static {
+  --breakpoint-workspace: 75rem;
+  --breakpoint-wide: 87.5rem;
+  --container-conversation: 50rem;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1.5;
+  --tracking-label: 0.15em;
   --font-sans:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-editorial: Georgia, 'Times New Roman', serif;
   --shadow-soft: 0 20px 55px rgb(28 51 45 / 0.08);
+  --shadow-panel: 0 2px 5px rgb(36 51 37 / 0.02), 0 12px 35px -22px rgb(36 51 37 / 0.25);
+  --shadow-composer: 0 4px 14px rgb(51 67 38 / 0.04), 0 0 0 4px var(--muted);
+  --shadow-emblem: 0 9px 14px -6px rgb(30 68 44 / 0.33), inset 0 1px 1px rgb(255 255 255 / 0.25);
+  --animate-workspace-appear: workspace-appear 300ms ease-out both;
+
+  @keyframes workspace-appear {
+    from {
+      opacity: 0;
+      transform: translateY(0.3rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 @layer base {
   :root {
-    color: var(--color-ink);
-    background: var(--color-canvas);
+    color-scheme: light;
+    --background: #fcfcf9;
+    --foreground: #253932;
+    --card: #fcfcf9;
+    --card-foreground: #253932;
+    --popover: #fcfcf9;
+    --popover-foreground: #253932;
+    --primary: #34654d;
+    --primary-foreground: #ffffff;
+    --secondary: #e9ede3;
+    --secondary-foreground: #344c35;
+    --muted: #e9ede3;
+    --muted-foreground: #5d695e;
+    --accent: #e7eddc;
+    --accent-foreground: #344c35;
+    --destructive: #a5362f;
+    --destructive-foreground: #ffffff;
+    --border: #dce0d6;
+    --input: #899784;
+    --ring: #34654d;
+    --canvas: #f0f1ed;
+    --warning: #f4eee3;
+    --warning-foreground: #76562f;
+    --info: #eaf0ee;
+    --info-foreground: #41675f;
+    --sidebar: #202f29;
+    --sidebar-foreground: #eff3e9;
+    --sidebar-muted: #b7c4b9;
+    --sidebar-primary: #d6e5be;
+    --sidebar-primary-foreground: #283d2a;
+    --sidebar-accent: #34483b;
+    --sidebar-accent-foreground: #eff3e9;
+    --sidebar-border: #40544a;
+    --sidebar-ring: #d6e5be;
+    color: var(--foreground);
+    background: var(--canvas);
     font-family: var(--font-sans);
     font-synthesis: none;
     text-rendering: optimizeLegibility;
   }
 
+  /* Scope standard shadcn tokens so primitives also work on the dark navigation surface. */
+  .theme-sidebar {
+    --background: var(--sidebar);
+    --foreground: var(--sidebar-foreground);
+    --primary: var(--sidebar-primary);
+    --primary-foreground: var(--sidebar-primary-foreground);
+    --secondary: var(--sidebar-accent);
+    --secondary-foreground: var(--sidebar-accent-foreground);
+    --muted: var(--sidebar-accent);
+    --muted-foreground: var(--sidebar-muted);
+    --accent: var(--sidebar-accent);
+    --accent-foreground: var(--sidebar-accent-foreground);
+    --border: var(--sidebar-border);
+    --input: var(--sidebar-muted);
+    --ring: var(--sidebar-ring);
+    --card: var(--sidebar);
+    --card-foreground: var(--sidebar-foreground);
+  }
+
   * {
     box-sizing: border-box;
   }
-
   html {
     min-width: 320px;
     scroll-behavior: smooth;
   }
-
   body {
     min-width: 320px;
     min-height: 100vh;
     margin: 0;
   }
-
   button,
   a,
   textarea {
     -webkit-tap-highlight-color: transparent;
   }
-
   ::selection {
-    color: var(--color-brand-900);
-    background: var(--color-brand-200);
+    color: var(--primary-foreground);
+    background: var(--primary);
   }
 }
 

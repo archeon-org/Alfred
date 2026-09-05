@@ -17,6 +17,25 @@ COPY packages/contracts/package.json ./packages/contracts/package.json
 RUN --mount=type=cache,id=alfred-pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @alfred/web...
 
+FROM dependencies AS development
+
+COPY tsconfig.base.json ./tsconfig.base.json
+COPY apps/web/tsconfig*.json apps/web/vite.config.ts apps/web/index.html ./apps/web/
+COPY apps/web/src ./apps/web/src
+COPY apps/web/public ./apps/web/public
+COPY packages/contracts ./packages/contracts
+
+WORKDIR /workspace/apps/web
+
+USER node
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=6 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:8080/ || exit 1
+
+CMD ["node", "node_modules/vite/bin/vite.js", "--host", "0.0.0.0", "--port", "8080"]
+
 FROM dependencies AS build
 
 COPY tsconfig.base.json ./tsconfig.base.json

@@ -57,11 +57,52 @@ security invariants, not optional feature flags.
 
 ## Start the complete local stack
 
+For frontend work with live updates at `http://localhost:5173`:
+
+```bash
+pnpm docker:dev
+```
+
+This combines `docker-compose.yml` with `docker-compose.dev.yml` in the same `alfred` project.
+The `web` service runs Vite instead of Nginx. React, Tailwind/CSS, public assets, HTML and shared
+contract source are mounted read-only from the checkout; Vite updates the browser when they change.
+Docker-only polling at a 300 ms interval makes file watching reliable across Docker Desktop's
+filesystem bridge. Vite's cache and temporary config bundle live in writable temporary filesystems.
+Dependencies stay inside the Linux image; no host `node_modules` or private `.env` file is mounted.
+Only the existing loopback port is published. `/api` forwards to `api:3000`, preserving the browser
+origin and replacing forwarding headers for the API's single trusted proxy hop.
+
+If the API and data services are already running, update only the frontend:
+
+```bash
+pnpm docker:dev:web
+pnpm docker:dev:logs
+```
+
+`docker:dev:web` rebuilds/recreates only `web`, without restarting databases or rerunning migrations.
+Keep using the dev commands while developing; plain `docker:up` switches `web` back to the static
+Nginx image. Do not combine the dev overlay with `docker-compose.platform.yml` or expose Vite as a
+production server.
+
+| Change                                                            | Required action in Docker development                                                            |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| React, styles, mocks, HTML, public assets, shared contract source | Save the file; Vite applies HMR or reloads the page.                                             |
+| Mounted Vite/TypeScript config                                    | Vite normally restarts/reloads; rerun `pnpm docker:dev:web` if a config change is not picked up. |
+| Dependencies, lockfile, Dockerfile, package metadata              | Run `pnpm docker:dev:web` to rebuild the web image.                                              |
+| Root `.env` values passed to `web`                                | Run `pnpm docker:dev:web` to recreate its environment.                                           |
+| API or agent source/config                                        | Their source is not mounted; rebuild/recreate the affected service.                              |
+
+`pnpm dev:web` still runs Vite directly on the host and uses the host API proxy settings. Stop the
+Docker web service first if the host process must use port 5173.
+
+For the static built-asset workflow:
+
 ```bash
 pnpm docker:up
 ```
 
-`docker:up` rebuilds images before starting the detached stack. When only runtime container values
+`docker:up` rebuilds images before starting the detached stack. Its Nginx web image is a source
+snapshot: it has no bind mount or hot reload, so edits require a new build. When only runtime container values
 such as Google OAuth settings changed, reuse the existing images and recreate the containers
 instead:
 
@@ -86,6 +127,12 @@ The startup order is deliberate:
 5. The API starts only after both PostgreSQL one-shot jobs exit successfully; Redis readiness is
    evaluated by the API only when rate limiting is enabled.
 6. The web container waits for API readiness.
+
+Docker Desktop groups the services under `alfred`. `postgres` and `redis` are persistent data
+services; `api`, `web` and `agent` are application processes. `postgres-bootstrap`, `migrate` and
+`postgres-runtime-grants` are initialization jobs, not additional PostgreSQL servers. An
+`Exited (0)` status is their expected successful state. Keep these service definitions because the
+next startup uses their ordering; inspect any nonzero exit code before starting the API.
 
 The local `agent` service runs `langgraph dev`, listens on port `8000` inside the container and is
 available at `http://127.0.0.1:2024`. It does not receive an Agent Server licence,
@@ -141,7 +188,7 @@ service and requires `REDIS_API_PASSWORD`. Keep its generated credential configu
 ## Proxy and metrics
 
 - `TRUST_PROXY_HOPS` is a non-negative integer, never a broad boolean. Direct host development uses
-  `0`; the Compose API uses `1` because Nginx is the single trusted hop. Production must set the
+  `0`; the Compose API uses `1` because Nginx (or Vite in Docker development) is the single trusted hop. Production must set the
   exact ingress chain length.
 - Structured JSON logs are enabled with `OBSERVABILITY_LOG_LEVEL`.
 - `/metrics` returns 404 unless `OBSERVABILITY_METRICS_ENABLED=true`. When enabled, callers must
@@ -161,6 +208,7 @@ The committed example is intentionally sufficient for static validation:
 
 ```bash
 docker compose --env-file .env.example config --quiet
+docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.dev.yml config --quiet
 docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml config --quiet
 ```
 

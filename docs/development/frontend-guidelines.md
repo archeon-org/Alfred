@@ -1,0 +1,139 @@
+# Guidelines frontend Alfred
+
+Cette convention s'applique à `apps/web`. Elle complète
+[l'ADR 0009](../adr/0009-application-and-test-topology.md) et formalise
+[l'ADR 0011](../adr/0011-frontend-design-system.md). Le workspace conserve son identité claire
+sauge, sa navigation sombre et son relief. Une migration technique ne justifie pas un redesign.
+
+## Choisir un composant
+
+1. Chercher la primitive existante dans `src/components/ui`, puis le composant shadcn/ui adapté.
+   Son code reste local, revu et personnalisé par tokens et variantes.
+2. Si shadcn ne couvre pas le besoin, composer les primitives existantes. Créer un composant local
+   avec Tailwind si nécessaire. Un composant propre au workspace reste dans son domaine.
+3. Utiliser du CSS écrit à la main seulement pour les tokens, les règles globales ou une exception
+   difficile à exprimer proprement avec Tailwind : keyframes, portée de thème, sélecteur complexe.
+   Documenter la raison près de la règle ; ne pas recréer une feuille CSS parallèle pour une page.
+
+L'absence d'un widget dans shadcn ne justifie **pas l'installation d'une autre bibliothèque UI**.
+Les dépendances d'implémentation des composants shadcn, notamment Radix et
+`react-resizable-panels`, ne sont pas des design systems concurrents. Réutiliser celles présentes ;
+ne pas reconstruire leur gestion du focus et du clavier. Une nouvelle dépendance nécessaire à
+une primitive shadcn doit être identifiée et justifiée dans le changement, sans importer un kit
+entier. Les futures intégrations spécialisées, comme un éditeur documentaire, constituent un autre
+périmètre et ne doivent pas entrer dans une simple retouche de présentation.
+
+## Primitives et variantes
+
+- `components/ui` contient des primitives sans données ni imports métier. Les composants de domaine
+  les composent ; ils ne dupliquent pas leur structure accessible ni leurs états d'interaction.
+- Les props natives dérivent de `ComponentProps<'button'>` ou de la primitive sous-jacente. Utiliser
+  des imports de types explicites, l'alias `@/lib/cn` et des exports nommés. Exposer `data-slot` sur
+  les racines des primitives pour les cibler sans dépendre de leur structure interne.
+- Les différences récurrentes de taille et d'intention deviennent des variantes typées, avec
+  `class-variance-authority` lorsque plusieurs variantes le justifient. Une prop `className`
+  ajuste la composition ; elle ne doit pas recolorer systématiquement une primitive.
+- Un bouton d'action utilise `Button` ou sa composition `IconButton`. Le type par défaut reste
+  `button` ; seul un bouton qui soumet réellement un formulaire prend `type="submit"`.
+- Employer `Input`, `Textarea`, `Checkbox`, `Switch` et les primitives de dialogue/onglets pour les
+  interactions correspondantes. Garder les éléments HTML natifs pour leur sémantique normale :
+  titres, liens, listes, formulaires, sections. Il ne s'agit pas d'envelopper chaque balise.
+- Un lien reste un lien, un bouton reste un bouton. Ne pas imbriquer deux éléments interactifs.
+
+## Couleurs, typographie et géométrie
+
+Les composants consomment des **rôles sémantiques**, par exemple `bg-background`, `text-foreground`,
+`text-muted-foreground`, `border-border`, `bg-primary`, `text-primary-foreground`, `ring-ring`.
+Les surfaces spécifiques utilisent des rôles dédiés (`sidebar`, `sidebar-foreground`, etc.) ou
+une portée de tokens sur leur conteneur.
+
+Les valeurs de couleur vivent dans `src/styles.css`. Aucun hexadécimal, `rgb()` ou `hsl()` dans le
+JSX, aucune classe de palette (`brand-*`, `ws-*`, `green-600`, `stone-200`, etc.) pour définir
+l'apparence d'un composant. Une nouvelle couleur doit correspondre à un rôle utile ; ne pas créer
+un token par nuance rencontrée pendant une migration. `transparent`, `currentColor` et l'héritage
+restent des mécanismes de composition, pas une seconde palette.
+
+Utiliser l'échelle Tailwind pour l'espacement, les rayons et la typographie ; centraliser les
+extensions réellement partagées. Les libellés utilisateur ont un plancher de **11 px à la taille
+racine standard**, exprimé en unité relative, y compris les mentions secondaires et les aides.
+Ce plancher ne dispense pas du contrôle de lisibilité, du zoom et du contraste.
+
+Les valeurs arbitraires ne sont pas interdites indistinctement. Une grille calculée, une largeur
+minimale de panneau, un ratio ou une géométrie décorative peuvent en avoir besoin. Les garder
+locales et explicites ; commenter une valeur inhabituelle dont la raison n'est pas évidente.
+Éviter les micro-écarts de spacing et les tailles de texte en pixels recopiés de la maquette.
+
+## Thème, relief et mouvement
+
+Le thème pris en charge à ce stade est **clair sauge**, avec une sidebar sombre. Il n'existe pas
+encore de sélecteur fonctionnel clair/sombre/auto ni de presets de branding. Les variantes `dark:`
+ne doivent pas s'activer implicitement avec le thème de l'OS : leur activation est explicite
+via une classe ou un attribut racine. Cette portée ne constitue pas, à elle seule, un thème sombre.
+
+Le relief vient de surfaces, bordures, ombres et états d'interaction cohérents. Un bouton possède
+un retour `hover`, `focus-visible`, `active` et `disabled` perceptible. Utiliser un changement de
+surface/ombre et, si utile, un déplacement discret à l'appui. Les transitions restent brèves et
+ciblées ; éviter `transition-all`, les animations permanentes décoratives et les sauts de layout.
+
+Respecter `prefers-reduced-motion` **et** la préférence temporaire de l'application : neutraliser
+les déplacements, transitions et animations décoratives, tout en conservant un retour visuel
+immédiat et un focus visible. Un skeleton réserve l'espace de son contenu ; il accompagne un état
+de chargement réel ou explicitement simulé pour la preview, sans faire croire à une requête réussie.
+
+## Responsabilités et organisation
+
+```text
+src/
+  components/
+    ui/                       primitives partagées, sans métier
+    layout/                   structures génériques si réellement réutilisées
+    workspace/
+      conversation/           transcript, accueil, composeur
+      navigation/             sidebar, projets, conversations
+      context/                contexte, équipes, skills, fichiers
+      header/                 en-tête, compte, paramètres
+  hooks/workspace/            état et adaptation React du workspace
+  services/<domaine>/         requêtes et validation, sans React
+  lib/workspace/              types de vue et fonctions pures
+  mock/                       données de la preview actuelle
+```
+
+Conserver `route → screen → hook → service → client HTTP`. Pas de `fetch` dans une vue, pas de
+React dans les services, pas de cache serveur copié dans un contexte. Ne pas ajouter un second
+arbre `features/`. Ne pas extraire `packages/ui` sans besoin concret de partage entre applications.
+
+Les vues reçoivent des props minimales, décrites par leurs besoins et les types de domaine ; éviter
+`ReturnType<typeof use...>` et le passage d'un hook entier à travers plusieurs composants.
+L'état local demeure dans un hook tant qu'il suffit. Ne pas ajouter Zustand ou un contexte global
+pour préparer un besoin hypothétique. Ne pas ajouter `memo`/`useMemo` sans coût ou stabilité
+référentielle à résoudre ; mesurer avant d'affirmer une amélioration de performance.
+
+## Preview et données réelles
+
+Les données de `src/mock` font actuellement partie de la preview produit livrée. Elles restent
+séparées des composants et des types de vue ; ce ne sont pas des fixtures à déplacer automatiquement
+sous `test`. Les préférences et créations de démonstration restent en mémoire. Le composeur ne doit
+pas simuler l'exécution d'un agent ni une sauvegarde serveur.
+
+Lors du branchement d'un contrat métier, remplacer l'alimentation mock par un service et un hook
+explicites, puis retirer les données de démonstration devenues inutiles du chemin concerné. Ne jamais
+utiliser un mock comme repli silencieux après une erreur réelle. Ne pas désactiver `RequireSession`
+pour rendre la preview plus facile à tester.
+
+## Vérification et revue
+
+- Vérifier clavier, labels, focus après dialogue, états désactivés, contraste et tailles tactiles.
+  Un contrôle compact garde une zone utilisable et un nom accessible ; une icône seule ne suffit pas.
+- Vérifier le viewport étroit, le zoom et les deux préférences de mouvement. Tester le thème OS sombre
+  pour détecter une activation accidentelle de styles sombres dans le thème clair.
+- Tester les interactions observables et les frontières, sans tests qui recopient simplement une
+  liste de classes. Les contrôles statiques du design system complètent les tests de comportement.
+- Exécuter `pnpm verify`, puis `pnpm test:e2e` pour les parcours, le responsive et les changements de
+  primitives interactives. Une modification purement documentaire utilise les contrôles de format
+  et de liens appropriés. Rapporter les tests ignorés et les limites de la vérification visuelle.
+- Relire le diff : réemploi d'une primitive, tokens sémantiques, variantes utiles, exceptions CSS
+  motivées, frontières préservées, aucune dépendance UI ajoutée par commodité.
+
+Un audit est un point de départ : vérifier ses constats dans le code et distinguer bug, règle
+retenue et capacité future. Les nombres historiques, la disponibilité d'un paquet ou une cible
+architecturale ne prouvent ni l'état courant ni une fonctionnalité livrée.

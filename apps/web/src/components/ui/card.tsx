@@ -1,11 +1,15 @@
-import type { HTMLAttributes } from 'react';
+import type { ComponentProps } from 'react';
 
-import { cn } from '../../lib/cn';
+import { cn } from '@/lib/cn';
 
-export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+export function Card({ className, ...props }: ComponentProps<'div'>) {
   return (
     <div
-      className={cn('rounded-2xl border border-line bg-panel shadow-soft', className)}
+      data-slot="card"
+      className={cn(
+        'rounded-2xl border border-border bg-card text-card-foreground shadow-soft',
+        className,
+      )}
       {...props}
     />
   );

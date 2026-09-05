@@ -196,3 +196,281 @@ test('lets the context panel use the full tablet width', async ({ page }) => {
     .poll(async () => (await contextPanel.boundingBox())?.width ?? 0)
     .toBeGreaterThan(1000);
 });
+
+test('browses sample conversations by keyboard while keeping drafts local', async ({ page }) => {
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
+  );
+  await page.goto('/app');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Nouvelle conversation' }),
+  ).toBeVisible();
+  const outgoingRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/')) outgoingRequests.push(request.url());
+  });
+
+  const search = page.getByRole('searchbox', { name: 'Rechercher une conversation' });
+  await search.fill('comité');
+  const sample = page.getByRole('button', { name: 'Synthèse du comité projet' });
+  await sample.focus();
+  await page.keyboard.press('Enter');
+
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Synthèse du comité projet' }),
+  ).toBeVisible();
+  const composer = page.getByRole('textbox', { name: 'Message' });
+  await composer.fill('Un brouillon privé');
+  await composer.press('Enter');
+  await expect(composer).toHaveValue('Un brouillon privé\n');
+  await expect(page.getByRole('button', { name: /envoyer/i })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /joindre/i })).toBeDisabled();
+
+  await page.getByRole('button', { name: 'Nouvelle conversation' }).click();
+  await page.getByRole('textbox', { name: 'Titre de la conversation' }).fill('Nouveau brouillon');
+  await page.getByRole('button', { name: 'Créer la conversation' }).click();
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Nouveau brouillon' })).toBeVisible();
+  await expect(composer).toHaveValue('');
+  expect(outgoingRequests).toEqual([]);
+  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+});
+
+test('opens mobile history and restores a hidden context without horizontal overflow', async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
+  );
+  await page.goto('/app');
+
+  const historyToggle = page.getByRole('button', { name: 'Afficher les conversations' });
+  await historyToggle.click();
+  await expect(page.getByRole('button', { name: 'Masquer les conversations' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await page
+    .getByRole('searchbox', { name: 'Rechercher une conversation' })
+    .fill('aucune-correspondance');
+  await expect(page.getByText('Aucune conversation trouvée')).toBeVisible();
+  await page.getByRole('button', { name: 'Masquer les conversations' }).click();
+  await expect(page.getByRole('searchbox', { name: 'Rechercher une conversation' })).toBeHidden();
+
+  await historyToggle.click();
+  await page.getByRole('searchbox', { name: 'Rechercher une conversation' }).clear();
+  const sample = page.getByRole('button', { name: 'Synthèse du comité projet' });
+  await sample.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('main')).toBeFocused();
+  await expect(sample).toBeHidden();
+
+  await page.getByRole('button', { name: 'Masquer le contexte' }).click();
+  await expect(
+    page.getByRole('complementary', { name: 'Contexte de la conversation' }),
+  ).toHaveCount(0);
+  await page.getByRole('button', { name: 'Afficher le contexte' }).click();
+  await expect(
+    page.getByRole('complementary', { name: 'Contexte de la conversation' }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});
+
+test('respects reduced motion while previewing loading placeholders', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
+  );
+  await page.goto('/app');
+  const loadingToggle = page.getByRole('button', { name: 'Aperçu du chargement' });
+  await loadingToggle.click();
+  const status = page.getByRole('status', { name: 'Chargement de l’espace de travail' });
+
+  await expect(status).toBeVisible();
+  await expect(loadingToggle).toHaveAttribute('aria-pressed', 'true');
+  const skeletons = page.locator('[data-slot="skeleton"]');
+  expect(await skeletons.count()).toBeGreaterThan(0);
+  expect(
+    await skeletons.evaluateAll((elements) =>
+      elements.every((element) => getComputedStyle(element).animationName === 'none'),
+    ),
+  ).toBe(true);
+
+  await loadingToggle.click();
+  await expect(status).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
+});
+
+test('creates a project conversation and a separate sandbox using accessible local dialogs', async ({
+  page,
+}) => {
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
+  );
+  await page.goto('/app');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Nouvelle conversation' }),
+  ).toBeVisible();
+  const outgoingRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/')) outgoingRequests.push(request.url());
+  });
+  const createProject = page.getByRole('button', { name: 'Créer un projet' });
+  await createProject.click();
+  const projectDialog = page.getByRole('dialog', { name: 'Nouveau projet' });
+  await projectDialog.getByRole('textbox', { name: 'Nom du projet' }).fill('Projet annulé');
+  await page.keyboard.press('Escape');
+  await expect(projectDialog).toHaveCount(0);
+  await expect(createProject).toBeFocused();
+  await expect(page.getByRole('group', { name: 'Projet annulé' })).toHaveCount(0);
+
+  await createProject.click();
+  await projectDialog.getByRole('textbox', { name: 'Nom du projet' }).fill('Projet Atlas');
+  await projectDialog.getByRole('button', { name: 'Créer le projet' }).click();
+  await page.getByRole('button', { name: 'Nouvelle conversation', exact: true }).click();
+  const conversationDialog = page.getByRole('dialog', { name: 'Nouvelle conversation' });
+  await expect(conversationDialog).toContainText('Projet Atlas');
+  await conversationDialog
+    .getByRole('textbox', { name: 'Titre de la conversation' })
+    .fill('Décisions de lancement');
+  await conversationDialog.getByRole('button', { name: 'Créer la conversation' }).click();
+
+  const project = page.getByRole('group', { name: 'Projet Atlas' });
+  await expect(
+    project.getByRole('button', { name: 'Décisions de lancement', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Décisions de lancement' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Créer une sandbox' }).click();
+  const sandboxDialog = page.getByRole('dialog', { name: 'Nouvelle sandbox' });
+  await sandboxDialog
+    .getByRole('textbox', { name: 'Titre de la conversation' })
+    .fill('Piste indépendante');
+  await sandboxDialog.getByRole('button', { name: 'Créer la sandbox' }).click();
+  await expect(
+    page
+      .getByRole('group', { name: 'Sandboxes' })
+      .getByRole('button', { name: 'Piste indépendante', exact: true }),
+  ).toBeVisible();
+  await expect(
+    project.getByRole('button', { name: 'Piste indépendante', exact: true }),
+  ).toHaveCount(0);
+  await project.getByRole('button', { name: 'Projet Atlas', exact: true }).click();
+  await project.getByRole('button', { name: 'Décisions de lancement', exact: true }).click();
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Décisions de lancement' }),
+  ).toBeVisible();
+  expect(outgoingRequests).toEqual([]);
+  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+});
+
+test('applies local display preferences and restores focus when settings close', async ({
+  page,
+}) => {
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
+  );
+  await page.goto('/app');
+  const settings = page.getByRole('button', { name: 'Paramètres' });
+  await settings.click();
+  const dialog = page.getByRole('dialog', { name: 'Paramètres' });
+  await dialog.getByRole('combobox', { name: 'Taille du texte' }).selectOption('comfortable');
+  await dialog.getByRole('switch', { name: 'Navigation compacte' }).click();
+  await dialog.getByRole('switch', { name: 'Réduire les animations' }).click();
+  const workspace = page.locator('[data-density]');
+  await expect(workspace).toHaveAttribute('data-density', 'compact');
+  await expect(workspace).toHaveAttribute('data-text-size', 'comfortable');
+  await expect(workspace).toHaveAttribute('data-reduced-motion', 'true');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(settings).toBeFocused();
+  await expect(workspace).toHaveAttribute('data-text-size', 'comfortable');
+  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+});
+
+test('resizes both desktop panels with keyboard and pointer while preserving the conversation space', async ({
+  page,
+}) => {
+  await page.setViewportSize({ height: 1000, width: 1440 });
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
+  );
+  await page.goto('/app');
+  const navigation = page.getByRole('navigation', { name: 'Navigation principale' });
+  const context = page.getByRole('complementary', { name: 'Contexte de la conversation' });
+  const leftHandle = page.getByRole('separator', { name: 'Redimensionner la navigation' });
+  const rightHandle = page.getByRole('separator', {
+    name: 'Redimensionner le panneau de contexte',
+  });
+  await expect(leftHandle).toBeVisible();
+  await expect(rightHandle).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        (await page.getByRole('complementary', { name: 'Espace personnel' }).boundingBox())
+          ?.height ?? 0,
+    )
+    .toBeGreaterThanOrEqual(990);
+  const initialNavigationWidth = (await navigation.boundingBox())?.width ?? 0;
+  const initialContextWidth = (await context.boundingBox())?.width ?? 0;
+
+  await leftHandle.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect
+    .poll(async () => (await navigation.boundingBox())?.width ?? 0)
+    .toBeGreaterThan(initialNavigationWidth);
+  await rightHandle.focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect
+    .poll(async () => (await context.boundingBox())?.width ?? 0)
+    .toBeGreaterThan(initialContextWidth);
+
+  for (const [handle, delta] of [
+    [leftHandle, 60],
+    [rightHandle, -60],
+  ] as const) {
+    const before = await handle.boundingBox();
+    expect(before).not.toBeNull();
+    if (!before) throw new Error('Resize handle is not visible');
+    const x = before.x + before.width / 2;
+    const y = before.y + before.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + delta, y, { steps: 5 });
+    await page.mouse.up();
+    await expect.poll(async () => (await handle.boundingBox())?.x ?? 0).not.toBe(before.x);
+  }
+
+  expect((await page.getByRole('main').boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(380);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+  await page.getByRole('button', { name: 'Masquer la navigation' }).click();
+  await expect(navigation).toBeHidden();
+  await expect(leftHandle).toHaveAttribute('aria-valuenow', '0');
+  await page.getByRole('button', { name: 'Afficher la navigation' }).click();
+  await expect(navigation).toBeVisible();
+  await expect(leftHandle).toBeVisible();
+});
+
+test('recovers mobile navigation after collapsing the desktop sidebar', async ({ page }) => {
+  await page.setViewportSize({ height: 1000, width: 1440 });
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
+  );
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Masquer la navigation' }).click();
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeHidden();
+
+  await page.setViewportSize({ height: 844, width: 390 });
+  await page.getByRole('button', { name: 'Afficher les conversations' }).click();
+
+  await expect(page.getByRole('searchbox', { name: 'Rechercher une conversation' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Nouvelle conversation', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Synthèse du comité projet', exact: true }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});

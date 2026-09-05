@@ -2,7 +2,7 @@ import { Bot, CheckCircle2, LoaderCircle, ShieldCheck, Sparkles } from 'lucide-r
 import { Navigate, useLocation } from 'react-router-dom';
 
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useAuthProvidersQuery } from '@/hooks/auth/use-auth-providers-query';
 import { useSession } from '@/hooks/auth/use-session';
@@ -41,12 +41,12 @@ export function LoginScreen() {
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -left-28 -top-36 size-[30rem] rounded-full bg-brand-100/70 blur-3xl"
+        className="pointer-events-none absolute -left-28 -top-36 size-[30rem] rounded-full bg-accent/70 blur-3xl"
       />
 
       <section className="relative flex flex-col justify-between gap-14 px-1 py-4 sm:px-5 lg:px-10 lg:py-10">
-        <div className="flex items-center gap-3 text-sm font-bold tracking-[0.18em] text-brand-900 uppercase">
-          <span className="grid size-10 place-items-center rounded-2xl bg-brand-800 text-white shadow-soft">
+        <div className="flex items-center gap-3 text-sm font-bold tracking-[0.18em] text-foreground uppercase">
+          <span className="grid size-10 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-soft">
             <Bot aria-hidden="true" size={20} />
           </span>
           Alfred
@@ -57,25 +57,25 @@ export function LoginScreen() {
             <Sparkles aria-hidden="true" size={14} />
             Espace agentique sécurisé
           </Badge>
-          <h1 className="text-4xl font-semibold tracking-[-0.04em] text-balance text-ink sm:text-6xl">
+          <h1 className="text-4xl font-semibold tracking-[-0.04em] text-balance text-foreground sm:text-6xl">
             Bienvenue sur Alfred
           </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-muted sm:text-lg">
+          <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
             Retrouvez vos conversations, composez votre équipe d’agents et gardez le contrôle sur
             chaque action depuis un espace de travail unique.
           </p>
 
-          <ul className="mt-9 grid gap-4 text-sm text-ink" aria-label="Garanties de session">
+          <ul className="mt-9 grid gap-4 text-sm text-foreground" aria-label="Garanties de session">
             {assurances.map((assurance) => (
               <li className="flex items-center gap-3" key={assurance}>
-                <CheckCircle2 aria-hidden="true" className="text-brand-700" size={18} />
+                <CheckCircle2 aria-hidden="true" className="text-primary" size={18} />
                 {assurance}
               </li>
             ))}
           </ul>
         </div>
 
-        <p className="text-xs leading-5 text-muted">
+        <p className="text-xs leading-5 text-muted-foreground">
           Alfred ne conserve ni jeton d’accès ni contenu de conversation dans le stockage du
           navigateur.
         </p>
@@ -86,13 +86,13 @@ export function LoginScreen() {
         aria-label="Connexion"
       >
         <Card className="w-full max-w-md p-6 sm:p-8">
-          <span className="grid size-12 place-items-center rounded-2xl bg-brand-50 text-brand-800">
+          <span className="grid size-12 place-items-center rounded-2xl bg-accent text-accent-foreground">
             <ShieldCheck aria-hidden="true" size={24} />
           </span>
-          <h2 className="mt-7 text-2xl font-semibold tracking-tight text-ink">
+          <h2 className="mt-7 text-2xl font-semibold tracking-tight text-foreground">
             Ouvrir votre espace
           </h2>
-          <p className="mt-2 text-sm leading-6 text-muted">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Utilisez le fournisseur autorisé par la configuration de votre environnement Alfred.
           </p>
 
@@ -100,7 +100,7 @@ export function LoginScreen() {
             {status === 'loading' ||
             (status === 'anonymous' && authProviders.status === 'loading') ? (
               <div
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line text-sm text-muted"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-sm text-muted-foreground"
                 role="status"
               >
                 <LoaderCircle
@@ -114,16 +114,17 @@ export function LoginScreen() {
 
             {status === 'error' ? (
               <div className="space-y-3" role="alert">
-                <p className="text-sm leading-6 text-danger-700">
+                <p className="text-sm leading-6 text-destructive">
                   Impossible de vérifier votre session pour le moment.
                 </p>
-                <button
-                  className={cn(buttonVariants({ variant: 'outline' }), 'w-full')}
+                <Button
+                  variant="outline"
+                  className="w-full"
                   onClick={() => void refresh().catch(() => undefined)}
                   type="button"
                 >
                   Réessayer
-                </button>
+                </Button>
               </div>
             ) : null}
 
@@ -146,23 +147,24 @@ export function LoginScreen() {
             {status === 'anonymous' &&
             authProviders.status === 'ready' &&
             authProviders.providers.length === 0 ? (
-              <div className="rounded-xl border border-line bg-canvas px-4 py-3 text-sm leading-6 text-muted">
+              <div className="rounded-xl border border-border bg-canvas px-4 py-3 text-sm leading-6 text-muted-foreground">
                 Aucun fournisseur de connexion n’est configuré sur cet environnement.
               </div>
             ) : null}
 
             {status === 'anonymous' && authProviders.status === 'error' ? (
               <div className="space-y-3" role="alert">
-                <p className="text-sm leading-6 text-danger-700">
+                <p className="text-sm leading-6 text-destructive">
                   Impossible de vérifier les fournisseurs de connexion.
                 </p>
-                <button
-                  className={cn(buttonVariants({ variant: 'outline' }), 'w-full')}
+                <Button
+                  variant="outline"
+                  className="w-full"
                   onClick={() => void authProviders.reload()}
                   type="button"
                 >
                   Réessayer
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>

@@ -19,10 +19,12 @@ export function RequireSession() {
         <div className="text-center" role="status">
           <LoaderCircle
             aria-hidden="true"
-            className="mx-auto animate-spin text-brand-700 motion-reduce:animate-none"
+            className="mx-auto animate-spin text-primary motion-reduce:animate-none"
             size={30}
           />
-          <p className="mt-4 text-sm font-medium text-muted">Restauration de votre session…</p>
+          <p className="mt-4 text-sm font-medium text-muted-foreground">
+            Restauration de votre session…
+          </p>
         </div>
       </main>
     );
@@ -36,13 +38,13 @@ export function RequireSession() {
         tabIndex={-1}
       >
         <Card className="w-full max-w-md p-8 text-center">
-          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-danger-50 text-danger-700">
+          <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-destructive/10 text-destructive">
             <TriangleAlert aria-hidden="true" size={24} />
           </span>
-          <h1 className="mt-6 text-2xl font-semibold text-ink">
+          <h1 className="mt-6 text-2xl font-semibold text-foreground">
             Session momentanément indisponible
           </h1>
-          <p className="mt-3 text-sm leading-6 text-danger-700" role="alert">
+          <p className="mt-3 text-sm leading-6 text-destructive" role="alert">
             Alfred ne peut pas restaurer votre session. Votre connexion n’est pas considérée comme
             fermée : réessayez lorsque le service répond de nouveau.
           </p>

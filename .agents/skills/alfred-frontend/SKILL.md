@@ -15,7 +15,17 @@ Vite; do not migrate it to Next.js without an accepted architecture decision.
   React memory; never write tokens or conversation content to browser storage.
 - Validate API envelopes at the boundary and fail closed on malformed or unavailable auth responses.
 - Accept only same-origin relative return paths. Authentication UI must not become an open redirect.
-- Keep feature components small and compose local shadcn-style primitives from `components/ui`.
+- Follow `docs/development/frontend-guidelines.md` and ADR 0011: use local shadcn primitives first,
+  then custom Tailwind compositions when needed. Reserve plain CSS for documented global or complex
+  effects. Do not add another UI library solely to fill a missing widget.
+- Use semantic role tokens from `styles.css`, not palette utilities or literal JSX colors. Shared
+  primitives expose `data-slot`, native `ComponentProps`, typed variants and the `@/lib/cn` helper.
+- Keep workspace rendering under `components/workspace` by domain, state in hooks and view models
+  in `lib`. Pass the data and callbacks a component needs, not inferred hook return types.
+- Preserve the light sage design, visible press/focus/disabled feedback, a relative 11px label
+  minimum and OS/application reduced motion. Dark variants require explicit theme activation.
+- Preview mocks remain deliberate application inputs until real contracts replace them. Do not
+  use mocks as a fallback for failed real requests or introduce a speculative client-state store.
 - Preserve keyboard access, labels, focus visibility, reduced motion and narrow-viewport behavior.
 - Keep the composer inert until a conversation/AG-UI contract is implemented; do not fake success.
 - Keep the source root responsibility-visible: `app`, `routes`, `screens`, `components`, `contexts`,

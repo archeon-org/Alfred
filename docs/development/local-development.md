@@ -21,6 +21,20 @@ Individual applications can be started with `pnpm dev:web`, `pnpm dev:api` and `
 
 ## Container mode
 
+For frontend development with hot reload inside Docker:
+
+```bash
+pnpm docker:dev
+```
+
+This uses `docker-compose.dev.yml` together with the base file. React/Vite serves
+`http://localhost:5173` and observes the mounted frontend sources; API and agent images still
+require rebuilding after their source changes. Do not run native Vite on the same port.
+See the [local development runbook](../runbooks/local-development.md) for rebuild boundaries and
+the purpose of the PostgreSQL initialization jobs.
+
+For the compiled Nginx frontend, without hot reload:
+
 ```bash
 docker compose --env-file .env up --build
 ```

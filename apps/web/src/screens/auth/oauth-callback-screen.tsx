@@ -52,11 +52,11 @@ export function OauthCallbackScreen() {
       <Card className="w-full max-w-md p-8 text-center">
         {failed ? (
           <>
-            <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-danger-50 text-danger-700">
+            <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-destructive/10 text-destructive">
               <TriangleAlert aria-hidden="true" size={24} />
             </span>
-            <h1 className="mt-6 text-2xl font-semibold text-ink">Connexion non finalisée</h1>
-            <p className="mt-3 text-sm leading-6 text-muted" role="alert">
+            <h1 className="mt-6 text-2xl font-semibold text-foreground">Connexion non finalisée</h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground" role="alert">
               Votre session n’a pas pu être restaurée. Aucun jeton n’a été conservé sur cet
               appareil.
             </p>
@@ -68,11 +68,11 @@ export function OauthCallbackScreen() {
           <div role="status">
             <LoaderCircle
               aria-hidden="true"
-              className="mx-auto animate-spin text-brand-700 motion-reduce:animate-none"
+              className="mx-auto animate-spin text-primary motion-reduce:animate-none"
               size={30}
             />
-            <h1 className="mt-6 text-2xl font-semibold text-ink">Connexion en cours</h1>
-            <p className="mt-3 text-sm leading-6 text-muted">
+            <h1 className="mt-6 text-2xl font-semibold text-foreground">Connexion en cours</h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
               Nous restaurons votre session sécurisée avant d’ouvrir Alfred.
             </p>
           </div>

@@ -8,20 +8,33 @@ import { normalizeApiBaseUrl } from './src/services/http/api-base-url.ts';
 const webRoot = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig(({ mode }) => {
+  const dockerDevelopment = process.env.ALFRED_DOCKER_DEV === 'true';
   const fileEnvironment = loadEnv(mode, webRoot, ['ALFRED_', 'VITE_']);
   normalizeApiBaseUrl(process.env.VITE_API_URL ?? fileEnvironment.VITE_API_URL);
 
   return {
     plugins: [react(), tailwindcss()],
+    cacheDir: dockerDevelopment ? '/tmp/alfred-vite' : undefined,
     envPrefix: 'VITE_',
     server: {
       host: '127.0.0.1',
       port: 5173,
       strictPort: true,
       forwardConsole: true,
+      watch: dockerDevelopment ? { usePolling: true, interval: 300 } : undefined,
       proxy: {
         '/api': {
-          changeOrigin: true,
+          changeOrigin: !dockerDevelopment,
+          configure: (proxy) => {
+            if (!dockerDevelopment) return;
+
+            // The Docker API trusts one proxy hop. Replace caller-supplied forwarding headers.
+            proxy.on('proxyReq', (proxyRequest, request) => {
+              proxyRequest.setHeader('X-Forwarded-For', request.socket.remoteAddress ?? '');
+              proxyRequest.setHeader('X-Forwarded-Host', request.headers.host ?? 'localhost');
+              proxyRequest.setHeader('X-Forwarded-Proto', 'http');
+            });
+          },
           target: resolveDevApiProxyTarget(
             process.env.ALFRED_DEV_API_PROXY_TARGET,
             fileEnvironment.ALFRED_DEV_API_PROXY_TARGET,

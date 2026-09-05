@@ -1,0 +1,23 @@
+# Local frontend development only; do not combine with the platform overlay.
+# The base file keeps the same localhost port, API, databases and hardened runtime settings.
+services:
+  web:
+    image: alfred-web-dev
+    build:
+      target: development
+    environment:
+      ALFRED_DOCKER_DEV: 'true'
+      ALFRED_DEV_API_PROXY_TARGET: http://api:3000
+      HOME: /tmp
+      VITE_API_URL: ${VITE_API_URL:-/api}
+    volumes:
+      - ./apps/web/src:/workspace/apps/web/src:ro
+      - ./apps/web/public:/workspace/apps/web/public:ro
+      - ./apps/web/index.html:/workspace/apps/web/index.html:ro
+      - ./apps/web/vite.config.ts:/workspace/apps/web/vite.config.ts:ro
+      - ./apps/web/tsconfig.json:/workspace/apps/web/tsconfig.json:ro
+      - ./apps/web/tsconfig.app.json:/workspace/apps/web/tsconfig.app.json:ro
+      - ./tsconfig.base.json:/workspace/tsconfig.base.json:ro
+      - ./packages/contracts/src:/workspace/packages/contracts/src:ro
+    tmpfs:
+      - /workspace/apps/web/node_modules/.vite-temp:uid=1000,gid=1000,mode=0700

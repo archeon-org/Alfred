@@ -61,8 +61,8 @@ describe('Alfred routes', () => {
     expect(screen.getByRole('heading', { name: /nouvelle conversation/i })).toBeVisible();
     const composer = screen.getByRole('textbox', { name: /message/i });
     expect(composer).toBeVisible();
-    expect(composer).toHaveClass('placeholder:text-muted');
-    expect(composer).not.toHaveClass('placeholder:text-muted/80');
+    expect(composer).toHaveClass('placeholder:text-muted-foreground');
+    expect(composer).not.toHaveClass('placeholder:text-muted-foreground/80');
     expect(screen.getByText('Ada Lovelace')).toBeVisible();
   });
 });
