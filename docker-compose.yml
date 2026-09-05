@@ -5,34 +5,122 @@ services:
     build:
       context: ./infra/postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-alfred_api}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-env}
-      POSTGRES_USER: ${POSTGRES_USER:-alfred}
+      AGENT_DATABASE_PASSWORD: ${AGENT_DATABASE_PASSWORD:?Set AGENT_DATABASE_PASSWORD in .env}
+      API_DATABASE_PASSWORD: ${API_DATABASE_PASSWORD:?Set API_DATABASE_PASSWORD in .env}
+      MIGRATOR_DATABASE_PASSWORD: ${MIGRATOR_DATABASE_PASSWORD:?Set MIGRATOR_DATABASE_PASSWORD in .env}
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
     ports:
       - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks:
+      - agent-data
+      - api-data
+      - host-access
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-alfred} -d ${POSTGRES_DB:-alfred_api}']
+      test: ['CMD-SHELL', 'pg_isready --username "$${POSTGRES_USER}" --dbname postgres']
       interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
     restart: unless-stopped
 
+  postgres-bootstrap:
+    build:
+      context: ./infra/postgres
+    entrypoint: ['/bin/sh', '-ec']
+    command:
+      - >-
+        /docker-entrypoint-initdb.d/01-create-databases.sh &&
+        /docker-entrypoint-initdb.d/02-configure-databases.sh
+    environment:
+      AGENT_DATABASE_PASSWORD: ${AGENT_DATABASE_PASSWORD:?Set AGENT_DATABASE_PASSWORD in .env}
+      API_DATABASE_PASSWORD: ${API_DATABASE_PASSWORD:?Set API_DATABASE_PASSWORD in .env}
+      MIGRATOR_DATABASE_PASSWORD: ${MIGRATOR_DATABASE_PASSWORD:?Set MIGRATOR_DATABASE_PASSWORD in .env}
+      PGHOST: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - api-data
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: postgres
+    restart: 'no'
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
   redis:
-    image: redis:7.4-alpine
-    command: ['redis-server', '--appendonly', 'yes']
+    image: redis:7.4-alpine@sha256:8b81dd37ff027bec4e516d41acfbe9fe2460070dc6d4a4570a2ac5b9d59df065
+    environment:
+      REDIS_PASSWORD: ${REDIS_API_PASSWORD:?Set REDIS_API_PASSWORD in .env}
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --appendfsync
+      - everysec
+      - --maxmemory-policy
+      - noeviction
+      - --requirepass
+      - ${REDIS_API_PASSWORD:?Set REDIS_API_PASSWORD in .env}
     ports:
       - '127.0.0.1:${REDIS_PORT:-6379}:6379'
     volumes:
       - redis-data:/data
+    networks:
+      - api-data
+      - host-access
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test:
+        - CMD-SHELL
+        - redis-cli --no-auth-warning --pass "$${REDIS_PASSWORD}" ping | grep -q PONG
       interval: 5s
       timeout: 3s
-      retries: 10
+      retries: 12
+      start_period: 5s
     restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    command: ['node', 'dist/database/run-migrations.js']
+    environment:
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Set AUTH_JWT_SECRET to at least 32 characters}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
+      DATABASE_SSL: ${DATABASE_SSL:-false}
+      DATABASE_URL: postgresql://alfred_migrator:${MIGRATOR_DATABASE_PASSWORD:?Set MIGRATOR_DATABASE_PASSWORD in .env}@postgres:5432/alfred_app?schema=public
+      HOME: /tmp
+      NODE_ENV: development
+      WEB_APP_URL: ${WEB_APP_URL:-http://localhost:5173}
+    depends_on:
+      postgres-bootstrap:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    networks:
+      - api-data
+    read_only: true
+    tmpfs:
+      - /tmp
+    user: '10001:10001'
+    init: true
+    restart: 'no'
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   api:
     build:
@@ -43,45 +131,128 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 3000
       API_PREFIX: ${API_PREFIX:-api}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-alfred}:${POSTGRES_PASSWORD:-change-me-in-env}@postgres:5432/${POSTGRES_DB:-alfred_api}?schema=public
-      NODE_ENV: production
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: ${AUTH_ACCESS_TOKEN_TTL_SECONDS:-300}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-alfred-web}
+      AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:-alfred-api}
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Set AUTH_JWT_SECRET to at least 32 characters}
+      AUTH_REFRESH_TOKEN_TTL_SECONDS: ${AUTH_REFRESH_TOKEN_TTL_SECONDS:-2592000}
+      AUTH_SESSION_CLEANUP_INTERVAL_SECONDS: ${AUTH_SESSION_CLEANUP_INTERVAL_SECONDS:-3600}
+      AUTH_SESSION_RETENTION_SECONDS: ${AUTH_SESSION_RETENTION_SECONDS:-604800}
+      DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
+      DATABASE_SSL: ${DATABASE_SSL:-false}
+      DATABASE_URL: postgresql://alfred_api:${API_DATABASE_PASSWORD:?Set API_DATABASE_PASSWORD in .env}@postgres:5432/alfred_app?schema=public
+      FEATURE_AGENT_RUNTIME_ENABLED: ${FEATURE_AGENT_RUNTIME_ENABLED:-false}
+      FEATURE_AG_UI_STREAMING_ENABLED: ${FEATURE_AG_UI_STREAMING_ENABLED:-false}
+      FEATURE_FILE_UPLOADS_ENABLED: ${FEATURE_FILE_UPLOADS_ENABLED:-false}
+      FEATURE_GENERATIVE_UI_ENABLED: ${FEATURE_GENERATIVE_UI_ENABLED:-false}
+      FEATURE_GOOGLE_OAUTH_ENABLED: ${FEATURE_GOOGLE_OAUTH_ENABLED:-false}
+      FEATURE_MCP_APPS_ENABLED: ${FEATURE_MCP_APPS_ENABLED:-false}
+      FEATURE_RUNTIME_MEMORY_ENABLED: ${FEATURE_RUNTIME_MEMORY_ENABLED:-false}
+      FEATURE_SKILLS_ENABLED: ${FEATURE_SKILLS_ENABLED:-false}
+      FEATURE_TEAMS_ENABLED: ${FEATURE_TEAMS_ENABLED:-false}
+      GOOGLE_OAUTH_CALLBACK_URL: ${GOOGLE_OAUTH_CALLBACK_URL:-}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_WORKSPACE_DOMAIN: ${GOOGLE_WORKSPACE_DOMAIN:-}
+      NODE_ENV: development
+      OBSERVABILITY_LOG_LEVEL: ${OBSERVABILITY_LOG_LEVEL:-info}
+      OBSERVABILITY_METRICS_ENABLED: ${OBSERVABILITY_METRICS_ENABLED:-false}
+      OBSERVABILITY_METRICS_TOKEN: ${OBSERVABILITY_METRICS_TOKEN:-}
+      REDIS_URL: redis://default:${REDIS_API_PASSWORD:?Set REDIS_API_PASSWORD in .env}@redis:6379/0
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      WEB_APP_URL: ${WEB_APP_URL:-http://localhost:5173}
     ports:
-      - '${API_PORT:-3000}:3000'
+      - '127.0.0.1:${API_PORT:-3000}:3000'
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app
+      - api-data
+    healthcheck:
+      test:
+        ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://127.0.0.1:3000/health/ready']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp
     init: true
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+        VITE_API_URL: ${VITE_API_URL:-/api}
     ports:
-      - '${WEB_PORT:-5173}:8080'
+      - '127.0.0.1:${WEB_PORT:-5173}:8080'
     depends_on:
       api:
         condition: service_healthy
+    networks:
+      - app
+    read_only: true
+    tmpfs:
+      - /tmp
     init: true
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   agent:
     build:
       context: ./apps/agent
       dockerfile: Dockerfile.dev
     environment:
-      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
-      LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+      LANGGRAPH_SERVER_PORT: 8000
     ports:
-      - '127.0.0.1:${AGENT_PORT:-2024}:2024'
-    volumes:
-      - agent-data:/app/.langgraph_api
+      - '127.0.0.1:${AGENT_PORT:-2024}:8000'
+    networks:
+      - app
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/ok', timeout=2)
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.langgraph_api:uid=10001,gid=10001,mode=0700
     init: true
     restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   postgres-data:
   redis-data:
+
+networks:
+  app:
   agent-data:
+    internal: true
+  api-data:
+    internal: true
+  host-access:

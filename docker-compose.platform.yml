@@ -1,0 +1,63 @@
+services:
+  migrate:
+    environment:
+      NODE_ENV: production
+
+  api:
+    ports: !reset []
+    environment:
+      AUTH_COOKIE_SECURE: 'true'
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Set AUTH_JWT_SECRET to at least 32 characters}
+      NODE_ENV: production
+
+  agent-redis:
+    image: redis:7.4-alpine@sha256:8b81dd37ff027bec4e516d41acfbe9fe2460070dc6d4a4570a2ac5b9d59df065
+    environment:
+      REDIS_PASSWORD: ${AGENT_REDIS_PASSWORD:?Set AGENT_REDIS_PASSWORD in .env}
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --appendfsync
+      - everysec
+      - --maxmemory-policy
+      - noeviction
+      - --requirepass
+      - ${AGENT_REDIS_PASSWORD:?Set AGENT_REDIS_PASSWORD in .env}
+    volumes:
+      - agent-redis-data:/data
+    networks:
+      - agent-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli --no-auth-warning --pass "$${REDIS_PASSWORD}" ping | grep -q PONG
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: ./apps/agent
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URI: postgres://alfred_agent:${AGENT_DATABASE_PASSWORD:?Set AGENT_DATABASE_PASSWORD in .env}@postgres:5432/alfred_langgraph?sslmode=disable
+      LANGCHAIN_TRACING_V2: 'false'
+      LANGGRAPH_CLOUD_LICENSE_KEY: ${LANGGRAPH_CLOUD_LICENSE_KEY:?Set LANGGRAPH_CLOUD_LICENSE_KEY in .env}
+      LANGSMITH_TRACING: 'false'
+      REDIS_URI: redis://default:${AGENT_REDIS_PASSWORD:?Set AGENT_REDIS_PASSWORD in .env}@agent-redis:6379/0
+    depends_on:
+      agent-redis:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    networks:
+      - app
+      - agent-data
+
+volumes:
+  agent-redis-data:

@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Alfred Backend'
+  short_description: 'Build secure NestJS and TypeORM slices'
+  default_prompt: 'Use $alfred-backend to implement a secure NestJS feature in Alfred.'

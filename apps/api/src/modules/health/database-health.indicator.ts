@@ -1,14 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import type { HealthIndicatorResult } from '@nestjs/terminus';
-import { PrismaService } from '../prisma/prisma.service';
+import { DataSource } from 'typeorm';
+
+export interface DatabaseHealth {
+  readonly database: { readonly status: 'down' | 'up' };
+}
 
 @Injectable()
 export class DatabaseHealthIndicator {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly dataSource: DataSource) {}
 
-  async check(): Promise<HealthIndicatorResult> {
+  async check(): Promise<DatabaseHealth> {
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      await this.dataSource.query('SELECT 1');
       return { database: { status: 'up' } };
     } catch {
       return { database: { status: 'down' } };

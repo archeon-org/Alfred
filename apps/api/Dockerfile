@@ -1,6 +1,4 @@
-# syntax=docker/dockerfile:1.7
-
-FROM node:22.23.2-alpine3.23 AS tooling
+FROM node:22.23.2-alpine3.23@sha256:46825fbbd4e996a78b7a2cdc08d75e38a5a505bdab95dcda55605359bf124bc6 AS tooling
 
 ENV HUSKY=0 \
     PNPM_HOME=/pnpm
@@ -14,6 +12,7 @@ FROM tooling AS dependencies
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/package.json
+COPY packages/contracts/package.json ./packages/contracts/package.json
 
 RUN --mount=type=cache,id=alfred-pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @alfred/api...
@@ -22,21 +21,21 @@ FROM dependencies AS build
 
 COPY tsconfig.base.json ./tsconfig.base.json
 COPY apps/api ./apps/api
+COPY packages/contracts ./packages/contracts
 
-RUN pnpm --filter @alfred/api prisma:generate \
+RUN pnpm --filter @alfred/contracts build \
     && pnpm --filter @alfred/api build
 
 FROM tooling AS production-dependencies
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json ./apps/api/package.json
-COPY apps/api/prisma ./apps/api/prisma
+COPY packages/contracts/package.json ./packages/contracts/package.json
 
 RUN --mount=type=cache,id=alfred-pnpm,target=/pnpm/store \
-    pnpm install --prod --frozen-lockfile --ignore-scripts --filter @alfred/api... \
-    && pnpm --filter @alfred/api prisma:generate
+    pnpm install --prod --frozen-lockfile --ignore-scripts --filter @alfred/api...
 
-FROM node:22.23.2-alpine3.23 AS runtime
+FROM node:22.23.2-alpine3.23@sha256:46825fbbd4e996a78b7a2cdc08d75e38a5a505bdab95dcda55605359bf124bc6 AS runtime
 
 ENV API_HOST=0.0.0.0 \
     API_PORT=3000 \
@@ -50,7 +49,8 @@ RUN addgroup --system --gid 10001 alfred \
 COPY --from=production-dependencies --chown=alfred:alfred /workspace/node_modules /app/node_modules
 COPY --from=production-dependencies --chown=alfred:alfred /workspace/apps/api/package.json ./package.json
 COPY --from=production-dependencies --chown=alfred:alfred /workspace/apps/api/node_modules ./node_modules
-COPY --from=production-dependencies --chown=alfred:alfred /workspace/apps/api/prisma ./prisma
+COPY --from=build --chown=alfred:alfred /workspace/packages/contracts/package.json /app/packages/contracts/package.json
+COPY --from=build --chown=alfred:alfred /workspace/packages/contracts/dist /app/packages/contracts/dist
 COPY --from=build --chown=alfred:alfred /workspace/apps/api/dist ./dist
 
 USER alfred

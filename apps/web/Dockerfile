@@ -1,6 +1,4 @@
-# syntax=docker/dockerfile:1.7
-
-FROM node:22.23.2-alpine3.23 AS tooling
+FROM node:22.23.2-alpine3.23@sha256:46825fbbd4e996a78b7a2cdc08d75e38a5a505bdab95dcda55605359bf124bc6 AS tooling
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
@@ -14,6 +12,7 @@ FROM tooling AS dependencies
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/web/package.json ./apps/web/package.json
+COPY packages/contracts/package.json ./packages/contracts/package.json
 
 RUN --mount=type=cache,id=alfred-pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @alfred/web...
@@ -22,13 +21,15 @@ FROM dependencies AS build
 
 COPY tsconfig.base.json ./tsconfig.base.json
 COPY apps/web ./apps/web
+COPY packages/contracts ./packages/contracts
 
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
 
-RUN pnpm --filter @alfred/web build
+RUN pnpm --filter @alfred/contracts build \
+    && pnpm --filter @alfred/web build
 
-FROM nginxinc/nginx-unprivileged:1.31.4-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.31.4-alpine@sha256:901e944d1f4fc2bd077e8f5568b98c1f6f8cdacf6b97a87747c43134a339b9a7 AS runtime
 
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/apps/web/dist /usr/share/nginx/html

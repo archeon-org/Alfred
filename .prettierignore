@@ -2,6 +2,7 @@
 .venv
 coverage
 dist
+docs/architecture
 htmlcov
 node_modules
 playwright-report

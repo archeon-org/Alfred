@@ -1,0 +1,15 @@
+import type { FeatureFlags } from '@alfred/contracts';
+
+export type { FeatureFlagName, FeatureFlags } from '@alfred/contracts';
+
+export const DISABLED_FEATURE_FLAGS: FeatureFlags = Object.freeze({
+  agentRuntime: false,
+  agUiStreaming: false,
+  fileUploads: false,
+  generativeUi: false,
+  googleOAuth: false,
+  mcpApps: false,
+  runtimeMemory: false,
+  skills: false,
+  teams: false,
+});

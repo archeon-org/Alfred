@@ -1,14 +1,22 @@
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   envPrefix: 'VITE_',
   server: {
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     port: 5173,
     strictPort: true,
     forwardConsole: true,
+    proxy: {
+      '/api': {
+        changeOrigin: true,
+        target: process.env.ALFRED_DEV_API_PROXY_TARGET ?? 'http://127.0.0.1:3000',
+      },
+    },
   },
   preview: {
     host: '0.0.0.0',
@@ -16,6 +24,9 @@ export default defineConfig({
     strictPort: true,
   },
   resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    },
     dedupe: ['react', 'react-dom'],
   },
   optimizeDeps: {

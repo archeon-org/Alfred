@@ -1,0 +1,38 @@
+# ADR 0004: Self-Hosted Runtime Isolation
+
+- Status: Accepted
+- Date: 2026-09-03
+
+## Context
+
+The local platform must model the security boundaries expected in Enterprise infrastructure without
+requiring public cloud storage or managed external services. Retained developer volumes must also
+upgrade without destructive recreation.
+
+## Decision
+
+- Docker Compose keeps web, API and LangGraph as separate application containers. The base file runs
+  the in-memory LangGraph development server; an explicit overlay selects standalone Agent Server.
+- A repeatable `postgres-bootstrap` job creates logical databases, required extensions and restricted
+  login roles on both fresh and retained PostgreSQL volumes.
+- `alfred_migrator` owns the API/blob/test schemas and is available only to migration jobs.
+  `alfred_api` can connect only to those databases with DML privileges and no schema creation
+  right. `alfred_agent` can connect only to `alfred_langgraph`. Application containers never
+  receive the PostgreSQL bootstrap or migration credential.
+- API Redis and Agent Server Redis are separate password-protected instances on separate internal
+  networks. Docker's Redis database number is not treated as an authorization boundary.
+- Published development ports bind to loopback. Application containers run without root, drop Linux
+  capabilities and use read-only filesystems where the runtime contract has been verified.
+- Deployable base images are pinned by digest. A production platform must mirror and scan them in the
+  Enterprise-approved registry before promotion.
+
+## Consequences
+
+- Compromising the API credential does not grant schema ownership or direct access to the agent
+  runtime's PostgreSQL database or Redis instance.
+- Local startup is ordered: PostgreSQL readiness, idempotent bootstrap, TypeORM migration, API,
+  then web. A migration failure blocks API replicas.
+- `alfred_blobs` reserves a self-hosted blob boundary but does not yet implement file storage.
+- The standalone Agent Server overlay still requires an approved licence or air-gapped arrangement,
+  TLS, secret injection, backups, image scanning and orchestrator-level network policy. Compose
+  validation alone is not production approval.

@@ -1,19 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { DataSource } from 'typeorm';
 
 import { DatabaseHealthIndicator } from '../../src/modules/health/database-health.indicator';
-import type { PrismaService } from '../../src/modules/prisma/prisma.service';
 
 describe('DatabaseHealthIndicator', () => {
   it('reports PostgreSQL as up after a successful probe', async () => {
-    const queryRaw = vi.fn().mockResolvedValue([{ result: 1 }]);
+    const query = vi.fn().mockResolvedValue([{ result: 1 }]);
     const indicator = new DatabaseHealthIndicator({
-      $queryRaw: queryRaw,
-    } as unknown as PrismaService);
+      query,
+    } as unknown as DataSource);
 
     await expect(indicator.check()).resolves.toEqual({
       database: { status: 'up' },
     });
-    expect(queryRaw).toHaveBeenCalledOnce();
+    expect(query).toHaveBeenCalledOnce();
+    expect(query).toHaveBeenCalledWith('SELECT 1');
   });
 
   it('reports PostgreSQL as down without leaking the driver error', async () => {
@@ -21,8 +22,8 @@ describe('DatabaseHealthIndicator', () => {
       .fn()
       .mockRejectedValue(new Error('password authentication failed for secret-user'));
     const indicator = new DatabaseHealthIndicator({
-      $queryRaw: queryRaw,
-    } as unknown as PrismaService);
+      query: queryRaw,
+    } as unknown as DataSource);
 
     const result = await indicator.check();
 

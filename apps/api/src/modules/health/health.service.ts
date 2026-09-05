@@ -1,12 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { HealthCheckService } from '@nestjs/terminus';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { DatabaseHealthIndicator } from './database-health.indicator';
+import { RedisHealthIndicator } from './redis-health.indicator';
 
 @Injectable()
 export class HealthService {
   constructor(
-    private readonly health: HealthCheckService,
     private readonly database: DatabaseHealthIndicator,
+    private readonly redis: RedisHealthIndicator,
   ) {}
 
   getHealth() {
@@ -17,11 +17,16 @@ export class HealthService {
     };
   }
 
-  checkLiveness() {
-    return this.health.check([]);
+  checkLiveness(): Promise<{ readonly status: 'ok' }> {
+    return Promise.resolve({ status: 'ok' as const });
   }
 
-  checkReadiness() {
-    return this.health.check([() => this.database.check()]);
+  async checkReadiness() {
+    const [database, redis] = await Promise.all([this.database.check(), this.redis.check()]);
+    const details = { ...database, ...redis };
+    if (database.database.status === 'down' || redis.redis.status === 'down') {
+      throw new ServiceUnavailableException({ details, status: 'error' });
+    }
+    return { details, status: 'ok' as const };
   }
 }

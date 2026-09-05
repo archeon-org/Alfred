@@ -1,6 +1,6 @@
 # Generated from langgraph.json with `langgraph dockerfile`.
 # Regenerate this file whenever the LangGraph deployment config changes.
-FROM langchain/langgraph-api:3.12-wolfi
+FROM langchain/langgraph-api:3.12-wolfi@sha256:7227ff9397725541be89a3586880d181819fcbe4eee3fd6237d42e23b40b1b84
 
 # Add the local agent package declared by `dependencies: ["."]`.
 ADD . /deps/agent
@@ -35,3 +35,11 @@ RUN pip uninstall -y pip setuptools wheel \
     && rm -f /usr/bin/uv /usr/bin/uvx
 
 WORKDIR /deps/agent
+
+RUN addgroup -g 10001 -S alfred \
+    && adduser -u 10001 -S -D -H -G alfred alfred
+
+ENV HOME=/tmp \
+    PYTHONDONTWRITEBYTECODE=1
+
+USER 10001:10001

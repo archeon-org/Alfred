@@ -22,12 +22,16 @@ Individual applications can be started with `pnpm dev:web`, `pnpm dev:api` and `
 ## Container mode
 
 ```bash
-docker compose up --build
+docker compose --env-file .env up --build
 ```
 
-Compose waits for PostgreSQL readiness before starting dependent services. Stop the stack without deleting data using `docker compose down`. Volume deletion is intentionally not part of the normal scripts because it destroys local database state.
+Compose waits for the idempotent PostgreSQL bootstrap and TypeORM migration before starting the
+API. Stop the stack without deleting data using `docker compose down`. Volume deletion is
+intentionally not part of normal troubleshooting because it destroys local state.
 
-The local Agent Server binds to `127.0.0.1` and persists its development data in the `agent-data` volume. Runtime memory requires a validated `MemoryContext`; cross-conversation sharing remains disabled unless the caller explicitly enables it.
+The local LangGraph development server binds to `127.0.0.1`. The production-like overlay adds
+durable PostgreSQL/Redis services; runtime memory still requires a validated `MemoryContext`, and
+cross-conversation sharing remains opt-in.
 
 ## Configuration
 

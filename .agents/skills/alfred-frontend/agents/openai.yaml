@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Alfred Frontend'
+  short_description: 'Build accessible secure React application slices'
+  default_prompt: 'Use $alfred-frontend to implement an accessible React feature in Alfred.'

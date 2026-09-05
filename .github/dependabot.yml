@@ -18,7 +18,11 @@ updates:
       day: monday
 
   - package-ecosystem: docker
-    directory: /
+    directories:
+      - /apps/agent
+      - /apps/api
+      - /apps/web
+      - /infra/postgres
     schedule:
       interval: weekly
       day: monday

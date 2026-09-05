@@ -7,8 +7,12 @@ const validEnvironment = Object.freeze({
   API_HOST: '127.0.0.1',
   API_PORT: '3100',
   API_PREFIX: '/v1/',
-  DATABASE_URL: 'postgresql://alfred:local-password@localhost:5432/alfred_api?schema=public',
+  AUTH_COOKIE_SECURE: 'false',
+  AUTH_JWT_SECRET: 'test-only-secret-that-is-longer-than-32-characters',
+  DATABASE_URL: 'postgresql://alfred:local-password@localhost:5432/alfred_app?schema=public',
+  FEATURE_GOOGLE_OAUTH_ENABLED: 'false',
   NODE_ENV: 'test',
+  WEB_APP_URL: 'http://localhost:5173',
 });
 
 describe('parseEnvironment', () => {
@@ -20,11 +24,44 @@ describe('parseEnvironment', () => {
       API_HOST: '127.0.0.1',
       API_PORT: 3100,
       API_PREFIX: 'v1',
-      DATABASE_URL: 'postgresql://alfred:local-password@localhost:5432/alfred_api?schema=public',
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: 300,
+      AUTH_COOKIE_SECURE: false,
+      AUTH_JWT_AUDIENCE: 'alfred-web',
+      AUTH_JWT_ISSUER: 'alfred-api',
+      AUTH_JWT_SECRET: 'test-only-secret-that-is-longer-than-32-characters',
+      AUTH_REFRESH_TOKEN_TTL_SECONDS: 2_592_000,
+      AUTH_SESSION_CLEANUP_INTERVAL_SECONDS: 3_600,
+      AUTH_SESSION_RETENTION_SECONDS: 604_800,
+      DATABASE_POOL_MAX: 20,
+      DATABASE_SSL: false,
+      DATABASE_URL: 'postgresql://alfred:local-password@localhost:5432/alfred_app?schema=public',
+      FEATURE_AGENT_RUNTIME_ENABLED: false,
+      FEATURE_AG_UI_STREAMING_ENABLED: false,
+      FEATURE_FILE_UPLOADS_ENABLED: false,
+      FEATURE_GENERATIVE_UI_ENABLED: false,
+      FEATURE_GOOGLE_OAUTH_ENABLED: false,
+      FEATURE_MCP_APPS_ENABLED: false,
+      FEATURE_RUNTIME_MEMORY_ENABLED: false,
+      FEATURE_SKILLS_ENABLED: false,
+      FEATURE_TEAMS_ENABLED: false,
       NODE_ENV: 'test',
+      OBSERVABILITY_LOG_LEVEL: 'info',
+      OBSERVABILITY_METRICS_ENABLED: false,
+      REDIS_URL: 'redis://localhost:6379',
+      TRUST_PROXY_HOPS: 0,
+      WEB_APP_URL: 'http://localhost:5173',
     });
     expect(Object.isFrozen(environment)).toBe(true);
     expect(Object.isFrozen(environment.API_CORS_ORIGINS)).toBe(true);
+  });
+
+  it('binds standalone development to loopback by default', () => {
+    const environment = parseEnvironment({
+      ...validEnvironment,
+      API_HOST: undefined,
+    });
+
+    expect(environment.API_HOST).toBe('127.0.0.1');
   });
 
   it('fails fast when DATABASE_URL is absent', () => {
@@ -52,5 +89,148 @@ describe('parseEnvironment', () => {
         NODE_ENV: 'production',
       }),
     ).toThrow(/API_CORS_ORIGINS/u);
+  });
+
+  it('requires HTTPS CORS origins in production', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        API_CORS_ORIGINS: 'http://alfred.example.test',
+        AUTH_COOKIE_SECURE: 'true',
+        NODE_ENV: 'production',
+        WEB_APP_URL: 'https://alfred.example.test',
+      }),
+    ).toThrow(/HTTPS/u);
+  });
+
+  it('requires a strong application signing secret', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        AUTH_JWT_SECRET: 'too-short',
+      }),
+    ).toThrow(/AUTH_JWT_SECRET/u);
+  });
+
+  it('requires the complete Google OAuth configuration when the provider is enabled', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FEATURE_GOOGLE_OAUTH_ENABLED: 'true',
+        GOOGLE_OAUTH_CLIENT_ID: 'client-id.apps.googleusercontent.com',
+      }),
+    ).toThrow(/GOOGLE_OAUTH/u);
+  });
+
+  it('treats empty optional Google variables from container environments as absent', () => {
+    const environment = parseEnvironment({
+      ...validEnvironment,
+      GOOGLE_OAUTH_CALLBACK_URL: '',
+      GOOGLE_OAUTH_CLIENT_ID: '',
+      GOOGLE_OAUTH_CLIENT_SECRET: '',
+      GOOGLE_WORKSPACE_DOMAIN: '',
+    });
+
+    expect(environment.GOOGLE_OAUTH_CALLBACK_URL).toBeUndefined();
+    expect(environment.GOOGLE_OAUTH_CLIENT_ID).toBeUndefined();
+    expect(environment.GOOGLE_OAUTH_CLIENT_SECRET).toBeUndefined();
+    expect(environment.GOOGLE_WORKSPACE_DOMAIN).toBeUndefined();
+  });
+
+  it('fails closed when production cookies are not secure', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        AUTH_COOKIE_SECURE: 'false',
+        NODE_ENV: 'production',
+        WEB_APP_URL: 'https://alfred.example.test',
+      }),
+    ).toThrow(/AUTH_COOKIE_SECURE/u);
+  });
+
+  it('allows commercial Google login without a Workspace restriction', () => {
+    const environment = parseEnvironment({
+      ...validEnvironment,
+      API_CORS_ORIGINS: 'https://alfred.example',
+      AUTH_COOKIE_SECURE: 'true',
+      FEATURE_GOOGLE_OAUTH_ENABLED: 'true',
+      GOOGLE_OAUTH_CALLBACK_URL: 'https://alfred.example/api/auth/google/callback',
+      GOOGLE_OAUTH_CLIENT_ID: 'client-id.apps.googleusercontent.com',
+      GOOGLE_OAUTH_CLIENT_SECRET: 'a-real-secret-from-the-runtime-vault',
+      NODE_ENV: 'production',
+      WEB_APP_URL: 'https://alfred.example',
+    });
+
+    expect(environment.GOOGLE_WORKSPACE_DOMAIN).toBeUndefined();
+  });
+
+  it('requires an HTTPS Google callback in production', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        API_CORS_ORIGINS: 'https://alfred.example.test',
+        AUTH_COOKIE_SECURE: 'true',
+        GOOGLE_OAUTH_CALLBACK_URL: 'http://api.alfred.example/auth/google/callback',
+        GOOGLE_OAUTH_CLIENT_ID: 'client-id.apps.googleusercontent.com',
+        GOOGLE_OAUTH_CLIENT_SECRET: 'a-real-secret-from-the-runtime-vault',
+        FEATURE_GOOGLE_OAUTH_ENABLED: 'true',
+        GOOGLE_WORKSPACE_DOMAIN: 'alfred.example.test',
+        NODE_ENV: 'production',
+        WEB_APP_URL: 'https://alfred.example.test',
+      }),
+    ).toThrow(/GOOGLE_OAUTH_CALLBACK_URL/u);
+  });
+
+  it('rejects committed placeholder credentials in production', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        AUTH_COOKIE_SECURE: 'true',
+        AUTH_JWT_SECRET: 'replace-with-at-least-32-random-characters',
+        NODE_ENV: 'production',
+        WEB_APP_URL: 'https://alfred.example',
+      }),
+    ).toThrow(/placeholder/u);
+  });
+
+  it('bounds the access-token revocation window to fifteen minutes', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        AUTH_ACCESS_TOKEN_TTL_SECONDS: '901',
+      }),
+    ).toThrow(/AUTH_ACCESS_TOKEN_TTL_SECONDS/u);
+  });
+
+  it('rejects invalid feature flag values instead of enabling them implicitly', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FEATURE_SKILLS_ENABLED: 'yes',
+      }),
+    ).toThrow(/FEATURE_SKILLS_ENABLED/u);
+  });
+
+  it('accepts only an explicit bounded number of trusted reverse-proxy hops', () => {
+    expect(parseEnvironment({ ...validEnvironment, TRUST_PROXY_HOPS: '1' }).TRUST_PROXY_HOPS).toBe(
+      1,
+    );
+    expect(() => parseEnvironment({ ...validEnvironment, TRUST_PROXY_HOPS: '-1' })).toThrow(
+      /TRUST_PROXY_HOPS/u,
+    );
+  });
+
+  it('requires a dedicated secret when the metrics endpoint is enabled', () => {
+    expect(() =>
+      parseEnvironment({ ...validEnvironment, OBSERVABILITY_METRICS_ENABLED: 'true' }),
+    ).toThrow(/OBSERVABILITY_METRICS_TOKEN/u);
+
+    expect(
+      parseEnvironment({
+        ...validEnvironment,
+        OBSERVABILITY_METRICS_ENABLED: 'true',
+        OBSERVABILITY_METRICS_TOKEN: 'metrics-only-secret-that-is-longer-than-32-characters',
+      }).OBSERVABILITY_METRICS_ENABLED,
+    ).toBe(true);
   });
 });

@@ -1,5 +1,17 @@
 # Alfred Agent Instructions
 
+## Development Assistant Canary
+
+For every user request that asks Codex or Claude Code to modify code, configuration,
+documentation or files in this repository, the assistant MUST begin its first user-facing response
+with this exact sentence, on its own line and with no preceding text:
+
+`Alfred est bien réveillé et ravi de travailler avec toi.`
+
+Emit the sentence before any plan, commentary, tool call or implementation work. Its absence means
+the execution should be treated as missing the repository instructions. Do not inject this canary
+into Alfred application responses, prompts, runtime state, tests or persisted memory.
+
 ## Scope
 
 This repository is the Alfred monorepo. Keep the three application layers separate:
@@ -20,6 +32,19 @@ This repository is the Alfred monorepo. Keep the three application layers separa
 
 - Use project-local skills from `.agents/skills/` when the task involves architecture, quality gates, testing or agent orchestration.
 - Use project-local Codex roles from `.codex/agents/` for read-only exploration, implementation, review and docs verification when multi-agent mode is enabled.
+- Use `alfred-backend` for NestJS, TypeORM, authentication and API boundaries; `alfred-frontend` for React/Vite, routing and browser session work; and `alfred-infrastructure` for Docker, PostgreSQL, Redis and LangGraph deployment work.
+
+Route delegated work by ownership:
+
+- `backend_engineer`: `apps/api` implementation.
+- `frontend_engineer`: `apps/web` implementation.
+- `infrastructure_engineer`: containers, Compose, PostgreSQL initialization and deployment runbooks.
+- `database_reviewer`: TypeORM migrations, transactions, indexes and entity parity.
+- `tester` / `quality_gate`: focused regression tests and final repository gate.
+- `security_reviewer` / `reviewer`: independent security and correctness audits.
+- `memory_keeper`: evidence-based memory-bank consolidation after meaningful work.
+
+Give coding agents disjoint write scopes. A reviewer must not silently rewrite implementation, and a quality gate must report failures rather than weakening checks.
 
 ## Memory Bank Protocol
 

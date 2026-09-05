@@ -1,8 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
-import { HealthCheck } from '@nestjs/terminus';
 import { ok } from '../../common/api-response';
+import { Public } from '../../common/decorators/public.decorator';
 import { HealthService } from './health.service';
 
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
@@ -13,13 +14,11 @@ export class HealthController {
   }
 
   @Get('live')
-  @HealthCheck()
   checkLiveness() {
     return this.healthService.checkLiveness();
   }
 
   @Get('ready')
-  @HealthCheck()
   checkReadiness() {
     return this.healthService.checkReadiness();
   }

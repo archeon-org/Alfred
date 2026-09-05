@@ -5,7 +5,8 @@ Alfred is a professional monorepo scaffold for a simplified agent platform inspi
 It contains three runnable application layers:
 
 - `apps/web`: React + Vite frontend.
-- `apps/api`: NestJS backend with configuration validation, global request validation, health endpoints and Prisma/PostgreSQL wiring.
+- `apps/api`: NestJS backend with private-by-default routes, environment-controlled feature flags,
+  optional Google OAuth, rotating sessions, strict validation and TypeORM migrations.
 - `apps/agent`: Python LangGraph application prepared for LangGraph Platform / Agent Server development.
 
 ## Requirements
@@ -19,7 +20,7 @@ It contains three runnable application layers:
 ## Quick Start
 
 ```bash
-cp .env.example .env
+pnpm setup:env
 pnpm install
 UV_CACHE_DIR=.cache/uv uv sync --project apps/agent --all-groups
 pnpm dev
@@ -35,14 +36,30 @@ Useful URLs:
 ## Docker
 
 ```bash
-cp .env.example .env
+pnpm setup:env
 docker compose up --build
 ```
+
+The setup command creates private `.env` files for Compose, NestJS, Vite and the standalone Agent
+Server. It generates local secrets without printing them and never overwrites an existing file.
+It preserves existing secrets while synchronizing managed feature flags and adding missing runtime
+defaults for sessions, proxy trust and observability.
+Google OAuth and the LangGraph licence remain disabled until their approved credentials are added.
+See the [foundation report](docs/alfred-foundation-report.md) for the component summary, environment
+matrix and exact Google OAuth setup checklist.
+
+## Feature flags
+
+Optional product capabilities are controlled by `FEATURE_*_ENABLED` variables in the backend
+environment. They are disabled by default, enforced by a global NestJS guard and exposed to React
+through the public, read-only `/api/features` manifest. Google OAuth is intended for external or
+commercial deployments and remains disabled in the Enterprise profile.
 
 The Compose stack starts:
 
 - `postgres`: application database.
-- `redis`: required backing service for production-like LangGraph Agent Server topologies.
+- `postgres-bootstrap`: idempotent logical-database and extension provisioning.
+- `redis`: API readiness and distributed throttling backing service.
 - `api`: NestJS API.
 - `web`: Vite production bundle served by Nginx.
 - `agent`: LangGraph development server for local graph iteration.
@@ -81,6 +98,8 @@ apps/
   web/       React + Vite frontend
   api/       NestJS API
   agent/     LangGraph graph application
+packages/
+  contracts/ Runtime-validated browser/API contracts
 infra/
   postgres/  PostgreSQL image and init scripts
 docs/

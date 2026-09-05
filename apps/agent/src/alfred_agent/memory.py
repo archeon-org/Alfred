@@ -10,6 +10,8 @@ from langgraph.store.base import BaseStore
 MEMORY_SCHEMA_VERSION: Literal[1] = 1
 MAX_MEMORY_TEXT_LENGTH = 500
 MEMORY_RECALL_LIMIT = 5
+MEMORY_INDEX_CAPACITY = 256
+MEMORY_INDEX_KEY = "recent-episodes-v1"
 
 _IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}")
 _TOKEN_PATTERN = re.compile(
@@ -52,6 +54,11 @@ class MemoryRecord(TypedDict):
     created_at: str
 
 
+class MemoryIndexEntry(TypedDict):
+    key: str
+    created_at: str
+
+
 def _validate_identifier(field: str, value: str) -> None:
     if _IDENTIFIER_PATTERN.fullmatch(value) is None:
         raise ValueError(f"{field} must be a non-empty identifier containing only safe characters")
@@ -82,6 +89,10 @@ def memory_namespace(context: MemoryContext) -> tuple[str, ...]:
 
 def shared_memory_namespace(context: MemoryContext) -> tuple[str, ...]:
     return ("alfred", "users", context.user_id, "shared", "planning_history")
+
+
+def _memory_index_namespace(namespace: tuple[str, ...]) -> tuple[str, ...]:
+    return ("alfred", "indexes", *namespace[1:])
 
 
 def build_memory_record(
@@ -120,14 +131,11 @@ def recall_memories(
     if not context.memory_enabled:
         return []
 
-    items = list(store.search(memory_namespace(context), limit=limit))
+    namespaces = [memory_namespace(context)]
     if context.share_across_conversations:
-        items.extend(store.search(shared_memory_namespace(context), limit=limit))
-    records = [
-        record
-        for record in (_parse_memory_record(item.value) for item in items)
-        if record is not None
-    ]
+        namespaces.append(shared_memory_namespace(context))
+
+    records = [record for namespace in namespaces for record in _recall_namespace(store, namespace)]
     deduplicated = {memory_key(record): record for record in records}
     return sorted(deduplicated.values(), key=lambda record: record["created_at"], reverse=True)[
         :limit
@@ -138,9 +146,9 @@ def store_memory(store: BaseStore, context: MemoryContext, record: MemoryRecord)
     if not context.memory_enabled:
         return
 
-    store.put(memory_namespace(context), memory_key(record), dict(record))
+    _store_in_namespace(store, memory_namespace(context), record)
     if context.share_across_conversations:
-        store.put(shared_memory_namespace(context), memory_key(record), dict(record))
+        _store_in_namespace(store, shared_memory_namespace(context), record)
 
 
 def forget_memories(
@@ -156,7 +164,57 @@ def forget_memories(
         for item in store.search(namespace, limit=1_000):
             store.delete(namespace, item.key)
             deleted += 1
+        store.delete(_memory_index_namespace(namespace), MEMORY_INDEX_KEY)
     return deleted
+
+
+def _store_in_namespace(
+    store: BaseStore, namespace: tuple[str, ...], record: MemoryRecord
+) -> None:
+    key = memory_key(record)
+    store.put(namespace, key, dict(record))
+
+    index_namespace = _memory_index_namespace(namespace)
+    index_item = store.get(index_namespace, MEMORY_INDEX_KEY)
+    entries = _parse_memory_index(index_item.value) if index_item is not None else []
+    by_key = {entry["key"]: entry for entry in entries}
+    by_key[key] = {"key": key, "created_at": record["created_at"]}
+    recent = sorted(by_key.values(), key=lambda entry: entry["created_at"], reverse=True)[
+        :MEMORY_INDEX_CAPACITY
+    ]
+    store.put(index_namespace, MEMORY_INDEX_KEY, {"entries": recent})
+
+
+def _recall_namespace(store: BaseStore, namespace: tuple[str, ...]) -> list[MemoryRecord]:
+    index_item = store.get(_memory_index_namespace(namespace), MEMORY_INDEX_KEY)
+    if index_item is None:
+        items = store.search(namespace, limit=MEMORY_INDEX_CAPACITY)
+    else:
+        entries = _parse_memory_index(index_item.value)
+        items = [item for entry in entries if (item := store.get(namespace, entry["key"]))]
+
+    return [
+        record
+        for record in (_parse_memory_record(item.value) for item in items)
+        if record is not None
+    ]
+
+
+def _parse_memory_index(value: Mapping[str, object]) -> list[MemoryIndexEntry]:
+    raw_entries = value.get("entries")
+    if not isinstance(raw_entries, list):
+        return []
+
+    entries: list[MemoryIndexEntry] = []
+    for raw_entry in cast(list[object], raw_entries):
+        if not isinstance(raw_entry, Mapping):
+            continue
+        typed_entry = cast(Mapping[str, object], raw_entry)
+        key = typed_entry.get("key")
+        created_at = typed_entry.get("created_at")
+        if isinstance(key, str) and isinstance(created_at, str):
+            entries.append({"key": key, "created_at": created_at})
+    return entries
 
 
 def _parse_memory_record(value: Mapping[str, object]) -> MemoryRecord | None:

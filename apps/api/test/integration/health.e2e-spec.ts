@@ -1,16 +1,24 @@
+import type { AddressInfo } from 'node:net';
 import type { INestApplication } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AppModule } from '../../src/app.module';
 import { configureApplication } from '../../src/bootstrap';
+import { ApiExceptionFilter } from '../../src/common/filters/api-exception.filter';
+import { validateEnv } from '../../src/config/configuration';
+import { DatabaseHealthIndicator } from '../../src/modules/health/database-health.indicator';
 import { HealthController } from '../../src/modules/health/health.controller';
-import { PrismaService } from '../../src/modules/prisma/prisma.service';
+import { HealthService } from '../../src/modules/health/health.service';
+import { RedisHealthIndicator } from '../../src/modules/health/redis-health.indicator';
 
 describe('operational health module', () => {
   let app: INestApplication;
-  let controller: HealthController;
-  const queryRaw = vi.fn();
+  let baseUrl: string;
+  const query = vi.fn();
+  const checkRedis = vi.fn();
 
   beforeAll(async () => {
     vi.stubEnv('NODE_ENV', 'test');
@@ -18,63 +26,83 @@ describe('operational health module', () => {
     vi.stubEnv('API_PORT', '3000');
     vi.stubEnv('API_PREFIX', 'api');
     vi.stubEnv('API_CORS_ORIGINS', 'http://localhost:5173');
+    vi.stubEnv('AUTH_COOKIE_SECURE', 'false');
+    vi.stubEnv('AUTH_JWT_SECRET', 'test-only-signing-secret-that-is-longer-than-32-characters');
     vi.stubEnv(
       'DATABASE_URL',
       'postgresql://alfred:test-password@localhost:5432/alfred_test?schema=public',
     );
+    vi.stubEnv('FEATURE_GOOGLE_OAUTH_ENABLED', 'false');
+    vi.stubEnv('WEB_APP_URL', 'http://localhost:5173');
 
     const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    })
-      .overrideProvider(PrismaService)
-      .useValue({ $queryRaw: queryRaw })
-      .compile();
+      imports: [ConfigModule.forRoot({ isGlobal: true, validate: validateEnv })],
+      controllers: [HealthController],
+      providers: [
+        DatabaseHealthIndicator,
+        HealthService,
+        { provide: APP_FILTER, useClass: ApiExceptionFilter },
+        { provide: DataSource, useValue: { query } },
+        { provide: RedisHealthIndicator, useValue: { check: checkRedis } },
+      ],
+    }).compile();
 
     app = moduleRef.createNestApplication();
     configureApplication(app);
-    await app.init();
-    controller = moduleRef.get(HealthController);
+    await app.listen(0, '127.0.0.1');
+    const server = app.getHttpServer() as { address(): AddressInfo | null | string };
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('HTTP test server failed');
+    baseUrl = `http://127.0.0.1:${address.port}`;
   });
 
   beforeEach(() => {
-    queryRaw.mockReset();
-    queryRaw.mockResolvedValue([{ result: 1 }]);
+    query.mockReset();
+    query.mockResolvedValue([{ result: 1 }]);
+    checkRedis.mockReset();
+    checkRedis.mockResolvedValue({ redis: { status: 'up' } });
   });
 
   afterAll(async () => {
-    await app.close();
+    await app?.close();
     vi.unstubAllEnvs();
   });
 
   it('resolves liveness without querying PostgreSQL', async () => {
-    await expect(controller.checkLiveness()).resolves.toMatchObject({ status: 'ok' });
-    expect(queryRaw).not.toHaveBeenCalled();
+    const response = await fetch(`${baseUrl}/health/live`, {
+      headers: { Origin: 'http://localhost:5173' },
+    });
+    const body: unknown = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('access-control-allow-origin')).toBe('http://localhost:5173');
+    expect(body).toMatchObject({ status: 'ok' });
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('resolves readiness only after querying PostgreSQL', async () => {
-    await expect(controller.checkReadiness()).resolves.toMatchObject({
-      details: { database: { status: 'up' } },
+    const response = await fetch(`${baseUrl}/health/ready`);
+    const body: unknown = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      details: { database: { status: 'up' }, redis: { status: 'up' } },
       status: 'ok',
     });
-    expect(queryRaw).toHaveBeenCalledOnce();
+    expect(query).toHaveBeenCalledOnce();
+    expect(checkRedis).toHaveBeenCalledOnce();
   });
 
   it('marks readiness down when PostgreSQL is unavailable without leaking its error', async () => {
-    queryRaw.mockRejectedValueOnce(new Error('password authentication failed for secret-user'));
+    query.mockRejectedValueOnce(new Error('password authentication failed for secret-user'));
+    const response = await fetch(`${baseUrl}/health/ready`);
+    const body: unknown = await response.json();
 
-    let thrown: unknown;
-    try {
-      await controller.checkReadiness();
-    } catch (error) {
-      thrown = error;
-    }
-
-    expect(thrown).toMatchObject({
-      response: {
-        details: { database: { status: 'down' } },
-        status: 'error',
-      },
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({
+      error: { code: 'HTTP_503' },
+      success: false,
     });
-    expect(JSON.stringify(thrown)).not.toContain('secret-user');
+    expect(JSON.stringify(body)).not.toContain('secret-user');
   });
 });

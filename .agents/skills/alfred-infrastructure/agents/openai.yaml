@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Alfred Infrastructure'
+  short_description: 'Build self-hosted Docker and platform foundations'
+  default_prompt: "Use $alfred-infrastructure to change Alfred's self-hosted runtime safely."

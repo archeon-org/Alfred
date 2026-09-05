@@ -57,6 +57,23 @@ async function main() {
     );
   }
 
+  const instructions = (await readFile(join(root, 'AGENTS.md'), 'utf8')).toLowerCase();
+  assert(
+    instructions.includes('docs/memory-bank/index.json') &&
+      instructions.includes('read the memory bank before') &&
+      instructions.includes('never store raw chain-of-thought'),
+    'AGENTS.md must define the memory-bank read and safety protocol.',
+  );
+
+  const codexConfig = await readFile(join(root, '.codex', 'config.toml'), 'utf8');
+  assert(
+    codexConfig.includes('[agents.memory_keeper]') &&
+      codexConfig.includes('config = ".codex/agents/memory-keeper.toml"'),
+    'The memory_keeper Codex role must stay registered.',
+  );
+  await access(join(root, '.codex', 'agents', 'memory-keeper.toml'));
+  await access(join(root, '.agents', 'skills', 'alfred-memory-bank', 'SKILL.md'));
+
   console.log(`Memory bank valid: ${manifest.documents.length} indexed documents.`);
 }
 

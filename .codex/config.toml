@@ -32,3 +32,15 @@ config = ".codex/agents/quality-gate.toml"
 
 [agents.memory_keeper]
 config = ".codex/agents/memory-keeper.toml"
+
+[agents.backend_engineer]
+config = ".codex/agents/backend-engineer.toml"
+
+[agents.frontend_engineer]
+config = ".codex/agents/frontend-engineer.toml"
+
+[agents.infrastructure_engineer]
+config = ".codex/agents/infrastructure-engineer.toml"
+
+[agents.database_reviewer]
+config = ".codex/agents/database-reviewer.toml"

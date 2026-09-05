@@ -94,6 +94,37 @@ def test_graph_recalls_prior_episode_across_conversations_for_same_user() -> Non
     assert prior["conversation_id"] == "conversation-a"
 
 
+def test_recall_returns_the_latest_episodes_after_the_namespace_exceeds_the_limit() -> None:
+    store = InMemoryStore()
+    context = MemoryContext(user_id="user-123", conversation_id="conversation-456")
+
+    for index in range(10):
+        record = build_memory_record(
+            context=context,
+            objective=f"Objective {index}",
+            outcome=f"Outcome {index}",
+            steps=["planner"],
+        )
+        store_memory(
+            store,
+            context,
+            {
+                **record,
+                "created_at": f"2026-09-03T10:{index:02d}:00+00:00",
+            },
+        )
+
+    recalled = recall_memories(store, context, limit=5)
+
+    assert [record["objective"] for record in recalled] == [
+        "Objective 9",
+        "Objective 8",
+        "Objective 7",
+        "Objective 6",
+        "Objective 5",
+    ]
+
+
 def test_graph_keeps_memories_isolated_between_users() -> None:
     store = InMemoryStore()
     memory_graph = build_graph(store=store)

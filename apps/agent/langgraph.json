@@ -10,7 +10,7 @@
       "default_ttl": 129600
     }
   },
-  "env": "../../.env",
+  "env": ".env",
   "image_distro": "wolfi",
   "python_version": "3.12"
 }

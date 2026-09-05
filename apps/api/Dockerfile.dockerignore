@@ -7,6 +7,9 @@
 !apps/
 !apps/api/
 !apps/api/**
+!packages/
+!packages/contracts/
+!packages/contracts/**
 
 **/.env
 **/.env.*
