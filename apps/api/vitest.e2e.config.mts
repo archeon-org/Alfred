@@ -12,6 +12,8 @@ export default defineConfig({
   test: {
     clearMocks: true,
     environment: 'node',
+    // PostgreSQL suites share migrations and global table cleanup in the same database.
+    fileParallelism: false,
     globals: true,
     include: ['test/e2e/**/*.e2e-spec.ts', 'test/integration/**/*.postgres.spec.ts'],
     mockReset: true,

@@ -1,6 +1,6 @@
 # Generated from langgraph.json with `langgraph dockerfile`.
 # Regenerate this file whenever the LangGraph deployment config changes.
-FROM langchain/langgraph-api:3.12-wolfi@sha256:7227ff9397725541be89a3586880d181819fcbe4eee3fd6237d42e23b40b1b84
+FROM langchain/langgraph-api:3.12-wolfi@sha256:cca6a56c9499cf9cff880cf40a3032c22e38b2998260cf3aaa1a6b9aaf37b7bf
 
 # Add the local agent package declared by `dependencies: ["."]`.
 ADD . /deps/agent
@@ -31,7 +31,6 @@ RUN pip uninstall -y pip setuptools wheel \
     && for bindir in /usr/local/bin /usr/bin; do \
       if [ -d "$bindir" ]; then find "$bindir" -name "pip*" -delete; fi; \
     done \
-    && uv pip uninstall --system pip setuptools wheel || true \
     && rm -f /usr/bin/uv /usr/bin/uvx
 
 WORKDIR /deps/agent

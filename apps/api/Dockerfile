@@ -43,12 +43,20 @@ ENV API_HOST=0.0.0.0 \
 
 WORKDIR /app/apps/api
 
-RUN addgroup --system --gid 10001 alfred \
+RUN apk upgrade --no-cache \
+    && addgroup --system --gid 10001 alfred \
     && adduser --system --uid 10001 --ingroup alfred alfred
+
+# Runtime starts compiled JavaScript directly; keep application dependencies below,
+# but remove the base image's package managers and their bundled dependencies.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-v* \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+      /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 COPY --from=production-dependencies --chown=alfred:alfred /workspace/node_modules /app/node_modules
 COPY --from=production-dependencies --chown=alfred:alfred /workspace/apps/api/package.json ./package.json
 COPY --from=production-dependencies --chown=alfred:alfred /workspace/apps/api/node_modules ./node_modules
+COPY --from=production-dependencies --chown=alfred:alfred /workspace/packages/contracts/node_modules /app/packages/contracts/node_modules
 COPY --from=build --chown=alfred:alfred /workspace/packages/contracts/package.json /app/packages/contracts/package.json
 COPY --from=build --chown=alfred:alfred /workspace/packages/contracts/dist /app/packages/contracts/dist
 COPY --from=build --chown=alfred:alfred /workspace/apps/api/dist ./dist

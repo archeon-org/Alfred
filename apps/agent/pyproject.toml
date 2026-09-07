@@ -9,8 +9,9 @@ dependencies = [
 ]
 
 [dependency-groups]
+local-server = ["langgraph-cli[inmem]>=0.4.30"]
 dev = [
-  "langgraph-cli[inmem]>=0.4.30",
+  {include-group = "local-server"},
   "pip-audit>=2.9.0",
   "pytest>=8.4.1",
   "pytest-cov>=6.2.1",

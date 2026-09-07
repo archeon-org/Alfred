@@ -6,10 +6,24 @@ updates:
       interval: weekly
       day: monday
     groups:
+      # Framework runtime and test adapter must move together across major versions.
+      nestjs-framework:
+        patterns:
+          - '@nestjs/common'
+          - '@nestjs/core'
+          - '@nestjs/platform-express'
+          - '@nestjs/testing'
+      vitest:
+        patterns:
+          - vitest
+          - '@vitest/*'
+      # Keep unrelated major upgrades in separate PRs for focused compatibility review.
       javascript-development:
         dependency-type: development
+        update-types: [minor, patch]
       javascript-runtime:
         dependency-type: production
+        update-types: [minor, patch]
 
   - package-ecosystem: pip
     directory: /apps/agent

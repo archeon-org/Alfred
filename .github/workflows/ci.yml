@@ -160,72 +160,25 @@ jobs:
                 "/usr/local/bin/revoke-runtime-migration-ledger.sh"
               ]
             '
-      - run: docker compose --env-file .env.example build
-      - name: Scan the PostgreSQL image
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-        with:
-          exit-code: '1'
-          format: table
-          ignore-unfixed: false
-          image-ref: alfred-postgres
-          scanners: vuln
-          severity: HIGH,CRITICAL
-      - name: Scan the API image
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-        with:
-          exit-code: '1'
-          format: table
-          ignore-unfixed: false
-          image-ref: alfred-api
-          scanners: vuln
-          severity: HIGH,CRITICAL
-      - name: Scan the migration image
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-        with:
-          exit-code: '1'
-          format: table
-          ignore-unfixed: false
-          image-ref: alfred-migrate
-          scanners: vuln
-          severity: HIGH,CRITICAL
-      - name: Scan the web image
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-        with:
-          exit-code: '1'
-          format: table
-          ignore-unfixed: false
-          image-ref: alfred-web
-          scanners: vuln
-          severity: HIGH,CRITICAL
-      - name: Scan the local agent image
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-        with:
-          exit-code: '1'
-          format: table
-          ignore-unfixed: false
-          image-ref: alfred-agent
-          scanners: vuln
-          severity: HIGH,CRITICAL
+      - name: Build base images
+        id: build_base
+        run: |
+          docker compose --env-file .env.example build
+          docker tag alfred-agent alfred-agent-local:ci
       - name: Assert base application images run as non-root
         run: |
-          test "$(docker compose --env-file .env.example run --rm --no-deps --entrypoint id api -u)" != "0"
-          test "$(docker compose --env-file .env.example run --rm --no-deps --entrypoint id web -u)" != "0"
-          test "$(docker compose --env-file .env.example run --rm --no-deps --entrypoint id migrate -u)" != "0"
-          test "$(docker compose --env-file .env.example run --rm --no-deps --entrypoint id agent -u)" != "0"
+          for service in api web migrate agent; do
+            uid="$(docker compose --env-file .env.example run --rm --no-deps --entrypoint id "$service" -u)"
+            test "$uid" -gt 0
+          done
       - name: Build the standalone Agent Server image
+        id: build_standalone
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
         run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml build agent
-      - name: Scan the standalone Agent Server image
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-        with:
-          exit-code: '1'
-          format: table
-          ignore-unfixed: false
-          image-ref: alfred-agent
-          scanners: vuln
-          severity: HIGH,CRITICAL
       - name: Assert the standalone Agent Server image runs as non-root
         run: |
-          test "$(docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml run --rm --no-deps --entrypoint id agent -u)" != "0"
+          uid="$(docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml run --rm --no-deps --entrypoint id agent -u)"
+          test "$uid" -gt 0
       - name: Start PostgreSQL and apply repeatable bootstrap
         run: |
           docker compose --env-file .env.example up -d --wait postgres
@@ -257,6 +210,80 @@ jobs:
           TEST_MIGRATION_DATABASE_URL="postgresql://alfred_migrator:${MIGRATOR_DATABASE_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5432}/alfred_test?schema=public" \
           TEST_DATABASE_URL="postgresql://alfred_api:${API_DATABASE_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5432}/alfred_test?schema=public" \
             pnpm --filter @alfred/api test:e2e
+      - name: Scan the PostgreSQL image
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '1'
+          format: json
+          output: trivy-postgres.json
+          ignore-unfixed: false
+          image-ref: alfred-postgres
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Scan the API image
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '1'
+          format: json
+          output: trivy-api.json
+          ignore-unfixed: false
+          image-ref: alfred-api
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Scan the migration image
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '1'
+          format: json
+          output: trivy-migrate.json
+          ignore-unfixed: false
+          image-ref: alfred-migrate
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Scan the web image
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '1'
+          format: json
+          output: trivy-web.json
+          ignore-unfixed: false
+          image-ref: alfred-web
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Scan the local agent image
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '1'
+          format: json
+          output: trivy-agent.json
+          ignore-unfixed: false
+          image-ref: alfred-agent-local:ci
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Scan the standalone Agent Server image
+        if: ${{ !cancelled() && steps.build_standalone.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '1'
+          format: json
+          output: trivy-agent-standalone.json
+          ignore-unfixed: false
+          image-ref: alfred-agent
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Upload image vulnerability reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: container-vulnerability-reports
+          path: trivy-*.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Remove CI containers and volumes
         if: always()
         run: docker compose --env-file .env.example down --volumes --remove-orphans

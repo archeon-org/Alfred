@@ -3,6 +3,45 @@ revision = 3
 requires-python = ">=3.12"
 
 [[package]]
+name = "alfred-agent"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "langgraph" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "langgraph-cli", extra = ["inmem"] },
+    { name = "pip-audit" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+]
+local-server = [
+    { name = "langgraph-cli", extra = ["inmem"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "langchain-core", specifier = ">=0.3.74" },
+    { name = "langgraph", specifier = ">=0.6.6" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "langgraph-cli", extras = ["inmem"], specifier = ">=0.4.30" },
+    { name = "pip-audit", specifier = ">=2.9.0" },
+    { name = "pyright", specifier = ">=1.1.403" },
+    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "pytest-cov", specifier = ">=6.2.1" },
+    { name = "ruff", specifier = ">=0.12.10" },
+]
+local-server = [{ name = "langgraph-cli", extras = ["inmem"], specifier = ">=0.4.30" }]
+
+[[package]]
 name = "annotated-types"
 version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -22,41 +61,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/61/cc/a381afa6efea9f496eff839d4a6a1aed3bfafc7b3ab4b0d1b243a12573dd/anyio-4.14.2.tar.gz", hash = "sha256:cfa139f3ed1a23ee8f88a145ddb5ac7605b8bbfd8592baacd7ce3d8bb4313c7f", size = 260176, upload-time = "2026-07-12T20:29:07.082Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/da/35/f2287558c17e29fafc8ef3daf819bb9834061cfa43bff8014f7df7f63bdc/anyio-4.14.2-py3-none-any.whl", hash = "sha256:9f505dda5ac9f0c8309b5e8bd445a8c2bf7246f3ce950121e45ea15bc41d1494", size = 125813, upload-time = "2026-07-12T20:29:05.763Z" },
-]
-
-[[package]]
-name = "alfred-agent"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "langchain-core" },
-    { name = "langgraph" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "langgraph-cli", extra = ["inmem"] },
-    { name = "pip-audit" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "langchain-core", specifier = ">=0.3.74" },
-    { name = "langgraph", specifier = ">=0.6.6" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "langgraph-cli", extras = ["inmem"], specifier = ">=0.4.30" },
-    { name = "pip-audit", specifier = ">=2.9.0" },
-    { name = "pyright", specifier = ">=1.1.403" },
-    { name = "pytest", specifier = ">=8.4.1" },
-    { name = "pytest-cov", specifier = ">=6.2.1" },
-    { name = "ruff", specifier = ">=0.12.10" },
 ]
 
 [[package]]

@@ -50,6 +50,10 @@ RUN pnpm --filter @alfred/contracts build \
 
 FROM nginxinc/nginx-unprivileged:1.31.4-alpine@sha256:901e944d1f4fc2bd077e8f5568b98c1f6f8cdacf6b97a87747c43134a339b9a7 AS runtime
 
+USER root
+RUN apk upgrade --no-cache
+USER 101
+
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/apps/web/dist /usr/share/nginx/html
 
