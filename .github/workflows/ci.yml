@@ -4,6 +4,11 @@ on:
   push:
     branches: [develop, main]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    # Full CI and fresh image scans every Monday at 04:23 UTC.
+    # GitHub activates scheduled runs only on the default branch.
+    - cron: '23 4 * * 1'
 
 permissions:
   contents: read
@@ -100,7 +105,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
+      COMPOSE_PROJECT_NAME: alfred-ci-${{ github.run_id }}-${{ github.run_attempt }}
       POSTGRES_USER: alfred
+      FEATURE_RATE_LIMITING_ENABLED: 'true'
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -113,7 +120,7 @@ jobs:
           cache: pnpm
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - run: pnpm install --frozen-lockfile
-      - name: Generate ephemeral CI database credentials
+      - name: Generate ephemeral CI runtime credentials
         run: |
           generate_secret() {
             local key="$1"
@@ -126,6 +133,8 @@ jobs:
           generate_secret MIGRATOR_DATABASE_PASSWORD
           generate_secret API_DATABASE_PASSWORD
           generate_secret AGENT_DATABASE_PASSWORD
+          generate_secret REDIS_API_PASSWORD
+          generate_secret AUTH_JWT_SECRET
       - run: docker compose --env-file .env.example config --quiet
       - run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml config --quiet
       - name: Assert the production overlay contract
@@ -164,7 +173,7 @@ jobs:
         id: build_base
         run: |
           docker compose --env-file .env.example build
-          docker tag alfred-agent alfred-agent-local:ci
+          docker tag "${COMPOSE_PROJECT_NAME}-agent" "${COMPOSE_PROJECT_NAME}-agent-local:ci"
       - name: Assert base application images run as non-root
         run: |
           for service in api web migrate agent; do
@@ -179,9 +188,10 @@ jobs:
         run: |
           uid="$(docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml run --rm --no-deps --entrypoint id agent -u)"
           test "$uid" -gt 0
-      - name: Start PostgreSQL and apply repeatable bootstrap
+      - name: Start PostgreSQL and Redis and apply repeatable bootstrap
+        timeout-minutes: 3
         run: |
-          docker compose --env-file .env.example up -d --wait postgres
+          docker compose --env-file .env.example up -d --no-build --wait --wait-timeout 120 postgres redis
           docker compose --env-file .env.example run --rm --no-deps postgres-bootstrap
       - name: Run the compiled TypeORM migration against PostgreSQL
         run: docker compose --env-file .env.example run --rm --no-deps migrate
@@ -189,6 +199,19 @@ jobs:
         run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml run --rm --no-deps migrate
       - name: Reconcile runtime grants after migration
         run: docker compose --env-file .env.example run --rm --no-deps postgres-runtime-grants
+      - name: Start the compiled API and assert dependency readiness
+        timeout-minutes: 3
+        run: |
+          # Bootstrap, migrations and grants already completed as one-shot jobs.
+          # Preserve the image's default command (node dist/main.js).
+          docker compose --env-file .env.example up -d --no-build --no-deps --wait --wait-timeout 120 api
+          curl --fail-with-body --silent --show-error --connect-timeout 3 --max-time 10 \
+            "http://127.0.0.1:${API_PORT:-3000}/health/ready" |
+            jq --exit-status '
+              .status == "ok" and
+              .details.database.status == "up" and
+              .details.redis.status == "up"
+            '
       - name: Assert the API role cannot mutate the TypeORM migration ledger
         run: |
           docker compose --env-file .env.example exec --no-TTY postgres \
@@ -220,7 +243,7 @@ jobs:
           format: json
           output: trivy-postgres.json
           ignore-unfixed: false
-          image-ref: alfred-postgres
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-postgres
           scanners: vuln
           severity: HIGH,CRITICAL
       - name: Scan the API image
@@ -231,7 +254,7 @@ jobs:
           format: json
           output: trivy-api.json
           ignore-unfixed: false
-          image-ref: alfred-api
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-api
           scanners: vuln
           severity: HIGH,CRITICAL
       - name: Scan the migration image
@@ -242,7 +265,7 @@ jobs:
           format: json
           output: trivy-migrate.json
           ignore-unfixed: false
-          image-ref: alfred-migrate
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-migrate
           scanners: vuln
           severity: HIGH,CRITICAL
       - name: Scan the web image
@@ -253,7 +276,7 @@ jobs:
           format: json
           output: trivy-web.json
           ignore-unfixed: false
-          image-ref: alfred-web
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-web
           scanners: vuln
           severity: HIGH,CRITICAL
       - name: Scan the local agent image
@@ -264,7 +287,7 @@ jobs:
           format: json
           output: trivy-agent.json
           ignore-unfixed: false
-          image-ref: alfred-agent-local:ci
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-agent-local:ci
           scanners: vuln
           severity: HIGH,CRITICAL
       - name: Scan the standalone Agent Server image
@@ -275,7 +298,7 @@ jobs:
           format: json
           output: trivy-agent-standalone.json
           ignore-unfixed: false
-          image-ref: alfred-agent
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-agent
           scanners: vuln
           severity: HIGH,CRITICAL
       - name: Enforce container vulnerability policy
@@ -292,6 +315,24 @@ jobs:
           path: trivy-*.json
           if-no-files-found: warn
           retention-days: 7
-      - name: Remove CI containers and volumes
+      - name: Show CI container diagnostics
         if: always()
-        run: docker compose --env-file .env.example down --volumes --remove-orphans
+        timeout-minutes: 2
+        run: |
+          status=0
+          docker compose --env-file .env.example ps --all || status=$?
+          docker compose --env-file .env.example logs --no-color --timestamps --tail 200 postgres redis api || status=$?
+          exit "$status"
+      - name: Remove the disposable CI project
+        if: always()
+        timeout-minutes: 2
+        # Base removes host-access; overlay also covers agent-redis-data.
+        # Never prune other Docker projects.
+        # The ephemeral GitHub-hosted runner disposes of images and build caches.
+        run: |
+          status=0
+          docker compose --env-file .env.example down \
+            --volumes --remove-orphans --timeout 10 || status=$?
+          docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml \
+            down --volumes --remove-orphans --timeout 10 || status=$?
+          exit "$status"
