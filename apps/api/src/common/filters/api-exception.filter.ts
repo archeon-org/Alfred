@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiException } from '../errors/api.exception';
+import { OwnedResourceNotFoundException } from '../ownership/owned-resource-not-found.exception';
 
 const INTERNAL_SERVER_ERROR_STATUS = 500;
 
@@ -101,7 +102,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
     const body: ErrorBody = Object.freeze({
       error: Object.freeze({
-        code: exception instanceof ApiException ? exception.code : `HTTP_${status}`,
+        code:
+          exception instanceof ApiException || exception instanceof OwnedResourceNotFoundException
+            ? exception.code
+            : `HTTP_${status}`,
         ...(details === undefined ? {} : { details }),
         message,
       }),
