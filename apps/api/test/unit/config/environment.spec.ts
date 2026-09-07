@@ -17,6 +17,16 @@ const validEnvironment = Object.freeze({
 });
 
 describe('parseEnvironment', () => {
+  it.each([
+    'FEATURE_OUTPUT_STYLES_ENABLED',
+    'FEATURE_KNOWLEDGE_SCOPE_ENABLED',
+    'FEATURE_CONVERSATION_FEEDBACK_ENABLED',
+  ])('parses both states and defaults %s to false', (key) => {
+    expect(parseEnvironment(validEnvironment)).toHaveProperty(key, false);
+    expect(parseEnvironment({ ...validEnvironment, [key]: 'true' })).toHaveProperty(key, true);
+    expect(parseEnvironment({ ...validEnvironment, [key]: 'false' })).toHaveProperty(key, false);
+    expect(() => parseEnvironment({ ...validEnvironment, [key]: 'yes' })).toThrow(key);
+  });
   it.each(Object.values(FEATURE_FLAG_ENVIRONMENT_KEYS))(
     'rejects ambiguous values for %s',
     (key) => {
@@ -71,6 +81,9 @@ describe('parseEnvironment', () => {
       FEATURE_GENERATIVE_UI_ENABLED: false,
       FEATURE_GOOGLE_OAUTH_ENABLED: false,
       FEATURE_MCP_APPS_ENABLED: false,
+      FEATURE_OUTPUT_STYLES_ENABLED: false,
+      FEATURE_KNOWLEDGE_SCOPE_ENABLED: false,
+      FEATURE_CONVERSATION_FEEDBACK_ENABLED: false,
       FEATURE_OPENAPI_ENABLED: true,
       FEATURE_RATE_LIMITING_ENABLED: true,
       FEATURE_RUNTIME_MEMORY_ENABLED: false,

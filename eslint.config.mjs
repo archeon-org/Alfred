@@ -48,5 +48,10 @@ export default tseslint.config(
       ...reactHooks.configs.flat['recommended-latest'].rules,
     },
   },
+  {
+    files: ['*.mjs', 'scripts/**/*.mjs'],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: globals.node },
+  },
   prettier,
 );

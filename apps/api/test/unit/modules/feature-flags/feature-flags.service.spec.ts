@@ -1,3 +1,4 @@
+import { FEATURE_FLAG_NAMES, featureFlagsSchema } from '@alfred/contracts';
 import { NotFoundException, type ExecutionContext } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
@@ -15,6 +16,9 @@ const configuredFlags = Object.freeze({
   FEATURE_GENERATIVE_UI_ENABLED: true,
   FEATURE_GOOGLE_OAUTH_ENABLED: true,
   FEATURE_MCP_APPS_ENABLED: true,
+  FEATURE_OUTPUT_STYLES_ENABLED: true,
+  FEATURE_KNOWLEDGE_SCOPE_ENABLED: true,
+  FEATURE_CONVERSATION_FEEDBACK_ENABLED: true,
   FEATURE_OPENAPI_ENABLED: true,
   FEATURE_RATE_LIMITING_ENABLED: true,
   FEATURE_RUNTIME_MEMORY_ENABLED: true,
@@ -30,6 +34,11 @@ function config(): ConfigService {
 }
 
 describe('FeatureFlagsService', () => {
+  it('publishes a complete manifest matching the shared contract', () => {
+    const manifest = new FeatureFlagsService(config()).getPublicFlags();
+    expect(Object.keys(manifest).sort()).toEqual([...FEATURE_FLAG_NAMES].sort());
+    expect(featureFlagsSchema.parse(manifest)).toEqual(manifest);
+  });
   it('disables implemented capabilities explicitly without exposing operational flags', () => {
     const service = new FeatureFlagsService(
       new ConfigService({
@@ -62,6 +71,9 @@ describe('FeatureFlagsService', () => {
       generativeUi: false,
       googleOAuth: true,
       mcpApps: false,
+      outputStyles: false,
+      knowledgeScope: false,
+      conversationFeedback: false,
       runtimeMemory: false,
       skills: false,
       teams: false,
@@ -102,6 +114,9 @@ describe('FeatureFlagsService', () => {
     'fileUploads',
     'generativeUi',
     'mcpApps',
+    'outputStyles',
+    'knowledgeScope',
+    'conversationFeedback',
     'runtimeMemory',
     'skills',
     'teams',
@@ -110,5 +125,14 @@ describe('FeatureFlagsService', () => {
 
     expect(service.isEnabled(feature)).toBe(false);
     expect(service.getPublicFlags()[feature]).toBe(false);
+    const controller = class ReservedController {};
+    Reflect.defineMetadata('alfred:required-feature-flags', [feature], controller);
+    const guard = new FeatureFlagGuard(new Reflector(), service);
+    expect(() =>
+      guard.canActivate({
+        getClass: () => controller,
+        getHandler: () => function handler() {},
+      } as unknown as ExecutionContext),
+    ).toThrow(NotFoundException);
   });
 });

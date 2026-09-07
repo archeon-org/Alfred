@@ -113,3 +113,35 @@ test('migrates generated local environment files to the current contract', async
   assert.equal(rootEnvironment.FEATURE_RATE_LIMITING_ENABLED, 'true');
   assert.equal(apiEnvironment.FEATURE_RATE_LIMITING_ENABLED, 'true');
 });
+
+const newFlagKeys = [
+  'FEATURE_OUTPUT_STYLES_ENABLED',
+  'FEATURE_KNOWLEDGE_SCOPE_ENABLED',
+  'FEATURE_CONVERSATION_FEEDBACK_ENABLED',
+];
+
+test('generates all three reserved flags as false in root and API env', async (context) => {
+  const workspace = await createWorkspace(context);
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  for (const path of ['.env', 'apps/api/.env']) {
+    const environment = parseEnvironment(await readFile(join(workspace, path), 'utf8'));
+    for (const key of newFlagKeys) assert.equal(environment[key], 'false');
+  }
+});
+
+test('adds missing reserved flags, preserves per-file choices and is idempotent', async (context) => {
+  const workspace = await createWorkspace(context);
+  await writeFile(join(workspace, '.env'), 'FEATURE_OUTPUT_STYLES_ENABLED=true\n');
+  await writeFile(join(workspace, 'apps/api/.env'), 'FEATURE_OUTPUT_STYLES_ENABLED=false\n');
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  const paths = ['.env', 'apps/api/.env'];
+  const first = await Promise.all(paths.map((path) => readFile(join(workspace, path), 'utf8')));
+  for (const [index, content] of first.entries()) {
+    const environment = parseEnvironment(content);
+    assert.equal(environment.FEATURE_OUTPUT_STYLES_ENABLED, index === 0 ? 'true' : 'false');
+    for (const key of newFlagKeys.slice(1)) assert.equal(environment[key], 'false');
+  }
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  const second = await Promise.all(paths.map((path) => readFile(join(workspace, path), 'utf8')));
+  assert.deepEqual(second, first);
+});
