@@ -1,3 +1,4 @@
+import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ConfigService } from '@nestjs/config';
@@ -90,6 +91,7 @@ export function createThrottlerOptions(
     PlatformModule,
     StreamModule,
     UsersModule,
+    IdempotencyModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: ApiExceptionFilter },

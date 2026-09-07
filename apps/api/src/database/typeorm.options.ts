@@ -1,3 +1,4 @@
+import { IdempotencyKeyEntity } from '../common/idempotency/idempotency-key.entity';
 import type { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { OauthLoginStateEntity } from '../modules/auth/infrastructure/persistence/entities/oauth-login-state.entity';
@@ -11,6 +12,7 @@ export const databaseEntities = [
   UserIdentityEntity,
   RefreshSessionEntity,
   OauthLoginStateEntity,
+  IdempotencyKeyEntity,
 ] as const;
 
 export function createTypeOrmOptions(config: ConfigService): TypeOrmModuleOptions {
