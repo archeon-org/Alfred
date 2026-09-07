@@ -44,6 +44,66 @@ For file storage, implement the persistent local adapter before adding a remote 
 read compatibility/migration before switching backends; do not silently move failed writes to a
 second store. No upload or S3 implementation exists yet.
 
+## Promouvoir un flag
+
+Register a product capability in the shared names/schema, backend environment-key mapping,
+implementation-readiness registry, environment parser, root/API examples, environment generator,
+Compose API environment and frontend disabled manifest. Declaration does not promote a capability:
+reserved capabilities remain unimplemented and default to false.
+Test that configured `true` still yields effective `false` until implementation is ready.
+
+For promotion, first deliver the real execution path and register both-state tests using
+`apps/api/test/support/feature-flags.ts`:
+
+```ts
+describeFeatureBothStates('googleOAuth', buildApp, {
+  whenEnabled: async (app) => {
+    const response = await fetch(`${await app.getUrl()}/api/auth/google/start`, {
+      redirect: 'manual',
+    });
+    expect(response.status).toBe(302);
+  },
+  whenDisabled: async (app) => {
+    await expectFeatureRouteHidden(app, 'GET', '/api/auth/google/start');
+  },
+});
+```
+
+Call the helper at file or suite collection time. It registers two sequential tests, then sets the
+exact registry environment key before building a fresh application for each state. Both cases are
+awaited assertion callbacks (`void | Promise<void>`); do not call `it`, `describe` or register hooks
+inside them. A `beforeAll` hook is also too late to register tests. The helper automatically requires
+a successful, schema-valid `/api/features` manifest and checks effective availability in both states.
+An unpromoted feature intentionally fails the ON assertion. Do not override readiness to pass it.
+
+`buildApp` must return an application configured with prefix `api` and already listening on an
+ephemeral loopback port (`app.listen(0, '127.0.0.1')`). Construct typed configuration after the env
+stub, using synthetic test inputs and the real parser; do not load private `.env` files or reuse an
+already-imported `AppModule` configuration snapshot. Install the real feature guard and API exception
+filter explicitly when building a focused testing module: `FeatureFlagsModule` and
+`configureApplication` alone do not install the global `APP_GUARD`/`APP_FILTER` bindings.
+
+The helper closes each returned app and restores only its flag's prior environment value, including
+an originally absent key, on success or failure. Builders must close partially constructed apps if
+initialization fails before returning. Keep callers sequential because process environment is shared;
+do not call the helper from concurrent suites or alter the same flag from concurrent tests.
+
+`expectFeatureRouteHidden` accepts GET, POST, PUT, PATCH and DELETE, with a full API path. It requires
+HTTP 404 and `{ success: false, error: { code: 'HTTP_404' } }`, without following redirects. HEAD has
+no JSON body and is not supported. Pair hidden-route checks with a real enabled route: a nonexistent
+route also returns 404. Use valid query/body inputs so validation does not mask availability checks.
+
+Google is the existing promotion example. Test its real provider registry and both legacy and generic
+start routes with synthetic credentials, stubbing persistence ports. Authorization URL generation and
+PKCE can run locally; use manual redirects and never exchange test credentials with Google. The OFF
+case must hide Google from provider discovery and reject start/callback routes without downstream
+state/session operations. This establishes a local flag/HTTP contract, not completed external login.
+
+Run the focused helper, flag, environment and generator tests, update complete browser manifest
+fixtures, then run the normal quality gates. Build `@alfred/contracts` before direct package checks:
+its type/CommonJS exports use compiled output. Roll out added manifest fields on the API before the
+updated browser; a browser requiring absent fields fails closed. Flags take effect on restart.
+
 ## Bounded Delivery Units
 
 Split work into independently verifiable changes:
