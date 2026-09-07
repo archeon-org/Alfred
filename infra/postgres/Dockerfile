@@ -4,8 +4,11 @@ FROM pgvector/pgvector:0.8.6-pg17-trixie@sha256:724a4041afdb1750446e3f6b5cfa8f3b
 # Apply distribution security updates without replacing the data-directory format.
 # gosu is only used by the upstream entrypoint when started as root; this image
 # starts directly as postgres and does not need the inherited Go executable.
-RUN apt-get update \
+RUN apt-get -o APT::Update::Error-Mode=any update \
     && apt-get upgrade -y --no-install-recommends \
+    && apt-get purge -y --auto-remove gnupg gnupg-l10n dirmngr gpg gpg-agent gpgconf gpgsm \
+    && apt-get purge -y mount \
+    && test ! -e /bin/mount && test ! -e /bin/umount \
     && rm -rf /var/lib/apt/lists/* \
     && rm /usr/local/bin/gosu
 

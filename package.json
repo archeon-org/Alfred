@@ -21,7 +21,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "turbo test && pnpm test:scripts && pnpm architecture:check",
-    "test:scripts": "node --test scripts/setup-local-env.test.mjs scripts/check-source-boundaries.test.mjs",
+    "test:scripts": "node --test scripts/setup-local-env.test.mjs scripts/check-source-boundaries.test.mjs scripts/check-image-vulnerabilities.test.mjs",
     "architecture:check": "node scripts/check-source-boundaries.mjs",
     "test:coverage": "turbo test:coverage",
     "test:e2e": "pnpm --filter @alfred/api test:e2e && pnpm --filter @alfred/web test:e2e",

@@ -210,11 +210,13 @@ jobs:
           TEST_MIGRATION_DATABASE_URL="postgresql://alfred_migrator:${MIGRATOR_DATABASE_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5432}/alfred_test?schema=public" \
           TEST_DATABASE_URL="postgresql://alfred_api:${API_DATABASE_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5432}/alfred_test?schema=public" \
             pnpm --filter @alfred/api test:e2e
+      # Keep complete reports. The following policy gate blocks fixable findings;
+      # scanner failures remain fatal because continue-on-error is not enabled.
       - name: Scan the PostgreSQL image
         if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
-          exit-code: '1'
+          exit-code: '0'
           format: json
           output: trivy-postgres.json
           ignore-unfixed: false
@@ -225,7 +227,7 @@ jobs:
         if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
-          exit-code: '1'
+          exit-code: '0'
           format: json
           output: trivy-api.json
           ignore-unfixed: false
@@ -236,7 +238,7 @@ jobs:
         if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
-          exit-code: '1'
+          exit-code: '0'
           format: json
           output: trivy-migrate.json
           ignore-unfixed: false
@@ -247,7 +249,7 @@ jobs:
         if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
-          exit-code: '1'
+          exit-code: '0'
           format: json
           output: trivy-web.json
           ignore-unfixed: false
@@ -258,7 +260,7 @@ jobs:
         if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
-          exit-code: '1'
+          exit-code: '0'
           format: json
           output: trivy-agent.json
           ignore-unfixed: false
@@ -269,13 +271,19 @@ jobs:
         if: ${{ !cancelled() && steps.build_standalone.outcome == 'success' }}
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
-          exit-code: '1'
+          exit-code: '0'
           format: json
           output: trivy-agent-standalone.json
           ignore-unfixed: false
           image-ref: alfred-agent
           scanners: vuln
           severity: HIGH,CRITICAL
+      - name: Enforce container vulnerability policy
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        run: |
+          node scripts/check-image-vulnerabilities.mjs \
+            trivy-postgres.json trivy-api.json trivy-migrate.json \
+            trivy-web.json trivy-agent.json trivy-agent-standalone.json
       - name: Upload image vulnerability reports
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

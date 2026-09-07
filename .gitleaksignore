@@ -8,3 +8,8 @@ b4d36c4f67b7451bf93004ab7b08f79faeb19b30:apps/scribe/README.md:generic-api-key:5
 # Literal synthetic JWT signing fixture, used only by the local feature-flag test app.
 # Exact commit/path/rule/line exception; real credentials and other test files remain scanned.
 fd9495173753c82cc9ef88de070f519e64d1ddfc:apps/api/test/unit/support/feature-flags.spec.ts:generic-api-key:46
+
+# Verified public Firebase Android client configuration, not a server credential.
+# Exact historical-key match and current restrictions reviewed on 2026-09-07.
+# Evidence and limits: docs/memory-bank/sessions/2026-09-07-firebase-client-key-review.md
+5335f34ab74fb921b83e097d0dd9446e1f6825e9:apps/native/google-services.json:gcp-api-key:18
