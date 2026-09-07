@@ -8,10 +8,21 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
-import { defer, from, last, type Observable, of, switchMap, throwError, timeout } from 'rxjs';
+import {
+  catchError,
+  defer,
+  from,
+  last,
+  type Observable,
+  of,
+  switchMap,
+  throwError,
+  timeout,
+} from 'rxjs';
 import type { AuthPrincipal } from '../auth/auth-principal';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ApiException } from '../errors/api.exception';
+import { RequestValidationException } from '../validation/request-validation.pipe';
 import { IDEMPOTENT_KEY } from './idempotent.decorator';
 import { IdempotencyStore, type StoredResponse } from './idempotency.store';
 
@@ -90,10 +101,16 @@ export class IdempotencyInterceptor implements NestInterceptor {
             response.status(saved.responseStatus!);
             return of(saved.responseBody);
           }
-          // No handler transaction is claimed here. Once reserved, errors/crashes/non-2xx
-          // retain the reservation until its original 24h expiry: the handler may have committed.
+          // Only the pure DTO validation boundary proves that business execution never began.
+          // All business failures retain the reservation, including ordinary HTTP 400 errors.
           return next.handle().pipe(
             last(undefined, null),
+            catchError((error: unknown) => {
+              if (!(error instanceof RequestValidationException)) return throwError(() => error);
+              return from(this.store.release(owner, key, hash, reservationId)).pipe(
+                switchMap(() => throwError(() => error)),
+              );
+            }),
             switchMap((body: unknown) =>
               from(this.persist(owner, key, hash, response, body, reservationId)),
             ),

@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { type INestApplication, ValidationPipe } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
+import { RequestValidationPipe } from '@api/common/validation/request-validation.pipe';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { firstValueFrom, from, timeout } from 'rxjs';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AccessTokenGuard } from '@api/common/guards/access-token.guard';
@@ -90,9 +92,7 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
       ],
     }).compile();
     app = module.createNestApplication({ logger: false });
-    app.useGlobalPipes(
-      new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }),
-    );
+    app.useGlobalPipes(new RequestValidationPipe());
     db = app.get(DataSource);
     url = await fixtureUrl(app);
   });
@@ -131,7 +131,7 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
     if (migration?.isInitialized) await migration.destroy();
   });
 
-  const post = (key = 'key', name = 'created', bearer = token, path = '') =>
+  const post = (key = 'key', name: unknown = 'created', bearer = token, path = '') =>
     fetch(`${url}${path}`, {
       method: 'POST',
       headers: {
@@ -173,6 +173,78 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
     const id = [...businessIds][0]!;
     expect(await db.getRepository(UserEntity).countBy({ id })).toBe(1);
     expect(await db.getRepository(IdempotencyKeyEntity).countBy({ ownerUserId: owner })).toBe(1);
+  });
+
+  it('allows invalid DTO retries and a corrected body under the same key without business effects', async () => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const invalid = await post('validation', 42);
+      expect(invalid.status).toBe(400);
+      expect(await invalid.json()).toMatchObject({
+        error: { code: 'HTTP_400', message: ['name must be a string'] },
+      });
+      expect(write).not.toHaveBeenCalled();
+      expect(await app.get(IdempotencyStore).find(owner, 'validation')).toBeNull();
+    }
+    const created = await post('validation', 'corrected');
+    expect(created.status).toBe(201);
+    const replay = await post('validation', 'corrected');
+    expect(replay.status).toBe(201);
+    expect(await replay.json()).toEqual(await created.json());
+    expect(write).toHaveBeenCalledOnce();
+  });
+
+  it('keeps an already waiting invalid contender bounded while validation releases its reservation', async () => {
+    const gate = () => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((done) => {
+        resolve = done;
+      });
+      return { promise, resolve };
+    };
+    const cleanupEntered = gate();
+    const cleanupAllowed = gate();
+    const contenderEntered = gate();
+    const store = app.get(IdempotencyStore);
+    const release = store.release.bind(store);
+    const find = store.find.bind(store);
+    const releaseSpy = vi.spyOn(store, 'release').mockImplementation(async (...args) => {
+      cleanupEntered.resolve();
+      await cleanupAllowed.promise;
+      return release(...args);
+    });
+    const findSpy = vi.spyOn(store, 'find').mockImplementation((...args) => {
+      contenderEntered.resolve();
+      return find(...args);
+    });
+    try {
+      const invalid = post('concurrent-validation', 42);
+      await firstValueFrom(from(cleanupEntered.promise).pipe(timeout(2_000)));
+      const contender = post('concurrent-validation', 42);
+      await firstValueFrom(from(contenderEntered.promise).pipe(timeout(2_000)));
+      cleanupAllowed.resolve();
+      expect((await invalid).status).toBe(400);
+      expect((await contender).status).toBe(409);
+      expect(write).not.toHaveBeenCalled();
+      expect(await find(owner, 'concurrent-validation')).toBeNull();
+      expect((await post('concurrent-validation', 'corrected')).status).toBe(201);
+      expect((await post('concurrent-validation', 'corrected')).status).toBe(201);
+      expect(write).toHaveBeenCalledOnce();
+    } finally {
+      cleanupAllowed.resolve();
+      releaseSpy.mockRestore();
+      findSpy.mockRestore();
+    }
+  });
+
+  it('rejects a valid JWT for a deleted owner before the business handler', async () => {
+    await db.getRepository(UserEntity).delete(owner);
+    const response = await post();
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({
+      error: { code: 'HTTP_401', message: 'Authentication required' },
+    });
+    expect(write).not.toHaveBeenCalled();
+    expect(await app.get(IdempotencyStore).find(owner, 'key')).toBeNull();
   });
 
   it('isolates owners and returns mismatch without another business write', async () => {
@@ -265,6 +337,26 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
     await expect(store.find(owner, 'key')).resolves.toMatchObject({ responseStatus: null });
     await store.complete(owner, 'key', hash, 201, { new: true }, newGeneration);
     await expect(store.find(owner, 'key')).resolves.toMatchObject({ responseBody: { new: true } });
+  });
+
+  it('releases only its own pending reservation and protects completed or replaced generations', async () => {
+    const store = app.get(IdempotencyStore);
+    const hash = 'a'.repeat(64);
+    const first = randomUUID();
+    const second = randomUUID();
+    await store.reserve(owner, 'key', hash, first);
+    await store.release(owner, 'key', hash, second);
+    await store.release(secondOwner, 'key', hash, first);
+    await store.release(owner, 'key', 'b'.repeat(64), first);
+    expect(await store.find(owner, 'key')).not.toBeNull();
+    await store.release(owner, 'key', hash, first);
+    expect(await store.find(owner, 'key')).toBeNull();
+    await store.reserve(owner, 'key', hash, second);
+    await store.release(owner, 'key', hash, first);
+    expect(await store.find(owner, 'key')).not.toBeNull();
+    await store.complete(owner, 'key', hash, 201, { saved: true }, second);
+    await store.release(owner, 'key', hash, second);
+    expect(await store.find(owner, 'key')).toMatchObject({ responseBody: { saved: true } });
   });
 
   it('enforces checks and ownership constraints at the database boundary', async () => {

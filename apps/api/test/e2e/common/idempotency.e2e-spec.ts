@@ -1,4 +1,5 @@
-import { type INestApplication, ValidationPipe } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
+import { RequestValidationPipe } from '@api/common/validation/request-validation.pipe';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -19,17 +20,33 @@ describe('idempotent fixture HTTP boundary', () => {
   let url: string;
   let token: string;
   let otherToken: string;
-  const records = new Map<string, StoredResponse>();
+  const records = new Map<string, StoredResponse & { reservationId: string }>();
   const write = vi.fn((name: string) => Promise.resolve({ id: 1, name }));
   const store = {
-    reserve(owner: string, key: string, requestHash: string) {
+    reserve(owner: string, key: string, requestHash: string, reservationId: string) {
       const identity = `${owner}/${key}`;
       if (records.has(identity)) return Promise.resolve(false);
-      records.set(identity, { requestHash, responseStatus: null, responseBody: null });
+      records.set(identity, {
+        requestHash,
+        responseStatus: null,
+        responseBody: null,
+        reservationId,
+      });
       return Promise.resolve(true);
     },
     find(owner: string, key: string) {
       return Promise.resolve(records.get(`${owner}/${key}`) ?? null);
+    },
+    release(owner: string, key: string, hash: string, reservationId: string) {
+      const identity = `${owner}/${key}`;
+      const saved = records.get(identity);
+      if (
+        saved?.requestHash === hash &&
+        saved.reservationId === reservationId &&
+        saved.responseStatus === null
+      )
+        records.delete(identity);
+      return Promise.resolve();
     },
     complete(
       owner: string,
@@ -37,8 +54,9 @@ describe('idempotent fixture HTTP boundary', () => {
       requestHash: string,
       responseStatus: number,
       responseBody: unknown,
+      reservationId: string,
     ) {
-      records.set(`${owner}/${key}`, { requestHash, responseStatus, responseBody });
+      records.set(`${owner}/${key}`, { requestHash, responseStatus, responseBody, reservationId });
       return Promise.resolve();
     },
   };
@@ -56,9 +74,7 @@ describe('idempotent fixture HTTP boundary', () => {
       ],
     }).compile();
     app = module.createNestApplication({ logger: false });
-    app.useGlobalPipes(
-      new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }),
-    );
+    app.useGlobalPipes(new RequestValidationPipe());
     const jwt = app.get(JwtService);
     token = jwt.sign({
       sub: 'owner-a',
@@ -86,7 +102,7 @@ describe('idempotent fixture HTTP boundary', () => {
 
   const post = (
     key: string | undefined = 'key',
-    name = 'fixture',
+    name: unknown = 'fixture',
     bearer: string | undefined = token,
     path = '',
   ) =>
@@ -138,6 +154,18 @@ describe('idempotent fixture HTTP boundary', () => {
       body: JSON.stringify({ unexpected: true }),
     });
     expect(invalid.status).toBe(400);
+    expect(write).toHaveBeenCalledOnce();
+  });
+
+  it('revalidates an invalid retry and replays the corrected request with the same key', async () => {
+    expect((await post('invalid', 42)).status).toBe(400);
+    expect((await post('invalid', 42)).status).toBe(400);
+    expect(write).not.toHaveBeenCalled();
+    expect(records.size).toBe(0);
+    const created = await post('invalid', 'corrected');
+    const replay = await post('invalid', 'corrected');
+    expect([created.status, replay.status]).toEqual([201, 201]);
+    expect(await replay.json()).toEqual(await created.json());
     expect(write).toHaveBeenCalledOnce();
   });
 

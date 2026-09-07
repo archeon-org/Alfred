@@ -1,9 +1,10 @@
-import { type INestApplication, RequestMethod, ValidationPipe } from '@nestjs/common';
+import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import type { NextFunction, Request, Response } from 'express';
+import { RequestValidationPipe } from './common/validation/request-validation.pipe';
 
 function preventResponseCaching(_request: Request, response: Response, next: NextFunction): void {
   response.setHeader('Cache-Control', 'no-store');
@@ -36,16 +37,6 @@ export function configureApplication(app: INestApplication): void {
       { method: RequestMethod.GET, path: 'metrics' },
     ],
   });
-  app.useGlobalPipes(
-    new ValidationPipe({
-      forbidNonWhitelisted: true,
-      forbidUnknownValues: true,
-      stopAtFirstError: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: false },
-      validationError: { target: false, value: false },
-      whitelist: true,
-    }),
-  );
+  app.useGlobalPipes(new RequestValidationPipe());
   app.enableShutdownHooks();
 }

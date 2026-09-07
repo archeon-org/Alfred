@@ -26,7 +26,11 @@ The source boundary remains NestJS API, shared framework-free contracts and Reac
   persistently before execution; compare canonical method/path/body hashes, store only completed
   successful JSON responses, and bound contenders' HTTP wait to two seconds. Database time owns the
   24-hour expiry. Retain failed or uncertain reservations until expiry, since a generic interceptor
-  cannot know whether a handler already committed a business write.
+  cannot know whether a handler already committed a business write. The exception is an identified,
+  pure DTO validation failure before the handler: release only that attempt's pending reservation,
+  fenced by `reservation_id`, and allow the corrected request to reuse the key. Validators, DTO
+  transformations and pipes on opted-in handlers must be side-effect-free. Ordinary business 400
+  errors and response-storage failures remain uncertain; no generic 4xx replay is introduced.
 - Keep implementation readiness separate from environment configuration. Declare reserved product
   flags false and require effective ON/OFF manifest and route behavior before promotion. Test
   helpers construct fresh applications and restore the environment after each case.

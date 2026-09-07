@@ -29,8 +29,24 @@ This interceptor does **not** transact the handler's business writes with respon
 A handler can commit, throw, crash, disconnect, or succeed while storing the response fails.
 Deleting the reservation immediately on any such uncertainty could duplicate the write.
 Therefore pending, failed and non-2xx executions retain their reservation until its original
-24-hour expiry; they return 409 (or 422 for a changed request) during that window. Even a
-validation failure after reservation is retained because this layer cannot prove no side effect.
+24-hour expiry; they return 409 (or 422 for a changed request) during that window.
+
+The global `RequestValidationPipe` identifies pure DTO validation failures before the handler.
+Only these failures release their own pending reservation, matched by owner, key, hash and
+`reservation_id`, before returning 400. An invalid body can be retried or corrected under the same
+key. An ordinary business 400 does not release it. A failed cleanup returns an error and may leave
+the reservation pending. A contender already waiting can still receive 409; retry after the
+validation response completes. Completed or replacement reservations cannot be deleted by a late
+validation failure.
+
+Opted-in handlers must use side-effect-free DTO transformations, validators and pipes, and must
+not create `RequestValidationException` from business code. Custom pipes/interceptors performing
+writes before the handler are incompatible with this contract. The marker is internal provenance,
+not a client-controlled field or a general classification of all 400 responses.
+
+A valid access JWT referencing a deleted user is rejected with 401 when PostgreSQL rejects the
+reservation's owner foreign key. Other database failures retain their existing error behavior.
+This does not implement immediate account/session revocation for every API route.
 
 The deduplication window is **24 hours**, including handler execution and response storage.
 Handlers must finish within that window. There is no exactly-once guarantee after expiry,

@@ -1,7 +1,8 @@
-import type { CallHandler, ExecutionContext } from '@nestjs/common';
+import { BadRequestException, type CallHandler, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { concat, firstValueFrom, of, throwError } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RequestValidationException } from '@api/common/validation/request-validation.pipe';
 import { IdempotencyInterceptor } from '@api/common/idempotency/idempotency.interceptor';
 import { IDEMPOTENT_KEY } from '@api/common/idempotency/idempotent.decorator';
 import type { IdempotencyStore } from '@api/common/idempotency/idempotency.store';
@@ -12,6 +13,7 @@ function fixture(
   const store = {
     reserve: vi.fn<IdempotencyStore['reserve']>().mockResolvedValue(true),
     find: vi.fn<IdempotencyStore['find']>(),
+    release: vi.fn<IdempotencyStore['release']>().mockResolvedValue(undefined),
     complete: vi.fn<IdempotencyStore['complete']>().mockResolvedValue(undefined),
   };
   const reflector = new Reflector();
@@ -194,10 +196,38 @@ describe('IdempotencyInterceptor', () => {
     f.next.handle.mockReturnValue(throwError(() => new Error('handler failed after committing')));
     await expect(f.run()).rejects.toThrow('handler failed');
     expect(f.store.complete).not.toHaveBeenCalled();
+    expect(f.store.release).not.toHaveBeenCalled();
     const g = fixture();
     g.store.complete.mockRejectedValue(new Error('storage unavailable'));
     await expect(g.run()).rejects.toThrow('storage unavailable');
     expect(g.next.handle).toHaveBeenCalledOnce();
+    expect(g.store.release).not.toHaveBeenCalled();
+    const h = fixture();
+    h.store.complete.mockRejectedValue(new RequestValidationException(['storage error']));
+    await expect(h.run()).rejects.toBeInstanceOf(RequestValidationException);
+    expect(h.store.release).not.toHaveBeenCalled();
+  });
+
+  it('releases identified DTO failures before returning the same validation error', async () => {
+    const f = fixture();
+    const error = new RequestValidationException(['name must be a string']);
+    f.next.handle.mockReturnValue(throwError(() => error));
+    await expect(f.run()).rejects.toBe(error);
+    expect(f.store.release).toHaveBeenCalledWith(...f.store.reserve.mock.calls[0]!);
+    expect(f.store.complete).not.toHaveBeenCalled();
+  });
+
+  it('retains a business 400 and surfaces failed validation cleanup as an error', async () => {
+    const f = fixture();
+    const businessError = new BadRequestException('business rejected after a write');
+    f.next.handle.mockReturnValue(throwError(() => businessError));
+    await expect(f.run()).rejects.toBe(businessError);
+    expect(f.store.release).not.toHaveBeenCalled();
+    const g = fixture();
+    g.next.handle.mockReturnValue(throwError(() => new RequestValidationException([])));
+    g.store.release.mockRejectedValue(new Error('cleanup unavailable'));
+    await expect(g.run()).rejects.toThrow('cleanup unavailable');
+    expect(g.store.complete).not.toHaveBeenCalled();
   });
 
   it('never stores non-2xx responses', async () => {
@@ -205,6 +235,7 @@ describe('IdempotencyInterceptor', () => {
     f.response.statusCode = 409;
     await f.run();
     expect(f.store.complete).not.toHaveBeenCalled();
+    expect(f.store.release).not.toHaveBeenCalled();
   });
 
   it('rejects public/auth handlers, non-POST methods and cookie-setting responses', async () => {

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import type { Repository } from 'typeorm';
+import { QueryFailedError, type Repository } from 'typeorm';
 import { IdempotencyKeyEntity } from './idempotency-key.entity';
 
 export interface StoredResponse {
@@ -21,14 +21,28 @@ export class IdempotencyStore {
       'DELETE FROM "idempotency_keys" WHERE "owner_user_id" = $1 AND "key" = $2 AND "expires_at" < now()',
       [owner, key],
     );
-    const inserted = await this.keys.query<{ key: string }[]>(
-      `
+    try {
+      const inserted = await this.keys.query<{ key: string }[]>(
+        `
       INSERT INTO "idempotency_keys" ("owner_user_id", "key", "request_hash", "reservation_id")
       VALUES ($1, $2, $3, $4) ON CONFLICT ("owner_user_id", "key") DO NOTHING RETURNING "key"
     `,
-      [owner, key, hash, reservationId],
-    );
-    return inserted.length === 1;
+        [owner, key, hash, reservationId],
+      );
+      return inserted.length === 1;
+    } catch (error: unknown) {
+      if (
+        error instanceof QueryFailedError &&
+        error.driverError instanceof Error &&
+        'code' in error.driverError &&
+        error.driverError.code === '23503' &&
+        'constraint' in error.driverError &&
+        error.driverError.constraint === 'fk_idempotency_keys_owner'
+      ) {
+        throw new UnauthorizedException('Authentication required');
+      }
+      throw error;
+    }
   }
 
   async find(owner: string, key: string): Promise<StoredResponse | null> {
@@ -40,6 +54,15 @@ export class IdempotencyStore {
       [owner, key],
     );
     return rows[0] ?? null;
+  }
+
+  async release(owner: string, key: string, hash: string, reservationId: string): Promise<void> {
+    await this.keys.query(
+      `DELETE FROM "idempotency_keys"
+      WHERE "owner_user_id" = $1 AND "key" = $2 AND "request_hash" = $3
+        AND "reservation_id" = $4 AND "response_status" IS NULL`,
+      [owner, key, hash, reservationId],
+    );
   }
 
   async complete(

@@ -1,4 +1,4 @@
-import type { Repository } from 'typeorm';
+import { QueryFailedError, type Repository } from 'typeorm';
 import { describe, expect, it, vi } from 'vitest';
 import type { IdempotencyKeyEntity } from '@api/common/idempotency/idempotency-key.entity';
 import { IdempotencyStore } from '@api/common/idempotency/idempotency.store';
@@ -21,6 +21,37 @@ describe('IdempotencyStore', () => {
     expect(query.mock.calls[1]?.[1]).toEqual(['owner', 'key', 'hash', 'generation']);
     query.mockResolvedValue([]);
     await expect(store.reserve('owner', 'key', 'hash', 'generation')).resolves.toBe(false);
+  });
+
+  it('returns authentication failure only for the missing owner foreign key', async () => {
+    const { query, store } = fixture();
+    query.mockResolvedValueOnce([]).mockRejectedValueOnce(
+      new QueryFailedError(
+        'INSERT',
+        [],
+        Object.assign(new Error('missing user'), {
+          code: '23503',
+          constraint: 'fk_idempotency_keys_owner',
+        }),
+      ),
+    );
+    await expect(store.reserve('owner', 'key', 'hash', 'generation')).rejects.toMatchObject({
+      status: 401,
+    });
+  });
+
+  it.each([
+    { code: '23503', constraint: 'another_foreign_key' },
+    { code: '23514', constraint: 'fk_idempotency_keys_owner' },
+  ])('preserves unrelated database failure %j', async (details) => {
+    const { query, store } = fixture();
+    const error = new QueryFailedError(
+      'INSERT',
+      [],
+      Object.assign(new Error('database failed'), details),
+    );
+    query.mockResolvedValueOnce([]).mockRejectedValueOnce(error);
+    await expect(store.reserve('owner', 'key', 'hash', 'generation')).rejects.toBe(error);
   });
 
   it('reads only within the authenticated owner and key', async () => {
