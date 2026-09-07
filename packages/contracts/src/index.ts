@@ -1,4 +1,5 @@
 import { z } from 'zod/mini';
+export { listEnvelopeSchema, listQuerySchema } from './pagination';
 export { API_ERROR_CODES, apiErrorSchema, type ApiError, type ApiErrorCode } from './errors';
 
 const nonEmptyString = z.string().check(z.trim(), z.minLength(1));
@@ -63,6 +64,4 @@ export const featureFlagsSchema = z.readonly(
 );
 export type FeatureFlags = z.infer<typeof featureFlagsSchema>;
 
-export function successEnvelopeSchema<T extends z.ZodMiniType>(data: T) {
-  return z.readonly(z.object({ data, success: z.literal(true) }));
-}
+export { successEnvelopeSchema } from './envelope';
