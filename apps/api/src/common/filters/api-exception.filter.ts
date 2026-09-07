@@ -6,13 +6,14 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { ApiException } from '../errors/api.exception';
 
 const INTERNAL_SERVER_ERROR_STATUS = 500;
 
 interface ErrorBody {
   readonly error: {
     readonly code: string;
-    readonly details?: Readonly<Record<string, { readonly status: 'down' | 'up' }>>;
+    readonly details?: Readonly<Record<string, unknown>>;
     readonly message: string | readonly string[];
   };
   readonly success: false;
@@ -78,6 +79,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
     const isHttpException = exception instanceof HttpException;
     const status = isHttpException ? exception.getStatus() : INTERNAL_SERVER_ERROR_STATUS;
     const operationalDetails = isHttpException ? safeOperationalDetails(exception) : undefined;
+    const details =
+      exception instanceof ApiException && status < INTERNAL_SERVER_ERROR_STATUS
+        ? exception.details
+        : operationalDetails;
     const message =
       isHttpException && status < INTERNAL_SERVER_ERROR_STATUS
         ? safeHttpMessage(exception)
@@ -96,8 +101,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
     const body: ErrorBody = Object.freeze({
       error: Object.freeze({
-        code: `HTTP_${status}`,
-        ...(operationalDetails === undefined ? {} : { details: operationalDetails }),
+        code: exception instanceof ApiException ? exception.code : `HTTP_${status}`,
+        ...(details === undefined ? {} : { details }),
         message,
       }),
       success: false,

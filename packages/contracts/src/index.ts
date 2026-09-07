@@ -1,4 +1,5 @@
 import { z } from 'zod/mini';
+export { API_ERROR_CODES, apiErrorSchema, type ApiError, type ApiErrorCode } from './errors';
 
 const nonEmptyString = z.string().check(z.trim(), z.minLength(1));
 const authProviderId = z.string().check(z.regex(/^[a-z][a-z0-9-]*$/u), z.maxLength(64));
