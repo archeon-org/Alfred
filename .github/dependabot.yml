@@ -1,10 +1,13 @@
 version: 2
+# All update PRs target develop: main only receives release merges from develop,
+# so its manifests and workflows lag behind and updates against it are stale.
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
       day: monday
+    target-branch: develop
     groups:
       # Framework runtime and test adapter must move together across major versions.
       nestjs-framework:
@@ -30,6 +33,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    target-branch: develop
 
   - package-ecosystem: docker
     directories:
@@ -40,9 +44,11 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    target-branch: develop
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
       day: monday
+    target-branch: develop
