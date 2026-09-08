@@ -1,0 +1,12 @@
+# Repository Gitleaks configuration. Extends the default ruleset; only narrows known synthetic
+# test fixtures whose commit hashes change on every rebase merge, so .gitleaksignore fingerprints
+# cannot pin them durably. Real credentials stay scanned everywhere.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Literal synthetic JWT signing fixture of the local feature-flag test app"
+condition = "AND"
+regexTarget = "secret"
+regexes = ['''^synthetic-test-signing-secret-at-least-32-characters$''']
+paths = ['''^apps/api/test/unit/support/feature-flags\.spec\.ts$''']
