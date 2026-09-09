@@ -23,6 +23,7 @@ interface ConversationRecord {
   title: string;
   titleSource: 'none' | 'user';
   lastActivityAt: null;
+  pinnedAt: string | null;
   createdAt: string;
   updatedAt: string;
   archivedAt: null;
@@ -41,6 +42,7 @@ export function defaultSeed(): WorkspaceSeed {
         createdAt: '2026-09-09T11:00:00.000Z',
         id: CONVERSATION_ID,
         lastActivityAt: null,
+        pinnedAt: null,
         projectId: PROJECT_ID,
         projectKind: 'named',
         title: 'Synthèse du comité projet',
@@ -172,6 +174,16 @@ export async function installWorkspaceApi(page: Page, seed: WorkspaceSeed = defa
   await page.route('**/api/conversations**', async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
+    const pinMatch = /^\/api\/conversations\/([^/]+)\/(pin|unpin)$/u.exec(url.pathname);
+    if (pinMatch !== null && method === 'POST') {
+      const index = conversations.findIndex((item) => item.id === pinMatch[1]);
+      if (index === -1) return notFound(route, 'conversation_not_found');
+      conversations[index] = {
+        ...conversations[index]!,
+        pinnedAt: pinMatch[2] === 'pin' ? now() : null,
+      };
+      return json(route, 200, { data: conversations[index], success: true });
+    }
     const match = /^\/api\/conversations(?:\/([^/]+))?$/u.exec(url.pathname);
     const id = match?.[1];
     if (id === undefined && method === 'GET') {
@@ -208,6 +220,7 @@ export async function installWorkspaceApi(page: Page, seed: WorkspaceSeed = defa
         createdAt: now(),
         id: nextId(),
         lastActivityAt: null,
+        pinnedAt: null,
         projectId: parent.id,
         projectKind: parent.kind,
         title: title === '' ? 'Nouvelle conversation' : title,
@@ -220,6 +233,15 @@ export async function installWorkspaceApi(page: Page, seed: WorkspaceSeed = defa
     const index = conversations.findIndex((item) => item.id === id);
     if (index === -1) return notFound(route, 'conversation_not_found');
     if (method === 'GET') return json(route, 200, { data: conversations[index], success: true });
+    if (method === 'PATCH') {
+      const input = body(route);
+      conversations[index] = {
+        ...conversations[index]!,
+        title: String(input.title),
+        titleSource: 'user',
+      };
+      return json(route, 200, { data: conversations[index], success: true });
+    }
     if (method === 'DELETE') {
       conversations.splice(index, 1);
       return route.fulfill({ status: 204 });

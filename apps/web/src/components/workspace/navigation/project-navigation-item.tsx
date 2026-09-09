@@ -1,5 +1,6 @@
 import { Folder, FolderOpen } from 'lucide-react';
 
+import type { ConversationActionHandlers } from '@/components/workspace/conversation/conversation-action-menu';
 import { Button } from '@/components/ui/button';
 import { ConversationNavigation } from '@/components/workspace/navigation/conversation-navigation';
 import {
@@ -11,6 +12,7 @@ import type { Conversation, Project } from '@/lib/workspace/workspace.types';
 
 export interface ProjectNavigationItemProps {
   readonly project: Project;
+  readonly conversationActions: ConversationActionHandlers;
   readonly conversations: readonly Conversation[];
   readonly panelId: string;
   readonly isSelected: boolean;
@@ -27,6 +29,7 @@ export interface ProjectNavigationItemProps {
 /** One project row: folder, name, its "⋯" menu and, when expanded, its chats. */
 export function ProjectNavigationItem({
   actions,
+  conversationActions,
   conversations,
   isExpanded,
   isSearching,
@@ -79,6 +82,7 @@ export function ProjectNavigationItem({
       >
         {conversations.length > 0 ? (
           <ConversationNavigation
+            conversationActions={conversationActions}
             compact
             conversations={conversations}
             onSelect={onSelectConversation}

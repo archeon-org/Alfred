@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ok } from '../../../common/api-response';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
@@ -9,6 +9,8 @@ import { ConversationsService } from '../application/conversations.service';
 import { CONVERSATION_RESOURCE } from '../domain/conversation';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
+
+import { UpdateConversationDto } from './dto/update-conversation.dto';
 
 const conversationId = new ResourceIdPipe(CONVERSATION_RESOURCE);
 
@@ -33,6 +35,27 @@ export class ConversationsController {
   @Get(':id')
   async get(@CurrentUser() principal: AuthPrincipal, @Param('id', conversationId) id: string) {
     return ok(await this.conversations.get(principal, id));
+  }
+
+  @Patch(':id')
+  async update(
+    @CurrentUser() principal: AuthPrincipal,
+    @Param('id', conversationId) id: string,
+    @Body() body: UpdateConversationDto,
+  ) {
+    return ok(await this.conversations.update(principal, id, body));
+  }
+
+  @Post(':id/pin')
+  @HttpCode(200)
+  async pin(@CurrentUser() principal: AuthPrincipal, @Param('id', conversationId) id: string) {
+    return ok(await this.conversations.setPinned(principal, id, true));
+  }
+
+  @Post(':id/unpin')
+  @HttpCode(200)
+  async unpin(@CurrentUser() principal: AuthPrincipal, @Param('id', conversationId) id: string) {
+    return ok(await this.conversations.setPinned(principal, id, false));
   }
 
   @Delete(':id')

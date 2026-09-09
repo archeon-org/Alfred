@@ -3,6 +3,8 @@ import {
   conversationListEnvelopeSchema,
   type Conversation,
   type CreateConversationInput,
+  updateConversationInputSchema,
+  type UpdateConversationInput,
 } from '@alfred/contracts';
 import {
   JSON_HEADERS,
@@ -13,7 +15,11 @@ import {
 } from '@/services/http/api-json';
 import type { HttpClient } from '@/services/http/http-client';
 
-export type { Conversation, CreateConversationInput } from '@alfred/contracts';
+export type {
+  Conversation,
+  CreateConversationInput,
+  UpdateConversationInput,
+} from '@alfred/contracts';
 
 export interface ConversationPage {
   readonly items: readonly Conversation[];
@@ -89,4 +95,45 @@ export async function deleteConversation(client: HttpClient, id: string): Promis
     retryOnUnauthorized: true,
   });
   if (!response.ok) await throwApiError(response);
+}
+
+export async function updateConversation(
+  client: HttpClient,
+  id: string,
+  input: UpdateConversationInput,
+): Promise<Conversation> {
+  return mutateConversation(
+    client,
+    conversationPath(id),
+    'PATCH',
+    updateConversationInputSchema.parse(input),
+  );
+}
+
+export async function setConversationPinned(
+  client: HttpClient,
+  id: string,
+  pinned: boolean,
+): Promise<Conversation> {
+  return mutateConversation(client, `${conversationPath(id)}/${pinned ? 'pin' : 'unpin'}`, 'POST');
+}
+
+async function mutateConversation(
+  client: HttpClient,
+  path: `/${string}`,
+  method: 'PATCH' | 'POST',
+  input?: UpdateConversationInput,
+): Promise<Conversation> {
+  const response = await client.request(path, {
+    ...(input === undefined ? {} : { body: JSON.stringify(input) }),
+    headers: JSON_HEADERS,
+    method,
+    retryOnUnauthorized: true,
+  });
+  if (!response.ok) await throwApiError(response);
+  return parseEnvelope(
+    conversationEnvelopeSchema,
+    await readJsonBody(response),
+    INVALID_CONVERSATION,
+  );
 }

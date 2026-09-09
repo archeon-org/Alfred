@@ -53,6 +53,7 @@ describe('conversation domain', () => {
       createdAt: '2026-09-09T12:00:00.000Z',
       id: conversationRow().id,
       lastActivityAt: null,
+      pinnedAt: null,
       projectId: projectRow().id,
       projectKind: 'implicit',
       title: 'Analyse de l’existant',

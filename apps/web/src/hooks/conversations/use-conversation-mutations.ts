@@ -5,6 +5,10 @@ import { conversationKeys } from '@/hooks/workspace/workspace-keys';
 import {
   createConversation,
   deleteConversation,
+  updateConversation,
+  setConversationPinned,
+  type Conversation,
+  type UpdateConversationInput,
   type CreateConversationInput,
 } from '@/services/conversations/conversations.service';
 
@@ -33,7 +37,37 @@ export function useDeleteConversation() {
     mutationFn: (id: string) => deleteConversation(client, id),
     onSuccess: async (_result, id) => {
       queryClient.removeQueries({ queryKey: conversationKeys.detail(userId, id) });
-      await queryClient.invalidateQueries({ queryKey: conversationKeys.all(userId) });
+      await queryClient.invalidateQueries({ queryKey: conversationKeys.lists(userId) });
     },
+  });
+}
+
+function useConversationChanged() {
+  const { userId } = useWorkspaceAccount();
+  const queryClient = useQueryClient();
+  return async (conversation: Conversation) => {
+    await queryClient.cancelQueries({ queryKey: conversationKeys.detail(userId, conversation.id) });
+    queryClient.setQueryData(conversationKeys.detail(userId, conversation.id), conversation);
+    await queryClient.invalidateQueries({ queryKey: conversationKeys.lists(userId) });
+  };
+}
+
+export function useUpdateConversation() {
+  const { client } = useWorkspaceAccount();
+  const onSuccess = useConversationChanged();
+  return useMutation({
+    mutationFn: ({ id, input }: { readonly id: string; readonly input: UpdateConversationInput }) =>
+      updateConversation(client, id, input),
+    onSuccess,
+  });
+}
+
+export function useSetConversationPinned() {
+  const { client } = useWorkspaceAccount();
+  const onSuccess = useConversationChanged();
+  return useMutation({
+    mutationFn: ({ id, pinned }: { readonly id: string; readonly pinned: boolean }) =>
+      setConversationPinned(client, id, pinned),
+    onSuccess,
   });
 }

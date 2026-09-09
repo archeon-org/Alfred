@@ -60,7 +60,9 @@ describe('Workspace projects', () => {
     expect(screen.getByText('Cap Penser la prochaine version.')).toBeVisible();
     expect(screen.getByRole('tab', { name: /Chats/u })).toHaveAttribute('aria-selected', 'true');
     const chats = await screen.findByRole('list', { name: 'Chats du projet' });
-    expect(within(chats).getByRole('button', { name: /Synthèse du comité projet/u })).toBeVisible();
+    expect(
+      within(chats).getByRole('button', { name: /^Synthèse du comité projet/u }),
+    ).toBeVisible();
     expect(within(chats).queryByRole('button', { name: /Piste libre/u })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Sources' }));
@@ -257,7 +259,7 @@ describe('Workspace projects', () => {
     renderWorkspaceAt(`/app/projects/${PROJECT_ID}`, api);
 
     const chats = await screen.findByRole('list', { name: 'Chats du projet' });
-    await user.click(within(chats).getByRole('button', { name: /Synthèse du comité projet/u }));
+    await user.click(within(chats).getByRole('button', { name: /^Synthèse du comité projet/u }));
     const composer = await screen.findByRole('textbox', { name: 'Message' });
     await user.type(composer, 'Un brouillon privé');
     expect(composer).toHaveValue('Un brouillon privé');

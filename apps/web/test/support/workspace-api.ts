@@ -36,6 +36,7 @@ export function conversation(overrides: Partial<Conversation> = {}): Conversatio
     createdAt: '2026-09-09T11:00:00.000Z',
     id: CONVERSATION_ID,
     lastActivityAt: null,
+    pinnedAt: null,
     projectId: PROJECT_ID,
     projectKind: 'named',
     title: 'Synthèse du comité projet',
@@ -204,11 +205,30 @@ export function createWorkspaceApi(
       conversations.push(created);
       return json({ data: created, success: true }, 201);
     }
+    const chatPinMatch = /^\/api\/conversations\/([^/]+)\/(pin|unpin)$/u.exec(path);
+    if (chatPinMatch !== null && method === 'POST') {
+      const index = conversations.findIndex((item) => item.id === chatPinMatch[1]);
+      if (index === -1) return failure(404, 'conversation_not_found');
+      conversations[index] = {
+        ...conversations[index]!,
+        pinnedAt: chatPinMatch[2] === 'pin' ? new Date().toISOString() : null,
+      };
+      return json({ data: conversations[index], success: true });
+    }
     const conversationMatch = /^\/api\/conversations\/([^/]+)$/u.exec(path);
     if (conversationMatch !== null) {
       const index = conversations.findIndex((item) => item.id === conversationMatch[1]);
       if (index === -1) return failure(404, 'conversation_not_found', 'Conversation not found.');
       if (method === 'GET') return json({ data: conversations[index], success: true });
+      if (method === 'PATCH') {
+        const input = body as { title: string };
+        conversations[index] = {
+          ...conversations[index]!,
+          title: input.title,
+          titleSource: 'user',
+        };
+        return json({ data: conversations[index], success: true });
+      }
       if (method === 'DELETE') {
         conversations.splice(index, 1);
         return new Response(null, { status: 204 });
@@ -242,6 +262,7 @@ export function createWorkspaceApi(
         conversations.filter((item) => projectId === null || item.projectId === projectId),
         (item) => item.createdAt,
       );
+      all.sort((left, right) => Number(right.pinnedAt !== null) - Number(left.pinnedAt !== null));
       // Offset cursors stand in for the opaque API cursors; the client treats both as strings.
       const offset = Number(url.searchParams.get('cursor') ?? '0');
       const limit = Number(url.searchParams.get('limit') ?? '50');

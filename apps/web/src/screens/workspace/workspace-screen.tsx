@@ -3,6 +3,8 @@ import { useRef, useState } from 'react';
 import { Outlet, useMatch, useNavigate } from 'react-router-dom';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 
+import { ConversationActionDialogs } from '@/components/workspace/conversation/conversation-action-dialogs';
+import { useConversationActions } from '@/hooks/conversations/use-conversation-actions';
 import { TextFieldDialog } from '@/components/ui/text-field-dialog';
 import { ContextPanel } from '@/components/workspace/context/context-panel';
 import { WorkspaceHeader } from '@/components/workspace/header/workspace-header';
@@ -88,6 +90,17 @@ export function WorkspaceScreen() {
   const projectActions = useProjectActions({
     onDeleted: (project) => {
       if (project.id === selectedProjectId) void navigate('/app', { replace: true });
+    },
+  });
+
+  const conversationActions = useConversationActions({
+    onDeleted: (conversation) => {
+      if (conversation.id === selectedConversationId) {
+        void navigate(
+          conversation.projectKind === 'named' ? projectHomePath(conversation.projectId) : '/app',
+          { replace: true },
+        );
+      }
     },
   });
 
@@ -195,6 +208,11 @@ export function WorkspaceScreen() {
         onSidebarOpenChange={shell.setIsSidebarOpen}
         sidebar={
           <WorkspaceSidebar
+            conversationActions={{
+              onDelete: conversationActions.remove,
+              onRename: conversationActions.rename,
+              onTogglePin: conversationActions.togglePin,
+            }}
             pinnedProjects={pinnedQuery.projects}
             projects={projectsQuery.projects}
             hasMoreProjects={projectsQuery.hasMore}
@@ -211,7 +229,7 @@ export function WorkspaceScreen() {
             isLoading={isLoading}
             isNavigationOpen={shell.isNavigationOpen}
             loadError={loadError}
-            notice={projectActions.pinError}
+            notice={conversationActions.pinError ?? projectActions.pinError}
             onRetry={() => navigationQueries.forEach(({ query }) => query.reload())}
             onSearch={shell.setSearch}
             onSelectConversation={(id) => {
@@ -278,6 +296,7 @@ export function WorkspaceScreen() {
         submitLabel={labels.submit}
         title={labels.title}
       />
+      <ConversationActionDialogs {...conversationActions.dialogs} />
       <ProjectActionDialogs {...projectActions.dialogs} />
       {shell.isPreviewLoading ? (
         <p className="sr-only" role="status" aria-label="Chargement de l’espace de travail">

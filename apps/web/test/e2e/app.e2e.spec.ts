@@ -489,3 +489,43 @@ test('recovers mobile navigation after collapsing the desktop sidebar', async ({
   await expect(page.getByRole('button', { name: 'Refonte du portail', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });
+
+test('renames, pins and deletes a conversation through accessible menus', async ({ page }) => {
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ json: authenticatedSession, status: 200 }),
+  );
+  await page.goto('/app/projects/0b6e1a9e-0a7f-4c26-9f5b-2f1a2c3d4e5f');
+  const chats = page.getByRole('list', { name: 'Chats du projet' });
+  await chats
+    .getByRole('button', { name: 'Actions de la conversation Synthèse du comité projet' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Renommer la conversation' }).click();
+  const rename = page.getByRole('dialog', { name: 'Renommer la conversation' });
+  await rename
+    .getByRole('textbox', { name: 'Titre de la conversation' })
+    .fill('Décisions partagées');
+  await rename.getByRole('button', { name: 'Renommer', exact: true }).click();
+  await expect(rename).not.toBeVisible();
+  await chats
+    .getByRole('button', { name: 'Actions de la conversation Décisions partagées' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Épingler la conversation', exact: true }).click();
+  await chats
+    .getByRole('button', { name: 'Actions de la conversation Décisions partagées' })
+    .click();
+  await expect(page.getByRole('menuitem', { name: 'Désépingler la conversation' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await chats.getByRole('button', { name: /^Décisions partagées/u }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Décisions partagées' })).toBeVisible();
+  await page
+    .getByRole('button', { name: 'Actions de la conversation Décisions partagées' })
+    .focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('menuitem', { name: 'Supprimer la conversation' }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Supprimer la conversation' })
+    .click();
+  await expect(page).toHaveURL(/\/app\/projects\//u);
+  await expect(page.getByRole('list', { name: 'Chats du projet' })).not.toBeVisible();
+});

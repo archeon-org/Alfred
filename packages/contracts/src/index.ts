@@ -32,6 +32,8 @@ export {
   conversationSchema,
   conversationTitleSourceSchema,
   createConversationInputSchema,
+  updateConversationInputSchema,
+  type UpdateConversationInput,
   type Conversation,
   type ConversationTitleSource,
   type CreateConversationInput,

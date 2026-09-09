@@ -7,6 +7,7 @@ export const projectKeys = {
 };
 
 export const conversationKeys = {
+  lists: (userId: string) => ['conversations', userId, 'list'] as const,
   all: (userId: string) => ['conversations', userId] as const,
   detail: (userId: string, conversationId: string) =>
     ['conversations', userId, 'detail', conversationId] as const,

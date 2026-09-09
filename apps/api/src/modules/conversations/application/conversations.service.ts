@@ -1,11 +1,11 @@
-import type { Conversation, ProjectKind } from '@alfred/contracts';
+import type { Conversation, ProjectKind, UpdateConversationInput } from '@alfred/contracts';
 import { Injectable } from '@nestjs/common';
 import { DataSource, In, type EntityManager, type Repository } from 'typeorm';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { deleteOwnedOrThrow, findOwnedOrThrow } from '../../../common/ownership/find-owned';
 import { OwnedResourceNotFoundException } from '../../../common/ownership/owned-resource-not-found.exception';
 import type { OwnerScope } from '../../../common/ownership/owner-scope';
-import { paginateByCursor } from '../../../common/pagination/paginate';
+import { paginateConversations } from '../infrastructure/persistence/paginate-conversations';
 import {
   assertProjectNamed,
   assertProjectWritable,
@@ -22,6 +22,7 @@ export interface CreateConversationCommand {
 }
 
 export interface ConversationListQuery {
+  readonly projectKind?: ProjectKind;
   readonly projectId?: string;
   readonly cursor?: string;
   readonly limit?: number;
@@ -86,10 +87,17 @@ export class ConversationsService {
     if (query.projectId !== undefined) {
       queryBuilder.andWhere('conversation.projectId = :projectId', { projectId: query.projectId });
     }
-    const page = await paginateByCursor(queryBuilder, {
+    if (query.projectKind !== undefined) {
+      queryBuilder.andWhere(
+        `EXISTS (SELECT 1 FROM "api_projects" "kind_project"
+        WHERE "kind_project"."id" = "conversation"."project_id"
+          AND "kind_project"."kind" = :projectKind)`,
+        { projectKind: query.projectKind },
+      );
+    }
+    const page = await paginateConversations(queryBuilder, {
       cursor: query.cursor,
       limit: query.limit,
-      sortColumn: 'created_at',
     });
     const kinds = await this.projectKinds(page.items.map((item) => item.projectId));
     return {
@@ -119,25 +127,68 @@ export class ConversationsService {
     const scope = await this.tenants.scopeFor(principal.id);
     await this.dataSource.transaction(async (manager) => {
       const conversations = manager.getRepository(ConversationEntity);
-      const located = await this.owned(conversations, scope)
-        .andWhere('conversation.id = :id', { id })
-        .getOne();
-      if (located === null) throw new OwnedResourceNotFoundException(CONVERSATION_RESOURCE);
+      const { conversation, project } = await this.lockOwned(manager, scope, id);
       const projects = manager.getRepository(ProjectEntity);
-      const ownership = { id: located.projectId, ...scope };
-      const project = await findOwnedOrThrow(projects, ownership, PROJECT_RESOURCE, ROW_LOCK);
-      // Re-read under the lock: the chat may have been deleted while waiting for the project.
-      const conversation = await conversations.findOne({
-        ...ROW_LOCK,
-        where: { id: located.id, projectId: project.id },
-      });
-      if (conversation === null) throw new OwnedResourceNotFoundException(CONVERSATION_RESOURCE);
+      const ownership = { id: project.id, ...scope };
       await conversations.delete({ id: conversation.id, projectId: project.id });
       if (project.kind === 'implicit') {
         const remaining = await conversations.count({ where: { projectId: project.id } });
         if (remaining === 0) await deleteOwnedOrThrow(projects, ownership, PROJECT_RESOURCE);
       }
     });
+  }
+
+  async update(
+    principal: AuthPrincipal,
+    id: string,
+    command: UpdateConversationInput,
+  ): Promise<Conversation> {
+    const scope = await this.tenants.scopeFor(principal.id);
+    return this.dataSource.transaction(async (manager) => {
+      const { conversation, project } = await this.lockOwned(manager, scope, id);
+      const updated = await manager.getRepository(ConversationEntity).save({
+        ...conversation,
+        title: command.title.trim(),
+        titleSource: 'user' as const,
+      });
+      return toConversationDto(updated, project.kind);
+    });
+  }
+
+  async setPinned(principal: AuthPrincipal, id: string, pinned: boolean): Promise<Conversation> {
+    const scope = await this.tenants.scopeFor(principal.id);
+    return this.dataSource.transaction(async (manager) => {
+      const { conversation, project } = await this.lockOwned(manager, scope, id);
+      if ((conversation.pinnedAt !== null) === pinned)
+        return toConversationDto(conversation, project.kind);
+      const updated = await manager.getRepository(ConversationEntity).save({
+        ...conversation,
+        pinnedAt: pinned ? new Date() : null,
+      });
+      return toConversationDto(updated, project.kind);
+    });
+  }
+
+  /** Parent before child; revalidation after waiting prevents writes through a stale relation. */
+  private async lockOwned(manager: EntityManager, scope: OwnerScope, id: string) {
+    const conversations = manager.getRepository(ConversationEntity);
+    const located = await this.owned(conversations, scope)
+      .andWhere('conversation.id = :id', { id })
+      .getOne();
+    if (located === null) throw new OwnedResourceNotFoundException(CONVERSATION_RESOURCE);
+    const project = await findOwnedOrThrow(
+      manager.getRepository(ProjectEntity),
+      { id: located.projectId, ...scope },
+      PROJECT_RESOURCE,
+      ROW_LOCK,
+    );
+    assertProjectWritable(project);
+    const conversation = await conversations.findOne({
+      ...ROW_LOCK,
+      where: { id, projectId: project.id },
+    });
+    if (conversation === null) throw new OwnedResourceNotFoundException(CONVERSATION_RESOURCE);
+    return { conversation, project };
   }
 
   private owned(repository: Repository<ConversationEntity>, scope: OwnerScope) {

@@ -1,5 +1,9 @@
-import { MessageSquareText } from 'lucide-react';
+import { MessageSquareText, Pin } from 'lucide-react';
 
+import {
+  ConversationActionMenu,
+  type ConversationActionHandlers,
+} from '@/components/workspace/conversation/conversation-action-menu';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { QueryStatus } from '@/hooks/projects/use-projects-query';
@@ -7,6 +11,7 @@ import { formatDate } from '@/lib/workspace/format-date';
 import type { Conversation } from '@/lib/workspace/workspace.types';
 
 export interface ProjectChatListProps {
+  readonly conversationActions: ConversationActionHandlers;
   readonly conversations: readonly Conversation[];
   readonly status: QueryStatus;
   readonly error: string | null;
@@ -18,6 +23,7 @@ export interface ProjectChatListProps {
 }
 
 export function ProjectChatList({
+  conversationActions,
   conversations,
   error,
   hasMore,
@@ -60,9 +66,9 @@ export function ProjectChatList({
     <div>
       <ul aria-label="Chats du projet" className="divide-y divide-border">
         {conversations.map((conversation) => (
-          <li key={conversation.id}>
+          <li key={conversation.id} className="flex min-w-0 items-center gap-1">
             <Button
-              className="flex h-auto min-h-14 w-full items-center justify-start gap-3 rounded-lg px-3 py-3 text-left whitespace-normal"
+              className="flex h-auto min-h-14 min-w-0 flex-1 items-center justify-start gap-3 rounded-lg px-3 py-3 text-left whitespace-normal"
               onClick={() => onSelect(conversation.id)}
               variant="ghost"
             >
@@ -71,6 +77,9 @@ export function ProjectChatList({
                 className="shrink-0 text-muted-foreground"
                 size={16}
               />
+              {conversation.pinnedAt !== null ? (
+                <Pin aria-hidden="true" size={12} className="shrink-0 text-muted-foreground" />
+              ) : null}
               <span className="min-w-0 flex-1 text-sm font-medium text-foreground wrap-anywhere">
                 {conversation.title}
               </span>
@@ -81,6 +90,7 @@ export function ProjectChatList({
                 {formatDate(conversation.createdAt)}
               </time>
             </Button>
+            <ConversationActionMenu conversation={conversation} {...conversationActions} />
           </li>
         ))}
       </ul>

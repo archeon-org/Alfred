@@ -8,6 +8,8 @@ import {
   deleteConversation,
   getConversation,
   listConversations,
+  updateConversation,
+  setConversationPinned,
 } from '@/services/conversations/conversations.service';
 import { ApiRequestError, withQuery } from '@/services/http/api-json';
 import { createHttpClient } from '@/services/http/http-client';
@@ -76,6 +78,27 @@ describe('projects service', () => {
 });
 
 describe('conversations service', () => {
+  it('validates rename input and mutation responses, and surfaces failed pins', async () => {
+    const { api, client } = clientFor();
+    const id = conversation().id;
+    await expect(updateConversation(client, id, { title: '' })).rejects.toThrow();
+    expect(api.calls).toHaveLength(0);
+    expect((await updateConversation(client, id, { title: 'Décisions' })).title).toBe('Décisions');
+    expect((await setConversationPinned(client, id, true)).pinnedAt).not.toBeNull();
+    expect((await setConversationPinned(client, id, false)).pinnedAt).toBeNull();
+    api.fail(`POST /api/conversations/${id}/pin`, 404, 'conversation_not_found');
+    await expect(setConversationPinned(client, id, true)).rejects.toMatchObject({
+      code: 'conversation_not_found',
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify({ success: true, data: { id } })))),
+    );
+    await expect(updateConversation(client, id, { title: 'Décisions' })).rejects.toThrow(
+      'La conversation reçue est invalide.',
+    );
+  });
+
   it('scopes the list by project, creates with an idempotency key and deletes', async () => {
     const { api, client } = clientFor();
 

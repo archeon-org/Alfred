@@ -13,6 +13,7 @@ export interface ConversationRecord {
   readonly projectId: string;
   readonly title: string;
   readonly titleSource: ConversationTitleSource;
+  readonly pinnedAt: Date | null;
   readonly lastActivityAt: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -39,6 +40,7 @@ export function toConversationDto(
     createdAt: record.createdAt.toISOString(),
     id: record.id,
     lastActivityAt: record.lastActivityAt === null ? null : record.lastActivityAt.toISOString(),
+    pinnedAt: record.pinnedAt === null ? null : record.pinnedAt.toISOString(),
     projectId: record.projectId,
     projectKind,
     title: record.title,

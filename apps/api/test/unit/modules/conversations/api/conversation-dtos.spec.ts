@@ -2,6 +2,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 
+import { UpdateConversationDto } from '@api/modules/conversations/api/dto/update-conversation.dto';
 import { CreateConversationDto } from '@api/modules/conversations/api/dto/create-conversation.dto';
 import { ListConversationsQueryDto } from '@api/modules/conversations/api/dto/list-conversations-query.dto';
 
@@ -10,6 +11,26 @@ async function errorsOf(dto: object): Promise<string[]> {
 }
 
 describe('conversation request DTOs', () => {
+  it('requires a usable title on rename, rejecting missing, null and unknown fields', async () => {
+    for (const title of [undefined, null, '', '   ', 'a\tb', 'x'.repeat(161)]) {
+      expect(await errorsOf(plainToInstance(UpdateConversationDto, { title }))).toContain('title');
+    }
+    const dto = plainToInstance(UpdateConversationDto, { title: '  Nouveau  ' });
+    expect(await errorsOf(dto)).toEqual([]);
+    expect(dto.title).toBe('Nouveau');
+  });
+
+  it('defaults to ten and validates the project kind filter', async () => {
+    expect(plainToInstance(ListConversationsQueryDto, {}).limit).toBe(10);
+    for (const projectKind of ['implicit', 'named'])
+      expect(await errorsOf(plainToInstance(ListConversationsQueryDto, { projectKind }))).toEqual(
+        [],
+      );
+    expect(
+      await errorsOf(plainToInstance(ListConversationsQueryDto, { projectKind: 'other' })),
+    ).toEqual(['projectKind']);
+  });
+
   it('accepts an empty body for a standalone chat and trims a provided title', async () => {
     expect(await errorsOf(plainToInstance(CreateConversationDto, {}))).toEqual([]);
 

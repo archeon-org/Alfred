@@ -36,6 +36,7 @@ interface WorkspaceSidebarProps extends Omit<
 }
 
 export function WorkspaceSidebar({
+  conversationActions,
   conversations,
   hasMoreConversations,
   isLoadingMoreConversations,
@@ -165,6 +166,7 @@ export function WorkspaceSidebar({
                 </p>
               ) : null}
               <ProjectNavigation
+                conversationActions={conversationActions}
                 {...projectNavigation}
                 conversations={projectChats}
                 isSearching={isSearching}
@@ -191,6 +193,7 @@ export function WorkspaceSidebar({
                   </Button>
                 </div>
                 <ConversationNavigation
+                  conversationActions={conversationActions}
                   compact
                   conversations={standaloneChats}
                   selectedId={selectedConversationId}

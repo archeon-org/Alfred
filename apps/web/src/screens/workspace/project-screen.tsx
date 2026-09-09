@@ -2,6 +2,8 @@ import { PROJECT_CONTEXT_MAX_BYTES, PROJECT_DESCRIPTION_MAX_LENGTH } from '@alfr
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
+import { ConversationActionDialogs } from '@/components/workspace/conversation/conversation-action-dialogs';
+import { useConversationActions } from '@/hooks/conversations/use-conversation-actions';
 import { buttonVariants } from '@/components/ui/button';
 import { MarkdownDocumentDialog } from '@/components/ui/markdown-document-dialog';
 import type { TextLimit } from '@/components/ui/markdown-editor';
@@ -52,6 +54,7 @@ export function ProjectScreen() {
   const documentUpdate = useUpdateProject();
   const createChat = useCreateConversation();
   const actions = useProjectActions({ onDeleted: () => void navigate('/app', { replace: true }) });
+  const conversationActions = useConversationActions();
   const [document, setDocument] = useState<ProjectDocumentKey | null>(null);
 
   function closeDocument() {
@@ -91,13 +94,18 @@ export function ProjectScreen() {
         ref={conversationRef}
         project={project}
         isBusy={isLoading}
-        notice={actions.pinError}
+        notice={conversationActions.pinError ?? actions.pinError}
         actions={{
           onDelete: actions.remove,
           onRename: actions.rename,
           onTogglePin: actions.togglePin,
         }}
         chats={{
+          conversationActions: {
+            onDelete: conversationActions.remove,
+            onRename: conversationActions.rename,
+            onTogglePin: conversationActions.togglePin,
+          },
           conversations: chats.conversations,
           error: chats.error
             ? describeApiError(chats.error, 'Impossible de charger les chats.')
@@ -128,6 +136,7 @@ export function ProjectScreen() {
         }}
         onEditDocument={setDocument}
       />
+      <ConversationActionDialogs {...conversationActions.dialogs} />
       <ProjectActionDialogs {...actions.dialogs} />
       {(['description', 'context'] as const).map((key) => (
         <MarkdownDocumentDialog

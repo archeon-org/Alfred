@@ -1,6 +1,7 @@
 import { Pin, Plus } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 
+import type { ConversationActionHandlers } from '@/components/workspace/conversation/conversation-action-menu';
 import { Button } from '@/components/ui/button';
 import { ProjectNavigationItem } from '@/components/workspace/navigation/project-navigation-item';
 import type { ProjectActionHandlers } from '@/components/workspace/project/project-action-menu';
@@ -17,6 +18,7 @@ export interface ProjectNavigationProps {
   readonly isLoadingMoreProjects: boolean;
   readonly onLoadMoreProjects: () => void;
   /** Chats of named projects only; standalone chats live in their own section. */
+  readonly conversationActions: ConversationActionHandlers;
   readonly conversations: readonly Conversation[];
   readonly selectedProjectId: string | undefined;
   readonly selectedConversationId: string | undefined;
@@ -102,6 +104,7 @@ function ProjectSection({ children, footer, headerAction, icon, title }: Project
 
 export function ProjectNavigation({
   actions,
+  conversationActions,
   conversations,
   hasMoreProjects,
   isLoadingMoreProjects,
@@ -129,6 +132,7 @@ export function ProjectNavigation({
     const isExpanded = isSearching || (isSelected && collapsedProjectId !== project.id);
     return (
       <ProjectNavigationItem
+        conversationActions={conversationActions}
         actions={actions}
         conversations={conversations.filter((item) => item.projectId === project.id)}
         isExpanded={isExpanded}

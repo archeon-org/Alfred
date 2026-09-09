@@ -50,6 +50,7 @@ export function conversationRow(overrides: Partial<ConversationEntity> = {}): Co
     createdAt: new Date('2026-09-09T12:00:00.000Z'),
     id: '3f2e1d0c-9b8a-4765-8321-fedcba987654',
     lastActivityAt: null,
+    pinnedAt: null,
     project: undefined as unknown as ConversationEntity['project'],
     projectId: projectRow().id,
     title: 'Analyse de l’existant',

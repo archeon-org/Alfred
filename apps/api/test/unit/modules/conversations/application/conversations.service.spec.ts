@@ -1,7 +1,7 @@
 import type { DataSource, EntityManager } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { paginateByCursor } from '@api/common/pagination/paginate';
+import { paginateConversations } from '@api/modules/conversations/infrastructure/persistence/paginate-conversations';
 import { ConversationsService } from '@api/modules/conversations/application/conversations.service';
 import { ConversationEntity } from '@api/modules/conversations/infrastructure/persistence/conversation.entity';
 import {
@@ -13,7 +13,9 @@ import {
   tenantsService,
 } from '../../../../support/project-fixtures';
 
-vi.mock('@api/common/pagination/paginate', () => ({ paginateByCursor: vi.fn() }));
+vi.mock('@api/modules/conversations/infrastructure/persistence/paginate-conversations', () => ({
+  paginateConversations: vi.fn(),
+}));
 
 function repositories(
   overrides: {
@@ -59,9 +61,108 @@ function repositories(
 
 describe('ConversationsService', () => {
   beforeEach(() => {
-    vi.mocked(paginateByCursor).mockResolvedValue({
+    vi.mocked(paginateConversations).mockResolvedValue({
       items: [conversationRow()],
       nextCursor: null,
+    });
+  });
+
+  it('renames an owned conversation as a user title without altering its pin', async () => {
+    const pinnedAt = new Date('2026-09-10T08:00:00Z');
+    const row = conversationRow({ pinnedAt });
+    const { service, conversations, projects } = repositories({
+      conversations: {
+        createQueryBuilder: vi.fn().mockReturnValue(queryBuilder(row)),
+        findOne: vi.fn().mockResolvedValue(row),
+      },
+    });
+    expect(await service.update(principal, row.id, { title: 'Nouveau titre' })).toMatchObject({
+      title: 'Nouveau titre',
+      titleSource: 'user',
+      pinnedAt: pinnedAt.toISOString(),
+    });
+    expect(projects.findOne.mock.invocationCallOrder[0]).toBeLessThan(
+      conversations.findOne.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(row.title).toBe('Analyse de l’existant');
+  });
+
+  it('preserves the timestamp and does not save when already pinned', async () => {
+    const row = conversationRow({ pinnedAt: new Date('2026-09-10T08:00:00Z') });
+    const { service, conversations } = repositories({
+      conversations: {
+        createQueryBuilder: vi.fn().mockReturnValue(queryBuilder(row)),
+        findOne: vi.fn().mockResolvedValue(row),
+      },
+    });
+    expect(await service.setPinned(principal, row.id, true)).toMatchObject({
+      pinnedAt: row.pinnedAt?.toISOString(),
+    });
+    expect(conversations.save).not.toHaveBeenCalled();
+  });
+
+  it('does not rename a conversation that moved while waiting for the parent lock', async () => {
+    const row = conversationRow();
+    const { service, conversations } = repositories({
+      conversations: {
+        createQueryBuilder: vi.fn().mockReturnValue(queryBuilder(row)),
+        findOne: vi.fn().mockResolvedValue(null),
+      },
+    });
+    await expect(service.update(principal, row.id, { title: 'Lost update' })).rejects.toMatchObject(
+      { code: 'conversation_not_found' },
+    );
+    expect(conversations.save).not.toHaveBeenCalled();
+  });
+
+  it('pins then unpins a conversation without mutating the loaded row', async () => {
+    const row = conversationRow();
+    const { service, conversations } = repositories({
+      conversations: {
+        createQueryBuilder: vi.fn().mockReturnValue(queryBuilder(row)),
+        findOne: vi
+          .fn()
+          .mockResolvedValueOnce(row)
+          .mockResolvedValueOnce({ ...row, pinnedAt: new Date() })
+          .mockResolvedValueOnce(row),
+      },
+    });
+    expect(await service.setPinned(principal, row.id, true)).toMatchObject({
+      pinnedAt: expect.any(String) as string,
+    });
+    expect(row.pinnedAt).toBeNull();
+    expect(await service.setPinned(principal, row.id, false)).toMatchObject({ pinnedAt: null });
+    expect(await service.setPinned(principal, row.id, false)).toMatchObject({ pinnedAt: null });
+    expect(conversations.save).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects missing conversations and parents made inactive while waiting', async () => {
+    const missing = repositories({
+      conversations: { createQueryBuilder: vi.fn().mockReturnValue(queryBuilder(null)) },
+    });
+    await expect(
+      missing.service.setPinned(principal, conversationRow().id, true),
+    ).rejects.toMatchObject({ code: 'conversation_not_found' });
+    const archived = repositories({
+      conversations: {
+        createQueryBuilder: vi.fn().mockReturnValue(queryBuilder(conversationRow())),
+      },
+      projects: { findOne: vi.fn().mockResolvedValue(projectRow({ status: 'archived' })) },
+    });
+    await expect(
+      archived.service.update(principal, conversationRow().id, { title: 'No' }),
+    ).rejects.toMatchObject({ code: 'project_archived' });
+    expect(archived.conversations.save).not.toHaveBeenCalled();
+  });
+
+  it('filters implicit conversations before pagination', async () => {
+    const builder = queryBuilder();
+    const { service } = repositories({
+      conversations: { createQueryBuilder: vi.fn().mockReturnValue(builder) },
+    });
+    await service.list(principal, { projectKind: 'implicit' });
+    expect(builder.andWhere).toHaveBeenCalledWith(expect.stringContaining('kind_project'), {
+      projectKind: 'implicit',
     });
   });
 
@@ -144,10 +245,9 @@ describe('ConversationsService', () => {
     expect(builder.andWhere).toHaveBeenCalledWith('conversation.projectId = :projectId', {
       projectId: projectRow().id,
     });
-    expect(paginateByCursor).toHaveBeenCalledWith(builder, {
+    expect(paginateConversations).toHaveBeenCalledWith(builder, {
       cursor: undefined,
       limit: 10,
-      sortColumn: 'created_at',
     });
     expect(page.items[0]).toMatchObject({ projectKind: 'named', title: 'Analyse de l’existant' });
   });

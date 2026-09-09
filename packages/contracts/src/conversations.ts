@@ -20,6 +20,7 @@ export const conversationSchema = z.readonly(
     projectKind: projectKindSchema,
     title: z.string(),
     titleSource: conversationTitleSourceSchema,
+    pinnedAt: z.nullable(isoDateTime),
     lastActivityAt: z.nullable(isoDateTime),
     createdAt: isoDateTime,
     updatedAt: isoDateTime,
@@ -37,3 +38,6 @@ export type CreateConversationInput = z.infer<typeof createConversationInputSche
 
 export const conversationEnvelopeSchema = successEnvelopeSchema(conversationSchema);
 export const conversationListEnvelopeSchema = listEnvelopeSchema(conversationSchema);
+
+export const updateConversationInputSchema = z.object({ title: resourceNameSchema });
+export type UpdateConversationInput = z.infer<typeof updateConversationInputSchema>;
