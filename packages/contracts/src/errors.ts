@@ -12,6 +12,8 @@ export const API_ERROR_CODES = Object.freeze([
   'project_not_found',
   'project_busy',
   'project_archived',
+  'project_implicit',
+  'project_deleting',
   'conversation_not_found',
   'conversation_archived',
   'thread_busy',

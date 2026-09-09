@@ -1,6 +1,40 @@
 import { z } from 'zod/mini';
 export { listEnvelopeSchema, listQuerySchema } from './pagination';
 export { API_ERROR_CODES, apiErrorSchema, type ApiError, type ApiErrorCode } from './errors';
+export {
+  PROJECT_CONTEXT_MAX_BYTES,
+  PROJECT_DESCRIPTION_MAX_LENGTH,
+  PROJECT_NAME_MAX_LENGTH,
+  RESOURCE_NAME_PATTERN,
+  RESOURCE_TEXT_PATTERN,
+  createProjectInputSchema,
+  projectContextSchema,
+  projectDescriptionSchema,
+  projectEnvelopeSchema,
+  projectKindSchema,
+  projectListEnvelopeSchema,
+  projectSchema,
+  projectStatusSchema,
+  resourceNameSchema,
+  updateProjectInputSchema,
+  type CreateProjectInput,
+  type Project,
+  type ProjectKind,
+  type ProjectStatus,
+  type UpdateProjectInput,
+} from './projects';
+export {
+  CONVERSATION_TITLE_MAX_LENGTH,
+  DEFAULT_CONVERSATION_TITLE,
+  conversationEnvelopeSchema,
+  conversationListEnvelopeSchema,
+  conversationSchema,
+  conversationTitleSourceSchema,
+  createConversationInputSchema,
+  type Conversation,
+  type ConversationTitleSource,
+  type CreateConversationInput,
+} from './conversations';
 
 const nonEmptyString = z.string().check(z.trim(), z.minLength(1));
 const authProviderId = z.string().check(z.regex(/^[a-z][a-z0-9-]*$/u), z.maxLength(64));
