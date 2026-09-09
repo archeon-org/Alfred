@@ -256,6 +256,50 @@ postgres('projects and conversations PostgreSQL contract', () => {
     expect(second.body?.data?.nextCursor).toBeNull();
   });
 
+  it('pins projects in pin order, keeps them out of the recent list and refuses implicit shells', async () => {
+    const owner = await user();
+    const ids: string[] = [];
+    for (const name of ['Alpha', 'Beta', 'Gamma']) {
+      const created = await api('POST', '/projects', owner.token, { name });
+      ids.push((created.body?.data as { id: string }).id);
+    }
+    const [alpha, beta, gamma] = ids as [string, string, string];
+
+    expect((await api('POST', `/projects/${beta}/pin`, owner.token)).body?.data).toMatchObject({
+      id: beta,
+      pinnedAt: expect.any(String) as string,
+    });
+    const alphaPinnedTwice = [
+      await api('POST', `/projects/${alpha}/pin`, owner.token),
+      await api('POST', `/projects/${alpha}/pin`, owner.token),
+    ];
+    expect(alphaPinnedTwice[0]?.body?.data).toEqual(alphaPinnedTwice[1]?.body?.data);
+
+    const pinned = await api('GET', '/projects?pinned=true', owner.token);
+    expect(pinned.body?.data?.items?.map(({ id }) => id)).toEqual([beta, alpha]);
+    const recent = await api('GET', '/projects?pinned=false&limit=3', owner.token);
+    expect(recent.body?.data?.items?.map(({ id }) => id)).toEqual([gamma]);
+    expect((await api('GET', '/projects', owner.token)).body?.data?.items).toHaveLength(3);
+
+    expect((await api('POST', `/projects/${beta}/unpin`, owner.token)).body?.data).toMatchObject({
+      pinnedAt: null,
+    });
+    expect(
+      (await api('GET', '/projects?pinned=true', owner.token)).body?.data?.items?.map(
+        ({ id }) => id,
+      ),
+    ).toEqual([alpha]);
+
+    const standalone = (await api('POST', '/conversations', owner.token, {})).body?.data as {
+      projectId: string;
+    };
+    expect(
+      (await api('POST', `/projects/${standalone.projectId}/pin`, owner.token)).body,
+    ).toMatchObject({ error: { code: 'project_implicit' } });
+    const other = await user();
+    expect((await api('POST', `/projects/${alpha}/pin`, other.token)).status).toBe(404);
+  });
+
   it('attaches chats to named projects, hides implicit shells and cascades deletions', async () => {
     const owner = await user();
     const project = (await api('POST', '/projects', owner.token, { name: 'Atlas' })).body?.data as {

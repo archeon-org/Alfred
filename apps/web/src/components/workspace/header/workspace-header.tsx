@@ -6,6 +6,7 @@ import {
   PanelRight,
   SlidersHorizontal,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { WorkspaceAccount } from '@/components/workspace/header/workspace-account';
 import { Separator } from '@/components/ui/separator';
@@ -13,8 +14,14 @@ import { IconButton } from '@/components/ui/icon-button';
 import { WorkspaceSettings } from '@/components/workspace/header/workspace-settings';
 import type { WorkspacePreferences } from '@/lib/workspace/workspace-preferences.types';
 
+export interface WorkspaceScopeLink {
+  readonly name: string;
+  /** Project home; omitted when the scope has no page of its own. */
+  readonly href?: string;
+}
+
 interface WorkspaceHeaderProps {
-  readonly scopeName: string;
+  readonly scope: WorkspaceScopeLink;
   readonly isLoading: boolean;
   readonly isContextOpen: boolean;
   readonly isNavigationOpen: boolean;
@@ -27,7 +34,7 @@ interface WorkspaceHeaderProps {
 }
 
 export function WorkspaceHeader({
-  scopeName,
+  scope,
   isLoading,
   isContextOpen,
   isNavigationOpen,
@@ -58,9 +65,19 @@ export function WorkspaceHeader({
         <span className="hidden text-2xs whitespace-nowrap text-muted-foreground min-[96.875rem]:inline">
           Espace de travail /
         </span>
-        <strong className="min-w-0 truncate text-2xs font-medium text-foreground">
-          {scopeName}
-        </strong>
+        {scope.href ? (
+          <Link
+            className="min-w-0 truncate rounded-md px-1 text-2xs font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+            title="Revenir à l’accueil du projet"
+            to={scope.href}
+          >
+            {scope.name}
+          </Link>
+        ) : (
+          <strong className="min-w-0 truncate text-2xs font-medium text-foreground">
+            {scope.name}
+          </strong>
+        )}
       </div>
       <div className="flex w-full items-center justify-end gap-0.5 md:w-auto">
         <IconButton

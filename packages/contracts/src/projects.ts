@@ -54,6 +54,8 @@ export const projectSchema = z.readonly(
     createdAt: isoDateTime,
     updatedAt: isoDateTime,
     archivedAt: z.nullable(isoDateTime),
+    /** Set when the owner pins the project; pinned lists follow this timestamp. */
+    pinnedAt: z.nullable(isoDateTime),
   }),
 );
 export type Project = z.infer<typeof projectSchema>;

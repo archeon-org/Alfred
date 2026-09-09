@@ -14,6 +14,7 @@ export interface ProjectRecord extends OwnerScope {
   readonly createdAt: Date;
   readonly updatedAt: Date;
   readonly archivedAt: Date | null;
+  readonly pinnedAt: Date | null;
 }
 
 export interface ProjectChanges {
@@ -44,6 +45,7 @@ export function toProjectDto(record: ProjectRecord): Project {
     id: record.id,
     kind: record.kind,
     name: record.name,
+    pinnedAt: record.pinnedAt === null ? null : record.pinnedAt.toISOString(),
     status: record.status,
     updatedAt: record.updatedAt.toISOString(),
   });

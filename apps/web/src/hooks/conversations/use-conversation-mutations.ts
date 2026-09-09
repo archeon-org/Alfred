@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useWorkspaceAccount } from '@/hooks/workspace/use-workspace-account';
-import { conversationKeys, projectKeys } from '@/hooks/workspace/workspace-keys';
+import { conversationKeys } from '@/hooks/workspace/workspace-keys';
 import {
   createConversation,
   deleteConversation,
@@ -21,7 +21,6 @@ export function useCreateConversation() {
         queryClient.invalidateQueries({
           queryKey: conversationKeys.list(userId, conversation.projectId),
         }),
-        queryClient.invalidateQueries({ queryKey: projectKeys.list(userId) }),
       ]);
     },
   });

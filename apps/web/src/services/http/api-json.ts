@@ -59,11 +59,13 @@ export function parseEnvelope<T>(
   return parsed.data.data;
 }
 
-/** Appends the string/number members of `params` as a query string; other values are skipped. */
+/** Appends the string, number and boolean members of `params` as a query string; other values are skipped. */
 export function withQuery<T extends object>(path: `/${string}`, params: T): `/${string}` {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params) as [string, unknown][]) {
-    if (typeof value === 'string' || typeof value === 'number') search.set(key, String(value));
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      search.set(key, String(value));
+    }
   }
   const query = search.toString();
   return query === '' ? path : `${path}?${query}`;

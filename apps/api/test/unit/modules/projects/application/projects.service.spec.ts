@@ -90,6 +90,78 @@ describe('ProjectsService', () => {
     expect(page.items[0]).toMatchObject({ id: projectRow().id, name: 'Refonte du portail' });
   });
 
+  it('serves pinned projects in pin order without a cursor and excludes them from the recent list', async () => {
+    const pinnedBuilder = queryBuilder([
+      projectRow({ pinnedAt: new Date('2026-09-09T12:00:00Z') }),
+    ]);
+    const pinnedRepository = repositoryWith({
+      createQueryBuilder: vi.fn().mockReturnValue(pinnedBuilder),
+    });
+    const pinned = await serviceWith(pinnedRepository).service.list(principal, { pinned: true });
+
+    expect(pinnedBuilder.andWhere).toHaveBeenCalledWith('project.pinnedAt IS NOT NULL');
+    expect(pinnedBuilder.orderBy).toHaveBeenCalledWith('project.pinnedAt', 'ASC');
+    expect(pinnedBuilder.addOrderBy).toHaveBeenCalledWith('project.id', 'ASC');
+    expect(pinnedBuilder.take).toHaveBeenCalledWith(100);
+    expect(paginateByCursor).not.toHaveBeenCalled();
+    expect(pinned).toEqual({
+      items: [expect.objectContaining({ pinnedAt: '2026-09-09T12:00:00.000Z' })],
+      nextCursor: null,
+    });
+
+    const recentBuilder = queryBuilder();
+    const recentRepository = repositoryWith({
+      createQueryBuilder: vi.fn().mockReturnValue(recentBuilder),
+    });
+    await serviceWith(recentRepository).service.list(principal, { limit: 3, pinned: false });
+    expect(recentBuilder.andWhere).toHaveBeenCalledWith('project.pinnedAt IS NULL');
+    expect(paginateByCursor).toHaveBeenCalledWith(recentBuilder, {
+      cursor: undefined,
+      limit: 3,
+      sortColumn: 'updated_at',
+    });
+  });
+
+  it('pins with the database clock, unpins, and leaves an unchanged state untouched', async () => {
+    const repository = repositoryWith({
+      findOne: vi
+        .fn()
+        .mockResolvedValueOnce(projectRow())
+        .mockResolvedValueOnce(projectRow({ pinnedAt: new Date('2026-09-09T12:00:00Z') })),
+    });
+    const { service } = serviceWith(repository);
+
+    const pinned = await service.setPinned(principal, projectRow().id, true);
+
+    expect(repository.update).toHaveBeenCalledWith(
+      { id: projectRow().id, ownerUserId: scope.ownerUserId, tenantId: scope.tenantId },
+      { pinnedAt: expect.any(Function) as () => string },
+    );
+    expect(pinned.pinnedAt).toBe('2026-09-09T12:00:00.000Z');
+
+    const alreadyPinned = repositoryWith({
+      findOne: vi.fn().mockResolvedValue(projectRow({ pinnedAt: new Date() })),
+    });
+    await serviceWith(alreadyPinned).service.setPinned(principal, projectRow().id, true);
+    expect(alreadyPinned.update).not.toHaveBeenCalled();
+
+    const unpin = repositoryWith({
+      findOne: vi
+        .fn()
+        .mockResolvedValueOnce(projectRow({ pinnedAt: new Date() }))
+        .mockResolvedValueOnce(projectRow()),
+    });
+    await serviceWith(unpin).service.setPinned(principal, projectRow().id, false);
+    expect(unpin.update).toHaveBeenCalledWith(expect.anything(), { pinnedAt: null });
+
+    const implicit = repositoryWith({
+      findOne: vi.fn().mockResolvedValue(projectRow({ kind: 'implicit', name: null })),
+    });
+    await expect(
+      serviceWith(implicit).service.setPinned(principal, projectRow().id, true),
+    ).rejects.toMatchObject({ code: 'project_implicit' });
+  });
+
   it('reads a project with tenant, owner and id in one predicate', async () => {
     const repository = repositoryWith();
     const { service } = serviceWith(repository);

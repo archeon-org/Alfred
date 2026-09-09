@@ -35,6 +35,7 @@ export function projectRow(overrides: Partial<ProjectEntity> = {}): ProjectEntit
     kind: 'named',
     name: 'Refonte du portail',
     owner: undefined as unknown as ProjectEntity['owner'],
+    pinnedAt: null,
     status: 'active',
     tenant: undefined as unknown as ProjectEntity['tenant'],
     updatedAt: new Date('2026-09-09T11:00:00.000Z'),
@@ -59,22 +60,30 @@ export function conversationRow(overrides: Partial<ConversationEntity> = {}): Co
 }
 
 export interface QueryBuilderDouble {
+  readonly addOrderBy: Mock<(...args: unknown[]) => QueryBuilderDouble>;
   readonly andWhere: Mock<(...args: unknown[]) => QueryBuilderDouble>;
+  readonly getMany: Mock<() => Promise<unknown[]>>;
   readonly getOne: Mock<() => Promise<unknown>>;
+  readonly orderBy: Mock<(...args: unknown[]) => QueryBuilderDouble>;
   readonly setLock: Mock<(...args: unknown[]) => QueryBuilderDouble>;
+  readonly take: Mock<(...args: unknown[]) => QueryBuilderDouble>;
   readonly where: Mock<(...args: unknown[]) => QueryBuilderDouble>;
 }
 
 /** Minimal chainable TypeORM query-builder double. */
 export function queryBuilder(result: unknown = null): QueryBuilderDouble {
   const builder: QueryBuilderDouble = {
+    addOrderBy: vi.fn(),
     andWhere: vi.fn(),
+    getMany: vi.fn().mockResolvedValue(Array.isArray(result) ? result : []),
     getOne: vi.fn().mockResolvedValue(result),
+    orderBy: vi.fn(),
     setLock: vi.fn(),
+    take: vi.fn(),
     where: vi.fn(),
   };
-  builder.where.mockReturnValue(builder);
-  builder.andWhere.mockReturnValue(builder);
-  builder.setLock.mockReturnValue(builder);
+  for (const method of ['addOrderBy', 'andWhere', 'orderBy', 'setLock', 'take', 'where'] as const) {
+    builder[method].mockReturnValue(builder);
+  }
   return builder;
 }

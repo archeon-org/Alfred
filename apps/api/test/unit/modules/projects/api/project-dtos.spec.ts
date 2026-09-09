@@ -3,6 +3,7 @@ import { validate } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 
 import { CreateProjectDto } from '@api/modules/projects/api/dto/create-project.dto';
+import { ListProjectsQueryDto } from '@api/modules/projects/api/dto/list-projects-query.dto';
 import { UpdateProjectDto } from '@api/modules/projects/api/dto/update-project.dto';
 
 async function errorsOf(dto: object): Promise<string[]> {
@@ -59,6 +60,17 @@ describe('project request DTOs', () => {
     const dto = plainToInstance(CreateProjectDto, { context: 'a\u0000b', name: 'Projet' });
 
     expect(await errorsOf(dto)).toEqual(['context']);
+  });
+
+  it('reads the pinned filter as a boolean and rejects anything else', async () => {
+    const pinned = plainToInstance(ListProjectsQueryDto, { limit: '3', pinned: 'true' });
+    expect(await errorsOf(pinned)).toEqual([]);
+    expect(pinned).toMatchObject({ limit: 3, pinned: true });
+    expect(plainToInstance(ListProjectsQueryDto, { pinned: 'false' }).pinned).toBe(false);
+    expect(await errorsOf(plainToInstance(ListProjectsQueryDto, {}))).toEqual([]);
+    expect(await errorsOf(plainToInstance(ListProjectsQueryDto, { pinned: 'maybe' }))).toEqual([
+      'pinned',
+    ]);
   });
 
   it('accepts a partial update and validates each provided field', async () => {

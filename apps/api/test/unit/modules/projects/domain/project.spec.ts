@@ -20,6 +20,7 @@ describe('project domain', () => {
       id: projectRow().id,
       kind: 'named',
       name: 'Refonte du portail',
+      pinnedAt: null,
       status: 'active',
       updatedAt: '2026-09-09T11:00:00.000Z',
     });

@@ -1,8 +1,11 @@
-import { FolderOpen, Pencil, Trash2 } from 'lucide-react';
+import { FolderOpen, Pin } from 'lucide-react';
 import type { Ref } from 'react';
 
-import { IconButton } from '@/components/ui/icon-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  ProjectActionMenu,
+  type ProjectActionHandlers,
+} from '@/components/workspace/project/project-action-menu';
 import {
   ProjectChatComposer,
   type ProjectChatComposerProps,
@@ -23,20 +26,20 @@ interface ProjectOverviewProps {
   readonly project: Project;
   readonly chats: ProjectChatListProps;
   readonly composer: Omit<ProjectChatComposerProps, 'projectName'>;
+  readonly actions: ProjectActionHandlers;
   readonly isBusy: boolean;
-  readonly onRename: () => void;
-  readonly onDelete: () => void;
+  readonly notice?: string | null;
   readonly onEditDocument: (document: ProjectDocumentKey) => void;
 }
 
 /** Project home: a chat input on top, then the project's chats and its Markdown sources. */
 export function ProjectOverview({
+  actions,
   chats,
   composer,
   isBusy,
-  onDelete,
+  notice,
   onEditDocument,
-  onRename,
   project,
   ref,
 }: ProjectOverviewProps) {
@@ -60,8 +63,14 @@ export function ProjectOverview({
             <FolderOpen aria-hidden="true" size={17} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="mb-1 text-2xs font-semibold tracking-label text-muted-foreground">
+            <p className="mb-1 flex items-center gap-1.5 text-2xs font-semibold tracking-label text-muted-foreground">
               PROJET
+              {project.pinnedAt !== null ? (
+                <span className="inline-flex items-center gap-1 rounded border border-border px-1 py-px font-medium tracking-normal normal-case">
+                  <Pin aria-hidden="true" size={10} />
+                  Épinglé
+                </span>
+              ) : null}
             </p>
             <h1
               className="text-base font-semibold tracking-tight wrap-anywhere md:text-lg"
@@ -75,20 +84,23 @@ export function ProjectOverview({
               </p>
             ) : null}
           </div>
-          <div className="flex shrink-0 items-center gap-0.5">
-            <IconButton label="Renommer le projet" onClick={onRename} size="icon-sm">
-              <Pencil aria-hidden="true" size={16} />
-            </IconButton>
-            <IconButton
-              className="hover:text-destructive"
-              label="Supprimer le projet"
-              onClick={onDelete}
-              size="icon-sm"
-            >
-              <Trash2 aria-hidden="true" size={16} />
-            </IconButton>
-          </div>
+          <ProjectActionMenu
+            className="shrink-0"
+            onDelete={actions.onDelete}
+            onRename={actions.onRename}
+            onTogglePin={actions.onTogglePin}
+            project={project}
+            size="icon"
+          />
         </header>
+        {notice ? (
+          <p
+            className="mx-4 mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive md:mx-6"
+            role="alert"
+          >
+            {notice}
+          </p>
+        ) : null}
         <div className="mx-auto w-full max-w-conversation px-4 pt-5 md:px-6 wide:px-8">
           <ProjectChatComposer projectName={name} {...composer} />
         </div>

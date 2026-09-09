@@ -4,11 +4,11 @@ import { ok } from '../../../common/api-response';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Idempotent } from '../../../common/idempotency/idempotent.decorator';
-import { ListQueryDto } from '../../../common/pagination/list-query.dto';
 import { ResourceIdPipe } from '../../../common/validation/resource-id.pipe';
 import { ProjectsService } from '../application/projects.service';
 import { PROJECT_RESOURCE } from '../domain/project';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { ListProjectsQueryDto } from './dto/list-projects-query.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
 const projectId = new ResourceIdPipe(PROJECT_RESOURCE);
@@ -27,7 +27,7 @@ export class ProjectsController {
   }
 
   @Get()
-  async list(@CurrentUser() principal: AuthPrincipal, @Query() query: ListQueryDto) {
+  async list(@CurrentUser() principal: AuthPrincipal, @Query() query: ListProjectsQueryDto) {
     return ok(await this.projects.list(principal, query));
   }
 
@@ -43,6 +43,18 @@ export class ProjectsController {
     @Body() body: UpdateProjectDto,
   ) {
     return ok(await this.projects.update(principal, id, body));
+  }
+
+  @Post(':id/pin')
+  @HttpCode(200)
+  async pin(@CurrentUser() principal: AuthPrincipal, @Param('id', projectId) id: string) {
+    return ok(await this.projects.setPinned(principal, id, true));
+  }
+
+  @Post(':id/unpin')
+  @HttpCode(200)
+  async unpin(@CurrentUser() principal: AuthPrincipal, @Param('id', projectId) id: string) {
+    return ok(await this.projects.setPinned(principal, id, false));
   }
 
   @Delete(':id')

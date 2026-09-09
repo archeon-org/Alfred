@@ -8,16 +8,22 @@ import { ContextPanel } from '@/components/workspace/context/context-panel';
 import { WorkspaceHeader } from '@/components/workspace/header/workspace-header';
 import { WorkspaceLayout } from '@/components/workspace/workspace-layout';
 import { WorkspaceSidebar } from '@/components/workspace/navigation/workspace-sidebar';
+import { ProjectActionDialogs } from '@/components/workspace/project/project-action-dialogs';
 import { useCreateConversation } from '@/hooks/conversations/use-conversation-mutations';
 import { useConversationsQuery } from '@/hooks/conversations/use-conversations-query';
+import { useProjectActions } from '@/hooks/projects/use-project-actions';
 import { useCreateProject } from '@/hooks/projects/use-project-mutations';
-import { useProjectsQuery } from '@/hooks/projects/use-projects-query';
+import {
+  usePinnedProjectsQuery,
+  useProjectQuery,
+  useProjectsQuery,
+} from '@/hooks/projects/use-projects-query';
 import { useWorkspacePreferences } from '@/hooks/workspace/use-workspace-preferences';
 import type { WorkspaceOutletContext } from '@/hooks/workspace/use-workspace-outlet';
 import { useWorkspaceShell } from '@/hooks/workspace/use-workspace-shell';
 import { useWorkspaceTools } from '@/hooks/workspace/use-workspace-tools';
 import { describeApiError } from '@/lib/workspace/api-error-message';
-import type { WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
+import type { Project, WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
 
 const creationLabels = {
   conversation: {
@@ -43,6 +49,10 @@ const creationLabels = {
   },
 } as const satisfies Record<WorkspaceCreationKind, unknown>;
 
+function projectHomePath(projectId: string): string {
+  return `/app/projects/${projectId}`;
+}
+
 /** Workspace frame: navigation data, creation dialogs and the panels around the routed screen. */
 export function WorkspaceScreen() {
   const shell = useWorkspaceShell();
@@ -51,6 +61,7 @@ export function WorkspaceScreen() {
   const navigate = useNavigate();
   const projectMatch = useMatch('/app/projects/:projectId');
   const conversationMatch = useMatch('/app/conversations/:conversationId');
+  const pinnedQuery = usePinnedProjectsQuery();
   const projectsQuery = useProjectsQuery();
   const recentQuery = useConversationsQuery(null);
   const createProject = useCreateProject();
@@ -65,23 +76,34 @@ export function WorkspaceScreen() {
   const selectedProjectId =
     projectMatch?.params.projectId ??
     (selectedConversation?.projectKind === 'named' ? selectedConversation.projectId : undefined);
-  const selectedProject = projectsQuery.projects.find(({ id }) => id === selectedProjectId);
+  const selectedProjectQuery = useProjectQuery(selectedProjectId);
+  const selectedProject = selectedProjectQuery.project;
+  const projectActions = useProjectActions({
+    onDeleted: (project) => {
+      if (project.id === selectedProjectId) void navigate('/app', { replace: true });
+    },
+  });
+
   const normalizedSearch = shell.search.trim().toLocaleLowerCase('fr');
   const conversations = recentQuery.conversations.filter(({ title }) =>
     title.toLocaleLowerCase('fr').includes(normalizedSearch),
   );
-  const isNavigationLoading =
-    projectsQuery.status === 'loading' || recentQuery.status === 'loading';
+  const navigationQueries = [
+    { fallback: 'Impossible de charger vos projets.', query: pinnedQuery },
+    { fallback: 'Impossible de charger vos projets.', query: projectsQuery },
+    { fallback: 'Impossible de charger vos conversations.', query: recentQuery },
+  ] as const;
+  const isNavigationLoading = navigationQueries.some(({ query }) => query.status === 'loading');
   const isLoading = shell.isPreviewLoading || isNavigationLoading;
+  const failed = navigationQueries.find(({ query }) => query.status === 'error');
   const loadError =
-    projectsQuery.status === 'error'
-      ? describeApiError(projectsQuery.error, 'Impossible de charger vos projets.')
-      : recentQuery.status === 'error'
-        ? describeApiError(recentQuery.error, 'Impossible de charger vos conversations.')
-        : null;
+    failed === undefined ? null : describeApiError(failed.query.error, failed.fallback);
   const scopeName =
-    selectedProject?.name ??
-    (selectedConversation?.projectKind === 'implicit' ? 'Chat libre' : 'Espace personnel');
+    selectedProjectId !== undefined
+      ? (selectedProject?.name ?? 'Projet')
+      : selectedConversation?.projectKind === 'implicit'
+        ? 'Chat libre'
+        : 'Espace personnel';
   const creationError =
     creation === 'project'
       ? createProject.isError
@@ -97,6 +119,11 @@ export function WorkspaceScreen() {
     createConversation.reset();
   }
 
+  function openProject(project: Project) {
+    shell.closeNavigation();
+    void navigate(projectHomePath(project.id));
+  }
+
   function submitCreation(value: string) {
     if (creation === 'project') {
       createProject.mutate(
@@ -104,8 +131,7 @@ export function WorkspaceScreen() {
         {
           onSuccess: (project) => {
             closeCreation();
-            shell.closeNavigation();
-            void navigate(`/app/projects/${project.id}`);
+            openProject(project);
           },
         },
       );
@@ -162,33 +188,42 @@ export function WorkspaceScreen() {
         onSidebarOpenChange={shell.setIsSidebarOpen}
         sidebar={
           <WorkspaceSidebar
+            pinnedProjects={pinnedQuery.projects}
             projects={projectsQuery.projects}
+            hasMoreProjects={projectsQuery.hasMore}
+            isLoadingMoreProjects={projectsQuery.isLoadingMore}
+            onLoadMoreProjects={projectsQuery.loadMore}
             conversations={conversations}
             selectedProjectId={selectedProjectId}
             selectedConversationId={conversationMatch?.params.conversationId}
+            isProjectHome={projectMatch !== null}
             search={shell.search}
             isLoading={isLoading}
             isNavigationOpen={shell.isNavigationOpen}
             loadError={loadError}
-            onRetry={() => {
-              projectsQuery.reload();
-              recentQuery.reload();
-            }}
+            notice={projectActions.pinError}
+            onRetry={() => navigationQueries.forEach(({ query }) => query.reload())}
             onSearch={shell.setSearch}
             onSelectConversation={(id) => {
               shell.closeNavigation();
               void navigate(`/app/conversations/${id}`);
             }}
-            onSelectProject={(id) => {
-              shell.closeNavigation();
-              void navigate(`/app/projects/${id}`);
-            }}
+            onSelectProject={openProject}
             onCreate={(kind) => setCreation(kind)}
+            actions={{
+              onDelete: projectActions.remove,
+              onRename: projectActions.rename,
+              onTogglePin: projectActions.togglePin,
+            }}
           />
         }
         header={
           <WorkspaceHeader
-            scopeName={scopeName}
+            scope={{
+              href:
+                selectedProjectId === undefined ? undefined : projectHomePath(selectedProjectId),
+              name: scopeName,
+            }}
             isLoading={shell.isPreviewLoading}
             isContextOpen={shell.isContextOpen}
             isSidebarOpen={shell.isSidebarOpen}
@@ -233,6 +268,7 @@ export function WorkspaceScreen() {
         submitLabel={labels.submit}
         title={labels.title}
       />
+      <ProjectActionDialogs {...projectActions.dialogs} />
       {shell.isPreviewLoading ? (
         <p className="sr-only" role="status" aria-label="Chargement de l’espace de travail">
           Chargement de l’espace de travail

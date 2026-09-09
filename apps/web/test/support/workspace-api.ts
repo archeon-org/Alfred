@@ -23,6 +23,7 @@ export function project(overrides: Partial<Project> = {}): Project {
     id: PROJECT_ID,
     kind: 'named',
     name: 'Refonte du portail',
+    pinnedAt: null,
     status: 'active',
     updatedAt: '2026-09-09T10:00:00.000Z',
     ...overrides,
@@ -83,17 +84,46 @@ export function createWorkspaceApi(
   const calls: RecordedCall[] = [];
   const failures = new Map<string, Failure>();
 
-  const route = (method: string, path: string, body: unknown): Response => {
+  const route = (method: string, url: URL, body: unknown): Response => {
+    const path = url.pathname;
     const failure_ = failures.get(`${method} ${path}`);
     if (failure_ !== undefined) return failure(failure_.status, failure_.code);
     if (path === '/api/features') return json({ data: DISABLED_FEATURE_FLAGS, success: true });
     if (path === '/api/auth/providers') return json({ data: [], success: true });
     if (path === '/api/projects' && method === 'GET') {
-      const items = byDate(
-        projects.filter((item) => item.kind === 'named' && item.status === 'active'),
+      const pinned = url.searchParams.get('pinned');
+      const named = projects.filter((item) => item.kind === 'named' && item.status === 'active');
+      if (pinned === 'true') {
+        const items = [...named.filter((item) => item.pinnedAt !== null)].sort((left, right) =>
+          (left.pinnedAt ?? '').localeCompare(right.pinnedAt ?? ''),
+        );
+        return json({ data: { items, nextCursor: null }, success: true });
+      }
+      const all = byDate(
+        named.filter((item) => pinned !== 'false' || item.pinnedAt === null),
         (item) => item.updatedAt,
       );
-      return json({ data: { items, nextCursor: null }, success: true });
+      const offset = Number(url.searchParams.get('cursor') ?? '0');
+      const limit = Number(url.searchParams.get('limit') ?? '20');
+      const items = all.slice(offset, offset + limit);
+      const nextCursor = offset + limit < all.length ? String(offset + limit) : null;
+      return json({ data: { items, nextCursor }, success: true });
+    }
+    const pinMatch = /^\/api\/projects\/([^/]+)\/(pin|unpin)$/u.exec(path);
+    if (pinMatch !== null && method === 'POST') {
+      const index = projects.findIndex((item) => item.id === pinMatch[1]);
+      if (index === -1) return failure(404, 'project_not_found', 'Project not found.');
+      const current = projects[index]!;
+      if (current.kind === 'implicit') return failure(409, 'project_implicit');
+      const pinned = pinMatch[2] === 'pin';
+      if ((current.pinnedAt !== null) !== pinned) {
+        projects[index] = {
+          ...current,
+          pinnedAt: pinned ? new Date().toISOString() : null,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      return json({ data: projects[index], success: true });
     }
     if (path === '/api/projects' && method === 'POST') {
       const input = body as { name?: unknown; description?: unknown; context?: unknown };
@@ -215,7 +245,7 @@ export function createWorkspaceApi(
       );
       return json({ data: { items, nextCursor: null }, success: true });
     }
-    return route(method, url.pathname, body);
+    return route(method, url, body);
   });
 
   return {

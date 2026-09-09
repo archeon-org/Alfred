@@ -2,7 +2,8 @@
 export const projectKeys = {
   all: (userId: string) => ['projects', userId] as const,
   detail: (userId: string, projectId: string) => ['projects', userId, 'detail', projectId] as const,
-  list: (userId: string) => ['projects', userId, 'list'] as const,
+  list: (userId: string, scope: 'pinned' | 'recent') =>
+    ['projects', userId, 'list', scope] as const,
 };
 
 export const conversationKeys = {

@@ -1,6 +1,6 @@
 import type { Project } from '@alfred/contracts';
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, type Repository } from 'typeorm';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { ApiException } from '../../../common/errors/api.exception';
 import {
@@ -15,6 +15,7 @@ import {
   hasProjectChanges,
   optionalText,
   toProjectDto,
+  type OwnerScope,
   type ProjectChanges,
 } from '../domain/project';
 import { ProjectEntity } from '../infrastructure/persistence/project.entity';
@@ -27,6 +28,8 @@ export interface CreateProjectCommand extends ProjectChanges {
 export interface ProjectListQuery {
   readonly cursor?: string;
   readonly limit?: number;
+  /** `true`: pinned projects in pin order; `false`: unpinned only; omitted: every named project. */
+  readonly pinned?: boolean;
 }
 
 export interface ProjectPage {
@@ -35,6 +38,8 @@ export interface ProjectPage {
 }
 
 const ROW_LOCK = { lock: { mode: 'pessimistic_write' } } as const;
+/** Pinned projects are a short, hand-curated list; they are returned in one page. */
+const PINNED_LIMIT = 100;
 
 @Injectable()
 export class ProjectsService {
@@ -59,16 +64,26 @@ export class ProjectsService {
     return toProjectDto(project);
   }
 
-  /** Named, active projects of the caller, most recently updated first. Implicit shells stay hidden. */
+  /**
+   * Named, active projects of the caller. Pinned projects come back in the order they were pinned;
+   * the others most recently updated first. Implicit shells stay hidden.
+   */
   async list(principal: AuthPrincipal, query: ProjectListQuery): Promise<ProjectPage> {
     const scope = await this.tenants.scopeFor(principal.id);
-    const queryBuilder = this.dataSource
-      .getRepository(ProjectEntity)
-      .createQueryBuilder('project')
-      .where('project.tenantId = :tenantId', { tenantId: scope.tenantId })
-      .andWhere('project.ownerUserId = :ownerUserId', { ownerUserId: scope.ownerUserId })
-      .andWhere('project.kind = :kind', { kind: 'named' })
-      .andWhere('project.status = :status', { status: 'active' });
+    const queryBuilder = this.ownedNamedProjects(
+      this.dataSource.getRepository(ProjectEntity),
+      scope,
+    );
+    if (query.pinned === true) {
+      const items = await queryBuilder
+        .andWhere('project.pinnedAt IS NOT NULL')
+        .orderBy('project.pinnedAt', 'ASC')
+        .addOrderBy('project.id', 'ASC')
+        .take(PINNED_LIMIT)
+        .getMany();
+      return { items: items.map(toProjectDto), nextCursor: null };
+    }
+    if (query.pinned === false) queryBuilder.andWhere('project.pinnedAt IS NULL');
     const page = await paginateByCursor(queryBuilder, {
       cursor: query.cursor,
       limit: query.limit,
@@ -114,6 +129,26 @@ export class ProjectsService {
     });
   }
 
+  /** Pins or unpins a named project. Repeating the current state changes nothing. */
+  async setPinned(principal: AuthPrincipal, id: string, pinned: boolean): Promise<Project> {
+    const scope = await this.tenants.scopeFor(principal.id);
+    return this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(ProjectEntity);
+      const ownership = { id, ...scope };
+      const project = await findOwnedOrThrow(repository, ownership, PROJECT_RESOURCE, ROW_LOCK);
+      assertProjectWritable(project);
+      assertProjectNamed(project);
+      if ((project.pinnedAt !== null) === pinned) return toProjectDto(project);
+      await updateOwnedOrThrow(
+        repository,
+        ownership,
+        { pinnedAt: pinned ? () => 'now()' : null },
+        PROJECT_RESOURCE,
+      );
+      return toProjectDto(await findOwnedOrThrow(repository, ownership, PROJECT_RESOURCE));
+    });
+  }
+
   /**
    * Immediate transactional deletion (story PRJ-06 option C1): no artifact, runtime binding or
    * Execution exists yet, so the row lock plus SQL cascade removes the project and its chats
@@ -127,5 +162,14 @@ export class ProjectsService {
       await findOwnedOrThrow(repository, ownership, PROJECT_RESOURCE, ROW_LOCK);
       await deleteOwnedOrThrow(repository, ownership, PROJECT_RESOURCE);
     });
+  }
+
+  private ownedNamedProjects(repository: Repository<ProjectEntity>, scope: OwnerScope) {
+    return repository
+      .createQueryBuilder('project')
+      .where('project.tenantId = :tenantId', { tenantId: scope.tenantId })
+      .andWhere('project.ownerUserId = :ownerUserId', { ownerUserId: scope.ownerUserId })
+      .andWhere('project.kind = :kind', { kind: 'named' })
+      .andWhere('project.status = :status', { status: 'active' });
   }
 }

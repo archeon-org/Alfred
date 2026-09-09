@@ -1,126 +1,153 @@
-import { ChevronRight, Folder, FolderOpen, Plus } from 'lucide-react';
-import { useId, useState } from 'react';
+import { Pin, Plus } from 'lucide-react';
+import { useId, useState, type ReactNode } from 'react';
 
-import { ConversationNavigation } from '@/components/workspace/navigation/conversation-navigation';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/cn';
+import { ProjectNavigationItem } from '@/components/workspace/navigation/project-navigation-item';
+import type { ProjectActionHandlers } from '@/components/workspace/project/project-action-menu';
 import type { Conversation, Project } from '@/lib/workspace/workspace.types';
 
-interface ProjectNavigationProps {
+export interface ProjectNavigationProps {
+  /** Pinned projects in the order they were pinned. */
+  readonly pinnedProjects: readonly Project[];
+  /** Unpinned projects, most recent first, loaded page by page. */
   readonly projects: readonly Project[];
+  readonly hasMoreProjects: boolean;
+  readonly isLoadingMoreProjects: boolean;
+  readonly onLoadMoreProjects: () => void;
   /** Chats of named projects only; standalone chats live in their own section. */
   readonly conversations: readonly Conversation[];
   readonly selectedProjectId: string | undefined;
   readonly selectedConversationId: string | undefined;
-  readonly onSelectProject: (id: string) => void;
+  /** True while the project home of `selectedProjectId` is the current screen. */
+  readonly isProjectHome: boolean;
+  readonly isSearching: boolean;
+  readonly onSelectProject: (project: Project) => void;
   readonly onSelectConversation: (id: string) => void;
   readonly onCreate: (trigger: HTMLButtonElement) => void;
-  readonly isSearching: boolean;
+  readonly actions: ProjectActionHandlers;
+}
+
+interface ProjectSectionProps {
+  readonly title: string;
+  readonly icon?: ReactNode;
+  readonly headerAction?: ReactNode;
+  readonly footer?: ReactNode;
+  readonly children: ReactNode;
+}
+
+function ProjectSection({ children, footer, headerAction, icon, title }: ProjectSectionProps) {
+  const id = useId();
+  return (
+    <section aria-labelledby={id} className="mt-1">
+      <div className="mb-1.5 flex min-h-8 items-center justify-between pl-2">
+        <h2
+          className="flex items-center gap-1.5 text-2xs font-semibold tracking-widest text-sidebar-muted uppercase"
+          id={id}
+        >
+          {icon}
+          {title}
+        </h2>
+        {headerAction}
+      </div>
+      <div className="space-y-1">{children}</div>
+      {footer}
+    </section>
+  );
 }
 
 export function ProjectNavigation({
-  projects,
+  actions,
   conversations,
-  selectedProjectId,
-  selectedConversationId,
-  onSelectProject,
-  onSelectConversation,
-  onCreate,
+  hasMoreProjects,
+  isLoadingMoreProjects,
+  isProjectHome,
   isSearching,
+  onCreate,
+  onLoadMoreProjects,
+  onSelectConversation,
+  onSelectProject,
+  pinnedProjects,
+  projects,
+  selectedConversationId,
+  selectedProjectId,
 }: ProjectNavigationProps) {
   const id = useId();
   const [collapsedProjectId, setCollapsedProjectId] = useState<string | null>(null);
+
+  const renderProject = (project: Project) => {
+    const isSelected = selectedProjectId === project.id;
+    const isExpanded = isSearching || (isSelected && collapsedProjectId !== project.id);
+    return (
+      <ProjectNavigationItem
+        actions={actions}
+        conversations={conversations.filter((item) => item.projectId === project.id)}
+        isExpanded={isExpanded}
+        isSearching={isSearching}
+        isSelected={isSelected}
+        key={project.id}
+        onHome={onSelectProject}
+        onSelect={(target) => {
+          if (isSelected && isProjectHome) {
+            setCollapsedProjectId(isExpanded ? target.id : null);
+            return;
+          }
+          setCollapsedProjectId(null);
+          onSelectProject(target);
+        }}
+        onSelectConversation={onSelectConversation}
+        panelId={`${id}-project-${project.id}`}
+        project={project}
+        selectedConversationId={selectedConversationId}
+      />
+    );
+  };
+
   return (
-    <section aria-labelledby={`${id}-title`}>
-      <div className="mb-3 flex items-center justify-between pl-2.5">
-        <h2
-          className="text-2xs font-semibold tracking-widest text-sidebar-muted uppercase"
-          id={`${id}-title`}
-        >
-          Projets
-        </h2>
-        <Button
-          variant="ghost"
-          aria-label="Créer un projet"
-          size="icon-sm"
-          onClick={(event) => onCreate(event.currentTarget)}
-          type="button"
-        >
-          <Plus aria-hidden="true" size={15} />
-        </Button>
-      </div>
-      {projects.length === 0 ? (
-        <p className="px-2.5 pb-2 text-2xs leading-relaxed text-sidebar-muted">
-          Aucun projet pour le moment. Créez-en un pour regrouper vos chats.
-        </p>
+    <div className="space-y-5">
+      {pinnedProjects.length > 0 ? (
+        <ProjectSection icon={<Pin aria-hidden="true" size={12} />} title="Épinglés">
+          {pinnedProjects.map(renderProject)}
+        </ProjectSection>
       ) : null}
-      <div className="space-y-3">
-        {projects.map((project) => {
-          const name = project.name ?? 'Projet';
-          const items = conversations.filter((item) => item.projectId === project.id);
-          const expanded =
-            isSearching || (selectedProjectId === project.id && collapsedProjectId !== project.id);
-          const Icon = expanded ? FolderOpen : Folder;
-          return (
-            <div role="group" aria-label={name} key={project.id}>
-              <Button
-                variant="ghost"
-                aria-current={selectedProjectId === project.id ? 'true' : undefined}
-                aria-controls={`${id}-project-${project.id}`}
-                aria-expanded={expanded}
-                className={cn(
-                  'flex h-auto min-h-10 w-full items-center justify-start whitespace-normal gap-2 rounded-lg px-2.5 text-left text-xs text-sidebar-foreground hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-sidebar-ring group-data-[density=compact]/workspace:min-h-8',
-                  selectedProjectId === project.id &&
-                    'bg-sidebar-accent text-sidebar-accent-foreground',
-                )}
-                onClick={() => {
-                  if (selectedProjectId === project.id)
-                    setCollapsedProjectId(expanded ? project.id : null);
-                  else {
-                    setCollapsedProjectId(null);
-                    onSelectProject(project.id);
-                  }
-                }}
-                type="button"
-              >
-                <Icon
-                  aria-hidden="true"
-                  size={16}
-                  className="shrink-0 text-sidebar-accent-foreground"
-                />
-                <span className="min-w-0 flex-1 wrap-anywhere">{name}</span>
-                <ChevronRight
-                  aria-hidden="true"
-                  size={13}
-                  className={cn(
-                    'shrink-0 transition-transform motion-reduce:transition-none',
-                    expanded && 'rotate-90',
-                  )}
-                />
-              </Button>
-              <div
-                id={`${id}-project-${project.id}`}
-                hidden={!expanded}
-                className="mt-1 ml-4 border-l border-sidebar-border pl-2"
-              >
-                {items.length ? (
-                  <ConversationNavigation
-                    conversations={items}
-                    selectedId={selectedConversationId}
-                    onSelect={onSelectConversation}
-                  />
-                ) : (
-                  <p className="px-2 py-3 text-2xs leading-relaxed text-sidebar-muted">
-                    {isSearching
-                      ? 'Aucun résultat dans ce projet.'
-                      : 'Un projet, de nouvelles possibilités.'}
-                  </p>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
+      <ProjectSection
+        footer={
+          hasMoreProjects ? (
+            <Button
+              aria-busy={isLoadingMoreProjects}
+              className="mt-1 h-8 min-h-8 w-full justify-start px-2 text-2xs font-normal text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              disabled={isLoadingMoreProjects}
+              onClick={onLoadMoreProjects}
+              size="sm"
+              variant="ghost"
+            >
+              Afficher plus
+            </Button>
+          ) : null
+        }
+        headerAction={
+          <Button
+            variant="ghost"
+            aria-label="Créer un projet"
+            className="size-7 min-h-7 text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            size="icon-sm"
+            onClick={(event) => onCreate(event.currentTarget)}
+            type="button"
+          >
+            <Plus aria-hidden="true" size={15} />
+          </Button>
+        }
+        title="Projets"
+      >
+        {projects.length === 0 ? (
+          <p className="px-2 pb-1 text-2xs leading-relaxed text-sidebar-muted">
+            {pinnedProjects.length === 0
+              ? 'Aucun projet pour le moment. Créez-en un pour regrouper vos chats.'
+              : 'Tous vos projets sont épinglés.'}
+          </p>
+        ) : (
+          projects.map(renderProject)
+        )}
+      </ProjectSection>
+    </div>
   );
 }

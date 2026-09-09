@@ -6,42 +6,45 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlfredMark } from '@/components/ui/alfred-mark';
 import { ConversationNavigation } from '@/components/workspace/navigation/conversation-navigation';
-import { ProjectNavigation } from '@/components/workspace/navigation/project-navigation';
+import {
+  ProjectNavigation,
+  type ProjectNavigationProps,
+} from '@/components/workspace/navigation/project-navigation';
 import { HistorySkeleton } from '@/components/workspace/workspace-skeletons';
-import type { Conversation, Project, WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
+import type { Conversation, WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
 import { cn } from '@/lib/cn';
 
-interface WorkspaceSidebarProps {
+interface WorkspaceSidebarProps extends Omit<
+  ProjectNavigationProps,
+  'conversations' | 'onCreate' | 'isSearching'
+> {
   /** Recent chats already filtered by the search box. */
   readonly conversations: readonly Conversation[];
-  readonly projects: readonly Project[];
-  readonly selectedProjectId: string | undefined;
-  readonly selectedConversationId: string | undefined;
   readonly search: string;
   readonly isLoading: boolean;
   readonly isNavigationOpen: boolean;
   readonly loadError: string | null;
+  /** Transient message, for example a failed pin; announced as an alert. */
+  readonly notice?: string | null;
   readonly onRetry: () => void;
   readonly onSearch: (value: string) => void;
-  readonly onSelectConversation: (id: string) => void;
-  readonly onSelectProject: (id: string) => void;
   readonly onCreate: (kind: WorkspaceCreationKind, trigger: HTMLButtonElement) => void;
 }
 
 export function WorkspaceSidebar({
   conversations,
-  projects,
-  selectedProjectId,
-  selectedConversationId,
   search,
   isLoading,
   isNavigationOpen,
   loadError,
+  notice,
   onRetry,
   onSearch,
-  onSelectConversation,
-  onSelectProject,
   onCreate,
+  onSelectConversation,
+  selectedProjectId,
+  selectedConversationId,
+  ...projectNavigation
 }: WorkspaceSidebarProps) {
   const searchId = useId();
   const isSearching = Boolean(search.trim());
@@ -111,7 +114,7 @@ export function WorkspaceSidebar({
       >
         <label
           htmlFor={searchId}
-          className="mb-5 flex min-h-10 items-center gap-2 rounded-lg border border-sidebar-border px-2.5 text-sidebar-muted focus-within:border-sidebar-ring"
+          className="mb-4 flex min-h-10 items-center gap-2 rounded-lg border border-sidebar-border px-2.5 text-sidebar-muted focus-within:border-sidebar-ring"
         >
           <Search aria-hidden="true" size={15} />
           <Input
@@ -124,6 +127,14 @@ export function WorkspaceSidebar({
             value={search}
           />
         </label>
+        {notice ? (
+          <p
+            className="mb-3 rounded-lg border border-sidebar-border bg-sidebar-accent px-2.5 py-2 text-2xs text-sidebar-foreground"
+            role="alert"
+          >
+            {notice}
+          </p>
+        ) : null}
         <div aria-busy={isLoading}>
           {isLoading ? (
             <HistorySkeleton />
@@ -147,24 +158,24 @@ export function WorkspaceSidebar({
                 </p>
               ) : null}
               <ProjectNavigation
-                projects={projects}
+                {...projectNavigation}
                 conversations={projectChats}
-                selectedProjectId={selectedProjectId}
-                selectedConversationId={selectedConversationId}
-                onSelectProject={onSelectProject}
-                onSelectConversation={onSelectConversation}
-                onCreate={(trigger) => onCreate('project', trigger)}
                 isSearching={isSearching}
+                onCreate={(trigger) => onCreate('project', trigger)}
+                onSelectConversation={onSelectConversation}
+                selectedConversationId={selectedConversationId}
+                selectedProjectId={selectedProjectId}
               />
-              <section role="group" aria-label="Chats libres" className="mt-7">
-                <div className="mb-2 flex items-center justify-between pl-2.5">
-                  <h2 className="flex items-center gap-2 text-2xs font-semibold tracking-widest text-sidebar-muted uppercase">
-                    <FlaskConical aria-hidden="true" size={13} />
+              <section role="group" aria-label="Chats libres" className="mt-6">
+                <div className="mb-1.5 flex min-h-8 items-center justify-between pl-2">
+                  <h2 className="flex items-center gap-1.5 text-2xs font-semibold tracking-widest text-sidebar-muted uppercase">
+                    <FlaskConical aria-hidden="true" size={12} />
                     Chats libres
                   </h2>
                   <Button
                     variant="ghost"
                     aria-label="Ouvrir un chat libre"
+                    className="size-7 min-h-7 text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
                     size="icon-sm"
                     onClick={(event) => onCreate('sandbox', event.currentTarget)}
                     type="button"
@@ -173,11 +184,12 @@ export function WorkspaceSidebar({
                   </Button>
                 </div>
                 <ConversationNavigation
+                  compact
                   conversations={standaloneChats}
                   selectedId={selectedConversationId}
                   onSelect={onSelectConversation}
                 />
-                <p className="mt-2 px-2.5 text-2xs text-sidebar-muted">
+                <p className="mt-2 px-2 text-2xs text-sidebar-muted">
                   Conversations hors projet, chacune dans son espace privé.
                 </p>
               </section>

@@ -5,6 +5,7 @@ import { conversationKeys, projectKeys } from '@/hooks/workspace/workspace-keys'
 import {
   createProject,
   deleteProject,
+  setProjectPinned,
   updateProject,
   type CreateProjectInput,
   type Project,
@@ -23,7 +24,7 @@ export function useCreateProject() {
     mutationFn: (input: CreateProjectInput) => createProject(client, input, newIdempotencyKey()),
     onSuccess: async (project) => {
       queryClient.setQueryData(projectKeys.detail(userId, project.id), project);
-      await queryClient.invalidateQueries({ queryKey: projectKeys.list(userId) });
+      await queryClient.invalidateQueries({ queryKey: projectKeys.list(userId, 'recent') });
     },
   });
 }
@@ -36,7 +37,21 @@ export function useUpdateProject() {
       updateProject(client, id, input),
     onSuccess: async (project: Project) => {
       queryClient.setQueryData(projectKeys.detail(userId, project.id), project);
-      await queryClient.invalidateQueries({ queryKey: projectKeys.list(userId) });
+      await queryClient.invalidateQueries({ queryKey: projectKeys.all(userId) });
+    },
+  });
+}
+
+/** Pinning moves a project between the pinned and recent lists; both are refreshed. */
+export function useSetProjectPinned() {
+  const { client, userId } = useWorkspaceAccount();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, pinned }: { readonly id: string; readonly pinned: boolean }) =>
+      setProjectPinned(client, id, pinned),
+    onSuccess: async (project: Project) => {
+      queryClient.setQueryData(projectKeys.detail(userId, project.id), project);
+      await queryClient.invalidateQueries({ queryKey: projectKeys.all(userId) });
     },
   });
 }
@@ -49,7 +64,7 @@ export function useDeleteProject() {
     onSuccess: async (_result, id) => {
       queryClient.removeQueries({ queryKey: projectKeys.detail(userId, id) });
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: projectKeys.list(userId) }),
+        queryClient.invalidateQueries({ queryKey: projectKeys.all(userId) }),
         queryClient.invalidateQueries({ queryKey: conversationKeys.all(userId) }),
       ]);
     },

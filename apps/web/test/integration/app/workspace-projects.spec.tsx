@@ -136,7 +136,13 @@ describe('Workspace projects', () => {
     const api = seededApi();
     renderWorkspaceAt(`/app/projects/${PROJECT_ID}`, api);
 
-    await user.click(await screen.findByRole('button', { name: 'Renommer le projet' }));
+    await screen.findByRole('heading', { level: 1, name: 'Refonte du portail' });
+    await user.click(
+      within(screen.getByRole('main')).getByRole('button', {
+        name: 'Actions du projet Refonte du portail',
+      }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Renommer le projet' }));
     const rename = screen.getByRole('dialog', { name: 'Renommer le projet' });
     const nameField = within(rename).getByRole('textbox', { name: 'Nom du projet' });
     expect(nameField).toHaveValue('Refonte du portail');
@@ -188,14 +194,24 @@ describe('Workspace projects', () => {
     const api = seededApi();
     renderWorkspaceAt(`/app/projects/${PROJECT_ID}`, api);
 
-    await user.click(await screen.findByRole('button', { name: 'Supprimer le projet' }));
+    const openPageMenu = async () => {
+      await screen.findByRole('heading', { level: 1, name: 'Refonte du portail' });
+      await user.click(
+        within(screen.getByRole('main')).getByRole('button', {
+          name: 'Actions du projet Refonte du portail',
+        }),
+      );
+    };
+    await openPageMenu();
+    await user.click(screen.getByRole('menuitem', { name: 'Supprimer le projet' }));
     const confirm = screen.getByRole('alertdialog', { name: 'Supprimer ce projet ?' });
     expect(within(confirm).getByText(/tous ses chats seront supprimés/u)).toBeVisible();
     await user.click(within(confirm).getByRole('button', { name: 'Annuler' }));
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(api.calls.some(({ method }) => method === 'DELETE')).toBe(false);
 
-    await user.click(screen.getByRole('button', { name: 'Supprimer le projet' }));
+    await openPageMenu();
+    await user.click(screen.getByRole('menuitem', { name: 'Supprimer le projet' }));
     await user.click(
       within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Supprimer le projet' }),
     );

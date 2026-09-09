@@ -13,6 +13,7 @@ interface ProjectRecord {
   createdAt: string;
   updatedAt: string;
   archivedAt: null;
+  pinnedAt: string | null;
 }
 
 interface ConversationRecord {
@@ -56,6 +57,7 @@ export function defaultSeed(): WorkspaceSeed {
         id: PROJECT_ID,
         kind: 'named',
         name: 'Refonte du portail',
+        pinnedAt: null,
         status: 'active',
         updatedAt: '2026-09-09T10:00:00.000Z',
       },
@@ -89,13 +91,36 @@ export async function installWorkspaceApi(page: Page, seed: WorkspaceSeed = defa
   await page.route('**/api/projects**', async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
+    const pinMatch = /^\/api\/projects\/([^/]+)\/(pin|unpin)$/u.exec(url.pathname);
+    if (pinMatch !== null && method === 'POST') {
+      const index = projects.findIndex((item) => item.id === pinMatch[1]);
+      if (index === -1) return notFound(route, 'project_not_found');
+      const current = projects[index]!;
+      const pinned = pinMatch[2] === 'pin';
+      if ((current.pinnedAt !== null) !== pinned) {
+        projects[index] = { ...current, pinnedAt: pinned ? now() : null, updatedAt: now() };
+      }
+      return json(route, 200, { data: projects[index], success: true });
+    }
     const match = /^\/api\/projects(?:\/([^/]+))?$/u.exec(url.pathname);
     const id = match?.[1];
     if (id === undefined && method === 'GET') {
-      const items = projects
-        .filter((item) => item.kind === 'named')
+      const pinned = url.searchParams.get('pinned');
+      const named = projects.filter((item) => item.kind === 'named');
+      if (pinned === 'true') {
+        const items = named
+          .filter((item) => item.pinnedAt !== null)
+          .sort((left, right) => (left.pinnedAt ?? '').localeCompare(right.pinnedAt ?? ''));
+        return json(route, 200, { data: { items, nextCursor: null }, success: true });
+      }
+      const all = named
+        .filter((item) => pinned !== 'false' || item.pinnedAt === null)
         .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-      return json(route, 200, { data: { items, nextCursor: null }, success: true });
+      const offset = Number(url.searchParams.get('cursor') ?? '0');
+      const limit = Number(url.searchParams.get('limit') ?? '20');
+      const items = all.slice(offset, offset + limit);
+      const nextCursor = offset + limit < all.length ? String(offset + limit) : null;
+      return json(route, 200, { data: { items, nextCursor }, success: true });
     }
     if (id === undefined && method === 'POST') {
       const input = body(route);
@@ -107,6 +132,7 @@ export async function installWorkspaceApi(page: Page, seed: WorkspaceSeed = defa
         id: nextId(),
         kind: 'named',
         name: typeof input.name === 'string' ? input.name.trim() : '',
+        pinnedAt: null,
         status: 'active',
         updatedAt: now(),
       };
@@ -170,6 +196,7 @@ export async function installWorkspaceApi(page: Page, seed: WorkspaceSeed = defa
           id: nextId(),
           kind: 'implicit',
           name: null,
+          pinnedAt: null,
           status: 'active',
           updatedAt: now(),
         };

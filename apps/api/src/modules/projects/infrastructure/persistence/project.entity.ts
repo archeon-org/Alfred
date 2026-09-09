@@ -21,6 +21,8 @@ import { UserEntity } from '../../../users/user.entity';
 // (tenant_id, owner_user_id, kind, status, updated_at DESC, id DESC) is created by the migration;
 // TypeORM decorators cannot express column order, so the index is only declared for drift checks.
 @Index('idx_projects_owner_list', { synchronize: false })
+// Partial index (WHERE pinned_at IS NOT NULL) created by the migration for pinned lists.
+@Index('idx_projects_pinned', { synchronize: false })
 export class ProjectEntity {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'pk_projects' })
   id!: string;
@@ -74,4 +76,7 @@ export class ProjectEntity {
 
   @Column({ name: 'archived_at', type: 'timestamptz', nullable: true })
   archivedAt!: Date | null;
+
+  @Column({ name: 'pinned_at', type: 'timestamptz', nullable: true })
+  pinnedAt!: Date | null;
 }

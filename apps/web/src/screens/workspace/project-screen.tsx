@@ -1,28 +1,22 @@
-import {
-  PROJECT_CONTEXT_MAX_BYTES,
-  PROJECT_DESCRIPTION_MAX_LENGTH,
-  PROJECT_NAME_MAX_LENGTH,
-} from '@alfred/contracts';
+import { PROJECT_CONTEXT_MAX_BYTES, PROJECT_DESCRIPTION_MAX_LENGTH } from '@alfred/contracts';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { buttonVariants } from '@/components/ui/button';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MarkdownDocumentDialog } from '@/components/ui/markdown-document-dialog';
 import type { TextLimit } from '@/components/ui/markdown-editor';
-import { TextFieldDialog } from '@/components/ui/text-field-dialog';
+import { ProjectActionDialogs } from '@/components/workspace/project/project-action-dialogs';
 import { ProjectOverview } from '@/components/workspace/project/project-overview';
 import type { ProjectDocumentKey } from '@/components/workspace/project/project-sources';
 import { WorkspaceNotice } from '@/components/workspace/workspace-notice';
 import { useCreateConversation } from '@/hooks/conversations/use-conversation-mutations';
 import { useConversationsQuery } from '@/hooks/conversations/use-conversations-query';
-import { useDeleteProject, useUpdateProject } from '@/hooks/projects/use-project-mutations';
+import { useProjectActions } from '@/hooks/projects/use-project-actions';
+import { useUpdateProject } from '@/hooks/projects/use-project-mutations';
 import { useProjectQuery } from '@/hooks/projects/use-projects-query';
 import { useWorkspaceOutlet } from '@/hooks/workspace/use-workspace-outlet';
 import { describeApiError } from '@/lib/workspace/api-error-message';
 import { deriveConversationTitle } from '@/lib/workspace/derive-title';
-
-type ProjectDialog = ProjectDocumentKey | 'delete' | 'rename';
 
 const documents: Record<
   ProjectDocumentKey,
@@ -55,22 +49,15 @@ export function ProjectScreen() {
   const navigate = useNavigate();
   const projectQuery = useProjectQuery(projectId);
   const chats = useConversationsQuery(projectId);
-  const update = useUpdateProject();
-  const remove = useDeleteProject();
+  const documentUpdate = useUpdateProject();
   const createChat = useCreateConversation();
-  const [dialog, setDialog] = useState<ProjectDialog | null>(null);
+  const actions = useProjectActions({ onDeleted: () => void navigate('/app', { replace: true }) });
+  const [document, setDocument] = useState<ProjectDocumentKey | null>(null);
 
-  function closeDialog() {
-    setDialog(null);
-    update.reset();
-    remove.reset();
+  function closeDocument() {
+    setDocument(null);
+    documentUpdate.reset();
   }
-  const dialogError = (fallback: string) =>
-    update.isError
-      ? describeApiError(update.error, fallback)
-      : remove.isError
-        ? describeApiError(remove.error, fallback)
-        : null;
 
   if (projectQuery.status === 'error') {
     return (
@@ -97,7 +84,6 @@ export function ProjectScreen() {
       />
     );
   }
-  const name = project.name ?? 'Projet';
 
   return (
     <>
@@ -105,6 +91,12 @@ export function ProjectScreen() {
         ref={conversationRef}
         project={project}
         isBusy={isLoading}
+        notice={actions.pinError}
+        actions={{
+          onDelete: actions.remove,
+          onRename: actions.rename,
+          onTogglePin: actions.togglePin,
+        }}
         chats={{
           conversations: chats.conversations,
           error: chats.error
@@ -134,66 +126,33 @@ export function ProjectScreen() {
               },
             ),
         }}
-        onRename={() => setDialog('rename')}
-        onDelete={() => setDialog('delete')}
-        onEditDocument={setDialog}
+        onEditDocument={setDocument}
       />
-      <TextFieldDialog
-        error={dialog === 'rename' ? dialogError('Impossible de renommer le projet.') : null}
-        initialValue={project.name ?? ''}
-        isPending={update.isPending}
-        label="Nom du projet"
-        maxLength={PROJECT_NAME_MAX_LENGTH}
-        onOpenChange={(open) => {
-          if (!open) closeDialog();
-        }}
-        onSubmit={(value) =>
-          update.mutate({ id: project.id, input: { name: value } }, { onSuccess: closeDialog })
-        }
-        open={dialog === 'rename'}
-        submitLabel="Renommer"
-        title="Renommer le projet"
-      />
-      <ConfirmDialog
-        confirmLabel="Supprimer le projet"
-        description={`Le projet « ${name} » et tous ses chats seront supprimés définitivement. Cette action est irréversible.`}
-        destructive
-        error={dialog === 'delete' ? dialogError('Impossible de supprimer le projet.') : null}
-        isPending={remove.isPending}
-        onConfirm={() =>
-          remove.mutate(project.id, {
-            onSuccess: () => {
-              closeDialog();
-              void navigate('/app', { replace: true });
-            },
-          })
-        }
-        onOpenChange={(open) => {
-          if (!open) closeDialog();
-        }}
-        open={dialog === 'delete'}
-        title="Supprimer ce projet ?"
-      />
+      <ProjectActionDialogs {...actions.dialogs} />
       {(['description', 'context'] as const).map((key) => (
         <MarkdownDocumentDialog
           description={documents[key].description}
-          error={dialog === key ? dialogError('Impossible d’enregistrer le document.') : null}
-          isPending={update.isPending}
+          error={
+            document === key && documentUpdate.isError
+              ? describeApiError(documentUpdate.error, 'Impossible d’enregistrer le document.')
+              : null
+          }
+          isPending={documentUpdate.isPending}
           key={key}
           limit={documents[key].limit}
           onOpenChange={(open) => {
-            if (!open) closeDialog();
+            if (!open) closeDocument();
           }}
           onSave={(value) =>
-            update.mutate(
+            documentUpdate.mutate(
               {
                 id: project.id,
                 input: key === 'description' ? { description: value } : { context: value },
               },
-              { onSuccess: closeDialog },
+              { onSuccess: closeDocument },
             )
           }
-          open={dialog === key}
+          open={document === key}
           placeholder={documents[key].placeholder}
           title={documents[key].title}
           value={project[key] ?? ''}
