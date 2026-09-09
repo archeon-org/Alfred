@@ -2,6 +2,11 @@
 # Regenerate this file whenever the LangGraph deployment config changes.
 FROM langchain/langgraph-api:3.12-wolfi@sha256:cca6a56c9499cf9cff880cf40a3032c22e38b2998260cf3aaa1a6b9aaf37b7bf
 
+# Alfred does not configure the optional DD_API_KEY startup path. Remove its
+# bundled Datadog agent (CVE-2026-84445) and tracer from the runtime image.
+# Preserve this hardening step when regenerating the Dockerfile.
+RUN rm -rf /app/datadog-init /dd_tracer
+
 # Add the local agent package declared by `dependencies: ["."]`.
 ADD . /deps/agent
 
