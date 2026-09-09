@@ -42,15 +42,20 @@ export function ProjectNavigationItem({
   const Icon = isExpanded ? FolderOpen : Folder;
   return (
     <div role="group" aria-label={name}>
-      <div className="group/project flex items-center gap-0.5">
+      <div
+        className={cn(
+          'group/project flex items-center rounded-lg pr-0.5 transition-colors hover:bg-sidebar-accent has-[[data-state=open]]:bg-sidebar-accent motion-reduce:transition-none',
+          isSelected && 'bg-sidebar-accent text-sidebar-accent-foreground',
+        )}
+      >
         <Button
           variant="ghost"
           aria-controls={panelId}
           aria-current={isSelected ? 'true' : undefined}
           aria-expanded={isExpanded}
           className={cn(
-            'flex h-auto min-h-8 min-w-0 flex-1 items-center justify-start gap-2 rounded-lg px-2 py-1 text-left text-xs font-medium whitespace-normal text-sidebar-foreground hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-sidebar-ring group-data-[density=compact]/workspace:min-h-7',
-            isSelected && 'bg-sidebar-accent text-sidebar-accent-foreground',
+            'flex h-auto min-h-8 min-w-0 flex-1 items-center justify-start gap-2 rounded-lg px-2 py-1 text-left text-xs font-medium whitespace-normal text-sidebar-foreground hover:bg-transparent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sidebar-ring group-data-[density=compact]/workspace:min-h-7',
+            isSelected && 'text-sidebar-accent-foreground',
           )}
           onClick={() => onSelect(project)}
           type="button"
@@ -59,7 +64,7 @@ export function ProjectNavigationItem({
           <span className="min-w-0 flex-1 wrap-anywhere">{name}</span>
         </Button>
         <ProjectActionMenu
-          className="size-7 min-h-7 shrink-0 text-sidebar-muted opacity-70 hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:opacity-100 group-hover/project:opacity-100 data-[state=open]:opacity-100"
+          className="size-7 min-h-7 shrink-0 text-sidebar-muted opacity-70 hover:bg-transparent hover:text-sidebar-foreground focus-visible:opacity-100 focus-visible:-outline-offset-2 group-hover/project:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-sidebar-foreground"
           onDelete={actions.onDelete}
           onHome={onHome}
           onRename={actions.onRename}
