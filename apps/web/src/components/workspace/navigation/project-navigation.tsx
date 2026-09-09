@@ -4,6 +4,7 @@ import { useId, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { ProjectNavigationItem } from '@/components/workspace/navigation/project-navigation-item';
 import type { ProjectActionHandlers } from '@/components/workspace/project/project-action-menu';
+import { RECENT_PROJECTS_FIRST_PAGE } from '@/lib/workspace/project-list';
 import type { Conversation, Project } from '@/lib/workspace/workspace.types';
 
 export interface ProjectNavigationProps {
@@ -73,6 +74,18 @@ export function ProjectNavigation({
 }: ProjectNavigationProps) {
   const id = useId();
   const [collapsedProjectId, setCollapsedProjectId] = useState<string | null>(null);
+  // "Afficher plus" reveals the loaded projects beyond the first page (fetching the next page
+  // when needed); "Afficher moins" folds the list back to the first page without refetching.
+  const [showAll, setShowAll] = useState(false);
+  const visibleProjects = showAll ? projects : projects.slice(0, RECENT_PROJECTS_FIRST_PAGE);
+  const canShowMore = showAll
+    ? hasMoreProjects
+    : projects.length > RECENT_PROJECTS_FIRST_PAGE || hasMoreProjects;
+  const canShowLess = showAll && projects.length > RECENT_PROJECTS_FIRST_PAGE;
+  const showMore = () => {
+    if (showAll || projects.length <= RECENT_PROJECTS_FIRST_PAGE) onLoadMoreProjects();
+    setShowAll(true);
+  };
 
   const renderProject = (project: Project) => {
     const isSelected = selectedProjectId === project.id;
@@ -111,17 +124,31 @@ export function ProjectNavigation({
       ) : null}
       <ProjectSection
         footer={
-          hasMoreProjects ? (
-            <Button
-              aria-busy={isLoadingMoreProjects}
-              className="mt-1 h-8 min-h-8 w-full justify-start px-2 text-2xs font-normal text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              disabled={isLoadingMoreProjects}
-              onClick={onLoadMoreProjects}
-              size="sm"
-              variant="ghost"
-            >
-              Afficher plus
-            </Button>
+          canShowMore || canShowLess ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {canShowMore ? (
+                <Button
+                  aria-busy={isLoadingMoreProjects}
+                  className="h-8 min-h-8 justify-start px-2 text-2xs font-normal text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  disabled={isLoadingMoreProjects}
+                  onClick={showMore}
+                  size="sm"
+                  variant="ghost"
+                >
+                  Afficher plus
+                </Button>
+              ) : null}
+              {canShowLess ? (
+                <Button
+                  className="h-8 min-h-8 justify-start px-2 text-2xs font-normal text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  onClick={() => setShowAll(false)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  Afficher moins
+                </Button>
+              ) : null}
+            </div>
           ) : null
         }
         headerAction={
@@ -145,7 +172,7 @@ export function ProjectNavigation({
               : 'Tous vos projets sont épinglés.'}
           </p>
         ) : (
-          projects.map(renderProject)
+          visibleProjects.map(renderProject)
         )}
       </ProjectSection>
     </div>

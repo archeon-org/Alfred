@@ -235,6 +235,16 @@ describe('Workspace navigation', () => {
     await waitFor(() => expect(within(recent).getAllByRole('group')).toHaveLength(4));
     expect(within(recent).getByRole('group', { name: 'Cinq' })).toBeVisible();
     expect(within(recent).queryByRole('button', { name: 'Afficher plus' })).not.toBeInTheDocument();
+    const requestsAfterLoad = api.calls.length;
+
+    await user.click(within(recent).getByRole('button', { name: 'Afficher moins' }));
+    expect(within(recent).getAllByRole('group')).toHaveLength(3);
+    expect(
+      within(recent).queryByRole('button', { name: 'Afficher moins' }),
+    ).not.toBeInTheDocument();
+    await user.click(within(recent).getByRole('button', { name: 'Afficher plus' }));
+    expect(within(recent).getAllByRole('group')).toHaveLength(4);
+    expect(api.calls).toHaveLength(requestsAfterLoad);
     expect(
       api.calls.filter(({ path }) => path.startsWith('/api/projects?')).map(({ path }) => path),
     ).toEqual(

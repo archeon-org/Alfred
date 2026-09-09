@@ -3,6 +3,10 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useWorkspaceAccount } from '@/hooks/workspace/use-workspace-account';
 import { projectKeys } from '@/hooks/workspace/workspace-keys';
 import {
+  RECENT_PROJECTS_FIRST_PAGE,
+  RECENT_PROJECTS_NEXT_PAGE,
+} from '@/lib/workspace/project-list';
+import {
   getProject,
   listProjects,
   type Project,
@@ -10,10 +14,6 @@ import {
 } from '@/services/projects/projects.service';
 
 export type QueryStatus = 'error' | 'loading' | 'ready';
-
-/** The navigation shows a handful of recent projects first, then larger pages on demand. */
-export const RECENT_PROJECTS_FIRST_PAGE = 3;
-const RECENT_PROJECTS_NEXT_PAGE = 10;
 
 /** Unpinned named projects, most recently updated first, loaded page by page. */
 export function useProjectsQuery() {
