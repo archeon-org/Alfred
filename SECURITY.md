@@ -24,6 +24,18 @@ Do not access data that is not yours, disrupt services or retain sensitive data 
 
 If a secret is committed or printed, revoke and rotate it first; deleting the line from the latest commit is not sufficient.
 
+## Workflow cadence
+
+Pull requests and pushes to `develop`/`main` run lightweight TypeScript lint, type checking, tests
+and build, plus Python Ruff, Pyright and pytest. Browser E2E and container builds/probes/image scans
+run in `extended.yml`, manually or Mondays at 04:23 UTC. Dependency audits, full-history secret,
+source/configuration scans and SBOM generation run in `security.yml`, manually or Mondays at
+05:17 UTC. These extended/security workflows have no PR/push triggers.
+
+Existing failure thresholds apply whenever the checks run. Green PR CI does not establish browser,
+container or security validation. Run relevant extended/security workflows before release.
+Schedules activate only from the default branch; verify their completed runs.
+
 ## Container vulnerability gate
 
 CI retains complete HIGH/CRITICAL Trivy image reports, including findings without a published fix.
@@ -41,9 +53,9 @@ The **repository maintainer** role owns this policy and its residual-risk review
 the first review due **2026-09-14**. Review full reports, upstream advisories, changed exposure and
 available fixes; record evidence, mitigation actions and the next review date in existing security
 follow-up records. Review reports before their current seven-day artifact expiry, retaining bounded
-evidence for open actions. Missing or failed scans require investigation and a manual full-CI rerun.
+evidence for open actions. Missing or failed scans require investigation and a manual rerun of the affected workflow.
 An overdue review or changed risk requires reassessment before release; CI does not enforce review
-dates. Weekly full-CI rebuilds/scans and manual dispatch are the maintenance mechanism. Scheduled
+dates. Weekly extended/security checks and manual dispatch are the maintenance mechanism. Scheduled
 runs activate only once the workflow is on the default branch; verify execution rather than
 assuming a PR's schedule is active. The separate Security workflow does not scan built images.
 
@@ -55,5 +67,5 @@ Reassess the exception when credential permissions, restrictions or usage change
 evidence no longer supports classification as public client configuration.
 
 [ADR 0013](docs/adr/0013-ci-security-risk-policy.md) records the accepted decision, consequences,
-remote PR 20 baseline and dated provider evidence. Green CI means compliance with these gates;
+remote PR 20 baseline and dated provider evidence. A passing image scan means compliance with the image gate;
 unfixed findings remain present and require review.

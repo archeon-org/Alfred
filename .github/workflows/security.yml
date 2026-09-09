@@ -1,9 +1,6 @@
 name: Security
 
 on:
-  push:
-    branches: [develop, main]
-  pull_request:
   schedule:
     - cron: '17 5 * * 1'
   workflow_dispatch:

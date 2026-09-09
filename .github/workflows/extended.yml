@@ -1,0 +1,292 @@
+name: Extended checks
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Runs on the default branch; does not block ordinary PRs.
+    - cron: '23 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: extended-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  HUSKY: '0'
+
+jobs:
+  e2e:
+    name: Browser smoke tests
+    runs-on: ubuntu-latest
+    # Keep this image aligned with the locked @playwright/test version.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @alfred/web test:e2e
+
+      - name: Upload browser artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7
+
+  containers:
+    name: Container build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      COMPOSE_PROJECT_NAME: alfred-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      POSTGRES_USER: alfred
+      FEATURE_RATE_LIMITING_ENABLED: 'true'
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - run: pnpm install --frozen-lockfile
+      - name: Generate ephemeral CI runtime credentials
+        run: |
+          generate_secret() {
+            local key="$1"
+            local value
+            value="$(openssl rand -hex 32)"
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV"
+          }
+          generate_secret POSTGRES_PASSWORD
+          generate_secret MIGRATOR_DATABASE_PASSWORD
+          generate_secret API_DATABASE_PASSWORD
+          generate_secret AGENT_DATABASE_PASSWORD
+          generate_secret REDIS_API_PASSWORD
+          generate_secret AUTH_JWT_SECRET
+      - run: docker compose --env-file .env.example config --quiet
+      - run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml config --quiet
+      - name: Assert the production overlay contract
+        run: |
+          docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml config --format json |
+            jq --exit-status '
+              (.services.api.ports // []) == [] and
+              (.services.agent.ports // []) == [] and
+              (.services.postgres.ports // []) == [] and
+              (.services.redis.ports // []) == [] and
+              (.services.agent.networks | keys | sort) == ["agent-data"] and
+              (.services.postgres.networks | keys | sort) == ["agent-data", "api-data"] and
+              (.services.redis.networks | keys | sort) == ["api-data"] and
+              .services.api.environment.NODE_ENV == "production" and
+              .services.api.environment.FEATURE_AGENT_RUNTIME_ENABLED == "false" and
+              .services.api.environment.FEATURE_AG_UI_STREAMING_ENABLED == "false" and
+              .services.api.environment.FEATURE_RUNTIME_MEMORY_ENABLED == "false" and
+              .services.migrate.environment.NODE_ENV == "production" and
+              (.services.migrate.environment | keys | sort) == [
+                "DATABASE_POOL_MAX",
+                "DATABASE_SSL",
+                "DATABASE_URL",
+                "HOME",
+                "NODE_ENV"
+              ] and
+              .services.agent.environment.LANGCHAIN_TRACING_V2 == "false" and
+              .services.agent.environment.LANGSMITH_TRACING == "false" and
+              (.services.postgres.healthcheck.test[1] | contains("--host 127.0.0.1")) and
+              .services.api.depends_on["postgres-runtime-grants"].condition == "service_completed_successfully" and
+              .services["postgres-runtime-grants"].depends_on.migrate.condition == "service_completed_successfully" and
+              .services["postgres-runtime-grants"].command == [
+                "/usr/local/bin/revoke-runtime-migration-ledger.sh"
+              ]
+            '
+      - name: Build base images
+        id: build_base
+        run: |
+          docker compose --env-file .env.example build
+          docker tag "${COMPOSE_PROJECT_NAME}-agent" "${COMPOSE_PROJECT_NAME}-agent-local:ci"
+      - name: Assert base application images run as non-root
+        run: |
+          for service in api web migrate agent; do
+            uid="$(docker compose --env-file .env.example run --rm --no-deps --entrypoint id "$service" -u)"
+            test "$uid" -gt 0
+          done
+      - name: Build the standalone Agent Server image
+        id: build_standalone
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml build agent
+      - name: Assert the standalone Agent Server image runs as non-root
+        run: |
+          uid="$(docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml run --rm --no-deps --entrypoint id agent -u)"
+          test "$uid" -gt 0
+      - name: Start PostgreSQL and Redis and apply repeatable bootstrap
+        timeout-minutes: 3
+        run: |
+          docker compose --env-file .env.example up -d --no-build --wait --wait-timeout 120 postgres redis
+          docker compose --env-file .env.example run --rm --no-deps postgres-bootstrap
+      - name: Run the compiled TypeORM migration against PostgreSQL
+        run: docker compose --env-file .env.example run --rm --no-deps migrate
+      - name: Run the compiled migration with the production overlay environment
+        run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml run --rm --no-deps migrate
+      - name: Reconcile runtime grants after migration
+        run: docker compose --env-file .env.example run --rm --no-deps postgres-runtime-grants
+      - name: Start the compiled API and assert dependency readiness
+        timeout-minutes: 3
+        run: |
+          # Bootstrap, migrations and grants already completed as one-shot jobs.
+          # Preserve the image's default command (node dist/main.js).
+          docker compose --env-file .env.example up -d --no-build --no-deps --wait --wait-timeout 120 api
+          curl --fail-with-body --silent --show-error --connect-timeout 3 --max-time 10 \
+            "http://127.0.0.1:${API_PORT:-3000}/health/ready" |
+            jq --exit-status '
+              .status == "ok" and
+              .details.database.status == "up" and
+              .details.redis.status == "up"
+            '
+      - name: Assert the API role cannot mutate the TypeORM migration ledger
+        run: |
+          docker compose --env-file .env.example exec --no-TTY postgres \
+            psql --username alfred --dbname alfred_app --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+              --command "SELECT NOT (has_table_privilege('alfred_api', 'public.migrations', 'INSERT') OR has_table_privilege('alfred_api', 'public.migrations', 'UPDATE') OR has_table_privilege('alfred_api', 'public.migrations', 'DELETE'))" |
+            grep --line-regexp --quiet t
+      - name: Assert the Agent Server can manage its schema without owning extensions
+        run: |
+          docker compose --env-file .env.example exec --no-TTY postgres \
+            psql --username alfred --dbname alfred_langgraph --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+              --command "SELECT has_schema_privilege('alfred_agent', 'public', 'USAGE') AND has_schema_privilege('alfred_agent', 'public', 'CREATE') AND NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname <> 'plpgsql' AND pg_get_userbyid(extowner) = 'alfred_agent')" |
+            grep --line-regexp --quiet t
+      - name: Reject pending migrations and entity-schema drift
+        run: docker compose --env-file .env.example run --rm --no-deps migrate node dist/database/check-schema-drift.js
+      - name: Run API E2E tests against real PostgreSQL locking
+        run: |
+          REQUIRE_DATABASE_E2E=true \
+          TEST_DATABASE_ADMIN_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5432}/alfred_test?schema=public" \
+          TEST_MIGRATION_DATABASE_URL="postgresql://alfred_migrator:${MIGRATOR_DATABASE_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5432}/alfred_test?schema=public" \
+          TEST_DATABASE_URL="postgresql://alfred_api:${API_DATABASE_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5432}/alfred_test?schema=public" \
+            pnpm --filter @alfred/api test:e2e
+      # Keep complete reports. The following policy gate blocks fixable findings;
+      # scanner failures remain fatal because continue-on-error is not enabled.
+      - name: Scan the PostgreSQL image
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '0'
+          format: json
+          output: trivy-postgres.json
+          ignore-unfixed: false
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-postgres
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Scan the API image
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '0'
+          format: json
+          output: trivy-api.json
+          ignore-unfixed: false
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-api
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Scan the migration image
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '0'
+          format: json
+          output: trivy-migrate.json
+          ignore-unfixed: false
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-migrate
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Scan the web image
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '0'
+          format: json
+          output: trivy-web.json
+          ignore-unfixed: false
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-web
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Scan the local agent image
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '0'
+          format: json
+          output: trivy-agent.json
+          ignore-unfixed: false
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-agent-local:ci
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Scan the standalone Agent Server image
+        if: ${{ !cancelled() && steps.build_standalone.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          exit-code: '0'
+          format: json
+          output: trivy-agent-standalone.json
+          ignore-unfixed: false
+          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-agent
+          scanners: vuln
+          severity: HIGH,CRITICAL
+      - name: Enforce container vulnerability policy
+        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
+        run: |
+          node scripts/check-image-vulnerabilities.mjs \
+            trivy-postgres.json trivy-api.json trivy-migrate.json \
+            trivy-web.json trivy-agent.json trivy-agent-standalone.json
+      - name: Upload image vulnerability reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: container-vulnerability-reports
+          path: trivy-*.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Show CI container diagnostics
+        if: always()
+        timeout-minutes: 2
+        run: |
+          status=0
+          docker compose --env-file .env.example ps --all || status=$?
+          docker compose --env-file .env.example logs --no-color --timestamps --tail 200 postgres redis api || status=$?
+          exit "$status"
+      - name: Remove the disposable CI project
+        if: always()
+        timeout-minutes: 2
+        # Base removes host-access; overlay also covers agent-redis-data.
+        # Never prune other Docker projects.
+        # The ephemeral GitHub-hosted runner disposes of images and build caches.
+        run: |
+          status=0
+          docker compose --env-file .env.example down \
+            --volumes --remove-orphans --timeout 10 || status=$?
+          docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml \
+            down --volumes --remove-orphans --timeout 10 || status=$?
+          exit "$status"

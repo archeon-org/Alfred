@@ -63,3 +63,20 @@ validate consumers before changes. Reassess the exact exception if API access, a
 restrictions, service-account binding or usage changes; remove it if its justification no longer
 holds. Full-history secret scanning remains enabled. The role assignment defines maintenance
 responsibility and does not claim acceptance by a named person.
+
+## Amendment: 2026-09-09 — Separate development CI from extended checks
+
+Status: Accepted. This amendment supersedes the workflow cadence above; vulnerability thresholds,
+exact secret-scan exceptions, report retention and weekly maintainer review remain unchanged.
+
+PR and `develop`/`main` push events retain TypeScript lint, type checking, tests and build, plus
+Python Ruff, Pyright and pytest. Browser E2E and container builds/probes/image scans move to
+manual/weekly `extended.yml` (Monday 04:23 UTC). Dependency audits, full-history secret,
+source/configuration scans and SBOM generation run only manually or weekly in `security.yml`
+(Monday 05:17 UTC).
+
+This reduces development feedback time and exposure to external dependency failures, while
+delaying detection of regressions covered only by extended/security workflows. Green PR checks
+do not establish browser, container or security validation. Relevant workflows must still run
+before release; schedules require default-branch availability. No application security control
+or target-product architecture decision changes.
