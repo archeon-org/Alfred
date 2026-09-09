@@ -3,7 +3,7 @@ import type { OwnerScope } from '@api/common/ownership/owner-scope';
 import type { TenantsService } from '@api/modules/tenants/tenants.service';
 import type { ProjectEntity } from '@api/modules/projects/infrastructure/persistence/project.entity';
 import type { ConversationEntity } from '@api/modules/conversations/infrastructure/persistence/conversation.entity';
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 
 export const principal: AuthPrincipal = Object.freeze({
   email: 'ada@example.test',
@@ -58,9 +58,16 @@ export function conversationRow(overrides: Partial<ConversationEntity> = {}): Co
   };
 }
 
+export interface QueryBuilderDouble {
+  readonly andWhere: Mock<(...args: unknown[]) => QueryBuilderDouble>;
+  readonly getOne: Mock<() => Promise<unknown>>;
+  readonly setLock: Mock<(...args: unknown[]) => QueryBuilderDouble>;
+  readonly where: Mock<(...args: unknown[]) => QueryBuilderDouble>;
+}
+
 /** Minimal chainable TypeORM query-builder double. */
-export function queryBuilder(result: unknown = null) {
-  const builder = {
+export function queryBuilder(result: unknown = null): QueryBuilderDouble {
+  const builder: QueryBuilderDouble = {
     andWhere: vi.fn(),
     getOne: vi.fn().mockResolvedValue(result),
     setLock: vi.fn(),
