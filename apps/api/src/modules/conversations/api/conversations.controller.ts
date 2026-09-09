@@ -5,6 +5,8 @@ import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { Idempotent } from '../../../common/idempotency/idempotent.decorator';
 import { ResourceIdPipe } from '../../../common/validation/resource-id.pipe';
+import { ConversationMoveService } from '../application/conversation-move.service';
+import { MoveConversationDto } from './dto/move-conversation.dto';
 import { ConversationsService } from '../application/conversations.service';
 import { CONVERSATION_RESOURCE } from '../domain/conversation';
 import { CreateConversationDto } from './dto/create-conversation.dto';
@@ -18,7 +20,10 @@ const conversationId = new ResourceIdPipe(CONVERSATION_RESOURCE);
 @ApiBearerAuth('bearerAuth')
 @Controller('conversations')
 export class ConversationsController {
-  constructor(private readonly conversations: ConversationsService) {}
+  constructor(
+    private readonly conversations: ConversationsService,
+    private readonly moves: ConversationMoveService,
+  ) {}
 
   @Post()
   @HttpCode(201)
@@ -56,6 +61,17 @@ export class ConversationsController {
   @HttpCode(200)
   async unpin(@CurrentUser() principal: AuthPrincipal, @Param('id', conversationId) id: string) {
     return ok(await this.conversations.setPinned(principal, id, false));
+  }
+
+  @Post(':id/move')
+  @HttpCode(200)
+  @Idempotent()
+  async move(
+    @CurrentUser() principal: AuthPrincipal,
+    @Param('id', conversationId) id: string,
+    @Body() body: MoveConversationDto,
+  ) {
+    return ok(await this.moves.move(principal, id, body));
   }
 
   @Delete(':id')

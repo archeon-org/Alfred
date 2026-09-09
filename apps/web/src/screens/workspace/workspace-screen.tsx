@@ -209,6 +209,7 @@ export function WorkspaceScreen() {
         sidebar={
           <WorkspaceSidebar
             conversationActions={{
+              onMove: conversationActions.move,
               onDelete: conversationActions.remove,
               onRename: conversationActions.rename,
               onTogglePin: conversationActions.togglePin,

@@ -1,9 +1,10 @@
-import { Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
+import { FolderInput, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
 
 import { ActionMenu } from '@/components/ui/action-menu';
 import type { Conversation } from '@/lib/workspace/workspace.types';
 
 export interface ConversationActionHandlers {
+  readonly onMove: (conversation: Conversation) => void;
   readonly onRename: (conversation: Conversation) => void;
   readonly onTogglePin: (conversation: Conversation) => void;
   readonly onDelete: (conversation: Conversation) => void;
@@ -16,6 +17,7 @@ interface ConversationActionMenuProps extends ConversationActionHandlers {
 
 export function ConversationActionMenu({
   conversation,
+  onMove,
   onRename,
   onTogglePin,
   onDelete,
@@ -27,6 +29,16 @@ export function ConversationActionMenu({
       className={className}
       label={`Actions de la conversation ${conversation.title}`}
       items={[
+        ...(conversation.projectKind === 'implicit'
+          ? [
+              {
+                id: 'move',
+                icon: FolderInput,
+                label: 'Ajouter à un projet',
+                onSelect: () => onMove(conversation),
+              },
+            ]
+          : []),
         {
           id: 'rename',
           icon: Pencil,

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { installWorkspaceApi } from './support/workspace-api';
+import { defaultSeed, installWorkspaceApi } from './support/workspace-api';
 
 const authenticatedSession = {
   data: {
@@ -528,4 +528,53 @@ test('renames, pins and deletes a conversation through accessible menus', async 
     .click();
   await expect(page).toHaveURL(/\/app\/projects\//u);
   await expect(page.getByRole('list', { name: 'Chats du projet' })).not.toBeVisible();
+});
+
+test('moves a free chat into a project and restores menu focus when cancelling', async ({
+  page,
+}) => {
+  const seed = defaultSeed();
+  const implicitId = '9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b';
+  const chat = {
+    ...seed.conversations[0]!,
+    projectId: implicitId,
+    projectKind: 'implicit' as const,
+  };
+  await installWorkspaceApi(page, {
+    conversations: [chat],
+    projects: [
+      ...seed.projects,
+      { ...seed.projects[0]!, id: implicitId, kind: 'implicit', name: null },
+    ],
+  });
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ json: authenticatedSession, status: 200 }),
+  );
+  await page.goto(`/app/conversations/${chat.id}`);
+  const trigger = page.getByRole('button', { name: `Actions de la conversation ${chat.title}` });
+  await trigger.click();
+  await page.getByRole('menuitem', { name: 'Ajouter à un projet' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Ajouter la conversation à un projet' });
+  await dialog.getByRole('button', { name: 'Annuler' }).click();
+  await expect(trigger).toBeFocused();
+  await page.keyboard.press('Enter');
+  await page.getByRole('menuitem', { name: 'Renommer la conversation' }).focus();
+  await page.keyboard.press('Enter');
+  await page
+    .getByRole('dialog', { name: 'Renommer la conversation' })
+    .getByRole('button', { name: 'Annuler' })
+    .click();
+  await expect(trigger).toBeFocused();
+  await page.getByRole('textbox', { name: 'Message' }).fill('Mon brouillon');
+  await trigger.click();
+  await page.getByRole('menuitem', { name: 'Ajouter à un projet' }).click();
+  await dialog.getByRole('radio', { name: 'Refonte du portail' }).check();
+  await dialog.getByRole('button', { name: 'Ajouter au projet' }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(page).toHaveURL(`/app/conversations/${chat.id}`);
+  await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('Mon brouillon');
+  await expect(page.getByRole('main')).toBeFocused();
+  await expect(page.getByRole('link', { name: 'Refonte du portail' })).toBeVisible();
+  await trigger.click();
+  await expect(page.getByRole('menuitem', { name: 'Ajouter à un projet' })).toHaveCount(0);
 });

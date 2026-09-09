@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useWorkspaceAccount } from '@/hooks/workspace/use-workspace-account';
-import { conversationKeys } from '@/hooks/workspace/workspace-keys';
+import { conversationKeys, projectKeys } from '@/hooks/workspace/workspace-keys';
 import {
   createConversation,
+  moveConversation,
   deleteConversation,
   updateConversation,
   setConversationPinned,
@@ -69,5 +70,31 @@ export function useSetConversationPinned() {
     mutationFn: ({ id, pinned }: { readonly id: string; readonly pinned: boolean }) =>
       setConversationPinned(client, id, pinned),
     onSuccess,
+  });
+}
+
+export function useMoveConversation() {
+  const { client, userId } = useWorkspaceAccount();
+  const queryClient = useQueryClient();
+  const onChanged = useConversationChanged();
+  return useMutation({
+    mutationFn: ({
+      conversation,
+      projectId,
+      key,
+    }: {
+      readonly conversation: Conversation;
+      readonly projectId: string;
+      readonly key: string;
+    }) => moveConversation(client, conversation.id, { projectId }, key),
+    onSuccess: async (conversation, input) => {
+      queryClient.removeQueries({
+        queryKey: projectKeys.detail(userId, input.conversation.projectId),
+      });
+      await Promise.all([
+        onChanged(conversation),
+        queryClient.invalidateQueries({ queryKey: projectKeys.all(userId) }),
+      ]);
+    },
   });
 }

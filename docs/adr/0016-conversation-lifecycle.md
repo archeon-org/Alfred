@@ -33,15 +33,33 @@ to older chats.
   caches, and invalidates list/detail state after a mutation. Deleting the open chat returns to
   its named project or to the workspace home for a standalone chat.
 
-## Approved follow-up and register reconciliation
+## Transfer decision and register reconciliation
 
 The accepted implementation plan also includes transferring a standalone Conversation to an
 existing named Project of the same owner and tenant, preserving the Conversation ID. This is an
 explicit product exception to `ALF-DEC-034` section 5 and the lifetime Project identity clause of
 `ALF-DEC-002` section 3, not the promotion operation described by PRJ-05. The exact-one-Project
 invariant and product-plane authorization remain binding. The register is not silently amended;
-its owner must reconcile those clauses. Transfer implementation and evidence are recorded when
-that increment lands.
+its owner must reconcile those clauses.
+
+- `POST /api/conversations/:id/move` takes a validated destination `projectId`. The API derives
+  ownership from the authenticated principal and requires an active named destination belonging
+  to the same owner and tenant. Moving between named projects or back to an implicit project is
+  outside this increment.
+- The transaction locks source and destination Projects in deterministic UUID order before the
+  Conversation. It revalidates the parent after waiting, changes the parent relationship and
+  removes the emptied implicit source. Conversation identity, title, creation time and pin remain
+  intact. A retry toward the same destination has no additional effect; concurrent conflicting
+  destinations cannot both succeed.
+- Source context, description, unexpected name or project pin, and additional conversations prevent
+  cleanup and therefore prevent transfer. The operation must never delete those resources as an
+  incidental cascade. Once product
+  messages, artifacts, Executions or runtime bindings exist, their lifecycle and context policy
+  must be resolved before extending this operation.
+- The browser preserves the open Conversation route and draft, refreshes its detail and list
+  caches, and resolves the destination Project through the existing authorized detail API.
+  The destination's project context is the product context for future runtime integration;
+  this transfer does not invoke an agent or inject a prompt.
 
 Infinite scrolling in pages of ten with loading skeletons is the following web increment.
 It does not enable sending messages, runtime bindings, agents, artifacts or memory projection.

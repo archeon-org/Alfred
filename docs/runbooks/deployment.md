@@ -100,6 +100,12 @@ Reverting `CreateTenants` drops `api_conversations`, `api_projects`, the pin col
 tenant assignment; export anything that must survive before running it. Redeploying only the
 previous web application while keeping the schema is the safe partial rollback.
 
+`AddConversationPin1789080000000` adds nullable `api_conversations.pinned_at` and the
+project-scoped listing index. Apply it before deploying the API that reads conversation pins,
+then deploy the web contract that requires `pinnedAt`. Existing conversations start unpinned.
+An application rollback can retain this additive column; reverting the migration erases pin
+preferences. See [ADR 0016](../adr/0016-conversation-lifecycle.md).
+
 Keep `/health/live` and `/health/ready` on the internal probe path of the load balancer or
 orchestrator; do not publish them through the user-facing ingress. Both skip request throttling so a
 failed Redis limiter cannot make liveness fail. Liveness is process-only; readiness performs the

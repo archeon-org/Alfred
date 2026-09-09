@@ -205,6 +205,19 @@ export function createWorkspaceApi(
       conversations.push(created);
       return json({ data: created, success: true }, 201);
     }
+    const moveMatch = /^\/api\/conversations\/([^/]+)\/move$/u.exec(path);
+    if (moveMatch !== null && method === 'POST') {
+      const index = conversations.findIndex((item) => item.id === moveMatch[1]);
+      if (index === -1) return failure(404, 'conversation_not_found');
+      const input = body as { projectId: string };
+      const target = projects.find((item) => item.id === input.projectId);
+      if (target === undefined) return failure(404, 'project_not_found');
+      const current = conversations[index]!;
+      conversations[index] = { ...current, projectId: target.id, projectKind: target.kind };
+      const sourceIndex = projects.findIndex((item) => item.id === current.projectId);
+      if (sourceIndex !== -1) projects.splice(sourceIndex, 1);
+      return json({ data: conversations[index], success: true });
+    }
     const chatPinMatch = /^\/api\/conversations\/([^/]+)\/(pin|unpin)$/u.exec(path);
     if (chatPinMatch !== null && method === 'POST') {
       const index = conversations.findIndex((item) => item.id === chatPinMatch[1]);

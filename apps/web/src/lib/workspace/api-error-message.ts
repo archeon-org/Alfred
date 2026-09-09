@@ -5,6 +5,9 @@ import { ApiRequestError } from '@/services/http/api-json';
 const MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   HTTP_401: 'Votre session a expiré. Reconnectez-vous pour continuer.',
   HTTP_429: 'Trop de requêtes. Réessayez dans un instant.',
+  conversation_move_not_allowed: 'Seul un chat libre peut être ajouté à un projet actif.',
+  conversation_source_has_context:
+    'Ce chat contient un contexte ou d’autres données. Son déplacement est impossible sans les préserver.',
   conversation_not_found: 'Cette conversation n’existe plus.',
   invalid_name: 'Le nom est invalide.',
   invalid_update: 'Aucune modification à enregistrer.',

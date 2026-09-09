@@ -1,3 +1,4 @@
+import { ConversationMoveDialog } from '@/components/workspace/conversation/conversation-move-dialog';
 import { CONVERSATION_TITLE_MAX_LENGTH } from '@alfred/contracts';
 
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -12,6 +13,8 @@ export function ConversationActionDialogs({
   onConfirmDelete,
   onRename,
   pending,
+  moveTargets,
+  onMove,
 }: ConversationActionDialogsState) {
   const name = pending?.conversation.title ?? 'Conversation';
   const handleOpenChange = (open: boolean) => {
@@ -19,6 +22,14 @@ export function ConversationActionDialogs({
   };
   return (
     <>
+      <ConversationMoveDialog
+        open={pending?.type === 'move'}
+        targets={moveTargets}
+        onMove={onMove}
+        onClose={onClose}
+        error={pending?.type === 'move' ? error : null}
+        isPending={isPending}
+      />
       <TextFieldDialog
         error={pending?.type === 'rename' ? error : null}
         initialValue={pending?.conversation.title ?? ''}

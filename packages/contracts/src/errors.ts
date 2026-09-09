@@ -17,6 +17,8 @@ export const API_ERROR_CODES = Object.freeze([
   'project_pin_limit_reached',
   'conversation_not_found',
   'conversation_archived',
+  'conversation_source_has_context',
+  'conversation_move_not_allowed',
   'thread_busy',
   'invalid_status_transition',
   'message_not_found',

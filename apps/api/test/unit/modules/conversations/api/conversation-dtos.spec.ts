@@ -2,6 +2,7 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 
+import { MoveConversationDto } from '@api/modules/conversations/api/dto/move-conversation.dto';
 import { UpdateConversationDto } from '@api/modules/conversations/api/dto/update-conversation.dto';
 import { CreateConversationDto } from '@api/modules/conversations/api/dto/create-conversation.dto';
 import { ListConversationsQueryDto } from '@api/modules/conversations/api/dto/list-conversations-query.dto';
@@ -11,6 +12,18 @@ async function errorsOf(dto: object): Promise<string[]> {
 }
 
 describe('conversation request DTOs', () => {
+  it('requires a UUID destination for a move', async () => {
+    for (const projectId of [undefined, null, '', 'not-a-uuid'])
+      expect(await errorsOf(plainToInstance(MoveConversationDto, { projectId }))).toEqual([
+        'projectId',
+      ]);
+    expect(
+      await errorsOf(
+        plainToInstance(MoveConversationDto, { projectId: '0b6e1a9e-0a7f-4c26-9f5b-2f1a2c3d4e5f' }),
+      ),
+    ).toEqual([]);
+  });
+
   it('requires a usable title on rename, rejecting missing, null and unknown fields', async () => {
     for (const title of [undefined, null, '', '   ', 'a\tb', 'x'.repeat(161)]) {
       expect(await errorsOf(plainToInstance(UpdateConversationDto, { title }))).toContain('title');

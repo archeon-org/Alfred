@@ -174,6 +174,18 @@ export async function installWorkspaceApi(page: Page, seed: WorkspaceSeed = defa
   await page.route('**/api/conversations**', async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
+    const moveMatch = /^\/api\/conversations\/([^/]+)\/move$/u.exec(url.pathname);
+    if (moveMatch !== null && method === 'POST') {
+      const index = conversations.findIndex((item) => item.id === moveMatch[1]);
+      if (index === -1) return notFound(route, 'conversation_not_found');
+      const target = projects.find((item) => item.id === body(route).projectId);
+      if (target === undefined) return notFound(route, 'project_not_found');
+      const current = conversations[index]!;
+      conversations[index] = { ...current, projectId: target.id, projectKind: target.kind };
+      const sourceIndex = projects.findIndex((item) => item.id === current.projectId);
+      if (sourceIndex !== -1) projects.splice(sourceIndex, 1);
+      return json(route, 200, { data: conversations[index], success: true });
+    }
     const pinMatch = /^\/api\/conversations\/([^/]+)\/(pin|unpin)$/u.exec(url.pathname);
     if (pinMatch !== null && method === 'POST') {
       const index = conversations.findIndex((item) => item.id === pinMatch[1]);

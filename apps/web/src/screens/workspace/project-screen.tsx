@@ -102,6 +102,7 @@ export function ProjectScreen() {
         }}
         chats={{
           conversationActions: {
+            onMove: conversationActions.move,
             onDelete: conversationActions.remove,
             onRename: conversationActions.rename,
             onTogglePin: conversationActions.togglePin,

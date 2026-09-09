@@ -41,3 +41,6 @@ export const conversationListEnvelopeSchema = listEnvelopeSchema(conversationSch
 
 export const updateConversationInputSchema = z.object({ title: resourceNameSchema });
 export type UpdateConversationInput = z.infer<typeof updateConversationInputSchema>;
+
+export const moveConversationInputSchema = z.object({ projectId: z.uuid() });
+export type MoveConversationInput = z.infer<typeof moveConversationInputSchema>;

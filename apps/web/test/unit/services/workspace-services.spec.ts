@@ -8,6 +8,7 @@ import {
   deleteConversation,
   getConversation,
   listConversations,
+  moveConversation,
   updateConversation,
   setConversationPinned,
 } from '@/services/conversations/conversations.service';
@@ -78,6 +79,21 @@ describe('projects service', () => {
 });
 
 describe('conversations service', () => {
+  it('validates the move destination, supplies an idempotency key and handles target disappearance', async () => {
+    const { api, client } = clientFor();
+    const chat = await createConversation(client, {}, 'create');
+    await expect(
+      moveConversation(client, chat.id, { projectId: 'invalid' }, 'move'),
+    ).rejects.toThrow();
+    const moved = await moveConversation(client, chat.id, { projectId: PROJECT_ID }, 'move-key');
+    expect(moved).toMatchObject({ id: chat.id, projectId: PROJECT_ID, projectKind: 'named' });
+    expect(api.calls.at(-1)?.headers.get('idempotency-key')).toBe('move-key');
+    api.fail(`POST /api/conversations/${chat.id}/move`, 404, 'project_not_found');
+    await expect(
+      moveConversation(client, chat.id, { projectId: PROJECT_ID }, 'move-key'),
+    ).rejects.toMatchObject({ code: 'project_not_found' });
+  });
+
   it('validates rename input and mutation responses, and surfaces failed pins', async () => {
     const { api, client } = clientFor();
     const id = conversation().id;

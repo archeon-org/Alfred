@@ -4,6 +4,8 @@ import {
   type Conversation,
   type CreateConversationInput,
   updateConversationInputSchema,
+  moveConversationInputSchema,
+  type MoveConversationInput,
   type UpdateConversationInput,
 } from '@alfred/contracts';
 import {
@@ -128,6 +130,26 @@ async function mutateConversation(
     ...(input === undefined ? {} : { body: JSON.stringify(input) }),
     headers: JSON_HEADERS,
     method,
+    retryOnUnauthorized: true,
+  });
+  if (!response.ok) await throwApiError(response);
+  return parseEnvelope(
+    conversationEnvelopeSchema,
+    await readJsonBody(response),
+    INVALID_CONVERSATION,
+  );
+}
+
+export async function moveConversation(
+  client: HttpClient,
+  id: string,
+  input: MoveConversationInput,
+  idempotencyKey: string,
+): Promise<Conversation> {
+  const response = await client.request(`${conversationPath(id)}/move`, {
+    body: JSON.stringify(moveConversationInputSchema.parse(input)),
+    headers: { ...JSON_HEADERS, 'Idempotency-Key': idempotencyKey },
+    method: 'POST',
     retryOnUnauthorized: true,
   });
   if (!response.ok) await throwApiError(response);
