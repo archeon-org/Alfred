@@ -16,6 +16,8 @@ It contains three runnable application layers:
 - Python `>=3.12`
 - uv
 - Docker and Docker Compose
+- The sibling `langgraph-agent-repo` checkout, whose Compose stack provides PostgreSQL and Redis
+  (`docker compose up -d postgres redis` there)
 
 ## Quick Start
 
@@ -39,6 +41,11 @@ Useful URLs:
 pnpm setup:env
 docker compose up --build
 ```
+
+PostgreSQL and Redis are not part of this stack. Start them first from `langgraph-agent-repo`;
+Alfred containers join its `langgraph-agent-repo_agent-network` network (`DATA_NETWORK`) and the
+API stores `api_`-prefixed tables in the shared `langgraph` database. See the
+[local development runbook](docs/runbooks/local-development.md) for the connection URLs.
 
 The setup command creates private `.env` files for Compose, NestJS, Vite and the standalone Agent
 Server. It generates local secrets without printing them and never overwrites an existing file.
@@ -66,13 +73,10 @@ only implemented execution paths can be advertised. See the
 [capability delivery contract](docs/development/capability-delivery.md) for ownership, fallback
 semantics and required checks. `pnpm architecture:check` enforces source boundaries and file size.
 
-The Compose stack starts:
+The Compose stack starts (PostgreSQL and Redis come from `langgraph-agent-repo`):
 
-- `postgres`: application database.
-- `postgres-bootstrap`: idempotent logical-database and extension provisioning.
-- `redis`: distributed throttling backing service; required for readiness only while rate limiting
-  is enabled.
-- `api`: NestJS API.
+- `migrate`: one-shot TypeORM migration job against the shared `langgraph` database.
+- `api`: NestJS API; Redis is required for readiness only while rate limiting is enabled.
 - `web`: Vite production bundle served by Nginx.
 - `agent`: LangGraph development server for local graph iteration.
 
@@ -112,8 +116,6 @@ apps/
   agent/     LangGraph graph application
 packages/
   contracts/ Runtime-validated browser/API contracts
-infra/
-  postgres/  PostgreSQL image and init scripts
 docs/
   adr/       Architecture decisions
   runbooks/  Operational runbooks

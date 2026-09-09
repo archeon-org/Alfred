@@ -3,9 +3,14 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 interface ExistingIndexState {
   isValid: boolean;
   matchesExpectedDefinition: boolean;
+  tableName: string;
 }
 
 const INDEX_NAME = 'idx_refresh_sessions_replacement';
+// The table was created as "refresh_sessions" and later renamed by PrefixApiTables1788979000000.
+// A ledger retry that runs after that rename must repair the same index on the renamed table.
+const TABLE_NAME = 'refresh_sessions';
+const RENAMED_TABLE_NAME = 'api_refresh_sessions';
 
 async function withConcurrentIndexTimeouts<T>(
   queryRunner: QueryRunner,
@@ -33,8 +38,9 @@ export class IndexRefreshSessionReplacement1788515667301 implements MigrationInt
       const existingIndexes = (await queryRunner.query(
         `SELECT
            index_record.indisvalid AS "isValid",
+           table_record.relname AS "tableName",
            table_namespace.nspname = 'public'
-             AND table_record.relname = 'refresh_sessions'
+             AND table_record.relname IN ('${TABLE_NAME}', '${RENAMED_TABLE_NAME}')
              AND access_method.amname = 'btree'
              AND NOT index_record.indisunique
              AND index_record.indnkeyatts = 1
@@ -65,8 +71,9 @@ export class IndexRefreshSessionReplacement1788515667301 implements MigrationInt
       if (existingIndex !== undefined) {
         await queryRunner.query(`DROP INDEX CONCURRENTLY "public"."${INDEX_NAME}"`);
       }
+      const tableName = existingIndex?.tableName ?? TABLE_NAME;
       await queryRunner.query(
-        `CREATE INDEX CONCURRENTLY "${INDEX_NAME}" ON "refresh_sessions" ("replaced_by_session_id")`,
+        `CREATE INDEX CONCURRENTLY "${INDEX_NAME}" ON "${tableName}" ("replaced_by_session_id")`,
       );
     });
   }

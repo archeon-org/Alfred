@@ -17,6 +17,17 @@ const examplePaths = [
   'apps/agent/.env.example',
 ];
 const generatedPaths = ['.env', 'apps/api/.env', 'apps/web/.env', 'apps/agent/.env'];
+const removedDataServiceKeys = [
+  'POSTGRES_USER',
+  'POSTGRES_PASSWORD',
+  'POSTGRES_PORT',
+  'MIGRATOR_DATABASE_PASSWORD',
+  'API_DATABASE_PASSWORD',
+  'AGENT_DATABASE_PASSWORD',
+  'REDIS_API_PASSWORD',
+  'AGENT_REDIS_PASSWORD',
+  'REDIS_PORT',
+];
 
 test('preserves explicit per-file rate-limit choices while adding missing flags', async (context) => {
   const workspace = await createWorkspace(context);
@@ -84,19 +95,29 @@ test('migrates generated local environment files to the current contract', async
     'AUTH_JWT_SECRET=jwt-secret-that-is-long-enough',
     `GOOGLE_OAUTH_CALLBACK_URL=${legacyGoogleCallback}`,
   ].join('\n');
+  const legacyApiUrls = [
+    'DATABASE_URL=postgresql://alfred_api:api-password-that-is-long-enough@127.0.0.1:5432/alfred_app?schema=public',
+    'REDIS_URL=redis://default:redis-password-that-is-long-enough@127.0.0.1:6379/0',
+  ].join('\n');
+  const legacyAgentUrls = [
+    'DATABASE_URI=postgres://alfred_agent:agent-password-that-is-long-enough@postgres:5432/alfred_langgraph?sslmode=disable',
+    'REDIS_URI=redis://default:agent-redis-password-that-is-long-enough@agent-redis:6379/0',
+    'LANGGRAPH_CLOUD_LICENSE_KEY=',
+  ].join('\n');
 
   await Promise.all([
     writeFile(join(workspace, '.env'), `${sharedEnvironment}\n`),
-    writeFile(join(workspace, 'apps/api/.env'), `${sharedEnvironment}\n`),
+    writeFile(join(workspace, 'apps/api/.env'), `${sharedEnvironment}\n${legacyApiUrls}\n`),
     writeFile(join(workspace, 'apps/web/.env'), 'VITE_API_URL=/api\n'),
-    writeFile(join(workspace, 'apps/agent/.env'), 'LANGGRAPH_CLOUD_LICENSE_KEY=\n'),
+    writeFile(join(workspace, 'apps/agent/.env'), `${legacyAgentUrls}\n`),
   ]);
 
   await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
 
-  const [rootEnvironment, apiEnvironment] = await Promise.all([
+  const [rootEnvironment, apiEnvironment, agentEnvironment] = await Promise.all([
     readFile(join(workspace, '.env'), 'utf8').then(parseEnvironment),
     readFile(join(workspace, 'apps/api/.env'), 'utf8').then(parseEnvironment),
+    readFile(join(workspace, 'apps/agent/.env'), 'utf8').then(parseEnvironment),
   ]);
 
   assert.equal(rootEnvironment.GOOGLE_OAUTH_CALLBACK_URL, providerGoogleCallback);
@@ -104,10 +125,26 @@ test('migrates generated local environment files to the current contract', async
   assert.equal(rootEnvironment.NODE_ENV, 'development');
   assert.equal(rootEnvironment.AUTH_JWT_SECRET, 'jwt-secret-that-is-long-enough');
   assert.equal(apiEnvironment.AUTH_JWT_SECRET, 'jwt-secret-that-is-long-enough');
+  // In-repo PostgreSQL/Redis credentials are removed; URLs move to the shared platform services.
+  for (const environment of [rootEnvironment, apiEnvironment]) {
+    for (const key of removedDataServiceKeys) assert.equal(environment[key], undefined);
+  }
   assert.equal(
-    rootEnvironment.REDIS_URL,
-    'redis://default:redis-password-that-is-long-enough@localhost:6379/0',
+    rootEnvironment.DATABASE_URL,
+    'postgresql://postgres:postgres@postgres:5432/langgraph?schema=public',
   );
+  assert.equal(rootEnvironment.REDIS_URL, 'redis://redis:6379/0');
+  assert.equal(rootEnvironment.DATA_NETWORK, 'langgraph-agent-repo_agent-network');
+  assert.equal(
+    apiEnvironment.DATABASE_URL,
+    'postgresql://postgres:postgres@127.0.0.1:5432/langgraph?schema=public',
+  );
+  assert.equal(apiEnvironment.REDIS_URL, 'redis://127.0.0.1:6379/0');
+  assert.equal(
+    agentEnvironment.DATABASE_URI,
+    'postgres://postgres:postgres@postgres:5432/alfred_langgraph?sslmode=disable',
+  );
+  assert.equal(agentEnvironment.REDIS_URI, 'redis://redis:6379/1');
   assert.equal(rootEnvironment.AUTH_IP_RATE_LIMIT_PER_MINUTE, '6000');
   assert.equal(apiEnvironment.AUTH_IP_RATE_LIMIT_PER_MINUTE, '6000');
   assert.equal(rootEnvironment.FEATURE_RATE_LIMITING_ENABLED, 'true');
@@ -144,4 +181,21 @@ test('adds missing reserved flags, preserves per-file choices and is idempotent'
   await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
   const second = await Promise.all(paths.map((path) => readFile(join(workspace, path), 'utf8')));
   assert.deepEqual(second, first);
+});
+
+test('preserves customized shared data-service URLs across re-runs', async (context) => {
+  const workspace = await createWorkspace(context);
+  const customDatabaseUrl = 'postgresql://alfred:custom@db.internal:5433/alfred?schema=public';
+  const customRedisUrl = 'redis://cache.internal:6380/3';
+  await writeFile(
+    join(workspace, 'apps/api/.env'),
+    `DATABASE_URL=${customDatabaseUrl}\nREDIS_URL=${customRedisUrl}\n`,
+  );
+
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+
+  const api = parseEnvironment(await readFile(join(workspace, 'apps/api/.env'), 'utf8'));
+  assert.equal(api.DATABASE_URL, customDatabaseUrl);
+  assert.equal(api.REDIS_URL, customRedisUrl);
 });

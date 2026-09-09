@@ -9,7 +9,9 @@ pnpm setup:env
 ```
 
 - The command creates `.env`, `apps/api/.env`, `apps/web/.env` and `apps/agent/.env` with mode `0600`.
-- PostgreSQL, Redis and JWT secrets are generated independently with cryptographic randomness.
+- JWT and metrics secrets are generated with cryptographic randomness. `DATABASE_URL` and
+  `REDIS_URL` point at the sibling LangGraph platform stack (`langgraph-agent-repo`): loopback URLs
+  in `apps/api/.env`, container URLs plus `DATA_NETWORK` in the root `.env`.
 - Existing secret values are preserved and their permissions are tightened. The command migrates
   managed feature flags, synchronizes missing Google provider settings from `apps/api/.env` to the
   root `.env`, and adds missing session, proxy and observability defaults.
@@ -54,6 +56,38 @@ authentication or authorization path.
 
 Authentication, authorization, validation, same-origin mutation checks and audit controls are
 security invariants, not optional feature flags.
+
+## Shared data services
+
+PostgreSQL and Redis are not provisioned by this repository. Start them from the sibling
+`langgraph-agent-repo` checkout before any API, migration or Compose command:
+
+```bash
+cd ../langgraph-agent-repo && docker compose up -d postgres redis
+```
+
+That stack publishes PostgreSQL on `127.0.0.1:5432` (user `postgres`, password `postgres`, database
+`langgraph`) and Redis on `127.0.0.1:6379` without authentication. Containers reach the same
+services as `postgres` and `redis` on the `langgraph-agent-repo_agent-network` network, which the
+root `.env` names in `DATA_NETWORK`.
+
+| Consumer                                 | PostgreSQL                                                              | Redis                      |
+| ---------------------------------------- | ----------------------------------------------------------------------- | -------------------------- |
+| Host processes (`pnpm dev:api`)          | `postgresql://postgres:postgres@127.0.0.1:5432/langgraph?schema=public` | `redis://127.0.0.1:6379/0` |
+| Containers (`migrate`, `api`)            | `postgresql://postgres:postgres@postgres:5432/langgraph?schema=public`  | `redis://redis:6379/0`     |
+| Database client (Beekeeper Studio, psql) | `postgresql://postgres:postgres@localhost:5432/langgraph`               | —                          |
+
+The API owns only the `api_`-prefixed tables of the `langgraph` database: `api_users`,
+`api_user_identities`, `api_oauth_login_states`, `api_refresh_sessions`, `api_idempotency_keys` and
+the TypeORM ledger `api_migrations`. Every other `public` table belongs to the LangGraph runtime;
+never migrate, rename or drop those from this repository.
+
+Apply the migration registry from the host when Compose is not used. The migration and drift
+scripts read `DATABASE_URL` from the process environment, not from `apps/api/.env`:
+
+```bash
+DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/langgraph?schema=public' pnpm --filter @alfred/api migration:run
+```
 
 ## Start the complete local stack
 
@@ -118,50 +152,30 @@ requires `pnpm docker:up`; absolute API origins are rejected by the web build.
 
 The startup order is deliberate:
 
-1. PostgreSQL becomes reachable.
-2. `postgres-bootstrap` idempotently creates/configures the four logical databases, including on
-   a retained volume created by an older Alfred version. Only `alfred_app` and `alfred_test`
-   receive the required `citext` extension.
-3. `migrate` runs the compiled TypeORM migration registry once with the schema-owner role.
-4. `postgres-runtime-grants` revokes API-runtime DML on the TypeORM migration ledger.
-5. The API starts only after both PostgreSQL one-shot jobs exit successfully; Redis readiness is
-   evaluated by the API only when rate limiting is enabled.
-6. The web container waits for API readiness.
+1. The platform PostgreSQL and Redis must already be running; Compose fails fast when the external
+   `DATA_NETWORK` network does not exist.
+2. `migrate` runs the compiled TypeORM migration registry once against the shared `langgraph`
+   database; its first migration installs `citext` when missing.
+3. The API starts only after `migrate` exits successfully; Redis readiness is evaluated by the API
+   only when rate limiting is enabled.
+4. The web container waits for API readiness.
 
-Docker Desktop groups the services under `alfred`. `postgres` and `redis` are persistent data
-services; `api`, `web` and `agent` are application processes. `postgres-bootstrap`, `migrate` and
-`postgres-runtime-grants` are initialization jobs, not additional PostgreSQL servers. An
-`Exited (0)` status is their expected successful state. Keep these service definitions because the
-next startup uses their ordering; inspect any nonzero exit code before starting the API.
+Docker Desktop groups the services under `alfred`: `api`, `web` and `agent` are application
+processes and `migrate` is an initialization job whose `Exited (0)` status is the expected
+successful state. PostgreSQL and Redis appear under the `langgraph-agent-repo` project. Keep the
+`migrate` definition because the next startup uses its ordering; inspect any nonzero exit code
+before starting the API.
 
 The local `agent` service runs `langgraph dev`, listens on port `8000` inside the container and is
 available at `http://127.0.0.1:2024`. It does not receive an Agent Server licence,
 `DATABASE_URI` or `REDIS_URI`.
 
-## Start only data services
+## Retained volumes from the removed in-repo cluster
 
-For applications running directly on the host:
-
-```bash
-docker compose --env-file .env up -d postgres postgres-bootstrap redis
-```
-
-PostgreSQL and the API Redis publish only on `127.0.0.1`. Containers reach them through
-`api-data`; the production-like Agent Server uses a different `agent-data` network and a separate
-Redis instance. Named volumes are persistent:
-
-These loopback publications exist only in the base local-development Compose file. The production
-overlay resets both data-service port lists and removes `host-access`, leaving PostgreSQL and Redis
-reachable only through their internal Docker networks.
-
-- `postgres-data` contains `alfred_app`, `alfred_blobs`, `alfred_langgraph` and `alfred_test`;
-- `redis-data` contains the Redis append-only file, flushed with `appendfsync everysec`.
-
-The official PostgreSQL entrypoint runs initialization scripts only for an empty volume. Alfred's
-one-shot `postgres-bootstrap` service reruns those same idempotent scripts after every database
-startup, so an older healthy volume is upgraded without deleting it. Inspect and back up material
-data before any explicit volume recreation. Never use `docker compose down --volumes` as a routine
-troubleshooting step.
+Alfred versions before 2026-09-09 provisioned their own PostgreSQL and Redis. Their named volumes
+(`alfred_postgres-data` with `alfred_app`, `alfred_blobs`, `alfred_langgraph`, `alfred_test`, and
+`alfred_redis-data`) are neither read nor migrated by the current stack. Export anything useful,
+then remove them explicitly with `docker volume rm`; `docker compose down` never deletes them.
 
 ## Local endpoints
 
@@ -177,13 +191,11 @@ Swagger UI and its JSON document are mounted only in development and test enviro
 `FEATURE_OPENAPI_ENABLED=true`. Set it to false to remove both routes without changing the API.
 Production never exposes them, including when the flag is true.
 
-The API receives an authenticated Redis URL targeting the `redis` service. Redis backs the
-distributed rate limiter and is part of readiness only while `FEATURE_RATE_LIMITING_ENABLED=true`.
-When the flag is false, readiness reports Redis as `disabled` and requests never touch the limiter
-storage. No Agent Server URL is injected until the AG-UI invocation adapter exists.
-
-Disabling the limiter does not remove Redis from Compose: the base stack still provisions the
-service and requires `REDIS_API_PASSWORD`. Keep its generated credential configured.
+The API receives `REDIS_URL` targeting the platform `redis` service, which has no password on the
+local stack. Redis backs the distributed rate limiter and is part of readiness only while
+`FEATURE_RATE_LIMITING_ENABLED=true`. When the flag is false, readiness reports Redis as `disabled`
+and requests never touch the limiter storage. No Agent Server URL is injected until the AG-UI
+invocation adapter exists.
 
 ## Proxy and metrics
 
@@ -201,6 +213,12 @@ The provider-neutral foundation migration replaces the earlier uncommitted local
 schema. Do not delete a retained volume automatically. If an old developer volume contains useful
 data, export it and plan a data conversion first; otherwise explicitly recreate only that local
 Alfred volume. Clean databases and CI apply `CreateIdentityFoundation1788464265141` directly.
+
+`PrefixApiTables1788979000000` renames the tables created by the earlier migrations to their
+`api_`-prefixed names, and the ledger itself is now `api_migrations`. A database migrated before
+that change still holds a `migrations` ledger: rename it with
+`ALTER TABLE "migrations" RENAME TO "api_migrations"` before running the registry, or start from
+the fresh shared `langgraph` database.
 
 ## Validate configuration
 
@@ -227,4 +245,5 @@ pnpm agent:test
 docker compose down
 ```
 
-This removes containers and networks but retains named volumes.
+This removes Alfred containers and its `app` network but retains named volumes. It never stops the
+platform PostgreSQL or Redis, which belong to the `langgraph-agent-repo` project.

@@ -14,6 +14,7 @@ import { IdempotencyModule } from '@api/common/idempotency/idempotency.module';
 import { IdempotencyStore } from '@api/common/idempotency/idempotency.store';
 import { IdempotencyCleanupService } from '@api/common/idempotency/idempotency-cleanup.service';
 import { IdempotencyKeyEntity } from '@api/common/idempotency/idempotency-key.entity';
+import { API_MIGRATIONS_TABLE } from '@api/database/database-options';
 import { databaseMigrations } from '@api/database/migrations';
 import { databaseEntities } from '@api/database/typeorm.options';
 import { UserEntity } from '@api/modules/users/user.entity';
@@ -67,6 +68,7 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
       installExtensions: false,
       synchronize: false,
       migrationsRun: false,
+      migrationsTableName: API_MIGRATIONS_TABLE,
     });
     await migration.initialize();
     await migration.runMigrations({ transaction: 'each' });
@@ -144,7 +146,7 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
 
   it('migrates the exact entity schema including composite PK, checks, index and cascading owner FK', async () => {
     const runner = migration.createQueryRunner();
-    const table = await runner.getTable('idempotency_keys');
+    const table = await runner.getTable('api_idempotency_keys');
     await runner.release();
     expect(table?.primaryColumns.map(({ name }) => name).sort()).toEqual(['key', 'owner_user_id']);
     expect(table?.indices.map(({ name }) => name)).toContain('idx_idempotency_keys_expiry');
@@ -156,7 +158,7 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
     expect(table?.foreignKeys[0]).toMatchObject({
       name: 'fk_idempotency_keys_owner',
       onDelete: 'CASCADE',
-      referencedTableName: 'users',
+      referencedTableName: 'api_users',
     });
     const drift = await migration.driver.createSchemaBuilder().log();
     expect(drift.upQueries.map(({ query }) => query)).toEqual([]);
@@ -297,7 +299,7 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
     await app.get(IdempotencyCleanupService).purge();
     expect(await store.find(owner, 'uncertain')).toMatchObject({ responseStatus: null });
     await db.query(
-      `UPDATE idempotency_keys SET created_at = created_at - interval '25 hours', expires_at = expires_at - interval '25 hours' WHERE owner_user_id = $1`,
+      `UPDATE api_idempotency_keys SET created_at = created_at - interval '25 hours', expires_at = expires_at - interval '25 hours' WHERE owner_user_id = $1`,
       [owner],
     );
     await app.get(IdempotencyCleanupService).purge();
@@ -324,7 +326,7 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
     const hash = 'a'.repeat(64);
     await store.reserve(owner, 'key', hash, oldGeneration);
     await db.query(
-      `UPDATE idempotency_keys SET created_at = created_at - interval '25 hours', expires_at = expires_at - interval '25 hours' WHERE owner_user_id = $1`,
+      `UPDATE api_idempotency_keys SET created_at = created_at - interval '25 hours', expires_at = expires_at - interval '25 hours' WHERE owner_user_id = $1`,
       [owner],
     );
     await expect(
@@ -374,7 +376,9 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
       store.complete(owner, 'key', 'a'.repeat(64), 500, {}, reservationId),
     ).rejects.toThrow();
     await expect(
-      db.query(`UPDATE idempotency_keys SET expires_at = now() WHERE owner_user_id = $1`, [owner]),
+      db.query(`UPDATE api_idempotency_keys SET expires_at = now() WHERE owner_user_id = $1`, [
+        owner,
+      ]),
     ).rejects.toThrow();
   });
 });

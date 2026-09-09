@@ -14,7 +14,7 @@ import { UserIdentityEntity } from './user-identity.entity';
 
 export type UserStatus = 'active' | 'disabled';
 
-@Entity({ name: 'users' })
+@Entity({ name: 'api_users' })
 @Check('chk_users_role', `"role" IN ('user', 'admin')`)
 @Check('chk_users_status', `"status" IN ('active', 'disabled')`)
 @Index('uq_users_email', ['email'], { unique: true })

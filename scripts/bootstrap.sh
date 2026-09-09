@@ -6,7 +6,7 @@ cd "$repo_root"
 
 if [ ! -f .env ]; then
   cp .env.example .env
-  printf '%s\n' 'Created .env from .env.example; replace the local database password before deployment.'
+  printf '%s\n' 'Created .env from .env.example; replace placeholder secrets and point DATABASE_URL/REDIS_URL at the langgraph-agent-repo services before deployment.'
 fi
 
 corepack enable

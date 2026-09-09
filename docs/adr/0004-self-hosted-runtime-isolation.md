@@ -42,3 +42,12 @@ upgrade without destructive recreation.
 - The standalone Agent Server overlay still requires an approved licence or air-gapped arrangement,
   TLS, secret injection, backups, image scanning and orchestrator-level network policy. Compose
   validation alone is not production approval.
+
+## Amendment 2026-09-09
+
+PostgreSQL and Redis are no longer provisioned by this repository. The `postgres-bootstrap` and
+`postgres-runtime-grants` jobs, the `alfred_migrator`/`alfred_api`/`alfred_agent` roles, the four
+logical databases and the separate API/Agent Redis instances are removed; containers reach the
+sibling LangGraph platform services on an external network. The non-root, read-only, capability
+and loopback-publication items above remain in force. See
+[ADR 0014](0014-shared-platform-data-services.md).

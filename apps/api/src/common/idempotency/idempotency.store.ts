@@ -18,13 +18,13 @@ export class IdempotencyStore {
   async reserve(owner: string, key: string, hash: string, reservationId: string): Promise<boolean> {
     // Keep uncertainty for the full 24h deduplication window; only expired keys can be reused.
     await this.keys.query(
-      'DELETE FROM "idempotency_keys" WHERE "owner_user_id" = $1 AND "key" = $2 AND "expires_at" < now()',
+      'DELETE FROM "api_idempotency_keys" WHERE "owner_user_id" = $1 AND "key" = $2 AND "expires_at" < now()',
       [owner, key],
     );
     try {
       const inserted = await this.keys.query<{ key: string }[]>(
         `
-      INSERT INTO "idempotency_keys" ("owner_user_id", "key", "request_hash", "reservation_id")
+      INSERT INTO "api_idempotency_keys" ("owner_user_id", "key", "request_hash", "reservation_id")
       VALUES ($1, $2, $3, $4) ON CONFLICT ("owner_user_id", "key") DO NOTHING RETURNING "key"
     `,
         [owner, key, hash, reservationId],
@@ -49,7 +49,7 @@ export class IdempotencyStore {
     const rows = await this.keys.query<StoredResponse[]>(
       `
       SELECT "request_hash" AS "requestHash", "response_status" AS "responseStatus", "response_body" AS "responseBody"
-      FROM "idempotency_keys" WHERE "owner_user_id" = $1 AND "key" = $2
+      FROM "api_idempotency_keys" WHERE "owner_user_id" = $1 AND "key" = $2
     `,
       [owner, key],
     );
@@ -58,7 +58,7 @@ export class IdempotencyStore {
 
   async release(owner: string, key: string, hash: string, reservationId: string): Promise<void> {
     await this.keys.query(
-      `DELETE FROM "idempotency_keys"
+      `DELETE FROM "api_idempotency_keys"
       WHERE "owner_user_id" = $1 AND "key" = $2 AND "request_hash" = $3
         AND "reservation_id" = $4 AND "response_status" IS NULL`,
       [owner, key, hash, reservationId],
@@ -75,7 +75,7 @@ export class IdempotencyStore {
   ): Promise<void> {
     const rows = await this.keys.query<{ key: string }[]>(
       `
-      WITH completed AS (UPDATE "idempotency_keys" SET "response_status" = $4, "response_body" = $5::jsonb,
+      WITH completed AS (UPDATE "api_idempotency_keys" SET "response_status" = $4, "response_body" = $5::jsonb,
         "expires_at" = "created_at" + interval '24 hours'
       WHERE "owner_user_id" = $1 AND "key" = $2 AND "request_hash" = $3 AND "response_status" IS NULL
         AND "reservation_id" = $6 AND "expires_at" >= now()

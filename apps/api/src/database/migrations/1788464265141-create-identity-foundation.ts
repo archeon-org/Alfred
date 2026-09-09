@@ -4,6 +4,10 @@ export class CreateIdentityFoundation1788464265141 implements MigrationInterface
   name = 'CreateIdentityFoundation1788464265141';
 
   async up(queryRunner: QueryRunner): Promise<void> {
+    // The shared PostgreSQL server is provisioned outside this repository, so the schema owner
+    // installs the only extension the API needs. citext is a trusted extension: any role with
+    // CREATE on the database can install it, and the statement is a no-op when it already exists.
+    await queryRunner.query('CREATE EXTENSION IF NOT EXISTS "citext"');
     await queryRunner.query(`
       CREATE TABLE "users" (
         "id" uuid NOT NULL DEFAULT gen_random_uuid(),

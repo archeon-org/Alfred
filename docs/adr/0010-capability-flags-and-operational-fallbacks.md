@@ -85,3 +85,9 @@ read-only image filesystem.
 
 This decision refines the operational semantics in
 [ADR 0005](0005-environment-feature-flags.md) without changing its public product-flag contract.
+
+## Amendment 2026-09-09
+
+Compose no longer provisions Redis or requires `REDIS_API_PASSWORD`; `REDIS_URL` targets the
+sibling LangGraph platform's Redis. The readiness semantics of `FEATURE_RATE_LIMITING_ENABLED`
+are unchanged. See [ADR 0014](0014-shared-platform-data-services.md).

@@ -10,7 +10,7 @@ import {
 } from 'typeorm';
 import { UserEntity } from '../../modules/users/user.entity';
 
-@Entity({ name: 'idempotency_keys' })
+@Entity({ name: 'api_idempotency_keys' })
 @Index('idx_idempotency_keys_expiry', ['expiresAt'])
 @Check('chk_idempotency_keys_key', `"key" ~ '^[A-Za-z0-9_-]{1,128}$'`)
 @Check('chk_idempotency_keys_hash', `"request_hash" ~ '^[a-f0-9]{64}$'`)

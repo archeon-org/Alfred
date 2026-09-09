@@ -8,16 +8,19 @@
 `docker-compose.platform.yml` is a production-like overlay for validating the standalone Agent
 Server integration. It replaces the agent build with `apps/agent/Dockerfile` and injects:
 
-- `DATABASE_URI`, targeting only `alfred_langgraph`;
-- `REDIS_URI`, targeting the dedicated `agent-redis` instance;
+- `DATABASE_URI` from `AGENT_DATABASE_URI`, which must target a database reserved for this Agent
+  Server on the shared PostgreSQL, never the platform's own `langgraph` database;
+- `REDIS_URI` from `AGENT_REDIS_URI`, a Redis logical database reserved for this Agent Server;
 - `LANGGRAPH_CLOUD_LICENSE_KEY`, required from the runtime environment.
 
-The schema-owner role `alfred_migrator` owns `alfred_app`, `alfred_blobs` and `alfred_test` and is
-used only by migration jobs. The runtime role `alfred_api` receives DML privileges on their current
-and future tables but no schema creation right. `alfred_agent` can connect only to
-`alfred_langgraph`; cross-connections are revoked. The API and Agent Server also use separate
-password-protected Redis instances on separate internal Docker networks. The PostgreSQL databases
-still share one local cluster, so they are not independent backup or failure domains.
+PostgreSQL and Redis are external to this repository: both come from the sibling
+`langgraph-agent-repo` platform stack and are reached on the external Docker network named by
+`DATA_NETWORK`. The API stores only `api_`-prefixed tables in the shared `langgraph` database, next
+to the LangGraph runtime tables ([ADR 0014](../adr/0014-shared-platform-data-services.md)). Local
+development uses the platform's `postgres` superuser for migration and runtime connections; a
+deployment must inject a dedicated migration role and a DML-only runtime role through
+`DATABASE_URL`. Product and runtime data share one cluster, so they are not independent backup or
+failure domains.
 
 This overlay is a local integration aid, not a complete production orchestrator. A real deployment
 must use the Enterprise-approved internal registry and image scanner, secret injection, TLS, managed
@@ -58,10 +61,9 @@ See the [standalone server documentation](https://docs.langchain.com/langsmith/d
 
 ## Migration gate
 
-`postgres-bootstrap` first applies the idempotent database/extension prerequisites (`citext` for
-`alfred_app` and `alfred_test`, plus the Agent Server extension set on `alfred_langgraph`). TypeORM
-extension auto-installation is disabled. This also
-supports retained volumes because the official PostgreSQL entrypoint only initializes empty ones.
+The first migration installs the only required extension with
+`CREATE EXTENSION IF NOT EXISTS "citext"`; the migration credential must be allowed to create that
+trusted extension. TypeORM extension auto-installation stays disabled.
 
 `migrate` is a one-shot service built from the same production image as the API. It does not need
 TypeScript, pnpm or network access at startup. It runs exactly:
@@ -78,9 +80,8 @@ method and key definition, drops only that matching invalid index concurrently, 
 valid matching index is accepted after a ledger retry; any unexpected object using the reserved
 name fails closed. Never replace this with a blocking index build during a live rollout.
 
-The post-migration `postgres-runtime-grants` job then revokes runtime DML on the TypeORM migration
-ledger. The API has `condition: service_completed_successfully` on that job; a failed migration or
-ACL convergence prevents API startup.
+The API has `condition: service_completed_successfully` on `migrate`; a failed migration prevents
+API startup. The ledger is the `api_migrations` table.
 The job runs as UID/GID `10001`, with a read-only root filesystem, a temporary `/tmp`, all Linux
 capabilities dropped and `no-new-privileges` enabled.
 
@@ -91,17 +92,13 @@ bounded PostgreSQL and Redis checks.
 
 ## Image and process posture
 
-- PostgreSQL, Redis, Node.js, Nginx, Python, uv and LangGraph Agent Server references are pinned by
-  digest.
+- Node.js, Nginx, Python, uv and LangGraph Agent Server references are pinned by digest.
 - The API, web, local agent, platform agent and migration job run as non-root users.
-- PostgreSQL and Redis use their official entrypoints, which drop privileges for the database
-  processes while retaining the initialization behavior their images require.
-- The production overlay removes PostgreSQL and Redis host ports and detaches both services from
-  `host-access`; only the internal `api-data` and `agent-data` networks remain. Administrative access
+- The production overlay removes the API and Agent Server host ports; PostgreSQL and Redis are
+  reached only on the external platform network named by `DATA_NETWORK`. Administrative access
   must use an approved bastion, one-shot maintenance container or orchestrator-native tunnel.
 - Each service runs one primary process; Compose enables an init process for application services.
-- PostgreSQL, Redis, API and agent services have healthchecks. Web retains its image healthcheck.
-- Redis persists AOF data with `appendfsync everysec` and uses `noeviction`.
+- API and agent services have healthchecks. Web retains its image healthcheck.
 
 ## Required configuration contract
 
@@ -117,15 +114,15 @@ The API receives the complete current backend contract from Compose:
   capacity;
 - rate-limit mode: `FEATURE_RATE_LIMITING_ENABLED` defaults to `true`; setting it to `false`
   bypasses all global and route-specific throttlers, removes Redis from API readiness and therefore
-  deliberately removes abuse protection. Compose still provisions Redis and requires
-  `REDIS_API_PASSWORD` in this mode;
+  deliberately removes abuse protection. `REDIS_URL` remains part of the configuration contract in
+  this mode;
 - feature flags: every validated `FEATURE_*_ENABLED` switch listed in `.env.example`;
 - API documentation: `FEATURE_OPENAPI_ENABLED` defaults on for development/test but production
   always leaves Swagger UI and JSON unavailable;
 - OAuth: `FEATURE_GOOGLE_OAUTH_ENABLED`, `GOOGLE_OAUTH_CLIENT_ID`,
   `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_CALLBACK_URL`, and optional
   `GOOGLE_WORKSPACE_DOMAIN`;
-- topology: `WEB_APP_URL`, `REDIS_URL`, `TRUST_PROXY_HOPS`;
+- topology: `WEB_APP_URL`, `REDIS_URL`, `TRUST_PROXY_HOPS`, and `DATA_NETWORK` for Compose;
 - database: `DATABASE_URL`, `DATABASE_POOL_MAX`, `DATABASE_SSL`.
 
 The current API has no Agent Server URL because the AG-UI invocation adapter is not implemented.
@@ -142,9 +139,9 @@ Operational configuration also includes:
 - `OBSERVABILITY_METRICS_ENABLED` and a dedicated `OBSERVABILITY_METRICS_TOKEN` for the private
   Prometheus endpoint.
 
-Compose derives migration, API, Agent Server and Redis URLs from distinct URL-safe passwords. The
-API container receives only its DML credential; application containers never receive the
-PostgreSQL bootstrap or migration credential.
+Compose passes `DATABASE_URL` and `REDIS_URL` verbatim from the root `.env` to `migrate` and `api`.
+Production must give `migrate` and `api` distinct credentials and, while rate limiting is enabled,
+a password-protected `REDIS_URL`; the API rejects a password-less Redis URL in production.
 
 Only `.env.example` placeholders are committed. Never pass JWT, OAuth, PostgreSQL or licence
 secrets as image build arguments or public `VITE_` variables.
@@ -167,7 +164,7 @@ schedules and manual runs, the security workflow performs JavaScript/Python depe
 CodeQL analysis, Trivy vulnerability/secret/misconfiguration scanning and CycloneDX SBOM
 generation. A pinned Gitleaks CLI image scans the complete Git history from a full checkout without
 requiring the commercial organization action. CI also blocks HIGH/CRITICAL findings, including
-unfixed findings, in every built PostgreSQL, API, migration, web and agent image; an exception
+unfixed findings, in every built API, migration, web and agent image; an exception
 requires explicit, time-bounded risk acceptance rather than a silent scanner exclusion. Ephemeral
 CI database credentials are masked before entering the job environment. Dependabot covers npm,
 Python, GitHub Actions and each Dockerfile directory. In Enterprise, mirror the actions, package

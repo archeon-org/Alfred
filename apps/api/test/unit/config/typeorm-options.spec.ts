@@ -23,6 +23,7 @@ describe('createTypeOrmOptions', () => {
       entities: [...databaseEntities],
       installExtensions: false,
       migrationsRun: false,
+      migrationsTableName: 'api_migrations',
       retryAttempts: 5,
       ssl: false,
       synchronize: false,

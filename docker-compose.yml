@@ -1,98 +1,10 @@
 name: alfred
 
+# PostgreSQL and Redis are not provisioned here. Both come from the LangGraph platform stack in the
+# sibling `langgraph-agent-repo` checkout (`docker compose up postgres redis` there), which
+# publishes them on the host and exposes them to containers on the shared `data` network below.
+
 services:
-  postgres:
-    build:
-      context: ./infra/postgres
-    environment:
-      AGENT_DATABASE_PASSWORD: ${AGENT_DATABASE_PASSWORD:?Set AGENT_DATABASE_PASSWORD in .env}
-      API_DATABASE_PASSWORD: ${API_DATABASE_PASSWORD:?Set API_DATABASE_PASSWORD in .env}
-      MIGRATOR_DATABASE_PASSWORD: ${MIGRATOR_DATABASE_PASSWORD:?Set MIGRATOR_DATABASE_PASSWORD in .env}
-      POSTGRES_DB: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
-    ports:
-      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - agent-data
-      - api-data
-      - host-access
-    healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'pg_isready --host 127.0.0.1 --username "$${POSTGRES_USER}" --dbname postgres',
-        ]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
-    restart: unless-stopped
-
-  postgres-bootstrap:
-    build:
-      context: ./infra/postgres
-    entrypoint: ['/bin/sh', '-ec']
-    command:
-      - >-
-        /docker-entrypoint-initdb.d/01-create-databases.sh &&
-        /docker-entrypoint-initdb.d/02-configure-databases.sh
-    environment:
-      AGENT_DATABASE_PASSWORD: ${AGENT_DATABASE_PASSWORD:?Set AGENT_DATABASE_PASSWORD in .env}
-      API_DATABASE_PASSWORD: ${API_DATABASE_PASSWORD:?Set API_DATABASE_PASSWORD in .env}
-      MIGRATOR_DATABASE_PASSWORD: ${MIGRATOR_DATABASE_PASSWORD:?Set MIGRATOR_DATABASE_PASSWORD in .env}
-      PGHOST: postgres
-      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: postgres
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - api-data
-    read_only: true
-    tmpfs:
-      - /tmp
-    user: postgres
-    restart: 'no'
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-
-  redis:
-    image: redis:7.4-alpine@sha256:8b81dd37ff027bec4e516d41acfbe9fe2460070dc6d4a4570a2ac5b9d59df065
-    environment:
-      REDIS_PASSWORD: ${REDIS_API_PASSWORD:?Set REDIS_API_PASSWORD in .env}
-    command:
-      - redis-server
-      - --appendonly
-      - 'yes'
-      - --appendfsync
-      - everysec
-      - --maxmemory-policy
-      - noeviction
-      - --requirepass
-      - ${REDIS_API_PASSWORD:?Set REDIS_API_PASSWORD in .env}
-    ports:
-      - '127.0.0.1:${REDIS_PORT:-6379}:6379'
-    volumes:
-      - redis-data:/data
-    networks:
-      - api-data
-      - host-access
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - redis-cli --no-auth-warning --pass "$${REDIS_PASSWORD}" ping | grep -q PONG
-      interval: 5s
-      timeout: 3s
-      retries: 12
-      start_period: 5s
-    restart: unless-stopped
-
   migrate:
     build:
       context: .
@@ -102,47 +14,16 @@ services:
     environment:
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
       DATABASE_SSL: ${DATABASE_SSL:-false}
-      DATABASE_URL: postgresql://alfred_migrator:${MIGRATOR_DATABASE_PASSWORD:?Set MIGRATOR_DATABASE_PASSWORD in .env}@postgres:5432/alfred_app?schema=public
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to the shared PostgreSQL database in .env}
       HOME: /tmp
       NODE_ENV: development
-    depends_on:
-      postgres-bootstrap:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
     networks:
-      - api-data
+      - data
     read_only: true
     tmpfs:
       - /tmp
     user: '10001:10001'
     init: true
-    restart: 'no'
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-
-  postgres-runtime-grants:
-    build:
-      context: ./infra/postgres
-    entrypoint: ['/bin/sh', '-ec']
-    command: ['/usr/local/bin/revoke-runtime-migration-ledger.sh']
-    environment:
-      PGHOST: postgres
-      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env}
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
-    networks:
-      - api-data
-    read_only: true
-    tmpfs:
-      - /tmp
-    user: postgres
     restart: 'no'
     cap_drop:
       - ALL
@@ -173,7 +54,7 @@ services:
       AUTH_USER_RATE_LIMIT_PER_MINUTE: ${AUTH_USER_RATE_LIMIT_PER_MINUTE:-120}
       DATABASE_POOL_MAX: ${DATABASE_POOL_MAX:-20}
       DATABASE_SSL: ${DATABASE_SSL:-false}
-      DATABASE_URL: postgresql://alfred_api:${API_DATABASE_PASSWORD:?Set API_DATABASE_PASSWORD in .env}@postgres:5432/alfred_app?schema=public
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to the shared PostgreSQL database in .env}
       FEATURE_AGENT_RUNTIME_ENABLED: ${FEATURE_AGENT_RUNTIME_ENABLED:-false}
       FEATURE_AG_UI_STREAMING_ENABLED: ${FEATURE_AG_UI_STREAMING_ENABLED:-false}
       FEATURE_FILE_UPLOADS_ENABLED: ${FEATURE_FILE_UPLOADS_ENABLED:-false}
@@ -196,19 +77,17 @@ services:
       OBSERVABILITY_LOG_LEVEL: ${OBSERVABILITY_LOG_LEVEL:-info}
       OBSERVABILITY_METRICS_ENABLED: ${OBSERVABILITY_METRICS_ENABLED:-false}
       OBSERVABILITY_METRICS_TOKEN: ${OBSERVABILITY_METRICS_TOKEN:-}
-      REDIS_URL: redis://default:${REDIS_API_PASSWORD:?Set REDIS_API_PASSWORD in .env}@redis:6379/0
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL to the shared Redis instance in .env}
       TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
       WEB_APP_URL: ${WEB_APP_URL:-http://localhost:5173}
     ports:
       - '127.0.0.1:${API_PORT:-3000}:3000'
     depends_on:
-      postgres-runtime-grants:
+      migrate:
         condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
     networks:
       - app
-      - api-data
+      - data
     healthcheck:
       test:
         ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://127.0.0.1:3000/health/ready']
@@ -280,14 +159,9 @@ services:
     security_opt:
       - no-new-privileges:true
 
-volumes:
-  postgres-data:
-  redis-data:
-
 networks:
   app:
-  agent-data:
-    internal: true
-  api-data:
-    internal: true
-  host-access:
+  # Pre-existing network of the LangGraph platform stack; `postgres` and `redis` resolve on it.
+  data:
+    name: ${DATA_NETWORK:-langgraph-agent-repo_agent-network}
+    external: true

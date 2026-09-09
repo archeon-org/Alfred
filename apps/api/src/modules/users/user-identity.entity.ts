@@ -9,7 +9,7 @@ import {
 } from 'typeorm';
 import { UserEntity } from './user.entity';
 
-@Entity({ name: 'user_identities' })
+@Entity({ name: 'api_user_identities' })
 @Index('idx_user_identities_user', ['userId'])
 @Index('uq_user_identities_issuer_subject', ['issuer', 'subject'], { unique: true })
 export class UserIdentityEntity {

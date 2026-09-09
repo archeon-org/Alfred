@@ -40,7 +40,6 @@ updates:
       - /apps/agent
       - /apps/api
       - /apps/web
-      - /infra/postgres
     schedule:
       interval: weekly
       day: monday

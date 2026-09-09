@@ -5,7 +5,11 @@ import { OauthLoginStateEntity } from '../modules/auth/infrastructure/persistenc
 import { RefreshSessionEntity } from '../modules/auth/infrastructure/persistence/entities/refresh-session.entity';
 import { UserEntity } from '../modules/users/user.entity';
 import { UserIdentityEntity } from '../modules/users/user-identity.entity';
-import { createPostgresConnectionExtra, POSTGRES_UUID_EXTENSION } from './database-options';
+import {
+  API_MIGRATIONS_TABLE,
+  createPostgresConnectionExtra,
+  POSTGRES_UUID_EXTENSION,
+} from './database-options';
 
 export const databaseEntities = [
   UserEntity,
@@ -25,6 +29,7 @@ export function createTypeOrmOptions(config: ConfigService): TypeOrmModuleOption
     installExtensions: false,
     synchronize: false,
     migrationsRun: false,
+    migrationsTableName: API_MIGRATIONS_TABLE,
     retryAttempts: 5,
     retryDelay: 3000,
     ssl: ssl ? { rejectUnauthorized: true } : false,

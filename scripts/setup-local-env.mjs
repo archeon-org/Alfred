@@ -28,16 +28,22 @@ const featureFlagKeys = Object.freeze([
   'FEATURE_TEAMS_ENABLED',
 ]);
 const managedSecretKeys = new Set([
-  'POSTGRES_PASSWORD',
-  'MIGRATOR_DATABASE_PASSWORD',
-  'API_DATABASE_PASSWORD',
-  'AGENT_DATABASE_PASSWORD',
-  'REDIS_API_PASSWORD',
-  'AGENT_REDIS_PASSWORD',
   'AUTH_JWT_SECRET',
   'OBSERVABILITY_METRICS_TOKEN',
   'GOOGLE_OAUTH_CLIENT_SECRET',
 ]);
+// PostgreSQL and Redis come from the sibling LangGraph platform stack (langgraph-agent-repo).
+// Containers reach them as `postgres`/`redis` on that stack's network; host processes use loopback.
+const dataServices = Object.freeze({
+  hostDatabaseUrl: 'postgresql://postgres:postgres@127.0.0.1:5432/langgraph?schema=public',
+  hostRedisUrl: 'redis://127.0.0.1:6379/0',
+  containerDatabaseUrl: 'postgresql://postgres:postgres@postgres:5432/langgraph?schema=public',
+  containerRedisUrl: 'redis://redis:6379/0',
+  agentDatabaseUri: 'postgres://postgres:postgres@postgres:5432/alfred_langgraph?sslmode=disable',
+  agentRedisUri: 'redis://redis:6379/1',
+});
+const legacyDatabaseRoles = new Set(['alfred_api', 'alfred_migrator', 'alfred_agent']);
+const dataUrlKeys = new Set(['DATABASE_URL', 'REDIS_URL', 'DATABASE_URI', 'REDIS_URI']);
 const placeholderFragments = ['change-me', 'changeme', 'placeholder', 'replace-with'];
 const legacyGoogleCallbackUrl = 'http://localhost:3000/api/auth/google/callback';
 const defaultGoogleCallbackUrl = 'http://localhost:3000/api/auth/providers/google/callback';
@@ -92,18 +98,14 @@ function firstNonEmptyValue(key, environments, fallback = '') {
   return environments.map((environment) => environment[key]).find(isConfiguredValue) ?? fallback;
 }
 
-function hasExpectedRuntimeLocation(value, expectedValue) {
+function targetsRemovedDataService(value) {
   try {
     const current = new URL(value);
-    const expected = new URL(expectedValue);
-    return (
-      current.protocol === expected.protocol &&
-      current.username === expected.username &&
-      current.hostname === expected.hostname &&
-      current.port === expected.port &&
-      current.pathname === expected.pathname &&
-      current.search === expected.search
-    );
+    const legacyRole = legacyDatabaseRoles.has(current.username);
+    const legacyRedis =
+      current.protocol === 'redis:' && current.username === 'default' && current.password !== '';
+    const legacyHost = current.hostname === 'agent-redis';
+    return legacyRole || legacyRedis || legacyHost;
   } catch {
     return false;
   }
@@ -117,9 +119,7 @@ function shouldReplaceManagedValue(key, value, expectedValue) {
     return value === legacyGoogleCallbackUrl && value !== expectedValue;
   }
   if (expectedValue.trim() === '') return false;
-  if (key === 'DATABASE_URL' || key === 'REDIS_URL') {
-    return !hasExpectedRuntimeLocation(value, expectedValue);
-  }
+  if (dataUrlKeys.has(key)) return targetsRemovedDataService(value);
   return false;
 }
 
@@ -195,7 +195,20 @@ async function synchronizeFeatureFlags(path, flags) {
 async function synchronizeEnvironmentContract(path, entries) {
   const content = await readFile(path, 'utf8');
   const environment = parseEnvironmentFile(content);
-  const obsoleteKeys = new Set(['LANGGRAPH_API_URL', 'TRUST_PROXY']);
+  const obsoleteKeys = new Set([
+    'LANGGRAPH_API_URL',
+    'TRUST_PROXY',
+    // In-repo PostgreSQL/Redis provisioning was removed; these credentials no longer exist.
+    'POSTGRES_USER',
+    'POSTGRES_PASSWORD',
+    'POSTGRES_PORT',
+    'MIGRATOR_DATABASE_PASSWORD',
+    'API_DATABASE_PASSWORD',
+    'AGENT_DATABASE_PASSWORD',
+    'REDIS_API_PASSWORD',
+    'AGENT_REDIS_PASSWORD',
+    'REDIS_PORT',
+  ]);
   const managedEntries = new Map(entries);
   const seenKeys = new Set();
   let replacedEmptyValue = false;
@@ -260,14 +273,20 @@ const [rootEnvironment, apiEnvironment, webEnvironment, agentEnvironment] = awai
 const environments = [rootEnvironment, apiEnvironment, agentEnvironment];
 
 const secrets = Object.freeze({
-  postgres: firstUsableSecret('POSTGRES_PASSWORD', environments),
-  migratorDatabase: firstUsableSecret('MIGRATOR_DATABASE_PASSWORD', environments),
-  apiDatabase: firstUsableSecret('API_DATABASE_PASSWORD', environments),
-  agentDatabase: firstUsableSecret('AGENT_DATABASE_PASSWORD', environments),
-  apiRedis: firstUsableSecret('REDIS_API_PASSWORD', environments),
-  agentRedis: firstUsableSecret('AGENT_REDIS_PASSWORD', environments),
   jwt: firstUsableSecret('AUTH_JWT_SECRET', environments),
   metrics: firstUsableSecret('OBSERVABILITY_METRICS_TOKEN', environments),
+});
+
+function preservedDataUrl(key, fallback) {
+  const current = firstNonEmptyValue(key, environments);
+  return current !== '' && !targetsRemovedDataService(current) ? current : fallback;
+}
+
+const dataUrls = Object.freeze({
+  rootDatabase: preservedDataUrl('DATABASE_URL', dataServices.containerDatabaseUrl),
+  rootRedis: preservedDataUrl('REDIS_URL', dataServices.containerRedisUrl),
+  agentDatabase: preservedDataUrl('AGENT_DATABASE_URI', dataServices.agentDatabaseUri),
+  agentRedis: preservedDataUrl('AGENT_REDIS_URI', dataServices.agentRedisUri),
 });
 
 const configuredGoogleCallbackUrl = firstNonEmptyValue(
@@ -310,8 +329,6 @@ const featureFlags = Object.freeze({
 });
 
 const ports = Object.freeze({
-  postgres: firstValue('POSTGRES_PORT', environments, '5432'),
-  redis: firstValue('REDIS_PORT', environments, '6379'),
   api: firstValue('API_PORT', environments, '3000'),
   web: firstValue('WEB_PORT', [rootEnvironment, webEnvironment], '5173'),
   agent: firstValue('AGENT_PORT', environments, '2024'),
@@ -321,19 +338,10 @@ const rootContent = renderEnvironment([
   '# Generated by pnpm setup:env. Private local values: never commit this file.',
   'NODE_ENV=development',
   '',
-  '# PostgreSQL bootstrap and isolated runtime roles',
-  'POSTGRES_USER=alfred',
-  `POSTGRES_PASSWORD=${secrets.postgres}`,
-  `MIGRATOR_DATABASE_PASSWORD=${secrets.migratorDatabase}`,
-  `API_DATABASE_PASSWORD=${secrets.apiDatabase}`,
-  `AGENT_DATABASE_PASSWORD=${secrets.agentDatabase}`,
-  `POSTGRES_PORT=${ports.postgres}`,
-  '',
-  '# Isolated Redis credentials',
-  `REDIS_API_PASSWORD=${secrets.apiRedis}`,
-  `AGENT_REDIS_PASSWORD=${secrets.agentRedis}`,
-  `REDIS_PORT=${ports.redis}`,
-  `REDIS_URL=redis://default:${secrets.apiRedis}@localhost:${ports.redis}/0`,
+  '# Shared PostgreSQL and Redis from the langgraph-agent-repo platform stack, as seen by containers.',
+  `DATABASE_URL=${dataUrls.rootDatabase}`,
+  `REDIS_URL=${dataUrls.rootRedis}`,
+  'DATA_NETWORK=langgraph-agent-repo_agent-network',
   '',
   '# NestJS and browser session',
   `API_PORT=${ports.api}`,
@@ -377,6 +385,10 @@ const rootContent = renderEnvironment([
   '# LangGraph local port and optional standalone Agent Server licence',
   `AGENT_PORT=${ports.agent}`,
   `LANGGRAPH_CLOUD_LICENSE_KEY=${firstValue('LANGGRAPH_CLOUD_LICENSE_KEY', environments)}`,
+  '',
+  '# Standalone Agent Server overlay: reserve a database and Redis logical DB on the shared services.',
+  `AGENT_DATABASE_URI=${dataUrls.agentDatabase}`,
+  `AGENT_REDIS_URI=${dataUrls.agentRedis}`,
 ]);
 
 const apiContent = renderEnvironment([
@@ -388,8 +400,8 @@ const apiContent = renderEnvironment([
   'API_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173',
   'TRUST_PROXY_HOPS=0',
   '',
-  '# PostgreSQL runtime role; migrations use the migrator role separately.',
-  `DATABASE_URL=postgresql://alfred_api:${secrets.apiDatabase}@127.0.0.1:${ports.postgres}/alfred_app?schema=public`,
+  '# Shared PostgreSQL from the langgraph-agent-repo stack; API tables carry the api_ prefix.',
+  `DATABASE_URL=${dataServices.hostDatabaseUrl}`,
   'DATABASE_POOL_MAX=20',
   'DATABASE_SSL=false',
   '',
@@ -416,7 +428,7 @@ const apiContent = renderEnvironment([
   `GOOGLE_OAUTH_CALLBACK_URL=${google.callbackUrl}`,
   `GOOGLE_WORKSPACE_DOMAIN=${google.workspaceDomain}`,
   '',
-  `REDIS_URL=redis://default:${secrets.apiRedis}@127.0.0.1:${ports.redis}/0`,
+  `REDIS_URL=${dataServices.hostRedisUrl}`,
   '',
   '# Structured logs and opt-in Prometheus metrics.',
   'OBSERVABILITY_LOG_LEVEL=info',
@@ -433,8 +445,8 @@ const webContent = renderEnvironment([
 const agentContent = renderEnvironment([
   '# Generated by pnpm setup:env for standalone Agent Server configuration.',
   '# Local pnpm dev:agent loads the repository root .env through langgraph.json.',
-  `DATABASE_URI=postgres://alfred_agent:${secrets.agentDatabase}@postgres:5432/alfred_langgraph?sslmode=disable`,
-  `REDIS_URI=redis://default:${secrets.agentRedis}@agent-redis:6379/0`,
+  `DATABASE_URI=${dataUrls.agentDatabase}`,
+  `REDIS_URI=${dataUrls.agentRedis}`,
   `LANGGRAPH_CLOUD_LICENSE_KEY=${firstValue('LANGGRAPH_CLOUD_LICENSE_KEY', environments)}`,
 ]);
 
@@ -453,14 +465,11 @@ await Promise.all([
 await Promise.all([
   synchronizeEnvironmentContract(envPaths.root, [
     ['NODE_ENV', 'development'],
-    ['POSTGRES_USER', firstValue('POSTGRES_USER', environments, 'alfred')],
-    ['POSTGRES_PASSWORD', secrets.postgres],
-    ['MIGRATOR_DATABASE_PASSWORD', secrets.migratorDatabase],
-    ['API_DATABASE_PASSWORD', secrets.apiDatabase],
-    ['AGENT_DATABASE_PASSWORD', secrets.agentDatabase],
-    ['REDIS_API_PASSWORD', secrets.apiRedis],
-    ['AGENT_REDIS_PASSWORD', secrets.agentRedis],
-    ['REDIS_URL', `redis://default:${secrets.apiRedis}@localhost:${ports.redis}/0`],
+    ['DATABASE_URL', dataUrls.rootDatabase],
+    ['REDIS_URL', dataUrls.rootRedis],
+    ['DATA_NETWORK', 'langgraph-agent-repo_agent-network'],
+    ['AGENT_DATABASE_URI', dataUrls.agentDatabase],
+    ['AGENT_REDIS_URI', dataUrls.agentRedis],
     ['AUTH_JWT_SECRET', secrets.jwt],
     ['AUTH_SESSION_CLEANUP_INTERVAL_SECONDS', '3600'],
     ['AUTH_SESSION_RETENTION_SECONDS', '2592000'],
@@ -479,10 +488,7 @@ await Promise.all([
     ['GOOGLE_WORKSPACE_DOMAIN', google.workspaceDomain],
   ]),
   synchronizeEnvironmentContract(envPaths.api, [
-    [
-      'DATABASE_URL',
-      `postgresql://alfred_api:${secrets.apiDatabase}@127.0.0.1:${ports.postgres}/alfred_app?schema=public`,
-    ],
+    ['DATABASE_URL', dataServices.hostDatabaseUrl],
     ['AUTH_JWT_SECRET', secrets.jwt],
     ['AUTH_SESSION_CLEANUP_INTERVAL_SECONDS', '3600'],
     ['AUTH_SESSION_RETENTION_SECONDS', '2592000'],
@@ -499,18 +505,15 @@ await Promise.all([
     ['GOOGLE_OAUTH_CLIENT_SECRET', google.clientSecret],
     ['GOOGLE_OAUTH_CALLBACK_URL', google.callbackUrl],
     ['GOOGLE_WORKSPACE_DOMAIN', google.workspaceDomain],
-    ['REDIS_URL', `redis://default:${secrets.apiRedis}@127.0.0.1:${ports.redis}/0`],
+    ['REDIS_URL', dataServices.hostRedisUrl],
   ]),
   synchronizeEnvironmentContract(envPaths.web, [
     ['VITE_API_URL', '/api'],
     ['ALFRED_DEV_API_PROXY_TARGET', `http://127.0.0.1:${ports.api}`],
   ]),
   synchronizeEnvironmentContract(envPaths.agent, [
-    [
-      'DATABASE_URI',
-      `postgres://alfred_agent:${secrets.agentDatabase}@postgres:5432/alfred_langgraph?sslmode=disable`,
-    ],
-    ['REDIS_URI', `redis://default:${secrets.agentRedis}@agent-redis:6379/0`],
+    ['DATABASE_URI', dataUrls.agentDatabase],
+    ['REDIS_URI', dataUrls.agentRedis],
     ['LANGGRAPH_CLOUD_LICENSE_KEY', firstValue('LANGGRAPH_CLOUD_LICENSE_KEY', environments)],
   ]),
 ]);

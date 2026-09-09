@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn } from 'typeorm';
 
-@Entity({ name: 'oauth_login_states' })
+@Entity({ name: 'api_oauth_login_states' })
 @Index('idx_oauth_login_states_expiry', ['expiresAt'])
 export class OauthLoginStateEntity {
   @PrimaryColumn({

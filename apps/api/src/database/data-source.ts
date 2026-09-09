@@ -1,7 +1,11 @@
 import 'reflect-metadata';
 import { DataSource, type DataSourceOptions } from 'typeorm';
 import { parseDatabaseEnvironment } from './database-environment';
-import { createPostgresConnectionExtra, POSTGRES_UUID_EXTENSION } from './database-options';
+import {
+  API_MIGRATIONS_TABLE,
+  createPostgresConnectionExtra,
+  POSTGRES_UUID_EXTENSION,
+} from './database-options';
 import { databaseMigrations } from './migrations';
 import { databaseEntities } from './typeorm.options';
 
@@ -19,6 +23,7 @@ export function createApplicationDataSourceOptions(
     installExtensions: false,
     migrations: [...databaseMigrations],
     migrationsRun: false,
+    migrationsTableName: API_MIGRATIONS_TABLE,
     synchronize: false,
     ssl: environment.DATABASE_SSL ? { rejectUnauthorized: true } : false,
     extra: createPostgresConnectionExtra(environment.DATABASE_POOL_MAX),

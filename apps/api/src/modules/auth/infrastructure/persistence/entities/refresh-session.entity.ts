@@ -9,7 +9,7 @@ import {
 } from 'typeorm';
 import { UserEntity } from '../../../../users/user.entity';
 
-@Entity({ name: 'refresh_sessions' })
+@Entity({ name: 'api_refresh_sessions' })
 @Index('idx_refresh_sessions_expiry', ['expiresAt'])
 @Index('idx_refresh_sessions_family', ['familyId'])
 @Index('idx_refresh_sessions_replacement', ['replacedBySessionId'])

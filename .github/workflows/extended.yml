@@ -60,7 +60,12 @@ jobs:
     timeout-minutes: 60
     env:
       COMPOSE_PROJECT_NAME: alfred-ci-${{ github.run_id }}-${{ github.run_attempt }}
-      POSTGRES_USER: alfred
+      # Disposable stand-in for the langgraph-agent-repo platform network; PostgreSQL and Redis
+      # are not provisioned by this repository's Compose files.
+      DATA_NETWORK: alfred-ci-${{ github.run_id }}-${{ github.run_attempt }}-data
+      DATA_POSTGRES_CONTAINER: alfred-ci-${{ github.run_id }}-${{ github.run_attempt }}-postgres
+      DATA_REDIS_CONTAINER: alfred-ci-${{ github.run_id }}-${{ github.run_attempt }}-redis
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/alfred_test?schema=public
       FEATURE_RATE_LIMITING_ENABLED: 'true'
 
     steps:
@@ -83,11 +88,6 @@ jobs:
             echo "::add-mask::$value"
             printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV"
           }
-          generate_secret POSTGRES_PASSWORD
-          generate_secret MIGRATOR_DATABASE_PASSWORD
-          generate_secret API_DATABASE_PASSWORD
-          generate_secret AGENT_DATABASE_PASSWORD
-          generate_secret REDIS_API_PASSWORD
           generate_secret AUTH_JWT_SECRET
       - run: docker compose --env-file .env.example config --quiet
       - run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml config --quiet
@@ -95,13 +95,13 @@ jobs:
         run: |
           docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml config --format json |
             jq --exit-status '
+              (.services | keys | sort) == ["agent", "api", "migrate", "web"] and
               (.services.api.ports // []) == [] and
               (.services.agent.ports // []) == [] and
-              (.services.postgres.ports // []) == [] and
-              (.services.redis.ports // []) == [] and
-              (.services.agent.networks | keys | sort) == ["agent-data"] and
-              (.services.postgres.networks | keys | sort) == ["agent-data", "api-data"] and
-              (.services.redis.networks | keys | sort) == ["api-data"] and
+              .networks.data.external == true and
+              (.services.agent.networks | keys | sort) == ["data"] and
+              (.services.api.networks | keys | sort) == ["app", "data"] and
+              (.services.migrate.networks | keys | sort) == ["data"] and
               .services.api.environment.NODE_ENV == "production" and
               .services.api.environment.FEATURE_AGENT_RUNTIME_ENABLED == "false" and
               .services.api.environment.FEATURE_AG_UI_STREAMING_ENABLED == "false" and
@@ -116,12 +116,7 @@ jobs:
               ] and
               .services.agent.environment.LANGCHAIN_TRACING_V2 == "false" and
               .services.agent.environment.LANGSMITH_TRACING == "false" and
-              (.services.postgres.healthcheck.test[1] | contains("--host 127.0.0.1")) and
-              .services.api.depends_on["postgres-runtime-grants"].condition == "service_completed_successfully" and
-              .services["postgres-runtime-grants"].depends_on.migrate.condition == "service_completed_successfully" and
-              .services["postgres-runtime-grants"].command == [
-                "/usr/local/bin/revoke-runtime-migration-ledger.sh"
-              ]
+              .services.api.depends_on.migrate.condition == "service_completed_successfully"
             '
       - name: Build base images
         id: build_base
@@ -142,21 +137,39 @@ jobs:
         run: |
           uid="$(docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml run --rm --no-deps --entrypoint id agent -u)"
           test "$uid" -gt 0
-      - name: Start PostgreSQL and Redis and apply repeatable bootstrap
+      - name: Start disposable stand-ins for the platform PostgreSQL and Redis
         timeout-minutes: 3
+        # Mirrors the langgraph-agent-repo services: `postgres`/`redis` aliases on the shared
+        # network, the `langgraph` database, and loopback publication for host test processes.
         run: |
-          docker compose --env-file .env.example up -d --no-build --wait --wait-timeout 120 postgres redis
-          docker compose --env-file .env.example run --rm --no-deps postgres-bootstrap
+          docker network create "$DATA_NETWORK"
+          docker run --detach --name "$DATA_POSTGRES_CONTAINER" \
+            --network "$DATA_NETWORK" --network-alias postgres \
+            --publish 127.0.0.1:5432:5432 \
+            --env POSTGRES_USER=postgres --env POSTGRES_PASSWORD=postgres --env POSTGRES_DB=langgraph \
+            postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c
+          docker run --detach --name "$DATA_REDIS_CONTAINER" \
+            --network "$DATA_NETWORK" --network-alias redis \
+            --publish 127.0.0.1:6379:6379 \
+            redis:7.4-alpine@sha256:8b81dd37ff027bec4e516d41acfbe9fe2460070dc6d4a4570a2ac5b9d59df065
+          for _ in $(seq 1 60); do
+            if docker exec "$DATA_POSTGRES_CONTAINER" pg_isready --host 127.0.0.1 --username postgres --dbname langgraph >/dev/null 2>&1 &&
+              docker exec "$DATA_REDIS_CONTAINER" redis-cli ping 2>/dev/null | grep --quiet PONG; then
+              break
+            fi
+            sleep 2
+          done
+          docker exec "$DATA_POSTGRES_CONTAINER" pg_isready --host 127.0.0.1 --username postgres --dbname langgraph
+          docker exec "$DATA_REDIS_CONTAINER" redis-cli ping | grep --quiet PONG
+          docker exec "$DATA_POSTGRES_CONTAINER" createdb --username postgres alfred_test
       - name: Run the compiled TypeORM migration against PostgreSQL
         run: docker compose --env-file .env.example run --rm --no-deps migrate
       - name: Run the compiled migration with the production overlay environment
         run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml run --rm --no-deps migrate
-      - name: Reconcile runtime grants after migration
-        run: docker compose --env-file .env.example run --rm --no-deps postgres-runtime-grants
       - name: Start the compiled API and assert dependency readiness
         timeout-minutes: 3
         run: |
-          # Bootstrap, migrations and grants already completed as one-shot jobs.
+          # Migrations already completed as a one-shot job.
           # Preserve the image's default command (node dist/main.js).
           docker compose --env-file .env.example up -d --no-build --no-deps --wait --wait-timeout 120 api
           curl --fail-with-body --silent --show-error --connect-timeout 3 --max-time 10 \
@@ -166,40 +179,23 @@ jobs:
               .details.database.status == "up" and
               .details.redis.status == "up"
             '
-      - name: Assert the API role cannot mutate the TypeORM migration ledger
+      - name: Assert every API table carries the api_ prefix in the shared database
         run: |
-          docker compose --env-file .env.example exec --no-TTY postgres \
-            psql --username alfred --dbname alfred_app --tuples-only --no-align --set=ON_ERROR_STOP=1 \
-              --command "SELECT NOT (has_table_privilege('alfred_api', 'public.migrations', 'INSERT') OR has_table_privilege('alfred_api', 'public.migrations', 'UPDATE') OR has_table_privilege('alfred_api', 'public.migrations', 'DELETE'))" |
-            grep --line-regexp --quiet t
-      - name: Assert the Agent Server can manage its schema without owning extensions
-        run: |
-          docker compose --env-file .env.example exec --no-TTY postgres \
-            psql --username alfred --dbname alfred_langgraph --tuples-only --no-align --set=ON_ERROR_STOP=1 \
-              --command "SELECT has_schema_privilege('alfred_agent', 'public', 'USAGE') AND has_schema_privilege('alfred_agent', 'public', 'CREATE') AND NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname <> 'plpgsql' AND pg_get_userbyid(extowner) = 'alfred_agent')" |
-            grep --line-regexp --quiet t
+          docker exec "$DATA_POSTGRES_CONTAINER" \
+            psql --username postgres --dbname langgraph --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+              --command "SELECT string_agg(tablename, ',' ORDER BY tablename) FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('assistant', 'assistant_versions', 'checkpoint_blobs', 'checkpoint_delete_queue', 'checkpoint_writes', 'checkpoints', 'cron', 'run', 'schema_migrations', 'store', 'thread', 'thread_ttl')" |
+            grep --line-regexp --quiet 'api_idempotency_keys,api_migrations,api_oauth_login_states,api_refresh_sessions,api_user_identities,api_users'
       - name: Reject pending migrations and entity-schema drift
         run: docker compose --env-file .env.example run --rm --no-deps migrate node dist/database/check-schema-drift.js
       - name: Run API E2E tests against real PostgreSQL locking
         run: |
           REQUIRE_DATABASE_E2E=true \
-          TEST_DATABASE_ADMIN_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5432}/alfred_test?schema=public" \
-          TEST_MIGRATION_DATABASE_URL="postgresql://alfred_migrator:${MIGRATOR_DATABASE_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5432}/alfred_test?schema=public" \
-          TEST_DATABASE_URL="postgresql://alfred_api:${API_DATABASE_PASSWORD}@127.0.0.1:${POSTGRES_PORT:-5432}/alfred_test?schema=public" \
+          TEST_DATABASE_ADMIN_URL="$TEST_DATABASE_URL" \
+          TEST_MIGRATION_DATABASE_URL="$TEST_DATABASE_URL" \
+          TEST_DATABASE_URL="$TEST_DATABASE_URL" \
             pnpm --filter @alfred/api test:e2e
       # Keep complete reports. The following policy gate blocks fixable findings;
       # scanner failures remain fatal because continue-on-error is not enabled.
-      - name: Scan the PostgreSQL image
-        if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-        with:
-          exit-code: '0'
-          format: json
-          output: trivy-postgres.json
-          ignore-unfixed: false
-          image-ref: ${{ env.COMPOSE_PROJECT_NAME }}-postgres
-          scanners: vuln
-          severity: HIGH,CRITICAL
       - name: Scan the API image
         if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
@@ -259,7 +255,7 @@ jobs:
         if: ${{ !cancelled() && steps.build_base.outcome == 'success' }}
         run: |
           node scripts/check-image-vulnerabilities.mjs \
-            trivy-postgres.json trivy-api.json trivy-migrate.json \
+            trivy-api.json trivy-migrate.json \
             trivy-web.json trivy-agent.json trivy-agent-standalone.json
       - name: Upload image vulnerability reports
         if: ${{ !cancelled() }}
@@ -275,13 +271,15 @@ jobs:
         run: |
           status=0
           docker compose --env-file .env.example ps --all || status=$?
-          docker compose --env-file .env.example logs --no-color --timestamps --tail 200 postgres redis api || status=$?
+          docker compose --env-file .env.example logs --no-color --timestamps --tail 200 api || status=$?
+          docker logs --timestamps --tail 100 "$DATA_POSTGRES_CONTAINER" || status=$?
+          docker logs --timestamps --tail 100 "$DATA_REDIS_CONTAINER" || status=$?
           exit "$status"
       - name: Remove the disposable CI project
         if: always()
         timeout-minutes: 2
-        # Base removes host-access; overlay also covers agent-redis-data.
-        # Never prune other Docker projects.
+        # Compose never removes the external data network; the stand-in containers and that
+        # network are removed explicitly. Never prune other Docker projects.
         # The ephemeral GitHub-hosted runner disposes of images and build caches.
         run: |
           status=0
@@ -289,4 +287,6 @@ jobs:
             --volumes --remove-orphans --timeout 10 || status=$?
           docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml \
             down --volumes --remove-orphans --timeout 10 || status=$?
+          docker rm --force --volumes "$DATA_POSTGRES_CONTAINER" "$DATA_REDIS_CONTAINER" || status=$?
+          docker network rm "$DATA_NETWORK" || status=$?
           exit "$status"

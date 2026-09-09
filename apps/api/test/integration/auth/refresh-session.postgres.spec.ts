@@ -3,6 +3,7 @@ import type { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { API_MIGRATIONS_TABLE } from '@api/database/database-options';
 import { databaseMigrations } from '@api/database/migrations';
 import { databaseEntities } from '@api/database/typeorm.options';
 import { RefreshSessionEntity } from '@api/modules/auth/infrastructure/persistence/entities/refresh-session.entity';
@@ -28,6 +29,21 @@ if (
 const describeWithPostgres =
   databaseUrl === undefined || migrationDatabaseUrl === undefined ? describe.skip : describe;
 const itWithDatabaseAdmin = adminDatabaseUrl === undefined ? it.skip : it;
+// Role separation is a deployment concern (ADR 0014): the runtime-privilege assertion applies only
+// when the runtime and migration connections authenticate as different PostgreSQL roles.
+const itWithSeparatedRoles =
+  databaseRole(databaseUrl) !== undefined &&
+  databaseRole(databaseUrl) !== databaseRole(migrationDatabaseUrl)
+    ? it
+    : it.skip;
+
+function databaseRole(value: string | undefined): string | undefined {
+  try {
+    return value === undefined ? undefined : new URL(value).username;
+  } catch {
+    return undefined;
+  }
+}
 
 function requireDatabaseUrl(value: string | undefined, name: string): string {
   if (value === undefined) throw new Error(`${name} is required`);
@@ -51,6 +67,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
       installExtensions: false,
       migrations: [...databaseMigrations],
       migrationsRun: false,
+      migrationsTableName: API_MIGRATIONS_TABLE,
       synchronize: false,
     });
     await migrationDataSource.initialize();
@@ -79,9 +96,9 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
   });
 
   beforeEach(async () => {
-    await dataSource.query('DELETE FROM "refresh_sessions"');
-    await dataSource.query('DELETE FROM "oauth_login_states"');
-    await dataSource.query('DELETE FROM "users"');
+    await dataSource.query('DELETE FROM "api_refresh_sessions"');
+    await dataSource.query('DELETE FROM "api_oauth_login_states"');
+    await dataSource.query('DELETE FROM "api_users"');
   });
 
   afterAll(async () => {
@@ -96,7 +113,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         `SELECT indexname
          FROM pg_indexes
          WHERE schemaname = 'public'
-           AND tablename = 'refresh_sessions'
+           AND tablename = 'api_refresh_sessions'
            AND indexname = 'idx_refresh_sessions_replacement'`,
       ),
     ).resolves.toEqual([{ indexname: 'idx_refresh_sessions_replacement' }]);
@@ -113,7 +130,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
          WHERE indexrelid = 'public.idx_refresh_sessions_replacement'::regclass`,
       );
       await adminDataSource.query(
-        `DELETE FROM public.migrations
+        `DELETE FROM public.api_migrations
          WHERE name = 'IndexRefreshSessionReplacement1788515667301'`,
       );
 
@@ -125,7 +142,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
            index_record.indisvalid AS "isValid",
            COUNT(migration.id)::text AS "migrationCount"
          FROM pg_catalog.pg_index AS index_record
-         CROSS JOIN public.migrations AS migration
+         CROSS JOIN public.api_migrations AS migration
          WHERE index_record.indexrelid = 'public.idx_refresh_sessions_replacement'::regclass
            AND migration.name = 'IndexRefreshSessionReplacement1788515667301'
          GROUP BY index_record.indisvalid`,
@@ -404,7 +421,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
     expect(family.every(({ revokedAt }) => revokedAt !== null)).toBe(true);
   });
 
-  it('denies schema creation to the API runtime role', async () => {
+  itWithSeparatedRoles('denies schema creation to the API runtime role', async () => {
     const queryRunner = dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();

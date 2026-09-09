@@ -48,3 +48,10 @@ and safe when several API replicas serve concurrent users.
 
 The provider-neutral identity and future runtime-principal boundary are governed by
 [ADR 0006](0006-provider-neutral-identity-and-runtime-principal.md).
+
+## Amendment 2026-09-09
+
+Every API-owned table now carries the `api_` prefix, including the TypeORM ledger
+`api_migrations`, because the API shares the LangGraph platform's `langgraph` database. The first
+migration installs `citext` itself with `CREATE EXTENSION IF NOT EXISTS`; infrastructure no longer
+provisions it. See [ADR 0014](0014-shared-platform-data-services.md).

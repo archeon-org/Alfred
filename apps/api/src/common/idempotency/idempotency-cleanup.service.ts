@@ -31,7 +31,7 @@ export class IdempotencyCleanupService implements OnApplicationBootstrap, OnAppl
   async purge(): Promise<number> {
     // Reservation and expiry use PostgreSQL time; an API clock skew cannot release a key early.
     const rows = await this.keys.query<{ deleted: number }[]>(`
-      WITH expired AS (DELETE FROM "idempotency_keys" WHERE "expires_at" < now() RETURNING 1)
+      WITH expired AS (DELETE FROM "api_idempotency_keys" WHERE "expires_at" < now() RETURNING 1)
       SELECT count(*)::integer AS deleted FROM expired
     `);
     return rows[0]?.deleted ?? 0;

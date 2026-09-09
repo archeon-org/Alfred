@@ -5,12 +5,31 @@ import { OauthLoginStateEntity } from '@api/modules/auth/infrastructure/persiste
 import { RefreshSessionEntity } from '@api/modules/auth/infrastructure/persistence/entities/refresh-session.entity';
 import { UserIdentityEntity } from '@api/modules/users/user-identity.entity';
 import { UserEntity } from '@api/modules/users/user.entity';
+import { API_MIGRATIONS_TABLE, API_TABLE_PREFIX } from '@api/database/database-options';
+import { databaseEntities } from '@api/database/typeorm.options';
 
 function metadataNames<T extends { readonly name?: string }>(values: readonly T[]): string[] {
   return values.flatMap(({ name }) => (name === undefined ? [] : [name])).sort();
 }
 
 describe('entity schema contract', () => {
+  it('prefixes every API-owned table so it can share a database with the LangGraph runtime', () => {
+    const tables = getMetadataArgsStorage().tables.filter(({ target }) =>
+      (databaseEntities as readonly unknown[]).includes(target),
+    );
+
+    expect(tables).toHaveLength(databaseEntities.length);
+    expect(tables.map(({ name }) => name).sort()).toEqual([
+      'api_idempotency_keys',
+      'api_oauth_login_states',
+      'api_refresh_sessions',
+      'api_user_identities',
+      'api_users',
+    ]);
+    expect(tables.every(({ name }) => name?.startsWith(API_TABLE_PREFIX))).toBe(true);
+    expect(API_MIGRATIONS_TABLE).toBe('api_migrations');
+  });
+
   it('uses stable names for identity constraints and indexes', () => {
     const metadata = getMetadataArgsStorage();
 

@@ -21,13 +21,17 @@ the future AG-UI stream gateway; the LangGraph service remains a separate agent 
   rotated under a database lock and delivered in an HttpOnly cookie. Access-token lifetime defaults
   to five minutes and cannot be configured above fifteen minutes.
 - Refresh and logout additionally enforce the configured browser origin.
-- External identities are keyed by `(issuer, subject)` in `user_identities`; verified email alone
+- External identities are keyed by `(issuer, subject)` in `api_user_identities`; verified email alone
   never links accounts.
 - Expired, revoked and rotated refresh rows are removed only after a configurable retention period
   that must be at least the complete refresh-token lifetime.
 - DTOs cross a strict global `ValidationPipe`; unknown fields are rejected.
 - Database schema changes run only through TypeORM migrations. Runtime startup has
   `synchronize: false` and `migrationsRun: false`.
+- The API shares the LangGraph platform's `langgraph` PostgreSQL database and Redis from the sibling
+  `langgraph-agent-repo` stack. Every API-owned table, including the TypeORM ledger
+  `api_migrations`, carries the `api_` prefix so backend objects are distinguishable from the
+  runtime tables ([ADR 0014](../../docs/adr/0014-shared-platform-data-services.md)).
 
 ## Commands
 
@@ -46,6 +50,8 @@ pnpm --filter @alfred/api schema:check
 
 Run `pnpm setup:env` for API-specific host development and Compose configuration. Never commit
 credentials. Optional capabilities are declared through validated `FEATURE_*_ENABLED` variables.
+`migration:run` and `schema:check` read `DATABASE_URL` from the process environment, for example
+`DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/langgraph?schema=public'`.
 
 Operational endpoints are intentionally outside the `/api` prefix:
 
@@ -73,8 +79,8 @@ docker build --file apps/api/Dockerfile --target runtime --tag alfred-api .
 ```
 
 The runtime image contains compiled migrations and runs as UID/GID `10001`. Compose executes
-`node dist/database/run-migrations.js` in a one-shot, read-only container before a second one-shot
-job revokes runtime DML on the TypeORM migration ledger and starts the API.
+`node dist/database/run-migrations.js` in a one-shot, read-only container on the platform's external
+Docker network before starting the API.
 Migrations run atomically one at a time. A migration may explicitly opt out when PostgreSQL requires
 an operation outside a transaction; the refresh-session replacement index uses
 `CREATE INDEX CONCURRENTLY` with a bounded 15-minute statement timeout. It disables the connection's
@@ -82,5 +88,7 @@ short runtime `lock_timeout` only for the concurrent index operation, then reset
 `finally` blocks. A retry removes only a matching invalid index left by an interrupted concurrent
 build; a valid matching index is accepted, while an unexpected index using the reserved name fails
 closed.
-The required `citext` extension is provisioned by `postgres-bootstrap`, not by the application
-migration user. TypeORM cannot auto-install extensions.
+The first migration installs the required `citext` extension with `CREATE EXTENSION IF NOT EXISTS`;
+the migration credential must be allowed to create that trusted extension because TypeORM never
+auto-installs extensions. The replacement-index migration repairs its index on either the original
+`refresh_sessions` table or the renamed `api_refresh_sessions` table.
