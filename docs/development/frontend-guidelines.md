@@ -39,6 +39,11 @@ périmètre et ne doivent pas entrer dans une simple retouche de présentation.
   interactions correspondantes. Garder les éléments HTML natifs pour leur sémantique normale :
   titres, liens, listes, formulaires, sections. Il ne s'agit pas d'envelopper chaque balise.
 - Un lien reste un lien, un bouton reste un bouton. Ne pas imbriquer deux éléments interactifs.
+- Les interactions transverses ont une primitive unique sous `components/ui`, à réutiliser telle
+  quelle plutôt qu'à recopier par domaine : `ConfirmDialog` pour toute confirmation (suppression,
+  action irréversible), `TextFieldDialog` pour créer ou renommer une ressource nommée,
+  `MarkdownEditor` / `MarkdownDocumentDialog` / `MarkdownView` pour tout document Markdown. Une
+  nouvelle variante se fait par prop ou variante typée, jamais par duplication du composant.
 
 ## Couleurs, typographie et géométrie
 
