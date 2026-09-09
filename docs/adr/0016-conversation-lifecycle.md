@@ -61,8 +61,19 @@ its owner must reconcile those clauses.
   The destination's project context is the product context for future runtime integration;
   this transfer does not invoke an agent or inject a prompt.
 
-Infinite scrolling in pages of ten with loading skeletons is the following web increment.
-It does not enable sending messages, runtime bindings, agents, artifacts or memory projection.
+## Conversation list behavior
+
+Conversation lists request ten rows per page. The standalone list filters implicit projects on
+the server, so named-project chats cannot consume a page intended for standalone chats. Each
+project's navigation and main chat list use the same project-scoped query cache.
+
+A visible end marker requests the next cursor page. Initial and subsequent loading states show
+skeletons; in-flight requests and exhausted cursors suppress duplicate loads. A failed next page
+keeps the loaded chats visible and requires an explicit retry. Conversation details remain the
+source of truth for a chat opened directly outside the loaded pages. The sidebar text filter
+operates on loaded conversations; it is not a server-wide search facility.
+
+These actions do not enable sending messages, runtime bindings, agents, artifacts or memory projection.
 `ALF-DEC-010/012` remain the accepted-with-risk authority for eventual context resolution; the
 operational/retention questions under `ALF-DEC-019/051` are not resolved by this ADR.
 

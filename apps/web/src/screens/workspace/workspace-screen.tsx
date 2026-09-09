@@ -223,6 +223,12 @@ export function WorkspaceScreen() {
             hasMoreConversations={recentQuery.hasMore}
             isLoadingMoreConversations={recentQuery.isLoadingMore}
             onLoadMoreConversations={recentQuery.loadMore}
+            onRetryConversations={recentQuery.retryMore}
+            conversationsError={
+              recentQuery.status === 'ready' && recentQuery.error
+                ? describeApiError(recentQuery.error, 'Impossible de charger les conversations.')
+                : null
+            }
             selectedProjectId={selectedProjectId}
             selectedConversationId={conversationMatch?.params.conversationId}
             isProjectHome={projectMatch !== null}

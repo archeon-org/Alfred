@@ -114,7 +114,7 @@ export function ProjectScreen() {
           hasMore: chats.hasMore,
           isLoadingMore: chats.isLoadingMore,
           onLoadMore: chats.loadMore,
-          onRetry: chats.reload,
+          onRetry: chats.status === 'error' ? chats.reload : chats.retryMore,
           onSelect: (id) => void navigate(`/app/conversations/${id}`),
           status: chats.status,
         }}

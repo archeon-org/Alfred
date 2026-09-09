@@ -57,6 +57,7 @@ export function ProjectOverview({
         aria-labelledby="project-title"
         className="flex min-h-170 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-panel md:rounded-2xl workspace:min-h-0 workspace:overflow-y-auto [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin]"
         id="conversation"
+        data-conversation-scroll-root
       >
         <header className="flex shrink-0 items-start gap-3 border-b border-border px-4 py-4 md:px-6 md:py-5">
           <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-muted text-muted-foreground">

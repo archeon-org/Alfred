@@ -103,7 +103,7 @@ describe('Workspace organization', () => {
 
     await user.clear(search);
     await user.type(search, 'aucune-correspondance-123');
-    expect(screen.getByText('Aucune conversation trouvée')).toBeVisible();
+    expect(screen.getByText('Aucun chat libre trouvé')).toBeVisible();
     expect(
       screen.queryByRole('button', { name: 'Synthèse du comité projet' }),
     ).not.toBeInTheDocument();

@@ -12,5 +12,5 @@ export const conversationKeys = {
   detail: (userId: string, conversationId: string) =>
     ['conversations', userId, 'detail', conversationId] as const,
   list: (userId: string, projectId: string | null) =>
-    ['conversations', userId, 'list', projectId ?? 'recent'] as const,
+    ['conversations', userId, 'list', projectId ?? 'standalone'] as const,
 };

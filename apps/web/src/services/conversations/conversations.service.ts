@@ -31,6 +31,7 @@ export interface ConversationPage {
 export interface ConversationListQuery {
   /** Chats of one owned project; omitted, every recent chat of the caller. */
   readonly projectId?: string;
+  readonly projectKind?: 'implicit' | 'named';
   readonly cursor?: string;
   readonly limit?: number;
 }

@@ -1,3 +1,4 @@
+import { ConversationPagination } from '@/components/workspace/conversation/conversation-pagination';
 import { MessageSquareText, Pin } from 'lucide-react';
 
 import {
@@ -42,7 +43,7 @@ export function ProjectChatList({
       </div>
     );
   }
-  if (status === 'error') {
+  if (status === 'error' && conversations.length === 0) {
     return (
       <div
         className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"
@@ -57,9 +58,18 @@ export function ProjectChatList({
   }
   if (conversations.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
-        Aucun chat pour le moment. Écrivez ci-dessus pour ouvrir le premier.
-      </p>
+      <div>
+        <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+          Aucun chat pour le moment. Écrivez ci-dessus pour ouvrir le premier.
+        </p>
+        <ConversationPagination
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          error={error}
+          onLoadMore={onLoadMore}
+          onRetry={onRetry}
+        />
+      </div>
     );
   }
   return (
@@ -94,19 +104,13 @@ export function ProjectChatList({
           </li>
         ))}
       </ul>
-      {hasMore ? (
-        <div className="mt-4 flex justify-center">
-          <Button
-            aria-busy={isLoadingMore}
-            disabled={isLoadingMore}
-            onClick={onLoadMore}
-            size="sm"
-            variant="outline"
-          >
-            Charger plus de chats
-          </Button>
-        </div>
-      ) : null}
+      <ConversationPagination
+        hasMore={hasMore}
+        isLoadingMore={isLoadingMore}
+        error={error}
+        onLoadMore={onLoadMore}
+        onRetry={onRetry}
+      />
     </div>
   );
 }

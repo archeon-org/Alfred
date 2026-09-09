@@ -37,12 +37,13 @@ export function renderWorkspaceAt(
 ) {
   vi.stubGlobal('fetch', api.fetch);
   const router = createMemoryRouter(routes, { initialEntries: [path] });
+  const queryClient = createTestQueryClient();
   const view = render(
-    <QueryClientProvider client={createTestQueryClient()}>
+    <QueryClientProvider client={queryClient}>
       <SessionContext.Provider value={session}>
         <RouterProvider router={router} />
       </SessionContext.Provider>
     </QueryClientProvider>,
   );
-  return { ...view, api, router };
+  return { ...view, api, router, queryClient };
 }

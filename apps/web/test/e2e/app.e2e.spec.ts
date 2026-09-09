@@ -221,7 +221,7 @@ test('browses conversations by keyboard while keeping drafts local', async ({ pa
 
   const search = page.getByRole('searchbox', { name: 'Rechercher une conversation' });
   await search.fill('comité');
-  const sample = page.getByRole('button', { name: 'Synthèse du comité projet' });
+  const sample = page.getByRole('button', { name: 'Synthèse du comité projet', exact: true });
   await sample.focus();
   await page.keyboard.press('Enter');
 
@@ -264,13 +264,13 @@ test('opens mobile history and restores a hidden context without horizontal over
   await page
     .getByRole('searchbox', { name: 'Rechercher une conversation' })
     .fill('aucune-correspondance');
-  await expect(page.getByText('Aucune conversation trouvée')).toBeVisible();
+  await expect(page.getByText('Aucun chat libre trouvé')).toBeVisible();
   await page.getByRole('button', { name: 'Masquer les conversations' }).click();
   await expect(page.getByRole('searchbox', { name: 'Rechercher une conversation' })).toBeHidden();
 
   await historyToggle.click();
   await page.getByRole('searchbox', { name: 'Rechercher une conversation' }).fill('comité');
-  const sample = page.getByRole('button', { name: 'Synthèse du comité projet' });
+  const sample = page.getByRole('button', { name: 'Synthèse du comité projet', exact: true });
   await sample.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('main')).toBeFocused();

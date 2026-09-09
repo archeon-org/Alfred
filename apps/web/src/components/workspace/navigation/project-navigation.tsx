@@ -7,7 +7,7 @@ import { ProjectNavigationItem } from '@/components/workspace/navigation/project
 import type { ProjectActionHandlers } from '@/components/workspace/project/project-action-menu';
 import { useFoldedList } from '@/hooks/ui/use-folded-list';
 import { RECENT_PROJECTS_FIRST_PAGE } from '@/lib/workspace/project-list';
-import type { Conversation, Project } from '@/lib/workspace/workspace.types';
+import type { Project } from '@/lib/workspace/workspace.types';
 
 export interface ProjectNavigationProps {
   /** Pinned projects in the order they were pinned. */
@@ -19,7 +19,7 @@ export interface ProjectNavigationProps {
   readonly onLoadMoreProjects: () => void;
   /** Chats of named projects only; standalone chats live in their own section. */
   readonly conversationActions: ConversationActionHandlers;
-  readonly conversations: readonly Conversation[];
+  readonly search: string;
   readonly selectedProjectId: string | undefined;
   readonly selectedConversationId: string | undefined;
   /** True while the project home of `selectedProjectId` is the current screen. */
@@ -105,7 +105,7 @@ function ProjectSection({ children, footer, headerAction, icon, title }: Project
 export function ProjectNavigation({
   actions,
   conversationActions,
-  conversations,
+  search,
   hasMoreProjects,
   isLoadingMoreProjects,
   isProjectHome,
@@ -134,7 +134,7 @@ export function ProjectNavigation({
       <ProjectNavigationItem
         conversationActions={conversationActions}
         actions={actions}
-        conversations={conversations.filter((item) => item.projectId === project.id)}
+        search={search}
         isExpanded={isExpanded}
         isSearching={isSearching}
         isSelected={isSelected}

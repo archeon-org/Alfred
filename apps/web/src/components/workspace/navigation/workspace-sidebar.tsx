@@ -1,3 +1,4 @@
+import { ConversationPagination } from '@/components/workspace/conversation/conversation-pagination';
 import { ArrowUpRight, FlaskConical, MessageSquareText, Plus, Search } from 'lucide-react';
 import { useId } from 'react';
 import { Link } from 'react-router-dom';
@@ -14,15 +15,14 @@ import { HistorySkeleton } from '@/components/workspace/workspace-skeletons';
 import type { Conversation, WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
 import { cn } from '@/lib/cn';
 
-interface WorkspaceSidebarProps extends Omit<
-  ProjectNavigationProps,
-  'conversations' | 'onCreate' | 'isSearching'
-> {
+interface WorkspaceSidebarProps extends Omit<ProjectNavigationProps, 'onCreate' | 'isSearching'> {
   /** Recent chats already filtered by the search box. */
   readonly conversations: readonly Conversation[];
   /** Older chats exist beyond the loaded pages; the search only covers what is loaded. */
   readonly hasMoreConversations: boolean;
   readonly isLoadingMoreConversations: boolean;
+  readonly conversationsError: string | null;
+  readonly onRetryConversations: () => void;
   readonly onLoadMoreConversations: () => void;
   readonly search: string;
   readonly isLoading: boolean;
@@ -41,6 +41,8 @@ export function WorkspaceSidebar({
   hasMoreConversations,
   isLoadingMoreConversations,
   onLoadMoreConversations,
+  onRetryConversations,
+  conversationsError,
   search,
   isLoading,
   isNavigationOpen,
@@ -56,7 +58,6 @@ export function WorkspaceSidebar({
 }: WorkspaceSidebarProps) {
   const searchId = useId();
   const isSearching = Boolean(search.trim());
-  const projectChats = conversations.filter((item) => item.projectKind === 'named');
   const standaloneChats = conversations.filter((item) => item.projectKind === 'implicit');
   return (
     <aside
@@ -115,6 +116,7 @@ export function WorkspaceSidebar({
       </nav>
       <div
         id="conversation-history"
+        data-conversation-scroll-root
         className={cn(
           'mt-5 min-h-0 flex-1 overflow-y-auto [scrollbar-color:var(--sidebar-border)_transparent] [scrollbar-width:thin]',
           !isNavigationOpen && 'max-md:hidden',
@@ -135,6 +137,12 @@ export function WorkspaceSidebar({
             value={search}
           />
         </label>
+        {isSearching ? (
+          <p className="mb-3 px-2 text-2xs text-sidebar-muted">
+            Recherche parmi les conversations chargées. Effacez la recherche pour parcourir la
+            suite.
+          </p>
+        ) : null}
         {notice ? (
           <p
             className="mb-3 rounded-lg border border-sidebar-border bg-sidebar-accent px-2.5 py-2 text-2xs text-sidebar-foreground"
@@ -162,13 +170,13 @@ export function WorkspaceSidebar({
             <>
               {conversations.length === 0 && isSearching ? (
                 <p className="px-2.5 pb-3 text-xs text-sidebar-foreground">
-                  Aucune conversation trouvée
+                  Aucun chat libre trouvé
                 </p>
               ) : null}
               <ProjectNavigation
                 conversationActions={conversationActions}
                 {...projectNavigation}
-                conversations={projectChats}
+                search={search}
                 isSearching={isSearching}
                 onCreate={(trigger) => onCreate('project', trigger)}
                 onSelectConversation={onSelectConversation}
@@ -199,22 +207,18 @@ export function WorkspaceSidebar({
                   selectedId={selectedConversationId}
                   onSelect={onSelectConversation}
                 />
+                <ConversationPagination
+                  hasMore={hasMoreConversations}
+                  isLoadingMore={isLoadingMoreConversations}
+                  error={conversationsError}
+                  onLoadMore={onLoadMoreConversations}
+                  onRetry={onRetryConversations}
+                  paused={isSearching}
+                />
                 <p className="mt-2 px-2 text-2xs text-sidebar-muted">
                   Conversations hors projet, chacune dans son espace privé.
                 </p>
               </section>
-              {hasMoreConversations ? (
-                <Button
-                  aria-busy={isLoadingMoreConversations}
-                  className="mt-4 h-8 min-h-8 w-full justify-start px-2 text-2xs font-normal text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                  disabled={isLoadingMoreConversations}
-                  onClick={onLoadMoreConversations}
-                  size="sm"
-                  variant="ghost"
-                >
-                  Afficher plus de conversations
-                </Button>
-              ) : null}
             </>
           )}
         </div>

@@ -200,10 +200,19 @@ export async function installWorkspaceApi(page: Page, seed: WorkspaceSeed = defa
     const id = match?.[1];
     if (id === undefined && method === 'GET') {
       const projectId = url.searchParams.get('projectId');
-      const items = conversations
-        .filter((item) => projectId === null || item.projectId === projectId)
+      const projectKind = url.searchParams.get('projectKind');
+      const all = conversations
+        .filter(
+          (item) =>
+            (projectId === null || item.projectId === projectId) &&
+            (projectKind === null || item.projectKind === projectKind),
+        )
         .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
-      return json(route, 200, { data: { items, nextCursor: null }, success: true });
+      const offset = Number(url.searchParams.get('cursor') ?? '0');
+      const limit = Number(url.searchParams.get('limit') ?? '10');
+      const items = all.slice(offset, offset + limit);
+      const nextCursor = offset + limit < all.length ? String(offset + limit) : null;
+      return json(route, 200, { data: { items, nextCursor }, success: true });
     }
     if (id === undefined && method === 'POST') {
       const input = body(route);

@@ -266,13 +266,18 @@ export function createWorkspaceApi(
     await Promise.resolve();
     if (url.pathname === '/api/conversations' && method === 'GET') {
       const projectId = url.searchParams.get('projectId');
+      const projectKind = url.searchParams.get('projectKind');
       if (projectId !== null && !projects.some((item) => item.id === projectId)) {
         return failure(404, 'project_not_found', 'Project not found.');
       }
       const failure_ = failures.get('GET /api/conversations');
       if (failure_ !== undefined) return failure(failure_.status, failure_.code);
       const all = byDate(
-        conversations.filter((item) => projectId === null || item.projectId === projectId),
+        conversations.filter(
+          (item) =>
+            (projectId === null || item.projectId === projectId) &&
+            (projectKind === null || item.projectKind === projectKind),
+        ),
         (item) => item.createdAt,
       );
       all.sort((left, right) => Number(right.pinnedAt !== null) - Number(left.pinnedAt !== null));

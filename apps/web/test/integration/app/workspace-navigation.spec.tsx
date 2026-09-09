@@ -154,7 +154,7 @@ describe('Workspace navigation', () => {
     );
   });
 
-  it('keeps the project of an older chat opened by link and loads older chats on demand', async () => {
+  it('keeps the project of an older deep link independently of standalone pagination', async () => {
     const user = userEvent.setup();
     const oldChatId = '3f2e1d0c-9b8a-4765-8321-000000000001';
     const recentStandalone = Array.from({ length: 50 }, (_, index) =>
@@ -181,7 +181,7 @@ describe('Workspace navigation', () => {
       `/app/projects/${PROJECT_ID}`,
     );
     expect(projectRow('Refonte du portail')).toHaveAttribute('aria-current', 'true');
-    expect(within(sidebar()).queryByRole('button', { name: 'Vieux chat' })).not.toBeInTheDocument();
+    expect(await within(sidebar()).findByRole('button', { name: 'Vieux chat' })).toBeVisible();
     expect(api.calls).toContainEqual(
       expect.objectContaining({ method: 'GET', path: `/api/conversations/${oldChatId}` }),
     );
@@ -191,21 +191,10 @@ describe('Workspace navigation', () => {
     expect(within(dialog).getByText(/Refonte du portail/u)).toBeVisible();
     await user.keyboard('{Escape}');
 
-    await user.click(
-      within(sidebar()).getByRole('button', { name: 'Afficher plus de conversations' }),
-    );
-
-    const oldRow = await within(
-      screen.getByRole('group', { name: 'Refonte du portail' }),
-    ).findByRole('button', { name: 'Vieux chat' });
-    expect(oldRow).toHaveAttribute('aria-current', 'page');
-    expect(
-      within(sidebar()).queryByRole('button', { name: 'Afficher plus de conversations' }),
-    ).not.toBeInTheDocument();
     expect(api.calls.map(({ path }) => path)).toEqual(
       expect.arrayContaining([
-        '/api/conversations?limit=50',
-        '/api/conversations?cursor=50&limit=50',
+        '/api/conversations?limit=10&projectKind=implicit',
+        `/api/conversations?limit=10&projectId=${PROJECT_ID}`,
       ]),
     );
   });

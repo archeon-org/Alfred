@@ -1,3 +1,9 @@
+import { useConversationsQuery } from '@/hooks/conversations/use-conversations-query';
+import {
+  ConversationListSkeleton,
+  ConversationPagination,
+} from '@/components/workspace/conversation/conversation-pagination';
+import { describeApiError } from '@/lib/workspace/api-error-message';
 import { Folder, FolderOpen } from 'lucide-react';
 
 import type { ConversationActionHandlers } from '@/components/workspace/conversation/conversation-action-menu';
@@ -8,12 +14,12 @@ import {
   type ProjectActionHandlers,
 } from '@/components/workspace/project/project-action-menu';
 import { cn } from '@/lib/cn';
-import type { Conversation, Project } from '@/lib/workspace/workspace.types';
+import type { Project } from '@/lib/workspace/workspace.types';
 
 export interface ProjectNavigationItemProps {
   readonly project: Project;
   readonly conversationActions: ConversationActionHandlers;
-  readonly conversations: readonly Conversation[];
+  readonly search: string;
   readonly panelId: string;
   readonly isSelected: boolean;
   readonly isExpanded: boolean;
@@ -30,7 +36,7 @@ export interface ProjectNavigationItemProps {
 export function ProjectNavigationItem({
   actions,
   conversationActions,
-  conversations,
+  search,
   isExpanded,
   isSearching,
   isSelected,
@@ -41,6 +47,10 @@ export function ProjectNavigationItem({
   project,
   selectedConversationId,
 }: ProjectNavigationItemProps) {
+  const chats = useConversationsQuery(project.id, isExpanded);
+  const conversations = chats.conversations.filter((item) =>
+    item.title.toLocaleLowerCase('fr').includes(search.trim().toLocaleLowerCase('fr')),
+  );
   const name = project.name ?? 'Projet';
   const Icon = isExpanded ? FolderOpen : Folder;
   return (
@@ -80,6 +90,7 @@ export function ProjectNavigationItem({
         hidden={!isExpanded}
         id={panelId}
       >
+        {chats.status === 'loading' && isExpanded ? <ConversationListSkeleton /> : null}
         {conversations.length > 0 ? (
           <ConversationNavigation
             conversationActions={conversationActions}
@@ -88,11 +99,25 @@ export function ProjectNavigationItem({
             onSelect={onSelectConversation}
             selectedId={selectedConversationId}
           />
-        ) : (
+        ) : chats.status === 'ready' ? (
           <p className="px-2 py-2 text-2xs leading-relaxed text-sidebar-muted">
             {isSearching ? 'Aucun résultat dans ce projet.' : 'Aucun chat pour le moment.'}
           </p>
-        )}
+        ) : null}
+        {isExpanded ? (
+          <ConversationPagination
+            hasMore={chats.hasMore}
+            isLoadingMore={chats.isLoadingMore}
+            error={
+              chats.error
+                ? describeApiError(chats.error, 'Impossible de charger les conversations.')
+                : null
+            }
+            onLoadMore={chats.loadMore}
+            onRetry={chats.status === 'error' ? chats.reload : chats.retryMore}
+            paused={isSearching}
+          />
+        ) : null}
       </div>
     </div>
   );
