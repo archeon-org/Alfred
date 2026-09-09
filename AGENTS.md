@@ -20,6 +20,31 @@ This repository is the Alfred monorepo. Keep the three application layers separa
 - `apps/api`: NestJS backend.
 - `apps/agent`: LangGraph graph application.
 
+## Architecture Decision Register
+
+`docs/creative_phase_2026-07-29_post_poc_decision_workshop.md` is the source of truth for Alfred's
+target product architecture. It records 56 numbered decisions (`ALF-DEC-001` to `ALF-DEC-056`) with
+a status, a decision owner and dated revisions. Only records marked `accepted` or
+`accepted-with-risk` are binding; `in-discussion`, `to-decide` and `deferred` records, verbatim
+stakeholder remarks and "Synthesis — not a decision" sections are not requirements.
+
+Before planning or implementing any new product capability, feature module, agent role, data model,
+API contract, storage, streaming or deployment profile:
+
+1. Use the `alfred-decision-register` skill to read the register: its authority header, the
+   cross-cutting V1 prerequisites, the decision backlog table, the decision records relevant to the
+   task and every later revision-history entry that amends them.
+2. Produce a written plan that cites the applicable `ALF-DEC` identifiers with their status, lists
+   the open or deferred decisions the task touches, and flags any conflict between the register and
+   the repository ADRs, skills or code. Known reconciliation items are listed in
+   `docs/memory-bank/decisions.md`.
+3. Submit that plan to the user and wait for explicit validation before editing application code.
+   Do not implement an `in-discussion`, `to-decide` or `deferred` choice as if it were accepted, and
+   do not amend the register yourself; report needed changes as questions for the decision owner.
+
+The register does not replace ADRs under `docs/adr/`. When an accepted record changes repository
+structure, add an ADR that cites the `ALF-DEC` identifiers it implements.
+
 ## Engineering Defaults
 
 - Preserve strict TypeScript and Python type checking.
@@ -30,7 +55,7 @@ This repository is the Alfred monorepo. Keep the three application layers separa
 
 ## Agentic Workflow
 
-- Use project-local skills from `.agents/skills/` when the task involves architecture, quality gates, testing or agent orchestration.
+- Use project-local skills from `.agents/skills/` when the task involves architecture, quality gates, testing or agent orchestration, and `alfred-decision-register` before planning any new capability.
 - Use project-local Codex roles from `.codex/agents/` for read-only exploration, implementation, review and docs verification when multi-agent mode is enabled.
 - Use `alfred-backend` for NestJS, TypeORM, authentication and API boundaries; `alfred-frontend` for React/Vite, routing and browser session work; and `alfred-infrastructure` for Docker, PostgreSQL, Redis and LangGraph deployment work.
 

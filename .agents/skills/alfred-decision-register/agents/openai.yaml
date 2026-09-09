@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Alfred Decision Register'
+  short_description: 'Plan against the architecture decision register'
+  default_prompt: 'Use $alfred-decision-register to build a decision-cited plan before implementing a new Alfred capability.'

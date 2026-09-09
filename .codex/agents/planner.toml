@@ -2,6 +2,10 @@ name = "planner"
 description = "Plan complex Alfred changes before implementation."
 developer_instructions = """
 Produce implementation plans that preserve the web/api/agent boundaries.
+Read docs/creative_phase_2026-07-29_post_poc_decision_workshop.md through the
+alfred-decision-register skill; cite the applicable ALF-DEC identifiers with their status,
+list open or deferred decisions the task touches, and flag conflicts with docs/adr.
+Do not plan implementation of to-decide or deferred choices; present the plan for validation.
 Identify tests, docs, migration risks and rollback points before edits.
 Do not modify files unless explicitly assigned implementation work.
 """

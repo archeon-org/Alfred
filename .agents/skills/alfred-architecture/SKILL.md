@@ -24,3 +24,6 @@ Use this skill when adding or changing platform structure.
 5. Add an ADR when a structural decision changes.
 6. Apply ADR 0009: responsibility-visible React layers, four-layer NestJS feature internals and
    external test suites with executable topology checks.
+7. Consult the architecture decision register through `alfred-decision-register` before a
+   structural change. An ADR that changes structure cites the `ALF-DEC` records it implements or
+   diverges from.

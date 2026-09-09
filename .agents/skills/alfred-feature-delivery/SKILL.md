@@ -7,6 +7,9 @@ description: Implement or fix Alfred application behavior with boundary-aware TD
 
 Keep each change owned by one application whenever possible. The browser calls `apps/api`; durable product data belongs behind the API; agent graphs and LangGraph deployment configuration stay in `apps/agent`.
 
+For a new capability, first obtain a user-validated plan through `alfred-decision-register`; the
+workflow below starts once that plan is accepted.
+
 ## Workflow
 
 1. Use the repository knowledge graph to locate the owning module and affected callers. Fall back to text search only when the graph lacks the needed config or literal.
