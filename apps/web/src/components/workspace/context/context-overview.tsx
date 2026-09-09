@@ -3,14 +3,9 @@ import { useId } from 'react';
 import { Sparkles } from 'lucide-react';
 
 import { AlfredMark } from '@/components/ui/alfred-mark';
-import { ContextResources } from '@/components/workspace/context/context-resources';
-import type { ConversationView } from '@/lib/workspace/workspace.types';
+import type { WorkspaceScope } from '@/lib/workspace/workspace.types';
 
-export function ContextOverview({
-  conversation,
-}: {
-  readonly conversation: ConversationView | undefined;
-}) {
+export function ContextOverview({ scope }: { readonly scope: WorkspaceScope }) {
   const id = useId();
   return (
     <>
@@ -37,21 +32,14 @@ export function ContextOverview({
         <dl className="mt-4 grid gap-3 text-2xs">
           <div className="flex justify-between gap-2">
             <dt className="text-muted-foreground">Espace</dt>
-            <dd className="font-medium">Personnel</dd>
+            <dd className="font-medium wrap-anywhere">{scope.projectName ?? 'Personnel'}</dd>
           </div>
           <div className="flex justify-between gap-2">
             <dt className="text-muted-foreground">Conversation</dt>
-            <dd className="font-medium">{conversation?.category ?? 'À explorer'}</dd>
-          </div>
-          <div className="flex justify-between gap-2">
-            <dt className="text-muted-foreground">Contenu</dt>
-            <dd className="font-medium text-warning-foreground">Démonstration</dd>
+            <dd className="font-medium wrap-anywhere">{scope.conversationTitle ?? 'À explorer'}</dd>
           </div>
         </dl>
       </section>
-      <div className="border-b border-border py-5">
-        <ContextResources resources={conversation?.resources ?? []} />
-      </div>
       <section aria-labelledby={`${id}-direction`} className="py-5">
         <h3 className="text-xs font-semibold" id={`${id}-direction`}>
           Le bon point de départ

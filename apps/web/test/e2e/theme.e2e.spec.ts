@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { installWorkspaceApi } from './support/workspace-api';
+
 const authenticatedSession = {
   data: {
     accessToken: 'e2e-memory-only-token',
@@ -14,6 +16,7 @@ const authenticatedSession = {
 };
 
 test.beforeEach(async ({ page }) => {
+  await installWorkspaceApi(page);
   await page.route('**/api/auth/refresh', async (route) =>
     route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
   );
@@ -93,7 +96,8 @@ test('keeps visible workspace and dialog text at least eleven CSS pixels', async
       return violations;
     });
   expect(await undersizedText()).toEqual([]);
-  await page.getByRole('button', { name: 'Synthèse du comité projet' }).click();
+  await page.getByRole('button', { name: 'Refonte du portail' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Refonte du portail' })).toBeVisible();
   expect(await undersizedText()).toEqual([]);
   await page.getByRole('button', { name: 'Paramètres' }).click();
   expect(await undersizedText()).toEqual([]);

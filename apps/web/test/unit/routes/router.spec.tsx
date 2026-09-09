@@ -1,10 +1,13 @@
 import { render, screen } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SessionContext, type SessionContextValue } from '@/contexts/session/session-context';
 import { useAuthProvidersQuery } from '@/hooks/auth/use-auth-providers-query';
 import { routes } from '@/routes/router';
+import { createTestQueryClient } from '../../support/render-workspace';
+import { createWorkspaceApi } from '../../support/workspace-api';
 
 vi.mock('@/hooks/auth/use-auth-providers-query');
 
@@ -13,10 +16,13 @@ const mockedUseAuthProvidersQuery = vi.mocked(useAuthProvidersQuery);
 function renderRoute(path: string, session: SessionContextValue) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
 
+  vi.stubGlobal('fetch', createWorkspaceApi().fetch);
   return render(
-    <SessionContext.Provider value={session}>
-      <RouterProvider router={router} />
-    </SessionContext.Provider>,
+    <QueryClientProvider client={createTestQueryClient()}>
+      <SessionContext.Provider value={session}>
+        <RouterProvider router={router} />
+      </SessionContext.Provider>
+    </QueryClientProvider>,
   );
 }
 

@@ -1,41 +1,145 @@
+import { CONVERSATION_TITLE_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH } from '@alfred/contracts';
 import { useRef, useState } from 'react';
+import { Outlet, useMatch, useNavigate } from 'react-router-dom';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 
-import { ConversationPanel } from '@/components/workspace/conversation/conversation-panel';
+import { TextFieldDialog } from '@/components/ui/text-field-dialog';
 import { ContextPanel } from '@/components/workspace/context/context-panel';
 import { WorkspaceHeader } from '@/components/workspace/header/workspace-header';
 import { WorkspaceLayout } from '@/components/workspace/workspace-layout';
 import { WorkspaceSidebar } from '@/components/workspace/navigation/workspace-sidebar';
-import { WorkspaceCreateDialog } from '@/components/workspace/workspace-create-dialog';
+import { useCreateConversation } from '@/hooks/conversations/use-conversation-mutations';
+import { useConversationsQuery } from '@/hooks/conversations/use-conversations-query';
+import { useCreateProject } from '@/hooks/projects/use-project-mutations';
+import { useProjectsQuery } from '@/hooks/projects/use-projects-query';
 import { useWorkspacePreferences } from '@/hooks/workspace/use-workspace-preferences';
-import { useWorkspacePreview } from '@/hooks/workspace/use-workspace-preview';
+import type { WorkspaceOutletContext } from '@/hooks/workspace/use-workspace-outlet';
+import { useWorkspaceShell } from '@/hooks/workspace/use-workspace-shell';
 import { useWorkspaceTools } from '@/hooks/workspace/use-workspace-tools';
+import { describeApiError } from '@/lib/workspace/api-error-message';
 import type { WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
 
+const creationLabels = {
+  conversation: {
+    field: 'Titre de la conversation',
+    maxLength: CONVERSATION_TITLE_MAX_LENGTH,
+    placeholder: 'Ex. Définir les prochaines étapes',
+    submit: 'Créer la conversation',
+    title: 'Nouvelle conversation',
+  },
+  project: {
+    field: 'Nom du projet',
+    maxLength: PROJECT_NAME_MAX_LENGTH,
+    placeholder: 'Ex. Préparation du comité',
+    submit: 'Créer le projet',
+    title: 'Nouveau projet',
+  },
+  sandbox: {
+    field: 'Titre du chat',
+    maxLength: CONVERSATION_TITLE_MAX_LENGTH,
+    placeholder: 'Ex. Une idée à explorer',
+    submit: 'Ouvrir le chat',
+    title: 'Nouveau chat libre',
+  },
+} as const satisfies Record<WorkspaceCreationKind, unknown>;
+
+/** Workspace frame: navigation data, creation dialogs and the panels around the routed screen. */
 export function WorkspaceScreen() {
-  const preview = useWorkspacePreview();
+  const shell = useWorkspaceShell();
   const tools = useWorkspaceTools();
   const preferences = useWorkspacePreferences();
+  const navigate = useNavigate();
+  const projectMatch = useMatch('/app/projects/:projectId');
+  const conversationMatch = useMatch('/app/conversations/:conversationId');
+  const projectsQuery = useProjectsQuery();
+  const recentQuery = useConversationsQuery(null);
+  const createProject = useCreateProject();
+  const createConversation = useCreateConversation();
   const conversationRef = useRef<HTMLElement>(null);
-  const creationTriggerRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<PanelImperativeHandle>(null);
-  const [creationKind, setCreationKind] = useState<WorkspaceCreationKind | null>(null);
+  const [creation, setCreation] = useState<WorkspaceCreationKind | null>(null);
 
-  function selectConversation(id: string) {
-    preview.selectConversation(id);
-    conversationRef.current?.focus();
+  const selectedConversation = recentQuery.conversations.find(
+    ({ id }) => id === conversationMatch?.params.conversationId,
+  );
+  const selectedProjectId =
+    projectMatch?.params.projectId ??
+    (selectedConversation?.projectKind === 'named' ? selectedConversation.projectId : undefined);
+  const selectedProject = projectsQuery.projects.find(({ id }) => id === selectedProjectId);
+  const normalizedSearch = shell.search.trim().toLocaleLowerCase('fr');
+  const conversations = recentQuery.conversations.filter(({ title }) =>
+    title.toLocaleLowerCase('fr').includes(normalizedSearch),
+  );
+  const isNavigationLoading =
+    projectsQuery.status === 'loading' || recentQuery.status === 'loading';
+  const isLoading = shell.isPreviewLoading || isNavigationLoading;
+  const loadError =
+    projectsQuery.status === 'error'
+      ? describeApiError(projectsQuery.error, 'Impossible de charger vos projets.')
+      : recentQuery.status === 'error'
+        ? describeApiError(recentQuery.error, 'Impossible de charger vos conversations.')
+        : null;
+  const scopeName =
+    selectedProject?.name ??
+    (selectedConversation?.projectKind === 'implicit' ? 'Chat libre' : 'Espace personnel');
+  const creationError =
+    creation === 'project'
+      ? createProject.isError
+        ? describeApiError(createProject.error, 'Impossible de créer le projet.')
+        : null
+      : createConversation.isError
+        ? describeApiError(createConversation.error, 'Impossible de créer la conversation.')
+        : null;
+
+  function closeCreation() {
+    setCreation(null);
+    createProject.reset();
+    createConversation.reset();
   }
 
-  function openCreation(kind: WorkspaceCreationKind, trigger: HTMLButtonElement) {
-    creationTriggerRef.current = trigger;
-    setCreationKind(kind);
+  function submitCreation(value: string) {
+    if (creation === 'project') {
+      createProject.mutate(
+        { name: value },
+        {
+          onSuccess: (project) => {
+            closeCreation();
+            shell.closeNavigation();
+            void navigate(`/app/projects/${project.id}`);
+          },
+        },
+      );
+      return;
+    }
+    createConversation.mutate(
+      {
+        title: value,
+        ...(creation === 'conversation' && selectedProject !== undefined
+          ? { projectId: selectedProject.id }
+          : {}),
+      },
+      {
+        onSuccess: (conversation) => {
+          closeCreation();
+          shell.closeNavigation();
+          void navigate(`/app/conversations/${conversation.id}`);
+        },
+      },
+    );
   }
 
   function toggleSidebar() {
-    if (preview.isSidebarOpen) sidebarRef.current?.collapse();
+    if (shell.isSidebarOpen) sidebarRef.current?.collapse();
     else sidebarRef.current?.expand();
-    preview.setIsSidebarOpen(!preview.isSidebarOpen);
+    shell.setIsSidebarOpen(!shell.isSidebarOpen);
   }
+
+  const outlet: WorkspaceOutletContext = {
+    conversationRef,
+    isLoading: shell.isPreviewLoading,
+    selectedProject,
+  };
+  const labels = creation === null ? creationLabels.project : creationLabels[creation];
 
   return (
     <div
@@ -52,67 +156,84 @@ export function WorkspaceScreen() {
         Aller au contenu principal
       </a>
       <WorkspaceLayout
-        isSidebarOpen={preview.isSidebarOpen}
-        isContextOpen={preview.isContextOpen}
+        isSidebarOpen={shell.isSidebarOpen}
+        isContextOpen={shell.isContextOpen}
         sidebarRef={sidebarRef}
-        onSidebarOpenChange={preview.setIsSidebarOpen}
+        onSidebarOpenChange={shell.setIsSidebarOpen}
         sidebar={
           <WorkspaceSidebar
-            projects={preview.projects}
-            conversations={preview.conversations}
-            selectedProjectId={preview.selectedProject?.id}
-            selectedId={preview.conversation?.id}
-            search={preview.search}
-            isLoading={preview.isLoading}
-            isNavigationOpen={preview.isNavigationOpen}
-            onSearch={preview.setSearch}
-            onSelect={selectConversation}
-            onSelectProject={preview.selectProject}
-            onCreate={openCreation}
+            projects={projectsQuery.projects}
+            conversations={conversations}
+            selectedProjectId={selectedProjectId}
+            selectedConversationId={conversationMatch?.params.conversationId}
+            search={shell.search}
+            isLoading={isLoading}
+            isNavigationOpen={shell.isNavigationOpen}
+            loadError={loadError}
+            onRetry={() => {
+              projectsQuery.reload();
+              recentQuery.reload();
+            }}
+            onSearch={shell.setSearch}
+            onSelectConversation={(id) => {
+              shell.closeNavigation();
+              void navigate(`/app/conversations/${id}`);
+            }}
+            onSelectProject={(id) => {
+              shell.closeNavigation();
+              void navigate(`/app/projects/${id}`);
+            }}
+            onCreate={(kind) => setCreation(kind)}
           />
         }
         header={
           <WorkspaceHeader
-            scopeName={preview.selectedProject?.name ?? 'Sandbox'}
-            isLoading={preview.isLoading}
-            isContextOpen={preview.isContextOpen}
-            isSidebarOpen={preview.isSidebarOpen}
-            isNavigationOpen={preview.isNavigationOpen}
-            onToggleLoading={preview.toggleLoading}
-            onToggleContext={preview.toggleContext}
-            onToggleNavigation={preview.toggleNavigation}
+            scopeName={scopeName}
+            isLoading={shell.isPreviewLoading}
+            isContextOpen={shell.isContextOpen}
+            isSidebarOpen={shell.isSidebarOpen}
+            isNavigationOpen={shell.isNavigationOpen}
+            onToggleLoading={shell.toggleLoading}
+            onToggleContext={shell.toggleContext}
+            onToggleNavigation={shell.toggleNavigation}
             onToggleSidebar={toggleSidebar}
             preferences={preferences}
           />
         }
-        conversation={
-          <ConversationPanel
-            ref={conversationRef}
-            conversation={preview.conversation}
-            prompts={preview.starterPrompts}
-            isLoading={preview.isLoading}
-            onSelect={selectConversation}
-          />
-        }
+        conversation={<Outlet context={outlet} />}
         context={
           <ContextPanel
+            isLoading={isLoading}
+            scope={{
+              conversationTitle: selectedConversation?.title,
+              projectName: selectedProject?.name ?? undefined,
+            }}
             tools={tools}
-            conversation={preview.conversation}
-            isLoading={preview.isLoading}
           />
         }
       />
-      {creationKind ? (
-        <WorkspaceCreateDialog
-          kind={creationKind}
-          projectName={preview.selectedProject?.name}
-          onClose={() => setCreationKind(null)}
-          onCreate={preview.createItem}
-          returnFocusRef={creationTriggerRef}
-          conversationRef={conversationRef}
-        />
-      ) : null}
-      {preview.isLoading ? (
+      <TextFieldDialog
+        description={
+          creation === 'conversation' && selectedProject?.name
+            ? `Dans le projet « ${selectedProject.name} ».`
+            : creation === 'sandbox'
+              ? 'Un chat hors projet, dans son propre espace privé.'
+              : 'Regroupez les conversations autour d’un même objectif.'
+        }
+        error={creationError}
+        isPending={createProject.isPending || createConversation.isPending}
+        label={labels.field}
+        maxLength={labels.maxLength}
+        onOpenChange={(open) => {
+          if (!open) closeCreation();
+        }}
+        onSubmit={submitCreation}
+        open={creation !== null}
+        placeholder={labels.placeholder}
+        submitLabel={labels.submit}
+        title={labels.title}
+      />
+      {shell.isPreviewLoading ? (
         <p className="sr-only" role="status" aria-label="Chargement de l’espace de travail">
           Chargement de l’espace de travail
         </p>

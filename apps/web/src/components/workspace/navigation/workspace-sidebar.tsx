@@ -8,23 +8,22 @@ import { AlfredMark } from '@/components/ui/alfred-mark';
 import { ConversationNavigation } from '@/components/workspace/navigation/conversation-navigation';
 import { ProjectNavigation } from '@/components/workspace/navigation/project-navigation';
 import { HistorySkeleton } from '@/components/workspace/workspace-skeletons';
-import type {
-  ConversationView,
-  WorkspaceCreationKind,
-  ProjectView,
-} from '@/lib/workspace/workspace.types';
+import type { Conversation, Project, WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
 import { cn } from '@/lib/cn';
 
 interface WorkspaceSidebarProps {
-  readonly conversations: readonly ConversationView[];
-  readonly projects: readonly ProjectView[];
+  /** Recent chats already filtered by the search box. */
+  readonly conversations: readonly Conversation[];
+  readonly projects: readonly Project[];
   readonly selectedProjectId: string | undefined;
-  readonly selectedId: string | undefined;
+  readonly selectedConversationId: string | undefined;
   readonly search: string;
   readonly isLoading: boolean;
   readonly isNavigationOpen: boolean;
+  readonly loadError: string | null;
+  readonly onRetry: () => void;
   readonly onSearch: (value: string) => void;
-  readonly onSelect: (id: string) => void;
+  readonly onSelectConversation: (id: string) => void;
   readonly onSelectProject: (id: string) => void;
   readonly onCreate: (kind: WorkspaceCreationKind, trigger: HTMLButtonElement) => void;
 }
@@ -33,16 +32,21 @@ export function WorkspaceSidebar({
   conversations,
   projects,
   selectedProjectId,
-  selectedId,
+  selectedConversationId,
   search,
   isLoading,
   isNavigationOpen,
+  loadError,
+  onRetry,
   onSearch,
-  onSelect,
+  onSelectConversation,
   onSelectProject,
   onCreate,
 }: WorkspaceSidebarProps) {
   const searchId = useId();
+  const isSearching = Boolean(search.trim());
+  const projectChats = conversations.filter((item) => item.projectKind === 'named');
+  const standaloneChats = conversations.filter((item) => item.projectKind === 'implicit');
   return (
     <aside
       aria-label="Espace personnel"
@@ -75,7 +79,12 @@ export function WorkspaceSidebar({
       >
         <Button
           className="h-auto rounded-lg border border-sidebar-primary px-2 py-3 text-2xs whitespace-normal md:text-xs"
-          onClick={(event) => onCreate('conversation', event.currentTarget)}
+          onClick={(event) =>
+            onCreate(
+              selectedProjectId === undefined ? 'sandbox' : 'conversation',
+              event.currentTarget,
+            )
+          }
           type="button"
         >
           <Plus aria-hidden="true" size={17} />
@@ -118,32 +127,44 @@ export function WorkspaceSidebar({
         <div aria-busy={isLoading}>
           {isLoading ? (
             <HistorySkeleton />
+          ) : loadError ? (
+            <div className="px-2.5 pb-3 text-xs" role="alert">
+              <p className="text-sidebar-foreground">{loadError}</p>
+              <Button
+                className="mt-3 border-sidebar-border text-sidebar-foreground hover:bg-sidebar-accent"
+                onClick={onRetry}
+                size="sm"
+                variant="outline"
+              >
+                Réessayer
+              </Button>
+            </div>
           ) : (
             <>
-              {conversations.length === 0 && search.trim() ? (
+              {conversations.length === 0 && isSearching ? (
                 <p className="px-2.5 pb-3 text-xs text-sidebar-foreground">
                   Aucune conversation trouvée
                 </p>
               ) : null}
               <ProjectNavigation
                 projects={projects}
-                conversations={conversations}
+                conversations={projectChats}
                 selectedProjectId={selectedProjectId}
-                selectedId={selectedId}
+                selectedConversationId={selectedConversationId}
                 onSelectProject={onSelectProject}
-                onSelectConversation={onSelect}
+                onSelectConversation={onSelectConversation}
                 onCreate={(trigger) => onCreate('project', trigger)}
-                isSearching={Boolean(search.trim())}
+                isSearching={isSearching}
               />
-              <section role="group" aria-label="Sandboxes" className="mt-7">
+              <section role="group" aria-label="Chats libres" className="mt-7">
                 <div className="mb-2 flex items-center justify-between pl-2.5">
                   <h2 className="flex items-center gap-2 text-2xs font-semibold tracking-widest text-sidebar-muted uppercase">
                     <FlaskConical aria-hidden="true" size={13} />
-                    Sandbox
+                    Chats libres
                   </h2>
                   <Button
                     variant="ghost"
-                    aria-label="Créer une sandbox"
+                    aria-label="Ouvrir un chat libre"
                     size="icon-sm"
                     onClick={(event) => onCreate('sandbox', event.currentTarget)}
                     type="button"
@@ -152,12 +173,12 @@ export function WorkspaceSidebar({
                   </Button>
                 </div>
                 <ConversationNavigation
-                  conversations={conversations.filter((item) => !item.projectId)}
-                  selectedId={selectedId}
-                  onSelect={onSelect}
+                  conversations={standaloneChats}
+                  selectedId={selectedConversationId}
+                  onSelect={onSelectConversation}
                 />
                 <p className="mt-2 px-2.5 text-2xs text-sidebar-muted">
-                  Conversations libres, hors projet.
+                  Conversations hors projet, chacune dans son espace privé.
                 </p>
               </section>
             </>
@@ -173,7 +194,7 @@ export function WorkspaceSidebar({
         <p className="text-2xs text-sidebar-foreground">De l’idée à l’essentiel.</p>
         <div className="mt-4 flex justify-between border-t border-sidebar-border pt-3 text-2xs text-sidebar-muted">
           <span>Alfred · Workspace</span>
-          <span>Aperçu local</span>
+          <span>Espace personnel</span>
         </div>
       </footer>
     </aside>

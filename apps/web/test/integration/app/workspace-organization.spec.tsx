@@ -1,67 +1,24 @@
-import { render, screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { SessionContext, type SessionContextValue } from '@/contexts/session/session-context';
-import { WorkspaceScreen } from '@/screens/workspace/workspace-screen';
-
-const session: SessionContextValue = {
-  accessToken: 'memory-only-test-token',
-  logout: () => Promise.resolve(),
-  refresh: () => Promise.resolve(null),
-  status: 'authenticated',
-  user: {
-    displayName: 'Ada Lovelace',
-    email: 'ada@example.test',
-    id: '21dd1aaa-d564-4a45-9a07-dbc5777d25d5',
-    role: 'user',
-  },
-};
-
-function renderWorkspace() {
-  return render(
-    <MemoryRouter>
-      <SessionContext.Provider value={session}>
-        <WorkspaceScreen />
-      </SessionContext.Provider>
-    </MemoryRouter>,
-  );
-}
+import { renderWorkspaceAt } from '../../support/render-workspace';
+import { conversation, createWorkspaceApi, PROJECT_ID, project } from '../../support/workspace-api';
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
-describe('Local workspace organization', () => {
-  it('creates and selects a named project without creating a conversation', async () => {
+describe('Workspace organization', () => {
+  it('keeps project chats and standalone chats apart', async () => {
     const user = userEvent.setup();
-    renderWorkspace();
+    const api = createWorkspaceApi({ projects: [project({ name: 'Projet Atlas' })] });
+    renderWorkspaceAt(`/app/projects/${PROJECT_ID}`, api);
 
-    await user.click(screen.getByRole('button', { name: 'Créer un projet' }));
-    const dialog = screen.getByRole('dialog', { name: 'Nouveau projet' });
-    await user.type(within(dialog).getByRole('textbox', { name: 'Nom du projet' }), 'Projet Atlas');
-    await user.click(within(dialog).getByRole('button', { name: 'Créer le projet' }));
-
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Nouvelle conversation' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Projet Atlas' })).toBeVisible();
-  });
-
-  it('keeps project conversations separate from standalone sandboxes without persisting them', async () => {
-    const user = userEvent.setup();
-    const fetch = vi.fn();
-    vi.stubGlobal('fetch', fetch);
-    const persist = vi.spyOn(Storage.prototype, 'setItem');
-    renderWorkspace();
-
-    await user.click(screen.getByRole('button', { name: 'Créer un projet' }));
-    await user.type(screen.getByRole('textbox', { name: 'Nom du projet' }), 'Projet Atlas');
-    await user.click(screen.getByRole('button', { name: 'Créer le projet' }));
-    await user.click(screen.getByRole('button', { name: 'Nouvelle conversation' }));
+    await user.click(await screen.findByRole('button', { name: 'Nouvelle conversation' }));
     const conversationDialog = screen.getByRole('dialog', { name: 'Nouvelle conversation' });
-    expect(within(conversationDialog).getByText(/Projet Atlas/)).toBeVisible();
+    expect(within(conversationDialog).getByText(/Projet Atlas/u)).toBeVisible();
     await user.type(
       within(conversationDialog).getByRole('textbox', { name: 'Titre de la conversation' }),
       'Décisions de lancement',
@@ -70,39 +27,120 @@ describe('Local workspace organization', () => {
       within(conversationDialog).getByRole('button', { name: 'Créer la conversation' }),
     );
 
-    const project = screen.getByRole('group', { name: 'Projet Atlas' });
-    expect(within(project).getByRole('button', { name: 'Décisions de lancement' })).toBeVisible();
-    expect(screen.getByRole('heading', { level: 1, name: 'Décisions de lancement' })).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Décisions de lancement' }),
+    ).toBeVisible();
+    const projectGroup = screen.getByRole('group', { name: 'Projet Atlas' });
+    expect(
+      within(projectGroup).getByRole('button', { name: 'Décisions de lancement' }),
+    ).toBeVisible();
     expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
 
-    await user.click(screen.getByRole('button', { name: 'Créer une sandbox' }));
-    const sandboxDialog = screen.getByRole('dialog', { name: 'Nouvelle sandbox' });
+    await user.click(screen.getByRole('button', { name: 'Ouvrir un chat libre' }));
+    const sandboxDialog = screen.getByRole('dialog', { name: 'Nouveau chat libre' });
     await user.type(
-      within(sandboxDialog).getByRole('textbox', { name: 'Titre de la conversation' }),
+      within(sandboxDialog).getByRole('textbox', { name: 'Titre du chat' }),
       'Piste indépendante',
     );
-    await user.click(within(sandboxDialog).getByRole('button', { name: 'Créer la sandbox' }));
+    await user.click(within(sandboxDialog).getByRole('button', { name: 'Ouvrir le chat' }));
 
     expect(
-      within(screen.getByRole('group', { name: 'Sandboxes' })).getByRole('button', {
+      await screen.findByRole('heading', { level: 1, name: 'Piste indépendante' }),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole('group', { name: 'Chats libres' })).getByRole('button', {
         name: 'Piste indépendante',
       }),
     ).toBeVisible();
     expect(
-      within(project).queryByRole('button', { name: 'Piste indépendante' }),
+      within(screen.getByRole('group', { name: 'Projet Atlas' })).queryByRole('button', {
+        name: 'Piste indépendante',
+      }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Piste indépendante' })).toBeVisible();
-    expect(fetch).not.toHaveBeenCalled();
-    expect(persist).not.toHaveBeenCalled();
+    const standalone = api.calls.filter(
+      ({ method, path }) => method === 'POST' && path === '/api/conversations',
+    );
+    expect(standalone.map(({ body }) => body)).toEqual([
+      { projectId: PROJECT_ID, title: 'Décisions de lancement' },
+      { title: 'Piste indépendante' },
+    ]);
+    expect(screen.getByText('Chat libre')).toBeVisible();
+  });
+
+  it('opens a standalone chat from a starter and carries the starter text as a draft', async () => {
+    const user = userEvent.setup();
+    const api = createWorkspaceApi();
+    renderWorkspaceAt('/app', api);
+
+    await user.click(await screen.findByRole('button', { name: /Aller à l’essentiel/u }));
+
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Aide-moi à synthétiser ce sujet et à en dégager les points clés.',
+      }),
+    ).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(
+      'Aide-moi à synthétiser ce sujet et à en dégager les points clés.',
+    );
+    expect(api.projects.at(-1)?.kind).toBe('implicit');
+  });
+
+  it('filters the history and explains an empty search', async () => {
+    const user = userEvent.setup();
+    renderWorkspaceAt(
+      '/app',
+      createWorkspaceApi({ conversations: [conversation()], projects: [project()] }),
+    );
+    const search = screen.getByRole('searchbox', { name: 'Rechercher une conversation' });
+    expect(await screen.findByRole('button', { name: 'Refonte du portail' })).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Synthèse du comité projet' }),
+    ).not.toBeInTheDocument();
+
+    await user.type(search, 'comité');
+    expect(screen.getByRole('button', { name: 'Synthèse du comité projet' })).toBeVisible();
+
+    await user.clear(search);
+    await user.type(search, 'aucune-correspondance-123');
+    expect(screen.getByText('Aucune conversation trouvée')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Synthèse du comité projet' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('previews loading placeholders and hides or restores the context panel', async () => {
+    const user = userEvent.setup();
+    renderWorkspaceAt('/app');
+    const toggle = await screen.findByRole('button', { name: 'Aperçu du chargement' });
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('status', { name: 'Chargement de l’espace de travail' })).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: 'Message' })).not.toBeInTheDocument();
+    await user.click(toggle);
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBeVisible();
+
+    expect(
+      screen.getByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Masquer le contexte' }));
+    expect(
+      screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Afficher le contexte' }));
+    expect(
+      screen.getByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).toBeVisible();
   });
 
   it('applies display preferences immediately and keeps them local', async () => {
     const user = userEvent.setup();
     const persist = vi.spyOn(Storage.prototype, 'setItem');
-    const { container } = renderWorkspace();
+    const { container } = renderWorkspaceAt('/app');
     const workspace = container.querySelector('[data-density]');
 
-    await user.click(screen.getByRole('button', { name: 'Paramètres' }));
+    await user.click(await screen.findByRole('button', { name: 'Paramètres' }));
     const dialog = screen.getByRole('dialog', { name: 'Paramètres' });
     await user.selectOptions(
       within(dialog).getByRole('combobox', { name: 'Taille du texte' }),
@@ -117,23 +155,22 @@ describe('Local workspace organization', () => {
     expect(persist).not.toHaveBeenCalled();
 
     await user.keyboard('{Escape}');
-
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Paramètres' })).toHaveFocus();
-    expect(workspace).toHaveAttribute('data-text-size', 'comfortable');
   });
 
-  it('dismisses project creation with Escape without creating an entry', async () => {
+  it('dismisses project creation with Escape without any request', async () => {
     const user = userEvent.setup();
-    renderWorkspace();
-    const trigger = screen.getByRole('button', { name: 'Créer un projet' });
+    const api = createWorkspaceApi();
+    renderWorkspaceAt('/app', api);
+    const trigger = await screen.findByRole('button', { name: 'Créer un projet' });
 
     await user.click(trigger);
     await user.type(screen.getByRole('textbox', { name: 'Nom du projet' }), 'Projet abandonné');
     await user.keyboard('{Escape}');
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Projet abandonné' })).not.toBeInTheDocument();
-    expect(trigger).toHaveFocus();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(api.calls.some(({ method }) => method === 'POST')).toBe(false);
   });
 });

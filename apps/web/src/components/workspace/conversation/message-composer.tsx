@@ -4,7 +4,12 @@ import { Textarea } from '@/components/ui/textarea';
 
 import { Button } from '@/components/ui/button';
 
-export function MessageComposer() {
+interface MessageComposerProps {
+  /** Draft carried from a project input; kept in memory only, never sent or stored. */
+  readonly defaultValue?: string;
+}
+
+export function MessageComposer({ defaultValue }: MessageComposerProps) {
   const messageId = useId();
   const helpId = useId();
   return (
@@ -19,6 +24,7 @@ export function MessageComposer() {
         <Textarea
           aria-describedby={helpId}
           className="max-h-40 min-h-16 resize-y border-0 bg-transparent px-2 py-1 text-base leading-relaxed shadow-none focus-visible:ring-0 md:text-sm"
+          defaultValue={defaultValue}
           id={messageId}
           name="message"
           placeholder="Une idée, une question…"
@@ -45,14 +51,14 @@ export function MessageComposer() {
             aria-label="Envoyer le message"
             disabled
             size="icon-sm"
-            title="Envoi indisponible dans cet aperçu"
+            title="Envoi indisponible pour le moment"
           >
             <ArrowUp aria-hidden="true" size={18} />
           </Button>
         </div>
       </form>
       <p id={helpId} className="mt-3.5 text-center text-2xs leading-relaxed text-muted-foreground">
-        Aperçu de l’interface · L’envoi et les pièces jointes seront disponibles prochainement.
+        L’envoi des messages et les pièces jointes arrivent avec le raccordement de l’agent.
       </p>
     </div>
   );

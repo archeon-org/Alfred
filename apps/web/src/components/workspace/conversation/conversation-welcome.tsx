@@ -21,10 +21,15 @@ const starterCard = cva(
 
 interface ConversationWelcomeProps {
   readonly prompts: readonly StarterPrompt[];
-  readonly onSelect: (id: string) => void;
+  readonly onSelect: (prompt: StarterPrompt) => void;
+  readonly disabled?: boolean;
 }
 
-export function ConversationWelcome({ prompts, onSelect }: ConversationWelcomeProps) {
+export function ConversationWelcome({
+  disabled = false,
+  prompts,
+  onSelect,
+}: ConversationWelcomeProps) {
   return (
     <div className="m-auto w-full max-w-conversation animate-workspace-appear px-5 pt-8 pb-5 text-center motion-reduce:animate-none md:px-6 md:pt-9 md:pb-8 wide:px-9">
       <div className="relative mx-auto mb-6 grid size-18 place-items-center md:size-22">
@@ -47,38 +52,48 @@ export function ConversationWelcome({ prompts, onSelect }: ConversationWelcomePr
         Une question à explorer, des idées à structurer,
         <br className="hidden sm:block" /> une prochaine étape à dessiner. Commençons ici.
       </p>
-      <div className="mt-7 mb-3 flex justify-between gap-2.5 text-left text-2xs text-muted-foreground md:mt-8">
-        <span>Un point de départ</span>
-        <span>3 exemples à explorer</span>
-      </div>
-      <ul
-        className="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-2.5"
-        aria-label="Exemples de demandes"
-      >
-        {prompts.map(({ id, kind, title, description, conversationId }) => {
-          const Icon = promptIcons[kind];
-          return (
-            <li key={id}>
-              <Button
-                className={starterCard({ kind })}
-                onClick={() => onSelect(conversationId)}
-                variant="ghost"
-              >
-                <span className="absolute top-6 left-4 md:static md:mb-5" data-slot="prompt-icon">
-                  <Icon aria-hidden="true" size={21} />
-                </span>
-                <ArrowUpRight
-                  className="absolute top-7 right-3 md:top-4"
-                  aria-hidden="true"
-                  size={16}
-                />
-                <strong className="text-xs leading-normal font-semibold">{title}</strong>
-                <span className="mt-1 text-2xs leading-relaxed font-normal">{description}</span>
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
+      {prompts.length > 0 ? (
+        <>
+          <div className="mt-7 mb-3 flex justify-between gap-2.5 text-left text-2xs text-muted-foreground md:mt-8">
+            <span>Un point de départ</span>
+            <span>{prompts.length} pistes pour ouvrir un chat</span>
+          </div>
+          <ul
+            className="grid grid-cols-1 gap-2 md:grid-cols-3 md:gap-2.5"
+            aria-label="Points de départ"
+          >
+            {prompts.map((prompt) => {
+              const Icon = promptIcons[prompt.kind];
+              return (
+                <li key={prompt.id}>
+                  <Button
+                    className={starterCard({ kind: prompt.kind })}
+                    disabled={disabled}
+                    onClick={() => onSelect(prompt)}
+                    variant="ghost"
+                  >
+                    <span
+                      className="absolute top-6 left-4 md:static md:mb-5"
+                      data-slot="prompt-icon"
+                    >
+                      <Icon aria-hidden="true" size={21} />
+                    </span>
+                    <ArrowUpRight
+                      className="absolute top-7 right-3 md:top-4"
+                      aria-hidden="true"
+                      size={16}
+                    />
+                    <strong className="text-xs leading-normal font-semibold">{prompt.title}</strong>
+                    <span className="mt-1 text-2xs leading-relaxed font-normal">
+                      {prompt.description}
+                    </span>
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : null}
     </div>
   );
 }

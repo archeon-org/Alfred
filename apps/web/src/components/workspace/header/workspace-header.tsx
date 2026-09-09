@@ -63,10 +63,6 @@ export function WorkspaceHeader({
         </strong>
       </div>
       <div className="flex w-full items-center justify-end gap-0.5 md:w-auto">
-        <span className="mr-auto flex items-center gap-1 whitespace-nowrap text-2xs text-primary md:mr-2">
-          <span className="size-1.5 rounded-full bg-primary" />
-          Aperçu UI
-        </span>
         <IconButton
           className="md:hidden"
           aria-controls="conversation-history"

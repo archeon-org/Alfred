@@ -5,6 +5,9 @@ import { RouteFocusManager } from '@/routes/route-focus-manager';
 import { LoginScreen } from '@/screens/auth/login-screen';
 import { OauthCallbackScreen } from '@/screens/auth/oauth-callback-screen';
 import { NotFoundScreen } from '@/screens/errors/not-found-screen';
+import { ConversationScreen } from '@/screens/workspace/conversation-screen';
+import { ProjectScreen } from '@/screens/workspace/project-screen';
+import { WorkspaceHomeScreen } from '@/screens/workspace/workspace-home-screen';
 import { WorkspaceScreen } from '@/screens/workspace/workspace-screen';
 
 export const routes: RouteObject[] = [
@@ -15,7 +18,15 @@ export const routes: RouteObject[] = [
       { element: <OauthCallbackScreen />, path: '/auth/callback' },
       {
         children: [
-          { element: <WorkspaceScreen />, path: '/app' },
+          {
+            children: [
+              { element: <WorkspaceHomeScreen />, index: true },
+              { element: <ProjectScreen />, path: 'projects/:projectId' },
+              { element: <ConversationScreen />, path: 'conversations/:conversationId' },
+            ],
+            element: <WorkspaceScreen />,
+            path: '/app',
+          },
           { element: <Navigate replace to="/app" />, path: '/workspace' },
         ],
         element: <RequireSession />,

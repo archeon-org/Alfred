@@ -22,31 +22,7 @@ function ToolsPreview({
       </button>
       {visible && (
         <ContextPanel
-          conversation={
-            loaded
-              ? {
-                  id: 'sample',
-                  title: 'Sample',
-                  group: 'Hier',
-                  category: 'Analyse',
-                  messages: [],
-                  resources: [
-                    {
-                      id: 'pdf',
-                      name: 'Note.pdf',
-                      detail: 'Document de démonstration',
-                      format: 'PDF',
-                    },
-                    {
-                      id: 'md',
-                      name: 'Brief.md',
-                      detail: 'Document de démonstration',
-                      format: 'MD',
-                    },
-                  ],
-                }
-              : undefined
-          }
+          scope={loaded ? { conversationTitle: 'Sample', projectName: 'Analyse' } : {}}
           isLoading={isLoading}
           tools={tools}
         />
@@ -142,14 +118,13 @@ describe('Workspace tools local preview', () => {
     expect(screen.queryByRole('option', { name: 'Abandonnée' })).not.toBeInTheDocument();
   });
 
-  it('shows demo files for the selected conversation without offering an upload', async () => {
+  it('describes the current scope and announces files as a later capability', async () => {
     const user = userEvent.setup();
     render(<ToolsPreview loaded />);
     expect(screen.getByText('Analyse')).toBeVisible();
+    expect(screen.getByText('Sample')).toBeVisible();
     await user.click(screen.getByRole('tab', { name: 'Fichiers' }));
-    expect(screen.getByText('Note.pdf')).toBeVisible();
-    expect(screen.getByText('Brief.md')).toBeVisible();
-    expect(screen.getByText(/Fichiers de démonstration/)).toBeVisible();
+    expect(screen.getByText(/lecture de documents seront disponibles/)).toBeVisible();
     expect(screen.queryByRole('button', { name: /Ajouter un fichier/i })).not.toBeInTheDocument();
   });
 

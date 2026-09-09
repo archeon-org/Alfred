@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { installWorkspaceApi } from './support/workspace-api';
+
 const authenticatedSession = {
   data: {
     accessToken: 'e2e-memory-only-token',
@@ -29,6 +31,7 @@ const disabledFeatures = {
 };
 
 test.beforeEach(async ({ page }) => {
+  await installWorkspaceApi(page);
   await page.route('**/api/auth/providers', async (route) =>
     route.fulfill({
       contentType: 'application/json',
@@ -200,7 +203,7 @@ test('lets the context panel use the full tablet width', async ({ page }) => {
     .toBeGreaterThan(1000);
 });
 
-test('browses sample conversations by keyboard while keeping drafts local', async ({ page }) => {
+test('browses conversations by keyboard while keeping drafts local', async ({ page }) => {
   await page.route('**/api/auth/refresh', async (route) =>
     route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
   );
@@ -208,9 +211,10 @@ test('browses sample conversations by keyboard while keeping drafts local', asyn
   await expect(
     page.getByRole('heading', { level: 1, name: 'Nouvelle conversation' }),
   ).toBeVisible();
-  const outgoingRequests: string[] = [];
+  const writes: string[] = [];
   page.on('request', (request) => {
-    if (request.url().includes('/api/')) outgoingRequests.push(request.url());
+    if (request.url().includes('/api/') && request.method() !== 'GET')
+      writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
   });
 
   const search = page.getByRole('searchbox', { name: 'Rechercher une conversation' });
@@ -222,6 +226,7 @@ test('browses sample conversations by keyboard while keeping drafts local', asyn
   await expect(
     page.getByRole('heading', { level: 1, name: 'Synthèse du comité projet' }),
   ).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/conversations\//u);
   const composer = page.getByRole('textbox', { name: 'Message' });
   await composer.fill('Un brouillon privé');
   await composer.press('Enter');
@@ -235,7 +240,7 @@ test('browses sample conversations by keyboard while keeping drafts local', asyn
 
   await expect(page.getByRole('heading', { level: 1, name: 'Nouveau brouillon' })).toBeVisible();
   await expect(composer).toHaveValue('');
-  expect(outgoingRequests).toEqual([]);
+  expect(writes).toEqual(['POST /api/conversations']);
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
 });
 
@@ -262,7 +267,7 @@ test('opens mobile history and restores a hidden context without horizontal over
   await expect(page.getByRole('searchbox', { name: 'Rechercher une conversation' })).toBeHidden();
 
   await historyToggle.click();
-  await page.getByRole('searchbox', { name: 'Rechercher une conversation' }).clear();
+  await page.getByRole('searchbox', { name: 'Rechercher une conversation' }).fill('comité');
   const sample = page.getByRole('button', { name: 'Synthèse du comité projet' });
   await sample.focus();
   await page.keyboard.press('Enter');
@@ -305,7 +310,7 @@ test('respects reduced motion while previewing loading placeholders', async ({ p
   await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
 });
 
-test('creates a project conversation and a separate sandbox using accessible local dialogs', async ({
+test('creates a project, its first conversation and a separate standalone chat', async ({
   page,
 }) => {
   await page.route('**/api/auth/refresh', async (route) =>
@@ -315,9 +320,10 @@ test('creates a project conversation and a separate sandbox using accessible loc
   await expect(
     page.getByRole('heading', { level: 1, name: 'Nouvelle conversation' }),
   ).toBeVisible();
-  const outgoingRequests: string[] = [];
+  const writes: string[] = [];
   page.on('request', (request) => {
-    if (request.url().includes('/api/')) outgoingRequests.push(request.url());
+    if (request.url().includes('/api/') && request.method() !== 'GET')
+      writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
   });
   const createProject = page.getByRole('button', { name: 'Créer un projet' });
   await createProject.click();
@@ -327,10 +333,14 @@ test('creates a project conversation and a separate sandbox using accessible loc
   await expect(projectDialog).toHaveCount(0);
   await expect(createProject).toBeFocused();
   await expect(page.getByRole('group', { name: 'Projet annulé' })).toHaveCount(0);
+  expect(writes).toEqual([]);
 
   await createProject.click();
   await projectDialog.getByRole('textbox', { name: 'Nom du projet' }).fill('Projet Atlas');
   await projectDialog.getByRole('button', { name: 'Créer le projet' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Projet Atlas' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /Chats/u })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Sources' })).toBeVisible();
   await page.getByRole('button', { name: 'Nouvelle conversation', exact: true }).click();
   const conversationDialog = page.getByRole('dialog', { name: 'Nouvelle conversation' });
   await expect(conversationDialog).toContainText('Projet Atlas');
@@ -346,15 +356,13 @@ test('creates a project conversation and a separate sandbox using accessible loc
   await expect(
     page.getByRole('heading', { level: 1, name: 'Décisions de lancement' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Créer une sandbox' }).click();
-  const sandboxDialog = page.getByRole('dialog', { name: 'Nouvelle sandbox' });
-  await sandboxDialog
-    .getByRole('textbox', { name: 'Titre de la conversation' })
-    .fill('Piste indépendante');
-  await sandboxDialog.getByRole('button', { name: 'Créer la sandbox' }).click();
+  await page.getByRole('button', { name: 'Ouvrir un chat libre' }).click();
+  const standaloneDialog = page.getByRole('dialog', { name: 'Nouveau chat libre' });
+  await standaloneDialog.getByRole('textbox', { name: 'Titre du chat' }).fill('Piste indépendante');
+  await standaloneDialog.getByRole('button', { name: 'Ouvrir le chat' }).click();
   await expect(
     page
-      .getByRole('group', { name: 'Sandboxes' })
+      .getByRole('group', { name: 'Chats libres' })
       .getByRole('button', { name: 'Piste indépendante', exact: true }),
   ).toBeVisible();
   await expect(
@@ -365,7 +373,11 @@ test('creates a project conversation and a separate sandbox using accessible loc
   await expect(
     page.getByRole('heading', { level: 1, name: 'Décisions de lancement' }),
   ).toBeVisible();
-  expect(outgoingRequests).toEqual([]);
+  expect(writes).toEqual([
+    'POST /api/projects',
+    'POST /api/conversations',
+    'POST /api/conversations',
+  ]);
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
 });
 
@@ -472,8 +484,6 @@ test('recovers mobile navigation after collapsing the desktop sidebar', async ({
   await expect(
     page.getByRole('button', { name: 'Nouvelle conversation', exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: 'Synthèse du comité projet', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Refonte du portail', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

@@ -8,10 +8,10 @@ import { TeamBuilder } from '@/components/workspace/context/team-builder';
 import { ContextSkeleton } from '@/components/workspace/workspace-skeletons';
 import type { WorkspaceToolsState } from '@/lib/workspace/workspace-tools.types';
 import type { WorkspaceToolTab } from '@/lib/workspace/workspace-tools.types';
-import type { ConversationView } from '@/lib/workspace/workspace.types';
+import type { WorkspaceScope } from '@/lib/workspace/workspace.types';
 
 interface ContextPanelProps {
-  readonly conversation: ConversationView | undefined;
+  readonly scope: WorkspaceScope;
   readonly isLoading: boolean;
   readonly tools: WorkspaceToolsState;
 }
@@ -23,7 +23,7 @@ const toolTabs: readonly { readonly id: WorkspaceToolTab; readonly label: string
   { id: 'files', label: 'Fichiers' },
 ];
 
-export function ContextPanel({ conversation, isLoading, tools }: ContextPanelProps) {
+export function ContextPanel({ scope, isLoading, tools }: ContextPanelProps) {
   return (
     <aside
       aria-label="Contexte de la conversation"
@@ -59,7 +59,7 @@ export function ContextPanel({ conversation, isLoading, tools }: ContextPanelPro
               ))}
             </TabsList>
             <TabsContent value="context" className="pt-5">
-              <ContextOverview conversation={conversation} />
+              <ContextOverview scope={scope} />
             </TabsContent>
             <TabsContent value="teams" className="pt-5">
               <TeamBuilder tools={tools} />
@@ -68,10 +68,9 @@ export function ContextPanel({ conversation, isLoading, tools }: ContextPanelPro
               <SkillsPanel tools={tools} />
             </TabsContent>
             <TabsContent value="files" className="pt-5">
-              <ContextResources resources={conversation?.resources ?? []} />
+              <ContextResources resources={[]} />
               <p className="mt-4 text-2xs leading-relaxed text-muted-foreground">
-                Fichiers de démonstration. L’ajout et la lecture de documents seront disponibles
-                ultérieurement.
+                L’ajout et la lecture de documents seront disponibles ultérieurement.
               </p>
             </TabsContent>
           </Tabs>
@@ -82,7 +81,7 @@ export function ContextPanel({ conversation, isLoading, tools }: ContextPanelPro
         <p className="text-2xs leading-relaxed">
           Votre espace prend forme.
           <br />
-          <span className="text-2xs">Aperçu local, sans exécution ni sauvegarde.</span>
+          <span className="text-2xs">Équipes, skills et fichiers restent des aperçus locaux.</span>
         </p>
       </div>
     </aside>
