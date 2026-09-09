@@ -17,6 +17,15 @@ const user = {
   refreshSessions: [],
   role: 'user',
   status: 'active',
+  tenant: {
+    createdAt: new Date(),
+    id: '7c1d4d6e-2c3a-4d5e-8f90-1a2b3c4d5e6f',
+    name: 'Default tenant',
+    slug: 'default',
+    status: 'active',
+    updatedAt: new Date(),
+  },
+  tenantId: '7c1d4d6e-2c3a-4d5e-8f90-1a2b3c4d5e6f',
   updatedAt: new Date(),
 } satisfies UserEntity;
 

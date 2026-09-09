@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { DataSource, type EntityManager, type Repository } from 'typeorm';
+import { TenantsService } from '../tenants/tenants.service';
 import { UserEntity } from './user.entity';
 import { UserIdentityEntity } from './user-identity.entity';
 
@@ -14,7 +15,10 @@ export interface VerifiedIdentity {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly tenants: TenantsService,
+  ) {}
 
   async upsertVerifiedIdentity(identity: VerifiedIdentity): Promise<UserEntity> {
     try {
@@ -70,6 +74,7 @@ export class UsersService {
         lastLoginAt: now,
         role: 'user',
         status: 'active',
+        tenantId: await this.tenants.defaultTenantId(manager),
       }),
     );
     await identities.save(

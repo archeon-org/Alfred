@@ -10,6 +10,7 @@ import { RefreshSessionEntity } from '@api/modules/auth/infrastructure/persisten
 import { RefreshSessionCleanupService } from '@api/modules/auth/infrastructure/persistence/refresh-session-cleanup.service';
 import { RefreshSessionService } from '@api/modules/auth/infrastructure/persistence/refresh-session.service';
 import type { SessionTokenService } from '@api/modules/auth/infrastructure/security/session-token.service';
+import { TenantEntity } from '@api/modules/tenants/tenant.entity';
 import { UserEntity } from '@api/modules/users/user.entity';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -58,6 +59,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
   let adminDataSource: DataSource | undefined;
   let dataSource: DataSource;
   let migrationDataSource: DataSource;
+  let tenantId: string;
 
   beforeAll(async () => {
     migrationDataSource = new DataSource({
@@ -93,6 +95,8 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
       synchronize: false,
     });
     await dataSource.initialize();
+    tenantId = (await dataSource.getRepository(TenantEntity).findOneByOrFail({ slug: 'default' }))
+      .id;
   });
 
   beforeEach(async () => {
@@ -167,6 +171,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         lastLoginAt: new Date(),
         role: 'user',
         status: 'active',
+        tenantId,
       }),
     );
     const currentRawToken = 'current-refresh-token';
@@ -224,6 +229,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         lastLoginAt: new Date(),
         role: 'user',
         status: 'active',
+        tenantId,
       }),
     );
     const currentRawToken = 'replay-current-refresh-token';
@@ -276,6 +282,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         lastLoginAt: new Date(),
         role: 'user',
         status: 'active',
+        tenantId,
       }),
     );
     const currentRawToken = 'concurrent-current-refresh-token';
@@ -328,6 +335,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         lastLoginAt: new Date(),
         role: 'user',
         status: 'active',
+        tenantId,
       }),
     );
     const currentRawToken = 'logout-race-current-refresh-token';
@@ -374,6 +382,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         lastLoginAt: new Date(),
         role: 'user',
         status: 'active',
+        tenantId,
       }),
     );
     const familyId = randomUUID();

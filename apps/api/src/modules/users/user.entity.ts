@@ -4,12 +4,16 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import type { UserRole } from '../../common/auth/auth-principal';
 import { RefreshSessionEntity } from '../auth/infrastructure/persistence/entities/refresh-session.entity';
+import { TenantEntity } from '../tenants/tenant.entity';
 import { UserIdentityEntity } from './user-identity.entity';
 
 export type UserStatus = 'active' | 'disabled';
@@ -18,9 +22,19 @@ export type UserStatus = 'active' | 'disabled';
 @Check('chk_users_role', `"role" IN ('user', 'admin')`)
 @Check('chk_users_status', `"status" IN ('active', 'disabled')`)
 @Index('uq_users_email', ['email'], { unique: true })
+@Index('idx_users_tenant', ['tenantId'])
+// Lets tenant-rooted records reference (tenant_id, owner) atomically (ALF-DEC-055 §7).
+@Unique('uq_users_tenant_id', ['tenantId', 'id'])
 export class UserEntity {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'pk_users' })
   id!: string;
+
+  @Column({ name: 'tenant_id', type: 'uuid' })
+  tenantId!: string;
+
+  @ManyToOne(() => TenantEntity, { nullable: false, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'tenant_id', foreignKeyConstraintName: 'fk_users_tenant' })
+  tenant!: TenantEntity;
 
   @Column({ type: 'citext' })
   email!: string;

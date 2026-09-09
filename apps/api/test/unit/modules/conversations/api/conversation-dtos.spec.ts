@@ -1,0 +1,43 @@
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { describe, expect, it } from 'vitest';
+
+import { CreateConversationDto } from '@api/modules/conversations/api/dto/create-conversation.dto';
+import { ListConversationsQueryDto } from '@api/modules/conversations/api/dto/list-conversations-query.dto';
+
+async function errorsOf(dto: object): Promise<string[]> {
+  return (await validate(dto)).map((error) => error.property);
+}
+
+describe('conversation request DTOs', () => {
+  it('accepts an empty body for a standalone chat and trims a provided title', async () => {
+    expect(await errorsOf(plainToInstance(CreateConversationDto, {}))).toEqual([]);
+
+    const dto = plainToInstance(CreateConversationDto, {
+      projectId: '0b6e1a9e-0a7f-4c26-9f5b-2f1a2c3d4e5f',
+      title: '  Analyse  ',
+    });
+    expect(await errorsOf(dto)).toEqual([]);
+    expect(dto.title).toBe('Analyse');
+  });
+
+  it('rejects a malformed project identifier and an unusable title', async () => {
+    expect(await errorsOf(plainToInstance(CreateConversationDto, { projectId: 'x' }))).toEqual([
+      'projectId',
+    ]);
+    expect(await errorsOf(plainToInstance(CreateConversationDto, { title: 'a\tb' }))).toEqual([
+      'title',
+    ]);
+  });
+
+  it('keeps the shared pagination contract and an optional project filter', async () => {
+    const dto = plainToInstance(ListConversationsQueryDto, { limit: '5' });
+    expect(await errorsOf(dto)).toEqual([]);
+    expect(dto.limit).toBe(5);
+    expect(dto.projectId).toBeUndefined();
+
+    expect(
+      await errorsOf(plainToInstance(ListConversationsQueryDto, { projectId: 'not-a-uuid' })),
+    ).toEqual(['projectId']);
+  });
+});

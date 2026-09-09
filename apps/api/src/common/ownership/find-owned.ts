@@ -6,9 +6,21 @@ import { OwnedResourceNotFoundException } from './owned-resource-not-found.excep
 export interface OwnedResource extends ObjectLiteral {
   readonly id: string;
   readonly ownerUserId: string;
+  readonly tenantId?: string;
 }
 
-export type Ownership = Readonly<Pick<OwnedResource, 'id' | 'ownerUserId'>>;
+/** Tenant-rooted resources (ALF-DEC-055) pass `tenantId` so isolation is part of the same predicate. */
+export type Ownership = Readonly<{
+  readonly id: string;
+  readonly ownerUserId: string;
+  readonly tenantId?: string;
+}>;
+
+export type FindOwnedOptions<T extends ObjectLiteral> = Pick<FindOneOptions<T>, 'lock'>;
+
+function isPresent(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
 
 // Every read/write MUST include owner_user_id in the SQL WHERE, including UPDATE and DELETE.
 // Never load by id then compare owners; require exactly one affected row for a mutation.
@@ -18,22 +30,29 @@ function ownedWhere<T extends OwnedResource>(
   resourceName: string,
 ): FindOptionsWhere<T> {
   if (
-    typeof ownership.id !== 'string' ||
-    ownership.id.trim().length === 0 ||
-    typeof ownership.ownerUserId !== 'string' ||
-    ownership.ownerUserId.trim().length === 0
+    !isPresent(ownership.id) ||
+    !isPresent(ownership.ownerUserId) ||
+    (ownership.tenantId !== undefined && !isPresent(ownership.tenantId))
   ) {
     throw new OwnedResourceNotFoundException(resourceName);
   }
-  return { id: ownership.id, ownerUserId: ownership.ownerUserId } as FindOptionsWhere<T>;
+  return {
+    id: ownership.id,
+    ownerUserId: ownership.ownerUserId,
+    ...(ownership.tenantId === undefined ? {} : { tenantId: ownership.tenantId }),
+  } as FindOptionsWhere<T>;
 }
 
 export async function findOwnedOrThrow<T extends OwnedResource>(
   repository: { findOne(options: FindOneOptions<T>): Promise<T | null> },
   ownership: Ownership,
   resourceName: string,
+  options: FindOwnedOptions<T> = {},
 ): Promise<T> {
-  const resource = await repository.findOne({ where: ownedWhere<T>(ownership, resourceName) });
+  const resource = await repository.findOne({
+    ...options,
+    where: ownedWhere<T>(ownership, resourceName),
+  });
   if (resource === null) throw new OwnedResourceNotFoundException(resourceName);
   return resource;
 }
@@ -41,13 +60,13 @@ export async function findOwnedOrThrow<T extends OwnedResource>(
 export async function updateOwnedOrThrow<T extends OwnedResource>(
   repository: Pick<Repository<T>, 'update'>,
   ownership: Ownership,
-  changes: QueryDeepPartialEntity<Omit<T, 'id' | 'ownerUserId'>>,
+  changes: QueryDeepPartialEntity<Omit<T, 'id' | 'ownerUserId' | 'tenantId'>>,
   resourceName: string,
 ): Promise<void> {
   if (
-    Object.hasOwn(changes, 'id') ||
-    Object.hasOwn(changes, 'ownerUserId') ||
-    Object.hasOwn(changes, 'owner_user_id')
+    ['id', 'ownerUserId', 'owner_user_id', 'tenantId', 'tenant_id'].some((field) =>
+      Object.hasOwn(changes, field),
+    )
   ) {
     throw new ApiException(400, 'invalid_update', 'Ownership and identity cannot be changed.');
   }

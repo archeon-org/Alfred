@@ -20,9 +20,12 @@ describe('entity schema contract', () => {
 
     expect(tables).toHaveLength(databaseEntities.length);
     expect(tables.map(({ name }) => name).sort()).toEqual([
+      'api_conversations',
       'api_idempotency_keys',
       'api_oauth_login_states',
+      'api_projects',
       'api_refresh_sessions',
+      'api_tenants',
       'api_user_identities',
       'api_users',
     ]);
@@ -34,7 +37,11 @@ describe('entity schema contract', () => {
     const metadata = getMetadataArgsStorage();
 
     expect(metadataNames(metadata.indices.filter(({ target }) => target === UserEntity))).toEqual([
+      'idx_users_tenant',
       'uq_users_email',
+    ]);
+    expect(metadataNames(metadata.uniques.filter(({ target }) => target === UserEntity))).toEqual([
+      'uq_users_tenant_id',
     ]);
     expect(
       metadataNames(metadata.indices.filter(({ target }) => target === UserIdentityEntity)),

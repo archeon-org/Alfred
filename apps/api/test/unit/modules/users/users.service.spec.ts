@@ -2,6 +2,8 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import type { DataSource, EntityManager } from 'typeorm';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { TenantEntity } from '@api/modules/tenants/tenant.entity';
+import type { TenantsService } from '@api/modules/tenants/tenants.service';
 import { UserIdentityEntity } from '@api/modules/users/user-identity.entity';
 import type { UserEntity } from '@api/modules/users/user.entity';
 import { UsersService, type VerifiedIdentity } from '@api/modules/users/users.service';
@@ -15,6 +17,20 @@ const identity: VerifiedIdentity = Object.freeze({
   subject: 'google-subject',
 });
 
+const tenant: TenantEntity = {
+  createdAt: new Date(),
+  id: '7c1d4d6e-2c3a-4d5e-8f90-1a2b3c4d5e6f',
+  name: 'Default tenant',
+  slug: 'default',
+  status: 'active',
+  updatedAt: new Date(),
+};
+
+// Built per test: the vitest `mockReset` option clears module-level mock implementations.
+function tenants(): TenantsService {
+  return { defaultTenantId: vi.fn().mockResolvedValue(tenant.id) } as unknown as TenantsService;
+}
+
 function user(overrides: Partial<UserEntity> = {}): UserEntity {
   return {
     avatarUrl: null,
@@ -27,6 +43,8 @@ function user(overrides: Partial<UserEntity> = {}): UserEntity {
     refreshSessions: [],
     role: 'user',
     status: 'active',
+    tenant,
+    tenantId: tenant.id,
     updatedAt: new Date(),
     ...overrides,
   };
@@ -76,7 +94,7 @@ describe('UsersService', () => {
       findOne: vi.fn().mockResolvedValue(existingIdentity),
       save: vi.fn((value: UserIdentityEntity) => Promise.resolve(value)),
     };
-    const service = new UsersService(dataSourceWith(users, identities));
+    const service = new UsersService(dataSourceWith(users, identities), tenants());
 
     await expect(service.upsertVerifiedIdentity(identity)).resolves.toMatchObject({
       avatarUrl: identity.avatarUrl,
@@ -95,6 +113,7 @@ describe('UsersService', () => {
     };
     const service = new UsersService(
       dataSourceWith({ findOne: vi.fn().mockResolvedValue(disabledUser) }, identities),
+      tenants(),
     );
 
     await expect(service.upsertVerifiedIdentity(identity)).rejects.toThrow(UnauthorizedException);
@@ -103,7 +122,7 @@ describe('UsersService', () => {
   it('does not silently link a new subject to an email owned by another user', async () => {
     const users = { findOne: vi.fn().mockResolvedValue(user()) };
     const identities = { findOne: vi.fn().mockResolvedValue(null) };
-    const service = new UsersService(dataSourceWith(users, identities));
+    const service = new UsersService(dataSourceWith(users, identities), tenants());
 
     await expect(service.upsertVerifiedIdentity(identity)).rejects.toThrow(ConflictException);
   });
@@ -122,13 +141,14 @@ describe('UsersService', () => {
     };
     const source = dataSourceWith(users, identities);
     const transaction = vi.spyOn(source, 'transaction');
-    const service = new UsersService(source);
+    const service = new UsersService(source, tenants());
 
     await expect(service.upsertVerifiedIdentity(identity)).resolves.toMatchObject({
       role: 'user',
       status: 'active',
     });
     expect(transaction).toHaveBeenCalledOnce();
+    expect(users.create).toHaveBeenCalledWith(expect.objectContaining({ tenantId: tenant.id }));
     expect(identities.create).toHaveBeenCalledWith(
       expect.objectContaining({
         issuer: identity.issuer,
@@ -157,7 +177,7 @@ describe('UsersService', () => {
       findOne: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(concurrentIdentity),
       save: vi.fn((value: UserIdentityEntity) => Promise.resolve(value)),
     };
-    const service = new UsersService(dataSourceWith(users, identities));
+    const service = new UsersService(dataSourceWith(users, identities), tenants());
 
     await expect(service.upsertVerifiedIdentity(identity)).resolves.toMatchObject({
       id: concurrentIdentity.user.id,
@@ -166,7 +186,7 @@ describe('UsersService', () => {
 
   it('resolves only active users for authenticated requests', async () => {
     const users = { findOne: vi.fn().mockResolvedValueOnce(user()).mockResolvedValueOnce(null) };
-    const service = new UsersService(dataSourceWith(users, {}));
+    const service = new UsersService(dataSourceWith(users, {}), tenants());
 
     await expect(service.findActiveById(user().id)).resolves.toMatchObject({ id: user().id });
     await expect(service.findActiveById('missing')).rejects.toThrow(UnauthorizedException);

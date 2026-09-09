@@ -17,6 +17,7 @@ import { IdempotencyKeyEntity } from '@api/common/idempotency/idempotency-key.en
 import { API_MIGRATIONS_TABLE } from '@api/database/database-options';
 import { databaseMigrations } from '@api/database/migrations';
 import { databaseEntities } from '@api/database/typeorm.options';
+import { TenantEntity } from '@api/modules/tenants/tenant.entity';
 import { UserEntity } from '@api/modules/users/user.entity';
 import {
   FixtureWriter,
@@ -46,6 +47,7 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
   let secondOwner: string;
   let token: string;
   let secondToken: string;
+  let tenantId: string;
   const ownedUserIds = new Set<string>();
   const businessIds = new Set<string>();
   const write = vi.fn<(name: string) => Promise<unknown>>();
@@ -55,7 +57,7 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
     ownedUserIds.add(id);
     await db
       .getRepository(UserEntity)
-      .insert({ id, email: `${id}@example.test`, displayName: name });
+      .insert({ id, email: `${id}@example.test`, displayName: name, tenantId });
     return id;
   }
 
@@ -96,6 +98,7 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
     app = module.createNestApplication({ logger: false });
     app.useGlobalPipes(new RequestValidationPipe());
     db = app.get(DataSource);
+    tenantId = (await db.getRepository(TenantEntity).findOneByOrFail({ slug: 'default' })).id;
     url = await fixtureUrl(app);
   });
 

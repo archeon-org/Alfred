@@ -5,6 +5,9 @@ import { OauthLoginStateEntity } from '../modules/auth/infrastructure/persistenc
 import { RefreshSessionEntity } from '../modules/auth/infrastructure/persistence/entities/refresh-session.entity';
 import { UserEntity } from '../modules/users/user.entity';
 import { UserIdentityEntity } from '../modules/users/user-identity.entity';
+import { TenantEntity } from '../modules/tenants/tenant.entity';
+import { ProjectEntity } from '../modules/projects/infrastructure/persistence/project.entity';
+import { ConversationEntity } from '../modules/conversations/infrastructure/persistence/conversation.entity';
 import {
   API_MIGRATIONS_TABLE,
   createPostgresConnectionExtra,
@@ -12,11 +15,14 @@ import {
 } from './database-options';
 
 export const databaseEntities = [
+  TenantEntity,
   UserEntity,
   UserIdentityEntity,
   RefreshSessionEntity,
   OauthLoginStateEntity,
   IdempotencyKeyEntity,
+  ProjectEntity,
+  ConversationEntity,
 ] as const;
 
 export function createTypeOrmOptions(config: ConfigService): TypeOrmModuleOptions {

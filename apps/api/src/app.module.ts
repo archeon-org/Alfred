@@ -18,11 +18,13 @@ import { createTypeOrmOptions } from './database/typeorm.options';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { RedisThrottlerStorage } from './infrastructure/redis/redis-throttler.storage';
 import { AuthModule } from './modules/auth/auth.module';
+import { ConversationsModule } from './modules/conversations/conversations.module';
 import { FeatureFlagGuard } from './modules/feature-flags/feature-flag.guard';
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
 import { FeatureFlagsService } from './modules/feature-flags/feature-flags.service';
 import { HealthModule } from './modules/health/health.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 import { StreamModule } from './modules/stream/stream.module';
 import { UsersModule } from './modules/users/users.module';
 import { ObservabilityModule } from './observability/observability.module';
@@ -91,6 +93,8 @@ export function createThrottlerOptions(
     PlatformModule,
     StreamModule,
     UsersModule,
+    ProjectsModule,
+    ConversationsModule,
     IdempotencyModule,
   ],
   providers: [

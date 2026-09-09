@@ -32,7 +32,8 @@ describe('database migration registry', () => {
       .tables.filter(({ target }) => (databaseEntities as readonly unknown[]).includes(target))
       .map(({ name }) => name)
       .sort();
-    expect(API_TABLE_RENAMES.map(([, next]) => next).sort()).toEqual(entityTables);
+    expect(entityTables).toEqual(expect.arrayContaining(API_TABLE_RENAMES.map(([, next]) => next)));
+    expect(entityTables.every((name) => name?.startsWith('api_'))).toBe(true);
     expect(API_TABLE_RENAMES.every(([previous, next]) => next === `api_${previous}`)).toBe(true);
 
     const migration = new PrefixApiTables1788979000000();
