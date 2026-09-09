@@ -110,19 +110,28 @@ export class ConversationsService {
     return toConversationDto(conversation, kinds.get(conversation.projectId) ?? 'named');
   }
 
-  /** Deletes the chat; an implicit project that only existed for it is removed in the same transaction. */
+  /**
+   * Deletes the chat; an implicit project that only existed for it is removed in the same
+   * transaction. Locks go parent first (project, then conversation), the same order as project
+   * deletion whose cascade locks the chats after the project row, so the two never deadlock.
+   */
   async remove(principal: AuthPrincipal, id: string): Promise<void> {
     const scope = await this.tenants.scopeFor(principal.id);
     await this.dataSource.transaction(async (manager) => {
       const conversations = manager.getRepository(ConversationEntity);
-      const conversation = await this.owned(conversations, scope)
+      const located = await this.owned(conversations, scope)
         .andWhere('conversation.id = :id', { id })
-        .setLock('pessimistic_write')
         .getOne();
-      if (conversation === null) throw new OwnedResourceNotFoundException(CONVERSATION_RESOURCE);
+      if (located === null) throw new OwnedResourceNotFoundException(CONVERSATION_RESOURCE);
       const projects = manager.getRepository(ProjectEntity);
-      const ownership = { id: conversation.projectId, ...scope };
+      const ownership = { id: located.projectId, ...scope };
       const project = await findOwnedOrThrow(projects, ownership, PROJECT_RESOURCE, ROW_LOCK);
+      // Re-read under the lock: the chat may have been deleted while waiting for the project.
+      const conversation = await conversations.findOne({
+        ...ROW_LOCK,
+        where: { id: located.id, projectId: project.id },
+      });
+      if (conversation === null) throw new OwnedResourceNotFoundException(CONVERSATION_RESOURCE);
       await conversations.delete({ id: conversation.id, projectId: project.id });
       if (project.kind === 'implicit') {
         const remaining = await conversations.count({ where: { projectId: project.id } });

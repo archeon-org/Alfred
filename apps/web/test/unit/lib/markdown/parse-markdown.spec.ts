@@ -79,6 +79,35 @@ describe('parseMarkdown', () => {
     expect(parseMarkdown('')).toEqual([]);
     expect(parseMarkdown('   \n\n')).toEqual([]);
   });
+
+  it('strips a closing hash sequence only after whitespace', () => {
+    expect(parseMarkdown('## C# ##')).toEqual([
+      { type: 'heading', level: 2, children: [{ type: 'text', value: 'C#' }] },
+    ]);
+    expect(parseMarkdown('# C#')).toEqual([
+      { type: 'heading', level: 1, children: [{ type: 'text', value: 'C#' }] },
+    ]);
+    expect(parseMarkdown('# ###')).toEqual([{ type: 'heading', level: 1, children: [] }]);
+  });
+
+  // A project context holds up to 64 KiB; a hostile document must never freeze the interface.
+  it.each<[string, string]>([
+    ['backticks', '`'.repeat(64_000)],
+    ['backticks with text', '`a'.repeat(32_000)],
+    ['opening brackets', '['.repeat(64_000)],
+    ['bracket labels', '[a'.repeat(32_000)],
+    ['asterisks', ' *a'.repeat(20_000)],
+    ['underscores', ' _a'.repeat(20_000)],
+    ['heading padding', `# a${' '.repeat(30_000)}#b`],
+    ['trailing spaces', `a${' '.repeat(60_000)}b\nc`],
+    ['unterminated strong', `**${'a'.repeat(64_000)}`],
+    ['unterminated link', `[a](${'b'.repeat(64_000)}`],
+  ])('parses %s of the maximum document size in linear time', (_name, source) => {
+    const start = performance.now();
+    parseMarkdown(source);
+    markdownToText(source, 160);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
 });
 
 describe('parseInline', () => {

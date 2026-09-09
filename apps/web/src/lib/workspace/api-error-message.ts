@@ -1,3 +1,5 @@
+import { PROJECT_PIN_LIMIT } from '@alfred/contracts';
+
 import { ApiRequestError } from '@/services/http/api-json';
 
 const MESSAGES: Readonly<Record<string, string>> = Object.freeze({
@@ -10,6 +12,7 @@ const MESSAGES: Readonly<Record<string, string>> = Object.freeze({
   project_deleting: 'Ce projet est en cours de suppression.',
   project_implicit: 'Convertissez d’abord ce chat en projet.',
   project_not_found: 'Ce projet n’existe plus.',
+  project_pin_limit_reached: `Vous avez atteint la limite de ${PROJECT_PIN_LIMIT} projets épinglés. Désépinglez-en un pour continuer.`,
 });
 
 /** Human-readable French message for a failed workspace request. */

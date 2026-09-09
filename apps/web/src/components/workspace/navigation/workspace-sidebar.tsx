@@ -20,6 +20,10 @@ interface WorkspaceSidebarProps extends Omit<
 > {
   /** Recent chats already filtered by the search box. */
   readonly conversations: readonly Conversation[];
+  /** Older chats exist beyond the loaded pages; the search only covers what is loaded. */
+  readonly hasMoreConversations: boolean;
+  readonly isLoadingMoreConversations: boolean;
+  readonly onLoadMoreConversations: () => void;
   readonly search: string;
   readonly isLoading: boolean;
   readonly isNavigationOpen: boolean;
@@ -33,6 +37,9 @@ interface WorkspaceSidebarProps extends Omit<
 
 export function WorkspaceSidebar({
   conversations,
+  hasMoreConversations,
+  isLoadingMoreConversations,
+  onLoadMoreConversations,
   search,
   isLoading,
   isNavigationOpen,
@@ -193,6 +200,18 @@ export function WorkspaceSidebar({
                   Conversations hors projet, chacune dans son espace privé.
                 </p>
               </section>
+              {hasMoreConversations ? (
+                <Button
+                  aria-busy={isLoadingMoreConversations}
+                  className="mt-4 h-8 min-h-8 w-full justify-start px-2 text-2xs font-normal text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  disabled={isLoadingMoreConversations}
+                  onClick={onLoadMoreConversations}
+                  size="sm"
+                  variant="ghost"
+                >
+                  Afficher plus de conversations
+                </Button>
+              ) : null}
             </>
           )}
         </div>

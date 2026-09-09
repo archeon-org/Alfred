@@ -30,14 +30,30 @@ export type BlockNode =
   | { readonly type: 'quote'; readonly children: readonly InlineNode[] }
   | { readonly type: 'rule' };
 
+// Every pattern below runs in linear time on hostile input: a project document can hold 64 KiB,
+// so a run of 64,000 backticks or brackets must not make the renderer backtrack quadratically.
 const FENCE = /^```([\w-]*)\s*$/u;
-const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/u;
+const HEADING = /^(#{1,6})\s+(.*)$/u;
 const RULE = /^(?:-{3,}|\*{3,}|_{3,})\s*$/u;
 const LIST_ITEM = /^\s{0,3}(?:([-*+])|(\d{1,9})[.)])\s+(.*)$/u;
 const QUOTE = /^\s{0,3}>\s?(.*)$/u;
 const SAFE_LINK = /^(?:https?:\/\/|mailto:)/iu;
+// A code span only starts at the first backtick of a run and takes the whole run as its fence,
+// so a run never re-enters the match from each of its characters. A link label cannot contain
+// `[`, so a run of opening brackets fails immediately instead of being retried from every one.
 const INLINE =
-  /(`+)([^`]+?)\1|\*\*(.+?)\*\*|__(.+?)__|(?<![\w*])\*([^*\s](?:[^*]*?[^*\s])?)\*(?![\w*])|(?<![\w_])_([^_\s](?:[^_]*?[^_\s])?)_(?![\w_])|\[([^\]\n]+)\]\(([^)\s]+)\)/u;
+  /(?<!`)(`+)(?!`)([^`]+?)\1|\*\*(.+?)\*\*|__(.+?)__|(?<![\w*])\*([^*\s](?:[^*]*?[^*\s])?)\*(?![\w*])|(?<![\w_])_([^_\s](?:[^_]*?[^_\s])?)_(?![\w_])|\[([^[\]\n]+)\]\(([^)\s]+)\)/u;
+
+/** Drops an optional closing `#` sequence ("## Titre ##") without regex backtracking. */
+function headingText(raw: string): string {
+  const text = raw.trimEnd();
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '#') end -= 1;
+  if (end === text.length) return text;
+  const before = text.slice(0, end);
+  // Closing hashes count only after whitespace ("C#" keeps its hash, as in CommonMark).
+  return before.length === 0 || before.trimEnd().length < before.length ? before.trimEnd() : text;
+}
 
 export function parseInline(text: string): readonly InlineNode[] {
   const nodes: InlineNode[] = [];
@@ -75,7 +91,7 @@ function pushText(nodes: InlineNode[], value: string): void {
       nodes.push(previous.endsWith('  ') ? { type: 'break' } : { type: 'text', value: ' ' });
     }
     const trimmed = index > 0 ? line.trimStart() : line;
-    const content = index < lines.length - 1 ? trimmed.replace(/\s+$/u, '') : trimmed;
+    const content = index < lines.length - 1 ? trimmed.trimEnd() : trimmed;
     if (content.length > 0) nodes.push({ type: 'text', value: content });
   });
 }
@@ -114,7 +130,7 @@ export function parseMarkdown(source: string): readonly BlockNode[] {
       blocks.push({
         type: 'heading',
         level: heading[1]!.length as HeadingLevel,
-        children: parseInline(heading[2] ?? ''),
+        children: parseInline(headingText(heading[2] ?? '')),
       });
       continue;
     }

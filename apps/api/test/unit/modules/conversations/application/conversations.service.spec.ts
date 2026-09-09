@@ -36,6 +36,7 @@ function repositories(
     create: vi.fn((value: unknown) => value),
     createQueryBuilder: vi.fn(),
     delete: vi.fn().mockResolvedValue({ affected: 1 }),
+    findOne: vi.fn().mockResolvedValue(conversationRow()),
     save: vi.fn((value: Record<string, unknown>) =>
       Promise.resolve({ ...conversationRow(), ...value }),
     ),
@@ -180,7 +181,10 @@ describe('ConversationsService', () => {
   it('removes a chat and the implicit shell that only existed for it', async () => {
     const builder = queryBuilder(conversationRow({ projectId: 'implicit-1' }));
     const { conversations, projects, service } = repositories({
-      conversations: { createQueryBuilder: vi.fn().mockReturnValue(builder) },
+      conversations: {
+        createQueryBuilder: vi.fn().mockReturnValue(builder),
+        findOne: vi.fn().mockResolvedValue(conversationRow({ projectId: 'implicit-1' })),
+      },
       projects: {
         findOne: vi.fn().mockResolvedValue(projectRow({ id: 'implicit-1', kind: 'implicit' })),
       },
@@ -188,7 +192,19 @@ describe('ConversationsService', () => {
 
     await service.remove(principal, conversationRow().id);
 
-    expect(builder.setLock).toHaveBeenCalledWith('pessimistic_write');
+    // Parent first, then child: the same order as a cascading project deletion.
+    expect(builder.setLock).not.toHaveBeenCalled();
+    expect(projects.findOne).toHaveBeenCalledWith({
+      lock: { mode: 'pessimistic_write' },
+      where: { id: 'implicit-1', ownerUserId: scope.ownerUserId, tenantId: scope.tenantId },
+    });
+    expect(conversations.findOne).toHaveBeenCalledWith({
+      lock: { mode: 'pessimistic_write' },
+      where: { id: conversationRow().id, projectId: 'implicit-1' },
+    });
+    expect(projects.findOne.mock.invocationCallOrder[0]).toBeLessThan(
+      conversations.findOne.mock.invocationCallOrder[0] ?? 0,
+    );
     expect(conversations.delete).toHaveBeenCalledWith({
       id: conversationRow().id,
       projectId: 'implicit-1',
@@ -198,6 +214,22 @@ describe('ConversationsService', () => {
       ownerUserId: scope.ownerUserId,
       tenantId: scope.tenantId,
     });
+  });
+
+  it('answers 404 when the chat vanished while waiting for the project lock', async () => {
+    const builder = queryBuilder(conversationRow());
+    const { conversations, projects, service } = repositories({
+      conversations: {
+        createQueryBuilder: vi.fn().mockReturnValue(builder),
+        findOne: vi.fn().mockResolvedValue(null),
+      },
+    });
+
+    await expect(service.remove(principal, conversationRow().id)).rejects.toMatchObject({
+      code: 'conversation_not_found',
+    });
+    expect(conversations.delete).not.toHaveBeenCalled();
+    expect(projects.delete).not.toHaveBeenCalled();
   });
 
   it('keeps a named project when one of its chats is removed', async () => {

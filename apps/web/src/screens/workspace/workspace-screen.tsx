@@ -10,7 +10,10 @@ import { WorkspaceLayout } from '@/components/workspace/workspace-layout';
 import { WorkspaceSidebar } from '@/components/workspace/navigation/workspace-sidebar';
 import { ProjectActionDialogs } from '@/components/workspace/project/project-action-dialogs';
 import { useCreateConversation } from '@/hooks/conversations/use-conversation-mutations';
-import { useConversationsQuery } from '@/hooks/conversations/use-conversations-query';
+import {
+  useConversationQuery,
+  useConversationsQuery,
+} from '@/hooks/conversations/use-conversations-query';
 import { useProjectActions } from '@/hooks/projects/use-project-actions';
 import { useCreateProject } from '@/hooks/projects/use-project-mutations';
 import {
@@ -70,9 +73,13 @@ export function WorkspaceScreen() {
   const sidebarRef = useRef<PanelImperativeHandle>(null);
   const [creation, setCreation] = useState<WorkspaceCreationKind | null>(null);
 
-  const selectedConversation = recentQuery.conversations.find(
-    ({ id }) => id === conversationMatch?.params.conversationId,
-  );
+  // The conversation itself is the source of truth: an older chat opened by link must keep its
+  // project in the header and in "Nouvelle conversation". The recent list only bridges the
+  // detail request so a chat picked from the sidebar keeps its scope without a flicker.
+  const selectedConversationId = conversationMatch?.params.conversationId;
+  const selectedConversation =
+    useConversationQuery(selectedConversationId).conversation ??
+    recentQuery.conversations.find(({ id }) => id === selectedConversationId);
   const selectedProjectId =
     projectMatch?.params.projectId ??
     (selectedConversation?.projectKind === 'named' ? selectedConversation.projectId : undefined);
@@ -194,6 +201,9 @@ export function WorkspaceScreen() {
             isLoadingMoreProjects={projectsQuery.isLoadingMore}
             onLoadMoreProjects={projectsQuery.loadMore}
             conversations={conversations}
+            hasMoreConversations={recentQuery.hasMore}
+            isLoadingMoreConversations={recentQuery.isLoadingMore}
+            onLoadMoreConversations={recentQuery.loadMore}
             selectedProjectId={selectedProjectId}
             selectedConversationId={conversationMatch?.params.conversationId}
             isProjectHome={projectMatch !== null}

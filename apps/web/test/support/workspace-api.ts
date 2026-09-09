@@ -179,7 +179,6 @@ export function createWorkspaceApi(
         return new Response(null, { status: 204 });
       }
     }
-    if (path === '/api/conversations' && method === 'GET') return json({ data: null });
     if (path === '/api/conversations' && method === 'POST') {
       const input = body as { projectId?: unknown; title?: unknown };
       let parent: Project | undefined;
@@ -239,11 +238,16 @@ export function createWorkspaceApi(
       }
       const failure_ = failures.get('GET /api/conversations');
       if (failure_ !== undefined) return failure(failure_.status, failure_.code);
-      const items = byDate(
+      const all = byDate(
         conversations.filter((item) => projectId === null || item.projectId === projectId),
         (item) => item.createdAt,
       );
-      return json({ data: { items, nextCursor: null }, success: true });
+      // Offset cursors stand in for the opaque API cursors; the client treats both as strings.
+      const offset = Number(url.searchParams.get('cursor') ?? '0');
+      const limit = Number(url.searchParams.get('limit') ?? '50');
+      const items = all.slice(offset, offset + limit);
+      const nextCursor = offset + limit < all.length ? String(offset + limit) : null;
+      return json({ data: { items, nextCursor }, success: true });
     }
     return route(method, url, body);
   });

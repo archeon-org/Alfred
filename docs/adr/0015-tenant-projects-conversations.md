@@ -41,20 +41,36 @@ pagination, ownership predicates, business errors and opt-in idempotence.
   under a partial index, `POST /api/projects/:id/pin` and `/unpin` are idempotent and refused on
   implicit shells, and `GET /api/projects?pinned=true` returns the pinned list in pin order while
   `pinned=false` pages through the others. Pinning is a per-owner presentation preference of the
-  project; no register record covers it and it changes no ownership or context semantics.
+  project; no register record covers it and it changes no ownership or context semantics. The
+  pinned list is one page of at most `PROJECT_PIN_LIMIT` (100) projects, so the pin that would
+  exceed it is refused with `409 project_pin_limit_reached` under an owner-scoped advisory lock
+  rather than silently dropped from the navigation.
+- Request DTOs treat an explicit `null` as invalid (`400`), not as an omitted field: a cleared
+  document is an empty string, as the shared contracts state. Deleting a conversation locks the
+  parent project before the conversation row, the same order as a cascading project deletion, so
+  the two operations cannot deadlock.
 - The web application replaces the preview fixtures with services, TanStack Query hooks and three
   routes (`/app`, `/app/projects/:projectId`, `/app/conversations/:conversationId`). Confirmation,
   single-field and Markdown-document dialogs, the dropdown "⋯" action menu and the project
   action menu are shared primitives under `components/ui` and `components/workspace/project`;
-  Markdown renders through a typed parser into React elements, never through HTML injection.
-  The navigation shows pinned projects first, then three recent projects with on-demand paging;
-  a project row opens the project home and the header scope name links back to it.
+  Markdown renders through a typed parser into React elements, never through HTML injection, and
+  every parser pattern runs in linear time on a document of the maximum size. The navigation
+  shows pinned projects first, then three recent projects with on-demand paging, and recent chats
+  page on demand as well; a project row opens the project home and the header scope name links
+  back to it. The frame reads the current chat from its own detail request, so a chat older than
+  the loaded pages keeps its project scope when opened by link.
 
 ## Consequences
 
 - The tenant is resolved by one indexed read per product command instead of a JWT claim; adding a
   `tid` claim (story CORE-07) is a later optimization that requires revising ADR 0003.
 - Existing database fixtures and any future user insert must provide a tenant.
+- Rolling back the application alone is not enough once `CreateTenants` has run: the previous
+  `UsersService` does not set `api_users.tenant_id`, which the migration made `NOT NULL`, so new
+  accounts would fail. A rollback reverts the four migrations first (`migration:revert`, four
+  times, which drops `api_conversations`, `api_projects`, the pin column and `tenant_id`), then the
+  code; keeping the schema and redeploying the previous web application alone is the safe partial
+  rollback. See the [deployment runbook](../runbooks/deployment.md#migration-gate).
 - Sending messages, message history, Executions and runtime threads are not part of this slice;
   the composer stays inert and a project input only opens a titled chat that carries its draft in
   memory.

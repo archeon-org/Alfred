@@ -78,4 +78,19 @@ describe('project request DTOs', () => {
     expect(await errorsOf(plainToInstance(UpdateProjectDto, {}))).toEqual([]);
     expect(await errorsOf(plainToInstance(UpdateProjectDto, { name: ' ' }))).toEqual(['name']);
   });
+
+  it.each(['name', 'description', 'context'])(
+    'rejects an explicit null %s instead of letting it reach the service',
+    async (field) => {
+      expect(await errorsOf(plainToInstance(UpdateProjectDto, { [field]: null }))).toEqual([field]);
+      expect(
+        await errorsOf(
+          plainToInstance(CreateProjectDto, {
+            ...(field === 'name' ? {} : { name: 'Projet' }),
+            [field]: null,
+          }),
+        ),
+      ).toEqual([field]);
+    },
+  );
 });

@@ -6,6 +6,8 @@ import { listEnvelopeSchema } from './pagination';
 export const PROJECT_NAME_MAX_LENGTH = 160;
 export const PROJECT_DESCRIPTION_MAX_LENGTH = 2000;
 export const PROJECT_CONTEXT_MAX_BYTES = 65_536;
+/** Pinned projects form one short, hand-curated page; pinning beyond this limit is refused. */
+export const PROJECT_PIN_LIMIT = 100;
 
 /** One line of printable text: no ASCII control character, including line breaks. */
 // eslint-disable-next-line no-control-regex -- rejecting control characters is the purpose.

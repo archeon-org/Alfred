@@ -1,6 +1,6 @@
-import type { Project } from '@alfred/contracts';
+import { PROJECT_PIN_LIMIT, type Project } from '@alfred/contracts';
 import { Injectable } from '@nestjs/common';
-import { DataSource, type Repository } from 'typeorm';
+import { DataSource, IsNull, Not, type EntityManager, type Repository } from 'typeorm';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { ApiException } from '../../../common/errors/api.exception';
 import {
@@ -38,8 +38,8 @@ export interface ProjectPage {
 }
 
 const ROW_LOCK = { lock: { mode: 'pessimistic_write' } } as const;
-/** Pinned projects are a short, hand-curated list; they are returned in one page. */
-const PINNED_LIMIT = 100;
+/** Serializes the pin count and the pin write of one owner inside the current transaction. */
+const OWNER_PIN_LOCK = 'SELECT pg_advisory_xact_lock(hashtext($1))';
 
 @Injectable()
 export class ProjectsService {
@@ -79,7 +79,7 @@ export class ProjectsService {
         .andWhere('project.pinnedAt IS NOT NULL')
         .orderBy('project.pinnedAt', 'ASC')
         .addOrderBy('project.id', 'ASC')
-        .take(PINNED_LIMIT)
+        .take(PROJECT_PIN_LIMIT)
         .getMany();
       return { items: items.map(toProjectDto), nextCursor: null };
     }
@@ -129,16 +129,23 @@ export class ProjectsService {
     });
   }
 
-  /** Pins or unpins a named project. Repeating the current state changes nothing. */
+  /**
+   * Pins or unpins a named project. Repeating the current state changes nothing. The pinned list
+   * is served as one page, so pinning beyond `PROJECT_PIN_LIMIT` is refused instead of silently
+   * hiding the extra project from the navigation.
+   */
   async setPinned(principal: AuthPrincipal, id: string, pinned: boolean): Promise<Project> {
     const scope = await this.tenants.scopeFor(principal.id);
     return this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(ProjectEntity);
       const ownership = { id, ...scope };
+      // Taken before the row lock so every pin of one owner sees a consistent count.
+      if (pinned) await manager.query(OWNER_PIN_LOCK, [scope.ownerUserId]);
       const project = await findOwnedOrThrow(repository, ownership, PROJECT_RESOURCE, ROW_LOCK);
       assertProjectWritable(project);
       assertProjectNamed(project);
       if ((project.pinnedAt !== null) === pinned) return toProjectDto(project);
+      if (pinned) await this.assertPinCapacity(manager, scope);
       await updateOwnedOrThrow(
         repository,
         ownership,
@@ -162,6 +169,19 @@ export class ProjectsService {
       await findOwnedOrThrow(repository, ownership, PROJECT_RESOURCE, ROW_LOCK);
       await deleteOwnedOrThrow(repository, ownership, PROJECT_RESOURCE);
     });
+  }
+
+  private async assertPinCapacity(manager: EntityManager, scope: OwnerScope): Promise<void> {
+    const pinnedCount = await manager.getRepository(ProjectEntity).count({
+      where: { ...scope, pinnedAt: Not(IsNull()) },
+    });
+    if (pinnedCount >= PROJECT_PIN_LIMIT) {
+      throw new ApiException(
+        409,
+        'project_pin_limit_reached',
+        `At most ${PROJECT_PIN_LIMIT} projects can be pinned.`,
+      );
+    }
   }
 
   private ownedNamedProjects(repository: Repository<ProjectEntity>, scope: OwnerScope) {

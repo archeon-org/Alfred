@@ -1,3 +1,4 @@
+import { PROJECT_PIN_LIMIT } from '@alfred/contracts';
 import type { DataSource, EntityManager } from 'typeorm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +16,7 @@ vi.mock('@api/common/pagination/paginate', () => ({ paginateByCursor: vi.fn() })
 
 function repositoryWith(overrides: Record<string, unknown> = {}) {
   return {
+    count: vi.fn().mockResolvedValue(0),
     create: vi.fn((value: unknown) => value),
     createQueryBuilder: vi.fn(),
     delete: vi.fn().mockResolvedValue({ affected: 1 }),
@@ -26,15 +28,17 @@ function repositoryWith(overrides: Record<string, unknown> = {}) {
 }
 
 function serviceWith(repository: ReturnType<typeof repositoryWith>) {
+  const query = vi.fn().mockResolvedValue([]);
   const manager = {
     getRepository: vi.fn().mockReturnValue(repository),
+    query,
   } as unknown as EntityManager;
   const transaction = vi.fn((work: (manager: EntityManager) => unknown) => work(manager));
   const dataSource = {
     getRepository: vi.fn().mockReturnValue(repository),
     transaction,
   } as unknown as DataSource;
-  return { service: new ProjectsService(dataSource, tenantsService()), transaction };
+  return { query, service: new ProjectsService(dataSource, tenantsService()), transaction };
 }
 
 describe('ProjectsService', () => {
@@ -129,10 +133,16 @@ describe('ProjectsService', () => {
         .mockResolvedValueOnce(projectRow())
         .mockResolvedValueOnce(projectRow({ pinnedAt: new Date('2026-09-09T12:00:00Z') })),
     });
-    const { service } = serviceWith(repository);
+    const { query, service } = serviceWith(repository);
 
     const pinned = await service.setPinned(principal, projectRow().id, true);
 
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), [
+      scope.ownerUserId,
+    ]);
+    expect(repository.count).toHaveBeenCalledWith({
+      where: { ...scope, pinnedAt: expect.objectContaining({ _type: 'not' }) as unknown },
+    });
     expect(repository.update).toHaveBeenCalledWith(
       { id: projectRow().id, ownerUserId: scope.ownerUserId, tenantId: scope.tenantId },
       { pinnedAt: expect.any(Function) as () => string },
@@ -140,6 +150,7 @@ describe('ProjectsService', () => {
     expect(pinned.pinnedAt).toBe('2026-09-09T12:00:00.000Z');
 
     const alreadyPinned = repositoryWith({
+      count: vi.fn().mockResolvedValue(PROJECT_PIN_LIMIT),
       findOne: vi.fn().mockResolvedValue(projectRow({ pinnedAt: new Date() })),
     });
     await serviceWith(alreadyPinned).service.setPinned(principal, projectRow().id, true);
@@ -151,8 +162,11 @@ describe('ProjectsService', () => {
         .mockResolvedValueOnce(projectRow({ pinnedAt: new Date() }))
         .mockResolvedValueOnce(projectRow()),
     });
-    await serviceWith(unpin).service.setPinned(principal, projectRow().id, false);
+    const unpinning = serviceWith(unpin);
+    await unpinning.service.setPinned(principal, projectRow().id, false);
     expect(unpin.update).toHaveBeenCalledWith(expect.anything(), { pinnedAt: null });
+    expect(unpinning.query).not.toHaveBeenCalled();
+    expect(unpin.count).not.toHaveBeenCalled();
 
     const implicit = repositoryWith({
       findOne: vi.fn().mockResolvedValue(projectRow({ kind: 'implicit', name: null })),
@@ -160,6 +174,21 @@ describe('ProjectsService', () => {
     await expect(
       serviceWith(implicit).service.setPinned(principal, projectRow().id, true),
     ).rejects.toMatchObject({ code: 'project_implicit' });
+  });
+
+  it('refuses to pin beyond the announced limit instead of hiding the extra project', async () => {
+    const repository = repositoryWith({ count: vi.fn().mockResolvedValue(PROJECT_PIN_LIMIT) });
+    const { service } = serviceWith(repository);
+
+    await expect(service.setPinned(principal, projectRow().id, true)).rejects.toMatchObject({
+      code: 'project_pin_limit_reached',
+      status: 409,
+    });
+    expect(repository.update).not.toHaveBeenCalled();
+
+    const oneBelow = repositoryWith({ count: vi.fn().mockResolvedValue(PROJECT_PIN_LIMIT - 1) });
+    await serviceWith(oneBelow).service.setPinned(principal, projectRow().id, true);
+    expect(oneBelow.update).toHaveBeenCalled();
   });
 
   it('reads a project with tenant, owner and id in one predicate', async () => {

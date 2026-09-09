@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
+import { PROJECT_PIN_LIMIT } from '@alfred/contracts';
 import type { INestApplication } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { JwtModule, JwtService } from '@nestjs/jwt';
@@ -349,11 +350,76 @@ postgres('projects and conversations PostgreSQL contract', () => {
     expect(await db.getRepository(ProjectEntity).countBy({ id: chat.projectId })).toBe(0);
   });
 
+  it('refuses the pin that would exceed the announced limit', async () => {
+    const owner = await user();
+    const ids: string[] = [];
+    for (let index = 0; index <= PROJECT_PIN_LIMIT; index += 1) {
+      const created = await api('POST', '/projects', owner.token, { name: `Projet ${index}` });
+      ids.push((created.body?.data as { id: string }).id);
+    }
+    const [overflow, ...pinnable] = ids as [string, ...string[]];
+    for (const id of pinnable) {
+      expect((await api('POST', `/projects/${id}/pin`, owner.token)).status).toBe(200);
+    }
+
+    const refused = await api('POST', `/projects/${overflow}/pin`, owner.token);
+    expect(refused.status).toBe(409);
+    expect(refused.body).toMatchObject({ error: { code: 'project_pin_limit_reached' } });
+    expect((await api('GET', '/projects?pinned=true', owner.token)).body?.data?.items).toHaveLength(
+      PROJECT_PIN_LIMIT,
+    );
+    expect(
+      (await api('GET', '/projects?pinned=false', owner.token)).body?.data?.items?.map(
+        ({ id }) => id,
+      ),
+    ).toEqual([overflow]);
+
+    expect((await api('POST', `/projects/${pinnable[0]}/unpin`, owner.token)).status).toBe(200);
+    expect((await api('POST', `/projects/${overflow}/pin`, owner.token)).status).toBe(200);
+  });
+
+  it('deletes a chat and its project concurrently without deadlocking', async () => {
+    const owner = await user();
+    for (let round = 0; round < 6; round += 1) {
+      const project = (await api('POST', '/projects', owner.token, { name: `Course ${round}` }))
+        .body?.data as { id: string };
+      const chat = (
+        await api('POST', '/conversations', owner.token, { projectId: project.id, title: 'Chat' })
+      ).body?.data as { id: string };
+
+      const [chatDeletion, projectDeletion] = await Promise.all([
+        api('DELETE', `/conversations/${chat.id}`, owner.token),
+        api('DELETE', `/projects/${project.id}`, owner.token),
+      ]);
+
+      expect([204, 404]).toContain(chatDeletion.status);
+      expect(projectDeletion.status).toBe(204);
+      expect(await db.getRepository(ConversationEntity).countBy({ id: chat.id })).toBe(0);
+    }
+  });
+
   it('validates inputs at the HTTP boundary and hides identifier formats', async () => {
     const owner = await user();
 
     expect((await api('POST', '/projects', owner.token, { name: '   ' })).status).toBe(400);
     expect((await api('POST', '/projects', owner.token, { extra: 1, name: 'x' })).status).toBe(400);
+    const project = (await api('POST', '/projects', owner.token, { name: 'Nulls' })).body?.data as {
+      id: string;
+    };
+    for (const body of [{ name: null }, { description: null }, { context: null }]) {
+      const rejected = await api('PATCH', `/projects/${project.id}`, owner.token, body);
+      expect(rejected.status).toBe(400);
+    }
+    expect(
+      (await api('POST', '/projects', owner.token, { description: null, name: 'x' })).status,
+    ).toBe(400);
+    expect(
+      (await api('POST', '/conversations', owner.token, { projectId: null, title: null })).status,
+    ).toBe(400);
+    expect((await api('GET', `/projects/${project.id}`, owner.token)).body?.data).toMatchObject({
+      description: null,
+      name: 'Nulls',
+    });
     expect((await api('GET', '/projects/not-a-uuid', owner.token)).body).toMatchObject({
       error: { code: 'project_not_found' },
     });

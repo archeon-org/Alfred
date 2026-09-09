@@ -30,6 +30,15 @@ describe('conversation request DTOs', () => {
     ]);
   });
 
+  it('rejects explicit null fields that an omitted field would have defaulted', async () => {
+    expect(await errorsOf(plainToInstance(CreateConversationDto, { projectId: null }))).toEqual([
+      'projectId',
+    ]);
+    expect(await errorsOf(plainToInstance(CreateConversationDto, { title: null }))).toEqual([
+      'title',
+    ]);
+  });
+
   it('keeps the shared pagination contract and an optional project filter', async () => {
     const dto = plainToInstance(ListConversationsQueryDto, { limit: '5' });
     expect(await errorsOf(dto)).toEqual([]);

@@ -85,6 +85,21 @@ API startup. The ledger is the `api_migrations` table.
 The job runs as UID/GID `10001`, with a read-only root filesystem, a temporary `/tmp`, all Linux
 capabilities dropped and `no-new-privileges` enabled.
 
+Rolling back the API image does not undo a migration, and some migrations make the previous
+image unusable: `CreateTenants1789000000000` adds `api_users.tenant_id NOT NULL`, which the
+previous `UsersService` never fills, so account creation fails on the old code until the
+migration is reverted. To roll back below that release, revert the newer migrations first from
+the same image, one at a time and newest first, then redeploy the previous API:
+
+```bash
+node dist/database/run-migrations.js # forward; reverting uses the TypeORM data source
+pnpm --filter @alfred/api migration:revert # repeat once per migration to undo (development)
+```
+
+Reverting `CreateTenants` drops `api_conversations`, `api_projects`, the pin column and every
+tenant assignment; export anything that must survive before running it. Redeploying only the
+previous web application while keeping the schema is the safe partial rollback.
+
 Keep `/health/live` and `/health/ready` on the internal probe path of the load balancer or
 orchestrator; do not publish them through the user-facing ingress. Both skip request throttling so a
 failed Redis limiter cannot make liveness fail. Liveness is process-only; readiness performs the

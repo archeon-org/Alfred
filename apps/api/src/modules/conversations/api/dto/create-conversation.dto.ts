@@ -1,15 +1,15 @@
 import { CONVERSATION_TITLE_MAX_LENGTH, RESOURCE_NAME_PATTERN } from '@alfred/contracts';
 import { Transform } from 'class-transformer';
-import { IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
-import { trimmedString } from '../../../../common/validation/text-input';
+import { IsString, IsUUID, Length, Matches } from 'class-validator';
+import { Omittable, trimmedString } from '../../../../common/validation/text-input';
 
 /** Without `projectId`, the API creates a private implicit project for the chat (ALF-DEC-034 §2). */
 export class CreateConversationDto {
-  @IsOptional()
+  @Omittable()
   @IsUUID()
   projectId?: string;
 
-  @IsOptional()
+  @Omittable()
   @Transform(({ value }: { value: unknown }) => trimmedString(value))
   @IsString()
   @Length(1, CONVERSATION_TITLE_MAX_LENGTH)

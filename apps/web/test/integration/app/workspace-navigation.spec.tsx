@@ -154,6 +154,62 @@ describe('Workspace navigation', () => {
     );
   });
 
+  it('keeps the project of an older chat opened by link and loads older chats on demand', async () => {
+    const user = userEvent.setup();
+    const oldChatId = '3f2e1d0c-9b8a-4765-8321-000000000001';
+    const recentStandalone = Array.from({ length: 50 }, (_, index) =>
+      conversation({
+        createdAt: `2026-09-08T${String(10 + Math.floor(index / 60)).padStart(2, '0')}:${String(index % 60).padStart(2, '0')}:00.000Z`,
+        id: `7a6b5c4d-3e2f-4a1b-9c8d-${String(index).padStart(12, '0')}`,
+        projectId: `9e8d7c6b-5a4f-4e3d-8c2b-${String(index).padStart(12, '0')}`,
+        projectKind: 'implicit',
+        title: `Chat libre ${index}`,
+      }),
+    );
+    const api = createWorkspaceApi({
+      conversations: [
+        ...recentStandalone,
+        conversation({ createdAt: '2026-09-01T09:00:00.000Z', id: oldChatId, title: 'Vieux chat' }),
+      ],
+      projects: [project()],
+    });
+    renderWorkspaceAt(`/app/conversations/${oldChatId}`, api);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Vieux chat' })).toBeVisible();
+    expect(await screen.findByRole('link', { name: 'Refonte du portail' })).toHaveAttribute(
+      'href',
+      `/app/projects/${PROJECT_ID}`,
+    );
+    expect(projectRow('Refonte du portail')).toHaveAttribute('aria-current', 'true');
+    expect(within(sidebar()).queryByRole('button', { name: 'Vieux chat' })).not.toBeInTheDocument();
+    expect(api.calls).toContainEqual(
+      expect.objectContaining({ method: 'GET', path: `/api/conversations/${oldChatId}` }),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Nouvelle conversation' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nouvelle conversation' });
+    expect(within(dialog).getByText(/Refonte du portail/u)).toBeVisible();
+    await user.keyboard('{Escape}');
+
+    await user.click(
+      within(sidebar()).getByRole('button', { name: 'Afficher plus de conversations' }),
+    );
+
+    const oldRow = await within(
+      screen.getByRole('group', { name: 'Refonte du portail' }),
+    ).findByRole('button', { name: 'Vieux chat' });
+    expect(oldRow).toHaveAttribute('aria-current', 'page');
+    expect(
+      within(sidebar()).queryByRole('button', { name: 'Afficher plus de conversations' }),
+    ).not.toBeInTheDocument();
+    expect(api.calls.map(({ path }) => path)).toEqual(
+      expect.arrayContaining([
+        '/api/conversations?limit=50',
+        '/api/conversations?cursor=50&limit=50',
+      ]),
+    );
+  });
+
   it('shows three recent projects, loads more on demand and keeps pinned ones apart', async () => {
     const user = userEvent.setup();
     const [first, ...rest] = fiveProjects();

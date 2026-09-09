@@ -1,4 +1,13 @@
-import { registerDecorator, type ValidationOptions } from 'class-validator';
+import { registerDecorator, ValidateIf, type ValidationOptions } from 'class-validator';
+
+/**
+ * Skips validation only when the field is absent. Unlike `@IsOptional()`, an explicit `null`
+ * still runs the other validators, so it is rejected instead of reaching `.trim()` or a NOT NULL
+ * column; the contracts express a cleared document as an empty string, never as `null`.
+ */
+export function Omittable(): PropertyDecorator {
+  return ValidateIf((_object, value: unknown) => value !== undefined);
+}
 
 /** Pure, side-effect-free transforms for `@Transform()` on idempotent request DTOs. */
 export function trimmedString(value: unknown): unknown {
