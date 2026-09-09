@@ -37,10 +37,18 @@ pagination, ownership predicates, business errors and opt-in idempotence.
   followed by SQL cascade, valid while no artifact, runtime binding or Execution exists. The
   asynchronous variant with receipts is deferred to the artifact stories under `ALF-DEC-019/051`.
 - Creation endpoints use `@Idempotent()`; the browser generates one key per user gesture.
+- A project can be pinned by its owner: `api_projects.pinned_at` records the moment of pinning
+  under a partial index, `POST /api/projects/:id/pin` and `/unpin` are idempotent and refused on
+  implicit shells, and `GET /api/projects?pinned=true` returns the pinned list in pin order while
+  `pinned=false` pages through the others. Pinning is a per-owner presentation preference of the
+  project; no register record covers it and it changes no ownership or context semantics.
 - The web application replaces the preview fixtures with services, TanStack Query hooks and three
   routes (`/app`, `/app/projects/:projectId`, `/app/conversations/:conversationId`). Confirmation,
-  single-field and Markdown-document dialogs are shared primitives under `components/ui`; Markdown
-  renders through a typed parser into React elements, never through HTML injection.
+  single-field and Markdown-document dialogs, the dropdown "⋯" action menu and the project
+  action menu are shared primitives under `components/ui` and `components/workspace/project`;
+  Markdown renders through a typed parser into React elements, never through HTML injection.
+  The navigation shows pinned projects first, then three recent projects with on-demand paging;
+  a project row opens the project home and the header scope name links back to it.
 
 ## Consequences
 

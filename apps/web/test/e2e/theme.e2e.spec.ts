@@ -96,7 +96,7 @@ test('keeps visible workspace and dialog text at least eleven CSS pixels', async
       return violations;
     });
   expect(await undersizedText()).toEqual([]);
-  await page.getByRole('button', { name: 'Refonte du portail' }).click();
+  await page.getByRole('button', { name: 'Refonte du portail', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Refonte du portail' })).toBeVisible();
   expect(await undersizedText()).toEqual([]);
   await page.getByRole('button', { name: 'Paramètres' }).click();

@@ -109,6 +109,7 @@ test('serializes refresh rotation across two tabs', async ({ context, page }) =>
     });
   });
   const secondPage = await context.newPage();
+  await installWorkspaceApi(secondPage);
 
   await Promise.all([page.goto('/app'), secondPage.goto('/app')]);
 
@@ -145,6 +146,7 @@ test('waits for another tab refresh before confirming logout', async ({ context,
   const logoutButton = page.getByRole('button', { name: 'Se déconnecter' });
   await expect(logoutButton).toBeVisible();
   const secondPage = await context.newPage();
+  await installWorkspaceApi(secondPage);
   await secondPage.goto('/app');
   await expect.poll(() => activeRefreshes).toBe(1);
 
