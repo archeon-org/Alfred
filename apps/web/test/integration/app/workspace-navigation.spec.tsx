@@ -255,4 +255,31 @@ describe('Workspace navigation', () => {
       ]),
     );
   });
+
+  it('folds the pinned section to three projects and unfolds it without a request', async () => {
+    const user = userEvent.setup();
+    const api = createWorkspaceApi({
+      projects: fiveProjects().map((item, index) => ({
+        ...item,
+        pinnedAt: `2026-09-09T1${index}:00:00.000Z`,
+      })),
+    });
+    renderWorkspaceAt('/app', api);
+
+    const pinned = await screen.findByRole('region', { name: 'Épinglés' });
+    await waitFor(() => expect(within(pinned).getAllByRole('group')).toHaveLength(3));
+    expect(
+      within(pinned)
+        .getAllByRole('group')
+        .map((group) => group.getAttribute('aria-label')),
+    ).toEqual(['Un', 'Deux', 'Trois']);
+    const requests = api.calls.length;
+
+    await user.click(within(pinned).getByRole('button', { name: 'Afficher plus' }));
+    expect(within(pinned).getAllByRole('group')).toHaveLength(5);
+    expect(within(pinned).queryByRole('button', { name: 'Afficher plus' })).not.toBeInTheDocument();
+    await user.click(within(pinned).getByRole('button', { name: 'Afficher moins' }));
+    expect(within(pinned).getAllByRole('group')).toHaveLength(3);
+    expect(api.calls).toHaveLength(requests);
+  });
 });

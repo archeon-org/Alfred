@@ -4,6 +4,7 @@ import { useId, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { ProjectNavigationItem } from '@/components/workspace/navigation/project-navigation-item';
 import type { ProjectActionHandlers } from '@/components/workspace/project/project-action-menu';
+import { useFoldedList } from '@/hooks/ui/use-folded-list';
 import { RECENT_PROJECTS_FIRST_PAGE } from '@/lib/workspace/project-list';
 import type { Conversation, Project } from '@/lib/workspace/workspace.types';
 
@@ -34,6 +35,49 @@ interface ProjectSectionProps {
   readonly headerAction?: ReactNode;
   readonly footer?: ReactNode;
   readonly children: ReactNode;
+}
+
+interface FoldControlsProps {
+  readonly canShowMore: boolean;
+  readonly canShowLess: boolean;
+  readonly isLoadingMore?: boolean;
+  readonly onShowMore: () => void;
+  readonly onShowLess: () => void;
+}
+
+const foldButtonClass =
+  'h-8 min-h-8 justify-start px-2 text-2xs font-normal text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground';
+
+/** "Afficher plus" / "Afficher moins" footer shared by the sidebar sections. */
+function FoldControls({
+  canShowLess,
+  canShowMore,
+  isLoadingMore = false,
+  onShowLess,
+  onShowMore,
+}: FoldControlsProps) {
+  if (!canShowMore && !canShowLess) return null;
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {canShowMore ? (
+        <Button
+          aria-busy={isLoadingMore}
+          className={foldButtonClass}
+          disabled={isLoadingMore}
+          onClick={onShowMore}
+          size="sm"
+          variant="ghost"
+        >
+          Afficher plus
+        </Button>
+      ) : null}
+      {canShowLess ? (
+        <Button className={foldButtonClass} onClick={onShowLess} size="sm" variant="ghost">
+          Afficher moins
+        </Button>
+      ) : null}
+    </div>
+  );
 }
 
 function ProjectSection({ children, footer, headerAction, icon, title }: ProjectSectionProps) {
@@ -74,18 +118,11 @@ export function ProjectNavigation({
 }: ProjectNavigationProps) {
   const id = useId();
   const [collapsedProjectId, setCollapsedProjectId] = useState<string | null>(null);
-  // "Afficher plus" reveals the loaded projects beyond the first page (fetching the next page
-  // when needed); "Afficher moins" folds the list back to the first page without refetching.
-  const [showAll, setShowAll] = useState(false);
-  const visibleProjects = showAll ? projects : projects.slice(0, RECENT_PROJECTS_FIRST_PAGE);
-  const canShowMore = showAll
-    ? hasMoreProjects
-    : projects.length > RECENT_PROJECTS_FIRST_PAGE || hasMoreProjects;
-  const canShowLess = showAll && projects.length > RECENT_PROJECTS_FIRST_PAGE;
-  const showMore = () => {
-    if (showAll || projects.length <= RECENT_PROJECTS_FIRST_PAGE) onLoadMoreProjects();
-    setShowAll(true);
-  };
+  const pinnedList = useFoldedList(pinnedProjects, RECENT_PROJECTS_FIRST_PAGE);
+  const recentList = useFoldedList(projects, RECENT_PROJECTS_FIRST_PAGE, {
+    hasMore: hasMoreProjects,
+    onLoadMore: onLoadMoreProjects,
+  });
 
   const renderProject = (project: Project) => {
     const isSelected = selectedProjectId === project.id;
@@ -118,38 +155,30 @@ export function ProjectNavigation({
   return (
     <div className="space-y-5">
       {pinnedProjects.length > 0 ? (
-        <ProjectSection icon={<Pin aria-hidden="true" size={12} />} title="Épinglés">
-          {pinnedProjects.map(renderProject)}
+        <ProjectSection
+          footer={
+            <FoldControls
+              canShowLess={pinnedList.canShowLess}
+              canShowMore={pinnedList.canShowMore}
+              onShowLess={pinnedList.showLess}
+              onShowMore={pinnedList.showMore}
+            />
+          }
+          icon={<Pin aria-hidden="true" size={12} />}
+          title="Épinglés"
+        >
+          {pinnedList.visible.map(renderProject)}
         </ProjectSection>
       ) : null}
       <ProjectSection
         footer={
-          canShowMore || canShowLess ? (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {canShowMore ? (
-                <Button
-                  aria-busy={isLoadingMoreProjects}
-                  className="h-8 min-h-8 justify-start px-2 text-2xs font-normal text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                  disabled={isLoadingMoreProjects}
-                  onClick={showMore}
-                  size="sm"
-                  variant="ghost"
-                >
-                  Afficher plus
-                </Button>
-              ) : null}
-              {canShowLess ? (
-                <Button
-                  className="h-8 min-h-8 justify-start px-2 text-2xs font-normal text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
-                  onClick={() => setShowAll(false)}
-                  size="sm"
-                  variant="ghost"
-                >
-                  Afficher moins
-                </Button>
-              ) : null}
-            </div>
-          ) : null
+          <FoldControls
+            canShowLess={recentList.canShowLess}
+            canShowMore={recentList.canShowMore}
+            isLoadingMore={isLoadingMoreProjects}
+            onShowLess={recentList.showLess}
+            onShowMore={recentList.showMore}
+          />
         }
         headerAction={
           <Button
@@ -172,7 +201,7 @@ export function ProjectNavigation({
               : 'Tous vos projets sont épinglés.'}
           </p>
         ) : (
-          visibleProjects.map(renderProject)
+          recentList.visible.map(renderProject)
         )}
       </ProjectSection>
     </div>
