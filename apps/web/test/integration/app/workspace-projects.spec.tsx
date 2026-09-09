@@ -228,6 +228,37 @@ describe('Workspace projects', () => {
     expect(await screen.findByRole('button', { name: 'Refonte du portail' })).toBeVisible();
   });
 
+  it('never carries an unsent draft from one chat to another', async () => {
+    const user = userEvent.setup();
+    const api = seededApi();
+    api.conversations.push(
+      conversation({
+        createdAt: '2026-09-07T09:00:00.000Z',
+        id: '5c4d3e2f-1a0b-4c9d-8e7f-6a5b4c3d2e1f',
+        title: 'Autre chat du projet',
+      }),
+    );
+    renderWorkspaceAt(`/app/projects/${PROJECT_ID}`, api);
+
+    const chats = await screen.findByRole('list', { name: 'Chats du projet' });
+    await user.click(within(chats).getByRole('button', { name: /Synthèse du comité projet/u }));
+    const composer = await screen.findByRole('textbox', { name: 'Message' });
+    await user.type(composer, 'Un brouillon privé');
+    expect(composer).toHaveValue('Un brouillon privé');
+
+    await user.click(
+      within(screen.getByRole('group', { name: 'Refonte du portail' })).getByRole('button', {
+        name: 'Autre chat du projet',
+      }),
+    );
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Autre chat du projet' }),
+    ).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
+    expect(api.calls.some(({ method }) => method === 'POST')).toBe(false);
+  });
+
   it('explains a missing project without leaking the identifier format', async () => {
     renderWorkspaceAt('/app/projects/not-a-real-project', seededApi());
 

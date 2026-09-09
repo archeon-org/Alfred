@@ -36,6 +36,8 @@ export function ConversationScreen() {
   }
   return (
     <ConversationPanel
+      // Remount per conversation so an unsent draft never follows the user to another chat.
+      key={conversationId}
       ref={conversationRef}
       title={query.conversation?.title}
       draft={draftFrom(location.state)}
