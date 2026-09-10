@@ -57,7 +57,7 @@ describe('Workspace projects', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Refonte du portail' }),
     ).toBeVisible();
-    expect(screen.getByText('Cap Penser la prochaine version.')).toBeVisible();
+    expect(screen.queryByText('Cap Penser la prochaine version.')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Chats/u })).toHaveAttribute('aria-selected', 'true');
     const chats = await screen.findByRole('list', { name: 'Chats du projet' });
     expect(
@@ -65,11 +65,15 @@ describe('Workspace projects', () => {
     ).toBeVisible();
     expect(within(chats).queryByRole('button', { name: /Piste libre/u })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('tab', { name: 'Sources' }));
+    await user.click(
+      within(screen.getByRole('tablist', { name: 'Contenu du projet' })).getByRole('tab', {
+        name: 'Contexte',
+      }),
+    );
 
-    expect(screen.getByRole('heading', { name: 'Description' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Contexte' })).toBeVisible();
-    expect(screen.getByText('Aucun contexte pour le moment.')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Description' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Contexte du projet' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Préférences du projet' })).toBeVisible();
   });
 
   it('creates a project from the sidebar with an idempotency key and lands on its page', async () => {
@@ -133,7 +137,7 @@ describe('Workspace projects', () => {
     ).toHaveAttribute('aria-current', 'page');
   });
 
-  it('renames a project and edits its description through the Markdown editor with a preview', async () => {
+  it('renames a project and saves its context through the Markdown editor with a preview', async () => {
     const user = userEvent.setup();
     const api = seededApi();
     renderWorkspaceAt(`/app/projects/${PROJECT_ID}`, api);
@@ -158,35 +162,39 @@ describe('Workspace projects', () => {
       expect.objectContaining({ body: { name: 'Portail v2' }, method: 'PATCH' }),
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Sources' }));
-    await user.click(screen.getByRole('button', { name: 'Modifier la description' }));
-    const editor = screen.getByRole('dialog', { name: 'Description du projet' });
-    const textarea = within(editor).getByRole('textbox', { name: 'Description du projet' });
-    expect(textarea).toHaveValue('# Cap\n\nPenser la **prochaine** version.');
+    await user.click(
+      within(screen.getByRole('tablist', { name: 'Contenu du projet' })).getByRole('tab', {
+        name: 'Contexte',
+      }),
+    );
+    const editor = screen.getByRole('region', { name: 'Contexte du projet' });
+    const textarea = within(editor).getByRole('textbox', { name: 'Contexte du projet' });
+    expect(textarea).toHaveValue('');
     await user.clear(textarea);
     await user.type(
       textarea,
       '# Objectif{Enter}{Enter}Une **refonte** [[utile](https://alfred.test).',
     );
     await user.click(within(editor).getByRole('tab', { name: 'Aperçu' }));
-    const preview = within(editor).getByRole('region', { name: 'Aperçu · Description du projet' });
+    const preview = within(editor).getByRole('region', { name: 'Aperçu · Contexte du projet' });
     expect(within(preview).getByRole('heading', { level: 1, name: 'Objectif' })).toBeVisible();
     expect(within(preview).getByRole('link', { name: 'utile' })).toHaveAttribute(
       'rel',
       'noreferrer noopener',
     );
-    await user.click(within(editor).getByRole('button', { name: 'Enregistrer' }));
+    await user.click(
+      within(editor).getByRole('button', { name: 'Enregistrer · Contexte du projet' }),
+    );
 
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(
-      within(screen.getByRole('list', { name: 'Sources du projet' })).getByText(
-        'Objectif Une refonte utile.',
-      ),
-    ).toBeVisible();
+    await waitFor(() => expect(within(editor).getByRole('status')).toHaveTextContent('À jour'));
     expect(api.calls).toContainEqual(
       expect.objectContaining({
-        body: { description: '# Objectif\n\nUne **refonte** [utile](https://alfred.test).' },
-        method: 'PATCH',
+        body: {
+          content: '# Objectif\n\nUne **refonte** [utile](https://alfred.test).',
+          expectedRevision: 0,
+        },
+        method: 'PUT',
+        path: `/api/projects/${PROJECT_ID}/context-documents/context`,
       }),
     );
   });

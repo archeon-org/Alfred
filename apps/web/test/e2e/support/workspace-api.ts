@@ -171,6 +171,63 @@ export async function installWorkspaceApi(page: Page, seed: WorkspaceSeed = defa
     return route.fallback();
   });
 
+  const documents = new Map<
+    string,
+    {
+      kind: string;
+      content: string;
+      revision: number;
+      contentHash: string;
+      updatedAt: string | null;
+    }
+  >();
+  await page.route(
+    /\/api\/(?:context\/personal|projects\/[^/]+\/context-documents)(?:\/[^/]+)?$/u,
+    async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      const match =
+        /^\/api\/(context\/personal|projects\/[^/]+\/context-documents)(?:\/(instructions|context|preferences))?$/u.exec(
+          path,
+        )!;
+      const scope = match[1]!;
+      const get = (kind: string) =>
+        documents.get(`${scope}/${kind}`) ?? {
+          kind,
+          content: '',
+          revision: 0,
+          contentHash: '0'.repeat(64),
+          updatedAt: null,
+        };
+      if (route.request().method() === 'GET')
+        return json(route, 200, {
+          success: true,
+          data: {
+            maxBytes: 65536,
+            documents: (scope === 'context/personal'
+              ? ['instructions', 'preferences']
+              : ['context', 'preferences']
+            ).map(get),
+          },
+        });
+      const kind = match[2]!;
+      const input = body(route);
+      const current = get(kind);
+      if (input.expectedRevision !== current.revision)
+        return json(route, 409, {
+          success: false,
+          error: { code: 'context_revision_conflict', message: 'Conflict' },
+        });
+      const saved = {
+        ...current,
+        content: String(input.content),
+        revision: current.revision + 1,
+        updatedAt: now(),
+      };
+      documents.set(`${scope}/${kind}`, saved);
+      return json(route, 200, { success: true, data: saved });
+    },
+  );
+
   await page.route('**/api/conversations**', async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();

@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 
+import { SettingsScreen } from '@/screens/workspace/settings-screen';
 import { RequireSession } from '@/routes/guards/require-session';
 import { RouteFocusManager } from '@/routes/route-focus-manager';
 import { LoginScreen } from '@/screens/auth/login-screen';
@@ -21,6 +22,7 @@ export const routes: RouteObject[] = [
           {
             children: [
               { element: <WorkspaceHomeScreen />, index: true },
+              { element: <SettingsScreen />, path: 'settings' },
               { element: <ProjectScreen />, path: 'projects/:projectId' },
               { element: <ConversationScreen />, path: 'conversations/:conversationId' },
             ],

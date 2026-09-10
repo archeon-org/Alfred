@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -7,7 +8,11 @@ import { useWorkspacePreferences } from '@/hooks/workspace/use-workspace-prefere
 
 function SettingsPreview() {
   const preferences = useWorkspacePreferences();
-  return <WorkspaceSettings preferences={preferences} />;
+  return (
+    <MemoryRouter>
+      <WorkspaceSettings preferences={preferences} />
+    </MemoryRouter>
+  );
 }
 
 describe('Workspace appearance preferences', () => {

@@ -84,11 +84,56 @@ export function createWorkspaceApi(
   const conversations: Conversation[] = [...(seed.conversations ?? [])];
   const calls: RecordedCall[] = [];
   const failures = new Map<string, Failure>();
+  const documents = new Map<
+    string,
+    {
+      kind: string;
+      content: string;
+      revision: number;
+      contentHash: string;
+      updatedAt: string | null;
+    }
+  >();
 
   const route = (method: string, url: URL, body: unknown): Response => {
     const path = url.pathname;
     const failure_ = failures.get(`${method} ${path}`);
     if (failure_ !== undefined) return failure(failure_.status, failure_.code);
+    const contextMatch =
+      /^\/api\/(context\/personal|projects\/[^/]+\/context-documents)(?:\/(instructions|context|preferences))?$/u.exec(
+        path,
+      );
+    if (contextMatch !== null) {
+      const scope = contextMatch[1]!;
+      const kinds =
+        scope === 'context/personal' ? ['instructions', 'preferences'] : ['context', 'preferences'];
+      const getDocument = (kind: string) =>
+        documents.get(`${scope}/${kind}`) ?? {
+          kind,
+          content: '',
+          revision: 0,
+          contentHash: '0'.repeat(64),
+          updatedAt: null,
+        };
+      if (method === 'GET')
+        return json({
+          success: true,
+          data: { maxBytes: 65536, documents: kinds.map(getDocument) },
+        });
+      const kind = contextMatch[2]!;
+      const input = body as { content: string; expectedRevision: number };
+      const current = getDocument(kind);
+      if (input.expectedRevision !== current.revision)
+        return failure(409, 'context_revision_conflict');
+      const saved = {
+        ...current,
+        content: input.content,
+        revision: current.revision + 1,
+        updatedAt: new Date().toISOString(),
+      };
+      documents.set(`${scope}/${kind}`, saved);
+      return json({ success: true, data: saved });
+    }
     if (path === '/api/features') return json({ data: DISABLED_FEATURE_FLAGS, success: true });
     if (path === '/api/auth/providers') return json({ data: [], success: true });
     if (path === '/api/projects' && method === 'GET') {

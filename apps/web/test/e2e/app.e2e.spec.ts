@@ -342,7 +342,9 @@ test('creates a project, its first conversation and a separate standalone chat',
   await projectDialog.getByRole('button', { name: 'Créer le projet' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Projet Atlas' })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Chats/u })).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Sources' })).toBeVisible();
+  await expect(
+    page.getByRole('tablist', { name: 'Contenu du projet' }).getByRole('tab', { name: 'Contexte' }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Nouvelle conversation', exact: true }).click();
   const conversationDialog = page.getByRole('dialog', { name: 'Nouvelle conversation' });
   await expect(conversationDialog).toContainText('Projet Atlas');

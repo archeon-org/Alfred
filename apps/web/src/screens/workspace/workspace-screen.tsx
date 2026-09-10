@@ -181,6 +181,7 @@ export function WorkspaceScreen() {
   }
 
   const outlet: WorkspaceOutletContext = {
+    preferences,
     conversationRef,
     isLoading: shell.isPreviewLoading,
     selectedProject,

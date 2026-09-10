@@ -14,11 +14,7 @@ import {
   ProjectChatList,
   type ProjectChatListProps,
 } from '@/components/workspace/project/project-chat-list';
-import {
-  ProjectSources,
-  type ProjectDocumentKey,
-} from '@/components/workspace/project/project-sources';
-import { markdownToText } from '@/lib/markdown/parse-markdown';
+import { ProjectSources } from '@/components/workspace/project/project-sources';
 import type { Project } from '@/lib/workspace/workspace.types';
 
 interface ProjectOverviewProps {
@@ -29,7 +25,6 @@ interface ProjectOverviewProps {
   readonly actions: ProjectActionHandlers;
   readonly isBusy: boolean;
   readonly notice?: string | null;
-  readonly onEditDocument: (document: ProjectDocumentKey) => void;
 }
 
 /** Project home: a chat input on top, then the project's chats and its Markdown sources. */
@@ -39,12 +34,10 @@ export function ProjectOverview({
   composer,
   isBusy,
   notice,
-  onEditDocument,
   project,
   ref,
 }: ProjectOverviewProps) {
   const name = project.name ?? 'Projet';
-  const summary = project.description === null ? '' : markdownToText(project.description, 160);
   return (
     <main
       className="flex h-full min-h-0 min-w-0 outline-none focus-visible:outline-2 focus-visible:-outline-offset-3 focus-visible:outline-ring"
@@ -79,11 +72,6 @@ export function ProjectOverview({
             >
               {name}
             </h1>
-            {summary !== '' ? (
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground wrap-anywhere">
-                {summary}
-              </p>
-            ) : null}
           </div>
           <ProjectActionMenu
             className="shrink-0"
@@ -114,17 +102,13 @@ export function ProjectOverview({
               Chats
               <span className="text-2xs text-muted-foreground">{chats.conversations.length}</span>
             </TabsTrigger>
-            <TabsTrigger value="sources">Sources</TabsTrigger>
+            <TabsTrigger value="sources">Contexte</TabsTrigger>
           </TabsList>
           <TabsContent className="pt-4" value="chats">
             <ProjectChatList {...chats} />
           </TabsContent>
-          <TabsContent className="pt-4" value="sources">
-            <ProjectSources
-              context={project.context}
-              description={project.description}
-              onEdit={onEditDocument}
-            />
+          <TabsContent forceMount className="pt-4 data-[state=inactive]:hidden" value="sources">
+            <ProjectSources key={project.id} projectId={project.id} />
           </TabsContent>
         </Tabs>
       </section>
