@@ -181,10 +181,12 @@ jobs:
             '
       - name: Assert every API table carries the api_ prefix in the shared database
         run: |
+          # Check the namespace independently of the growing API table inventory.
+          # The following schema-drift step verifies the entity/migration structure.
           docker exec "$DATA_POSTGRES_CONTAINER" \
             psql --username postgres --dbname langgraph --tuples-only --no-align --set=ON_ERROR_STOP=1 \
-              --command "SELECT string_agg(tablename, ',' ORDER BY tablename) FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('assistant', 'assistant_versions', 'checkpoint_blobs', 'checkpoint_delete_queue', 'checkpoint_writes', 'checkpoints', 'cron', 'run', 'schema_migrations', 'store', 'thread', 'thread_ttl')" |
-            grep --line-regexp --quiet 'api_context_documents,api_conversations,api_idempotency_keys,api_migrations,api_oauth_login_states,api_projects,api_refresh_sessions,api_tenants,api_user_identities,api_users'
+              --command "SELECT coalesce(bool_and(left(tablename, 4) = 'api_'), false) FROM pg_tables WHERE schemaname = 'public' AND tablename NOT IN ('assistant', 'assistant_versions', 'checkpoint_blobs', 'checkpoint_delete_queue', 'checkpoint_writes', 'checkpoints', 'cron', 'run', 'schema_migrations', 'store', 'thread', 'thread_ttl')" |
+            grep --line-regexp --quiet 't'
       - name: Reject pending migrations and entity-schema drift
         run: docker compose --env-file .env.example run --rm --no-deps migrate node dist/database/check-schema-drift.js
       - name: Run API E2E tests against real PostgreSQL locking
