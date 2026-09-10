@@ -33,7 +33,7 @@ for (const viewport of [
     page.on('request', (request) => {
       if (request.method() === 'PUT') writes.push(request.postDataJSON());
     });
-    await page.goto('/app/settings');
+    await page.goto('/app/settings?section=personalization');
     const instructions = page.getByRole('textbox', { name: 'Instructions générales' });
     await expect(instructions).toHaveCount(0);
     await page.getByRole('button', { name: 'Modifier · Instructions générales' }).click();
@@ -88,7 +88,7 @@ test('requires a session for the dedicated settings URL', async ({ page }) => {
   await page.route('**/api/auth/providers', (route) =>
     route.fulfill({ json: { success: true, data: [] } }),
   );
-  await page.goto('/app/settings');
+  await page.goto('/app/settings?section=personalization');
   await expect(page).toHaveURL(/\/login$/u);
   await expect(page.getByRole('textbox', { name: 'Instructions générales' })).toHaveCount(0);
 });

@@ -327,7 +327,9 @@ test('creates a project, its first conversation and a separate standalone chat',
     if (request.url().includes('/api/') && request.method() !== 'GET')
       writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
   });
-  const createProject = page.getByRole('button', { name: 'Créer un projet' });
+  const createProject = page
+    .getByRole('navigation', { name: 'Navigation principale' })
+    .getByRole('button', { name: 'Nouveau projet' });
   await createProject.click();
   const projectDialog = page.getByRole('dialog', { name: 'Nouveau projet' });
   await projectDialog.getByRole('textbox', { name: 'Nom du projet' }).fill('Projet annulé');
@@ -397,17 +399,17 @@ test('opens settings directly and preserves local display preferences across nav
   const dialog = page.getByRole('main');
   await expect(page).toHaveURL(/\/app\/settings$/u);
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await dialog.getByRole('combobox', { name: 'Taille du texte' }).selectOption('comfortable');
+  await dialog.getByRole('combobox', { name: 'Largeur de lecture' }).selectOption('wide');
   await dialog.getByRole('switch', { name: 'Navigation compacte' }).click();
   await dialog.getByRole('switch', { name: 'Réduire les animations' }).click();
-  const workspace = page.locator('[data-density]');
+  const workspace = page.locator('html');
   await expect(workspace).toHaveAttribute('data-density', 'compact');
-  await expect(workspace).toHaveAttribute('data-text-size', 'comfortable');
+  await expect(workspace).toHaveAttribute('data-reading-width', 'wide');
   await expect(workspace).toHaveAttribute('data-reduced-motion', 'true');
   await page.goBack();
   await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
-  await expect(workspace).toHaveAttribute('data-text-size', 'comfortable');
-  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
+  await expect(workspace).toHaveAttribute('data-reading-width', 'wide');
+  expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([1, 0]);
 });
 
 test('resizes both desktop panels with keyboard and pointer while preserving the conversation space', async ({

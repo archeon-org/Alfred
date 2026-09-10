@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-09-05
+- Appearance restrictions superseded by: [ADR 0019](0019-browser-appearance-preferences.md)
 - Complements: [ADR 0009](0009-application-and-test-topology.md)
 
 ## Context

@@ -1,10 +1,18 @@
 import { useState } from 'react';
 
 /** Presentation state of the workspace frame: panels, mobile navigation, search, skeleton preview. */
-export function useWorkspaceShell() {
+export function useWorkspaceShell(contextOpenByDefault = true) {
   const [search, setSearch] = useState('');
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
-  const [isContextOpen, setIsContextOpen] = useState(true);
+  const [context, setContext] = useState({
+    defaultOpen: contextOpenByDefault,
+    open: contextOpenByDefault,
+  });
+  if (context.defaultOpen !== contextOpenByDefault) {
+    setContext({ defaultOpen: contextOpenByDefault, open: contextOpenByDefault });
+  }
+  const isContextOpen =
+    context.defaultOpen === contextOpenByDefault ? context.open : contextOpenByDefault;
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isNavigationOpen, setIsNavigationOpen] = useState(false);
 
@@ -17,7 +25,7 @@ export function useWorkspaceShell() {
     search,
     setIsSidebarOpen,
     setSearch,
-    toggleContext: () => setIsContextOpen((value) => !value),
+    toggleContext: () => setContext({ defaultOpen: contextOpenByDefault, open: !isContextOpen }),
     toggleLoading: () => setIsPreviewLoading((value) => !value),
     toggleNavigation: () => setIsNavigationOpen((value) => !value),
   };

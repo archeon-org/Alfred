@@ -31,6 +31,28 @@ function fiveProjects() {
 }
 
 describe('Workspace navigation', () => {
+  it('opens project creation from the primary navigation and restores focus when dismissed', async () => {
+    const user = userEvent.setup();
+    renderWorkspaceAt('/app', createWorkspaceApi());
+
+    const navigation = within(
+      await screen.findByRole('navigation', { name: 'Navigation principale' }),
+    );
+    expect(navigation.queryByRole('link', { name: /Conversations/u })).not.toBeInTheDocument();
+    expect(navigation.queryByRole('link', { name: 'Mes skills' })).not.toBeInTheDocument();
+    const createProject = navigation.getByRole('button', { name: 'Nouveau projet' });
+    expect(createProject).toBeVisible();
+
+    await user.click(createProject);
+
+    const dialog = screen.getByRole('dialog', { name: 'Nouveau projet' });
+    expect(within(dialog).getByRole('textbox', { name: 'Nom du projet' })).toBeVisible();
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(createProject).toHaveFocus();
+  });
+
   it('returns to the project home from one of its chats through the sidebar row and the header link', async () => {
     const user = userEvent.setup();
     const { router } = renderWorkspaceAt(

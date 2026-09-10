@@ -52,7 +52,8 @@ Les composants consomment des **rôles sémantiques**, par exemple `bg-backgroun
 Les surfaces spécifiques utilisent des rôles dédiés (`sidebar`, `sidebar-foreground`, etc.) ou
 une portée de tokens sur leur conteneur.
 
-Les valeurs de couleur vivent dans `src/styles.css`. Aucun hexadécimal, `rgb()` ou `hsl()` dans le
+Les valeurs de couleur vivent dans `src/styles.css` et ses palettes importées
+(`src/styles/appearance-palettes.css`). Aucun hexadécimal, `rgb()` ou `hsl()` dans le
 JSX, aucune classe de palette (`brand-*`, `ws-*`, `green-600`, `stone-200`, etc.) pour définir
 l'apparence d'un composant. Une nouvelle couleur doit correspondre à un rôle utile ; ne pas créer
 un token par nuance rencontrée pendant une migration. `transparent`, `currentColor` et l'héritage
@@ -70,17 +71,17 @@ locales et explicites ; commenter une valeur inhabituelle dont la raison n'est p
 
 ## Thème, relief et mouvement
 
-Le thème pris en charge à ce stade est **clair sauge**, avec une sidebar sombre. Il n'existe pas
-encore de sélecteur fonctionnel clair/sombre/auto ni de presets de branding. Les variantes `dark:`
-ne doivent pas s'activer implicitement avec le thème de l'OS : leur activation est explicite
-via une classe ou un attribut racine. Cette portée ne constitue pas, à elle seule, un thème sombre.
+Le thème par défaut reste **clair sauge**. Les paramètres proposent clair, sombre ou système
+et cinq accents. Les tokens complets sont activés sur `html` via `data-theme` et `data-accent`,
+y compris pour les portails. Le suivi du thème OS est explicite via le choix système.
+Voir [ADR 0019](../adr/0019-browser-appearance-preferences.md) pour la persistance locale validée.
 
 Le relief vient de surfaces, bordures, ombres et états d'interaction cohérents. Un bouton possède
 un retour `hover`, `focus-visible`, `active` et `disabled` perceptible. Utiliser un changement de
 surface/ombre et, si utile, un déplacement discret à l'appui. Les transitions restent brèves et
 ciblées ; éviter `transition-all`, les animations permanentes décoratives et les sauts de layout.
 
-Respecter `prefers-reduced-motion` **et** la préférence temporaire de l'application : neutraliser
+Respecter `prefers-reduced-motion` **et** la préférence persistante de l'application : neutraliser
 les déplacements, transitions et animations décoratives, tout en conservant un retour visuel
 immédiat et un focus visible. Un skeleton réserve l'espace de son contenu ; il accompagne un état
 de chargement réel ou explicitement simulé pour la preview, sans faire croire à une requête réussie.
@@ -117,7 +118,8 @@ référentielle à résoudre ; mesurer avant d'affirmer une amélioration de per
 
 Les données de `src/mock` font actuellement partie de la preview produit livrée. Elles restent
 séparées des composants et des types de vue ; ce ne sont pas des fixtures à déplacer automatiquement
-sous `test`. Les préférences et créations de démonstration restent en mémoire. Le composeur ne doit
+sous `test`. Les créations de démonstration restent en mémoire. Les seules préférences visuelles sont
+persistées via `useLocalStorage` et l’adaptateur partagé ; les vues n’accèdent pas au stockage. Le composeur ne doit
 pas simuler l'exécution d'un agent ni une sauvegarde serveur.
 
 Lors du branchement d'un contrat métier, remplacer l'alimentation mock par un service et un hook

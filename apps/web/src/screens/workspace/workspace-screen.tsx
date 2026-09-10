@@ -60,9 +60,10 @@ function projectHomePath(projectId: string): string {
 
 /** Workspace frame: navigation data, creation dialogs and the panels around the routed screen. */
 export function WorkspaceScreen() {
-  const shell = useWorkspaceShell();
-  const tools = useWorkspaceTools();
   const preferences = useWorkspacePreferences();
+  const shell = useWorkspaceShell(preferences.contextOpenByDefault);
+  const tools = useWorkspaceTools();
+  const isSettings = useMatch('/app/settings') !== null;
   const navigate = useNavigate();
   const projectMatch = useMatch('/app/projects/:projectId');
   const skillEditorMatch = useMatch('/app/skills/:skillId/edit');
@@ -191,12 +192,13 @@ export function WorkspaceScreen() {
   };
   const labels = creation === null ? creationLabels.project : creationLabels[creation];
 
+  if (isSettings) return <Outlet context={outlet} />;
+
   return (
     <div
-      className="group/workspace min-h-dvh bg-canvas text-sm text-foreground data-[reduced-motion=true]:[&_*]:animate-none data-[reduced-motion=true]:[&_*]:transition-none data-[reduced-motion=true]:[&_*]:scale-100 data-[text-size=comfortable]:[&_[data-slot=message-body]]:text-base data-[text-size=comfortable]:[&_[data-slot=welcome-description]]:text-sm data-[text-size=comfortable]:[&_textarea]:text-base"
+      className="group/workspace min-h-dvh bg-canvas text-sm text-foreground"
       data-testid="workspace"
       data-density={preferences.density}
-      data-text-size={preferences.textSize}
       data-reduced-motion={preferences.reducedMotion}
     >
       <a

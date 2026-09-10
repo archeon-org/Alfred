@@ -12,7 +12,7 @@ afterEach(() => {
 describe('Personal context settings', () => {
   it('shows compact cards and opens the editor in a dismissible modal', async () => {
     const user = userEvent.setup();
-    renderWorkspaceAt('/app/settings');
+    renderWorkspaceAt('/app/settings?section=personalization');
     const opener = await screen.findByRole('button', { name: 'Modifier · Instructions générales' });
     expect(opener).toHaveTextContent('Modifier');
     expect(
@@ -28,7 +28,7 @@ describe('Personal context settings', () => {
   it('saves personal documents independently with their revisions and keeps appearance shared', async () => {
     const user = userEvent.setup();
     const api = createWorkspaceApi();
-    const { router } = renderWorkspaceAt('/app/settings', api);
+    const { router } = renderWorkspaceAt('/app/settings?section=personalization', api);
     await user.click(
       await screen.findByRole('button', { name: 'Modifier · Instructions générales' }),
     );
@@ -55,13 +55,14 @@ describe('Personal context settings', () => {
         { content: 'Réponds en français.', expectedRevision: 0 },
       ],
     ]);
+    await user.click(screen.getByRole('link', { name: 'Apparence' }));
     await user.click(screen.getByRole('switch', { name: 'Navigation compacte' }));
-    expect(screen.getByTestId('workspace')).toHaveAttribute('data-density', 'compact');
     await act(async () => {
       await router.navigate('/app');
     });
     await user.click(screen.getByRole('link', { name: 'Paramètres' }));
     expect(screen.getByRole('switch', { name: 'Navigation compacte' })).toBeChecked();
+    await user.click(screen.getByRole('link', { name: 'Personnaliser Alfred' }));
     await user.click(
       await screen.findByRole('button', { name: 'Modifier · Instructions générales' }),
     );
@@ -73,7 +74,7 @@ describe('Personal context settings', () => {
   it('preserves a draft after conflict and requires confirmation before loading the server version', async () => {
     const user = userEvent.setup();
     const api = createWorkspaceApi();
-    renderWorkspaceAt('/app/settings', api);
+    renderWorkspaceAt('/app/settings?section=personalization', api);
     await user.click(
       await screen.findByRole('button', { name: 'Modifier · Instructions générales' }),
     );
@@ -115,7 +116,7 @@ describe('Personal context settings', () => {
     expect(editor).toHaveFocus();
     expect(editor).toHaveValue('Contexte non enregistré');
     await act(async () => {
-      await router.navigate('/app/settings');
+      await router.navigate('/app/settings?section=personalization');
     });
     await user.click(screen.getByRole('button', { name: 'Continuer à modifier' }));
     expect(editor).toHaveValue('Contexte non enregistré');
@@ -134,7 +135,7 @@ describe('Personal context settings', () => {
   it('imports text into a draft only, confirms replacement and rejects unsupported files', async () => {
     const user = userEvent.setup({ applyAccept: false });
     const api = createWorkspaceApi();
-    renderWorkspaceAt('/app/settings', api);
+    renderWorkspaceAt('/app/settings?section=personalization', api);
     await user.click(
       await screen.findByRole('button', { name: 'Modifier · Instructions générales' }),
     );
@@ -173,7 +174,7 @@ describe('Personal context settings', () => {
     const user = userEvent.setup();
     const api = createWorkspaceApi();
     api.fail('GET /api/context/personal', 503);
-    renderWorkspaceAt('/app/settings', api);
+    renderWorkspaceAt('/app/settings?section=personalization', api);
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Impossible de charger vos contenus',
     );
@@ -222,7 +223,7 @@ describe('Personal context settings', () => {
   it('keeps the modal open while a save is pending and updates its preview after success', async () => {
     const user = userEvent.setup();
     const api = createWorkspaceApi();
-    renderWorkspaceAt('/app/settings', api);
+    renderWorkspaceAt('/app/settings?section=personalization', api);
     await user.click(
       await screen.findByRole('button', { name: 'Modifier · Instructions générales' }),
     );

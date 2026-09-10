@@ -134,36 +134,25 @@ describe('Workspace organization', () => {
     ).toBeVisible();
   });
 
-  it('applies display preferences immediately and keeps them local', async () => {
+  it('applies display preferences and uses a dedicated settings frame', async () => {
     const user = userEvent.setup();
-    const persist = vi.spyOn(Storage.prototype, 'setItem');
-    const { container } = renderWorkspaceAt('/app');
-    const workspace = container.querySelector('[data-density]');
-
+    renderWorkspaceAt('/app');
     await user.click(await screen.findByRole('link', { name: 'Paramètres' }));
-    const dialog = screen.getByRole('main');
     expect(
-      await within(dialog).findByRole('heading', { name: 'Paramètres', level: 1 }),
-    ).toBeVisible();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    await user.selectOptions(
-      within(dialog).getByRole('combobox', { name: 'Taille du texte' }),
-      'comfortable',
-    );
-    await user.click(within(dialog).getByRole('switch', { name: 'Navigation compacte' }));
-    await user.click(within(dialog).getByRole('switch', { name: 'Réduire les animations' }));
-
-    expect(workspace).toHaveAttribute('data-text-size', 'comfortable');
-    expect(workspace).toHaveAttribute('data-density', 'compact');
-    expect(workspace).toHaveAttribute('data-reduced-motion', 'true');
-    expect(persist).not.toHaveBeenCalled();
-
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Paramètres' })).toHaveAttribute(
-      'href',
-      '/app/settings',
-    );
+      screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('navigation', { name: 'Navigation principale' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('switch', { name: 'Navigation compacte' }));
+    await user.click(screen.getByRole('switch', { name: 'Réduire les animations' }));
+    await user.click(screen.getByRole('link', { name: 'Retour à Alfred' }));
+    expect(screen.getByTestId('workspace')).toHaveAttribute('data-density', 'compact');
+    expect(screen.getByTestId('workspace')).toHaveAttribute('data-reduced-motion', 'true');
+    expect(JSON.parse(localStorage.getItem('alfred.appearance.v1') ?? '{}')).toMatchObject({
+      density: 'compact',
+      reducedMotion: true,
+    });
   });
 
   it('dismisses project creation with Escape without any request', async () => {

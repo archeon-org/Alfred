@@ -45,7 +45,7 @@ export function WorkspaceLayout({
     );
 
   return (
-    <div className="h-dvh min-h-[480px]">
+    <div className="h-dvh min-h-[480px] [--workspace-header-height:4.75rem]">
       <ResizablePanelGroup
         id="workspace-columns"
         orientation="horizontal"
@@ -71,7 +71,7 @@ export function WorkspaceLayout({
         </ResizablePanel>
         <ResizableHandle
           aria-label="Redimensionner la navigation"
-          className="w-1 shrink-0 border-0 bg-transparent"
+          className="mt-[var(--workspace-header-height)] mb-5 w-1 shrink-0 border-0 bg-transparent hover:bg-border focus-visible:bg-ring"
         />
         <ResizablePanel id="stage" minSize={isContextOpen ? 746 : 430}>
           <div className="flex h-full min-w-0 flex-col">
@@ -89,7 +89,7 @@ export function WorkspaceLayout({
                 <>
                   <ResizableHandle
                     aria-label="Redimensionner le panneau de contexte"
-                    className="w-2 shrink-0 border-0 bg-transparent"
+                    className="mb-5 w-2 shrink-0 border-0 bg-transparent hover:bg-border focus-visible:bg-ring"
                   />
                   <ResizablePanel id="context" defaultSize={330} minSize={304} maxSize={560}>
                     <div className="h-full min-h-0">{context}</div>

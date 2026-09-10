@@ -47,7 +47,7 @@ export function WorkspaceHeader({
 }: WorkspaceHeaderProps) {
   const SidebarIcon = isSidebarOpen ? PanelLeftClose : PanelLeftOpen;
   return (
-    <header className="flex min-h-16 shrink-0 items-center justify-between gap-2 px-3 md:min-h-18 md:px-5 workspace:min-h-19 workspace:px-6">
+    <header className="flex min-h-16 shrink-0 items-center justify-between gap-2 px-3 md:min-h-18 md:px-5 workspace:min-h-[var(--workspace-header-height,4.75rem)] workspace:px-6">
       <div className="hidden min-w-0 items-center gap-2 md:flex">
         <IconButton
           aria-controls="workspace-navigation"

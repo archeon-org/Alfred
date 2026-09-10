@@ -1,37 +1,91 @@
+import { SidebarFrame } from '@/components/workspace/navigation/sidebar-frame';
+import { useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Palette, SlidersHorizontal } from 'lucide-react';
 import { AppearanceSettings } from '@/components/workspace/personalization/appearance-settings';
 import { ContextDocuments } from '@/components/workspace/personalization/context-documents';
 import { useWorkspaceOutlet } from '@/hooks/workspace/use-workspace-outlet';
+import { cn } from '@/lib/cn';
+
+const sections = [
+  { key: 'appearance', label: 'Apparence', icon: Palette, to: '/app/settings' },
+  {
+    key: 'personalization',
+    label: 'Personnaliser Alfred',
+    icon: SlidersHorizontal,
+    to: '/app/settings?section=personalization',
+  },
+] as const;
 
 export function SettingsScreen() {
   const { preferences, conversationRef } = useWorkspaceOutlet();
+  const [searchParams] = useSearchParams();
+  const personalization = searchParams.get('section') === 'personalization';
+  const section = personalization ? 'personalization' : 'appearance';
+  useEffect(() => {
+    conversationRef.current?.focus({ preventScroll: true });
+    if (conversationRef.current) conversationRef.current.scrollTop = 0;
+  }, [section, conversationRef]);
   return (
-    <main
-      id="main-content"
-      ref={conversationRef}
-      tabIndex={-1}
-      className="h-full min-h-0 min-w-0 space-y-8 overflow-y-auto rounded-xl border border-border bg-card p-4 outline-none focus-visible:ring-2 focus-visible:ring-ring md:p-6"
-    >
-      <header>
-        <h1 className="text-xl font-semibold">Paramètres</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Personnalisez votre espace et la manière dont Alfred vous accompagne.
-        </p>
-      </header>
-      <section aria-labelledby="appearance-title" className="space-y-4">
-        <h2 id="appearance-title" className="text-lg font-semibold">
-          Apparence
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Ces réglages visuels sont temporaires et se réinitialisent au rechargement.
-        </p>
-        <AppearanceSettings preferences={preferences} />
-      </section>
-      <section aria-labelledby="personalization-title" className="space-y-4">
-        <h2 id="personalization-title" className="text-lg font-semibold">
-          Personnaliser Alfred
-        </h2>
-        <ContextDocuments scope={{ type: 'personal' }} />
-      </section>
-    </main>
+    <div className="flex h-dvh min-h-0 min-w-0 flex-col overflow-y-auto bg-background text-foreground md:flex-row md:overflow-hidden">
+      <div className="shrink-0 md:w-57 workspace:w-62.5">
+        <SidebarFrame>
+          <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+            <Link
+              to="/app"
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              Retour à Alfred
+            </Link>
+            <p className="mt-5 px-3 text-xs font-semibold tracking-wider text-sidebar-muted uppercase">
+              Paramètres
+            </p>
+            <nav aria-label="Paramètres" className="mt-3 flex flex-wrap gap-1 md:flex-col">
+              {sections.map(({ key, label, icon: Icon, to }) => (
+                <Link
+                  key={key}
+                  to={to}
+                  aria-current={section === key ? 'page' : undefined}
+                  className={cn(
+                    'flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    section === key
+                      ? 'bg-sidebar-accent text-sidebar-accent-foreground shadow-xs'
+                      : 'text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground',
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  {label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        </SidebarFrame>
+      </div>
+      <main
+        id="main-content"
+        ref={conversationRef}
+        tabIndex={-1}
+        className="min-w-0 flex-1 px-5 py-8 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:overflow-y-auto md:px-10 md:py-12 lg:px-16"
+      >
+        <div className="mx-auto w-full max-w-5xl space-y-8">
+          <header className="space-y-3">
+            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
+              {personalization ? 'Personnaliser Alfred' : 'Apparence'}
+            </h1>
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              {personalization
+                ? 'Vos instructions et préférences pour un accompagnement adapté à votre façon de travailler.'
+                : 'Un espace à votre image. Ajustez les couleurs et le confort de votre interface.'}
+            </p>
+          </header>
+          {personalization ? (
+            <ContextDocuments scope={{ type: 'personal' }} />
+          ) : (
+            <AppearanceSettings preferences={preferences} />
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
