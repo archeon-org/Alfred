@@ -3,6 +3,9 @@ import { vi } from 'vitest';
 
 import { DISABLED_FEATURE_FLAGS } from '@/services/feature-flags/feature-flags';
 
+export const TENANT_ID = 'a16b7db5-d522-4945-887d-346ea0a2fe2a';
+export const SECOND_WORKSPACE_ID = '1a8d7bf6-69a3-461e-87d2-26f4f2ef1dcb';
+export const WORKSPACE_ID = 'cbb19b92-f070-48db-8252-568f2dc0c67f';
 export const PROJECT_ID = '0b6e1a9e-0a7f-4c26-9f5b-2f1a2c3d4e5f';
 export const IMPLICIT_PROJECT_ID = '9e8d7c6b-5a4f-4e3d-8c2b-1a0f9e8d7c6b';
 export const CONVERSATION_ID = '3f2e1d0c-9b8a-4765-8321-fedcba987654';
@@ -134,6 +137,17 @@ export function createWorkspaceApi(
       documents.set(`${scope}/${kind}`, saved);
       return json({ success: true, data: saved });
     }
+    if (path === '/api/users/me/workspaces')
+      return json({
+        success: true,
+        data: {
+          tenant: { id: TENANT_ID, name: 'Organisation de test' },
+          workspaces: [
+            { id: WORKSPACE_ID, name: 'Équipe produit' },
+            { id: SECOND_WORKSPACE_ID, name: 'Équipe recherche' },
+          ],
+        },
+      });
     if (path === '/api/features') return json({ data: DISABLED_FEATURE_FLAGS, success: true });
     if (path === '/api/auth/providers') return json({ data: [], success: true });
     if (path === '/api/projects' && method === 'GET') {

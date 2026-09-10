@@ -1,5 +1,8 @@
 import type { Page, Route } from '@playwright/test';
 
+export const TENANT_ID = 'a16b7db5-d522-4945-887d-346ea0a2fe2a';
+export const SECOND_WORKSPACE_ID = '1a8d7bf6-69a3-461e-87d2-26f4f2ef1dcb';
+export const WORKSPACE_ID = 'cbb19b92-f070-48db-8252-568f2dc0c67f';
 export const PROJECT_ID = '0b6e1a9e-0a7f-4c26-9f5b-2f1a2c3d4e5f';
 export const CONVERSATION_ID = '3f2e1d0c-9b8a-4765-8321-fedcba987654';
 
@@ -89,6 +92,19 @@ export async function installWorkspaceApi(page: Page, seed: WorkspaceSeed = defa
     return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
   };
   const now = () => new Date().toISOString();
+
+  await page.route('**/api/users/me/workspaces', (route) =>
+    json(route, 200, {
+      success: true,
+      data: {
+        tenant: { id: TENANT_ID, name: 'Organisation de test' },
+        workspaces: [
+          { id: WORKSPACE_ID, name: 'Équipe produit' },
+          { id: SECOND_WORKSPACE_ID, name: 'Équipe recherche' },
+        ],
+      },
+    }),
+  );
 
   await page.route('**/api/projects**', async (route) => {
     const url = new URL(route.request().url());

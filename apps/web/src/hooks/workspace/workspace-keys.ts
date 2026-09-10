@@ -14,3 +14,7 @@ export const conversationKeys = {
   list: (userId: string, projectId: string | null) =>
     ['conversations', userId, 'list', projectId ?? 'standalone'] as const,
 };
+
+export const workspaceKeys = {
+  membership: (userId: string) => ['workspace', userId, 'membership'] as const,
+};

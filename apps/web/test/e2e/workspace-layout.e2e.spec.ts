@@ -97,3 +97,42 @@ test('keeps full accessible titles while ellipsizing and adapting to sidebar res
     clipped: true,
   });
 });
+
+for (const width of [390, 1440]) {
+  test(`shows personal organisation and team at width ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.route('**/api/users/me/workspaces', (route) =>
+      route.fulfill({
+        json: {
+          success: true,
+          data: {
+            tenant: { id: '11111111-1111-4111-8111-111111111111', name: 'Organisation de test' },
+            workspaces: Array.from({ length: 8 }, (_, index) => ({
+              id: `22222222-2222-4222-8222-${String(index).padStart(12, '0')}`,
+              name:
+                index === 0
+                  ? 'Équipe produit'
+                  : index === 1
+                    ? 'Équipe recherche'
+                    : `Équipe ${index + 1}`,
+            })),
+          },
+        },
+      }),
+    );
+    await page.goto('/app');
+    if (width < 768) await page.getByRole('button', { name: 'Afficher les conversations' }).click();
+    const sidebar = page.getByRole('complementary', { name: 'Espace personnel' });
+    await expect(sidebar.getByText('Organisation de test')).toBeVisible();
+    await expect(sidebar.getByText('Équipe produit')).toBeVisible();
+    await expect(sidebar.getByText('Équipe recherche')).toBeVisible();
+    const moreTeams = sidebar.getByText('5 autres équipes');
+    await expect(sidebar.getByText('Équipe 8')).toBeHidden();
+    await moreTeams.focus();
+    await page.keyboard.press('Enter');
+    await expect(sidebar.getByText('Équipe 8')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+  });
+}
