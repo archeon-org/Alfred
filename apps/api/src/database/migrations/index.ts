@@ -1,3 +1,7 @@
+import { RemoveConversationSkills1789270000000 } from './1789270000000-remove-conversation-skills';
+import { SkillRollbackPointer1789260000000 } from './1789260000000-skill-rollback-pointer';
+import { SkillLifecycle1789250000000 } from './1789250000000-skill-lifecycle';
+import { CreateSkills1789240000000 } from './1789240000000-create-skills';
 import { CreateContextDocuments1789160000000 } from './1789160000000-create-context-documents';
 import { AddConversationPin1789080000000 } from './1789080000000-add-conversation-pin';
 import { CreateIdempotencyKeys1788739200000 } from './1788739200000-create-idempotency-keys';
@@ -22,4 +26,8 @@ export const databaseMigrations = Object.freeze([
   AddProjectPin1789000300000,
   AddConversationPin1789080000000,
   CreateContextDocuments1789160000000,
+  CreateSkills1789240000000,
+  SkillLifecycle1789250000000,
+  SkillRollbackPointer1789260000000,
+  RemoveConversationSkills1789270000000,
 ] as const);

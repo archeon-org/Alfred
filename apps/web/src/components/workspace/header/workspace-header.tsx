@@ -22,6 +22,7 @@ export interface WorkspaceScopeLink {
 
 interface WorkspaceHeaderProps {
   readonly scope: WorkspaceScopeLink;
+  readonly contextAvailable?: boolean;
   readonly isLoading: boolean;
   readonly isContextOpen: boolean;
   readonly isNavigationOpen: boolean;
@@ -34,6 +35,7 @@ interface WorkspaceHeaderProps {
 
 export function WorkspaceHeader({
   scope,
+  contextAvailable = true,
   isLoading,
   isContextOpen,
   isNavigationOpen,
@@ -103,15 +105,18 @@ export function WorkspaceHeader({
         >
           <Settings aria-hidden="true" size={18} />
         </Link>
-        <IconButton
-          label={isContextOpen ? 'Masquer le contexte' : 'Afficher le contexte'}
-          aria-controls="context-panel"
-          aria-expanded={isContextOpen}
-          className="size-9 min-h-9"
-          onClick={onToggleContext}
-        >
-          <PanelRight aria-hidden="true" size={18} />
-        </IconButton>
+        {contextAvailable && (
+          <IconButton
+            label={isContextOpen ? 'Masquer le contexte' : 'Afficher le contexte'}
+            aria-controls="context-panel"
+            aria-expanded={isContextOpen}
+            className="size-9 min-h-9"
+            onClick={onToggleContext}
+          >
+            <PanelRight aria-hidden="true" size={18} />
+          </IconButton>
+        )}
+
         <Separator orientation="vertical" className="mx-1 h-5" />
         <WorkspaceAccount />
       </div>

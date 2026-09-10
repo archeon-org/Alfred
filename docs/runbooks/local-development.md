@@ -57,6 +57,40 @@ authentication or authorization path.
 Authentication, authorization, validation, same-origin mutation checks and audit controls are
 security invariants, not optional feature flags.
 
+### Personal skills
+
+After applying all pending migrations, including `1789270000000-remove-conversation-skills`,
+set `FEATURE_SKILLS_ENABLED=true`
+in the environment used by the API and restart it. The authenticated interface is
+`/app/skills`. Rebuild the development web image when introducing the ZIP/YAML dependencies.
+The flag enables personal catalog CRUD, Markdown/ZIP import/export, publication, availability
+and version history. Skills belong to the authenticated account and are independent of conversations.
+It does not enable agent execution or execute attached scripts.
+
+The API stores skill identity, immutable package versions and file bytes in `api_skills`,
+`api_skill_versions` and `api_skill_files`. The corrective migration removes only the former
+`api_conversation_skills` association table; skills, packages and conversations are preserved.
+`version` is the optimistic mutation token; `currentVersion` and `publishedVersion` identify
+package snapshots. An unchanged save is a no-op after the stale-token check. Publishing keeps
+the content snapshot and advances the mutation token. Editing a published skill creates a new
+draft while the previous publication remains available if the skill is enabled. Restoring a
+retained version changes the current pointer without copying bytes or increasing quota usage;
+publication remains unchanged until the explicit Publish action.
+
+`SKILLS_MAX_FILES` defaults to 50, `SKILLS_MAX_PACKAGE_BYTES` to 1048576,
+`SKILLS_MAX_INSTRUCTIONS_BYTES` to 131072 and `SKILLS_MAX_TOTAL_BYTES_PER_USER` to 26214400.
+The first three can be reduced within their supported maxima; every retained package version
+counts toward the user quota. Exceeding the quota returns `skill_storage_quota_exceeded`;
+concurrent stale writes return `skill_version_conflict`. The browser retains the draft so it can
+be exported before reloading. No automatic pruning is performed.
+
+Confirmed deletion immediately purges the skill and all its retained version bytes.
+Disabling a skill or the feature preserves stored data and does not release storage quota.
+Migration rollback refuses to drop
+nonempty skill tables: export and explicitly delete authored skills before reverting this schema.
+This deletion policy must be revisited before adding runtime copies, leases or history references.
+See [ADR 0018](../adr/0018-personal-skills-catalog.md).
+
 ## Shared data services
 
 PostgreSQL and Redis are not provisioned by this repository. Start them from the sibling

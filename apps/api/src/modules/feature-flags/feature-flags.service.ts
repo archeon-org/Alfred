@@ -20,7 +20,7 @@ const IMPLEMENTED_PUBLIC_FEATURES = Object.freeze({
   knowledgeScope: false,
   conversationFeedback: false,
   runtimeMemory: false,
-  skills: false,
+  skills: true,
   teams: false,
 } as const satisfies Readonly<Record<FeatureFlagName, boolean>>);
 

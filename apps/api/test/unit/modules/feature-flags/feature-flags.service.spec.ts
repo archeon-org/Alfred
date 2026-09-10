@@ -44,11 +44,13 @@ describe('FeatureFlagsService', () => {
       new ConfigService({
         ...configuredFlags,
         FEATURE_GOOGLE_OAUTH_ENABLED: false,
+        FEATURE_SKILLS_ENABLED: false,
         FEATURE_OPENAPI_ENABLED: false,
         FEATURE_RATE_LIMITING_ENABLED: false,
       }),
     );
     expect(service.isEnabled('googleOAuth')).toBe(false);
+    expect(service.isEnabled('skills')).toBe(false);
     expect(service.isEnabled('openApi')).toBe(false);
     expect(service.isEnabled('rateLimiting')).toBe(false);
     expect(service.getPublicFlags()).not.toHaveProperty('openApi');
@@ -75,7 +77,7 @@ describe('FeatureFlagsService', () => {
       knowledgeScope: false,
       conversationFeedback: false,
       runtimeMemory: false,
-      skills: false,
+      skills: true,
       teams: false,
     });
     expect(Object.isFrozen(service.getPublicFlags())).toBe(true);
@@ -89,6 +91,7 @@ describe('FeatureFlagsService', () => {
     const service = new FeatureFlagsService(config());
 
     expect(service.isEnabled('googleOAuth')).toBe(true);
+    expect(service.isEnabled('skills')).toBe(true);
     expect(service.isEnabled('agentRuntime')).toBe(false);
     expect(service.isEnabled('rateLimiting')).toBe(true);
   });
@@ -118,7 +121,6 @@ describe('FeatureFlagsService', () => {
     'knowledgeScope',
     'conversationFeedback',
     'runtimeMemory',
-    'skills',
     'teams',
   ])('keeps %s unavailable until its execution path is implemented', (feature) => {
     const service = new FeatureFlagsService(config());

@@ -124,3 +124,5 @@ export {
   type ContextDocumentSet,
   type SaveContextDocumentInput,
 } from './context';
+
+export * from './skills';

@@ -1,61 +1,87 @@
-import { useId } from 'react';
+import { Link } from 'react-router-dom';
+import { FeatureGate } from '@/components/feature-flags/feature-gate';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { useSkills } from '@/hooks/skills/use-skills';
 
-import { Sparkles } from 'lucide-react';
-
-import { Switch } from '@/components/ui/switch';
-import type { WorkspaceToolsState } from '@/lib/workspace/workspace-tools.types';
-
-export function SkillsPanel({
-  tools,
-}: {
-  readonly tools: Pick<WorkspaceToolsState, 'skills' | 'enabledSkillIds' | 'toggleSkill'>;
-}) {
-  const id = useId();
+export function SkillsPanel() {
   return (
-    <section aria-labelledby={`${id}-title`} className="space-y-5">
-      <div>
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold" id={`${id}-title`}>
-            Les skills
-          </h3>
-          <Sparkles aria-hidden="true" className="size-4 text-primary" />
-        </div>
-        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-          Imaginez les savoir-faire de votre assistant.
-        </p>
-      </div>
-      <ul className="space-y-3">
-        {tools.skills.map((skill) => (
-          <li
-            className="flex items-start gap-3 rounded-xl border border-border bg-card/70 p-3 shadow-sm"
-            key={skill.id}
-          >
-            <div className="min-w-0 flex-1">
-              <label
-                className="cursor-pointer text-xs font-semibold"
-                htmlFor={`${id}-skill-${skill.id}`}
-              >
-                {skill.name}
-              </label>
-              <p
-                className="mt-1 text-2xs leading-relaxed text-muted-foreground"
-                id={`${id}-skill-${skill.id}-description`}
-              >
-                {skill.description}
-              </p>
-            </div>
-            <Switch
-              aria-describedby={`${id}-skill-${skill.id}-description`}
-              checked={tools.enabledSkillIds.includes(skill.id)}
-              id={`${id}-skill-${skill.id}`}
-              onCheckedChange={() => tools.toggleSkill(skill.id)}
-            />
-          </li>
-        ))}
-      </ul>
-      <p className="text-2xs leading-relaxed text-muted-foreground">
-        Sélections d’aperçu uniquement. Aucun skill n’est exécuté.
+    <FeatureGate
+      feature="skills"
+      fallback={
+        <p className="text-sm text-muted-foreground">Le catalogue de skills est désactivé.</p>
+      }
+    >
+      <GlobalSkillsPanel />
+    </FeatureGate>
+  );
+}
+function GlobalSkillsPanel() {
+  const { skills, query } = useSkills();
+  const published = skills.filter((skill) => skill.enabled && skill.publishedVersion !== null);
+  const loading = query.isPending;
+  const failed = query.isError;
+  return (
+    <section className="space-y-4" aria-label="Catalogue global de skills">
+      <h3 className="text-sm font-semibold">Les skills</h3>
+      <Link to="/app/skills" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+        Gérer mes skills
+      </Link>
+      <p className="text-xs text-muted-foreground">
+        Vos skills actifs et publiés, disponibles dans tout votre espace.
       </p>
+      {loading ? (
+        <p role="status">Chargement…</p>
+      ) : failed ? (
+        <div role="alert">
+          <p>Impossible de charger les skills.</p>
+          <Button
+            size="sm"
+            onClick={() => {
+              void query.refetch();
+            }}
+          >
+            Réessayer
+          </Button>
+        </div>
+      ) : (
+        <ul className="space-y-3">
+          {published.map((skill) => (
+            <li
+              className="flex items-start gap-3 rounded-xl border border-border p-3"
+              key={skill.id}
+            >
+              <div className="min-w-0 flex-1">
+                <Link
+                  to={`/app/skills/${skill.id}/edit`}
+                  className="text-sm font-semibold break-all underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  {skill.name}
+                </Link>
+                <p className="text-xs text-muted-foreground">
+                  Version publiée {skill.publishedVersion}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!loading && !failed && published.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          {query.hasNextPage
+            ? 'Aucun skill actif et publié dans les résultats chargés.'
+            : 'Aucun skill actif et publié.'}
+        </p>
+      )}
+      {query.hasNextPage && (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={query.isFetchingNextPage}
+          onClick={() => void query.fetchNextPage()}
+        >
+          Charger plus de skills
+        </Button>
+      )}
     </section>
   );
 }

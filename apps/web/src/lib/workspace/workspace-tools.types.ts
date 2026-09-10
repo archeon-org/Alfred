@@ -15,12 +15,6 @@ export interface TeamView {
   readonly memberIds: readonly string[];
 }
 
-export interface SkillView {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string;
-}
-
 /** View model consumed by the workspace; independent of React and hook implementation. */
 export interface WorkspaceToolsState {
   readonly activeTab: WorkspaceToolTab;
@@ -31,7 +25,4 @@ export interface WorkspaceToolsState {
   readonly createTeam: (name: string, memberIds: readonly string[]) => boolean;
   readonly selectedTeam: TeamView | undefined;
   readonly agents: readonly AgentView[];
-  readonly skills: readonly SkillView[];
-  readonly enabledSkillIds: readonly string[];
-  readonly toggleSkill: (id: string) => void;
 }

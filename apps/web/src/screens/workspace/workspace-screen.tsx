@@ -65,6 +65,9 @@ export function WorkspaceScreen() {
   const preferences = useWorkspacePreferences();
   const navigate = useNavigate();
   const projectMatch = useMatch('/app/projects/:projectId');
+  const skillEditorMatch = useMatch('/app/skills/:skillId/edit');
+  const newSkillMatch = useMatch('/app/skills/new');
+  const isSkillEditor = skillEditorMatch !== null || newSkillMatch !== null;
   const conversationMatch = useMatch('/app/conversations/:conversationId');
   const pinnedQuery = usePinnedProjectsQuery();
   const projectsQuery = useProjectsQuery();
@@ -204,7 +207,7 @@ export function WorkspaceScreen() {
       </a>
       <WorkspaceLayout
         isSidebarOpen={shell.isSidebarOpen}
-        isContextOpen={shell.isContextOpen}
+        isContextOpen={shell.isContextOpen && !isSkillEditor}
         sidebarRef={sidebarRef}
         onSidebarOpenChange={shell.setIsSidebarOpen}
         sidebar={
@@ -255,13 +258,14 @@ export function WorkspaceScreen() {
         }
         header={
           <WorkspaceHeader
+            contextAvailable={!isSkillEditor}
             scope={{
               href:
                 selectedProjectId === undefined ? undefined : projectHomePath(selectedProjectId),
               name: scopeName,
             }}
             isLoading={shell.isPreviewLoading}
-            isContextOpen={shell.isContextOpen}
+            isContextOpen={shell.isContextOpen && !isSkillEditor}
             isSidebarOpen={shell.isSidebarOpen}
             isNavigationOpen={shell.isNavigationOpen}
             onToggleLoading={shell.toggleLoading}

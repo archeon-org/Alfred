@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 
 import { MarkdownView } from '@/components/ui/markdown-view';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SourceEditor } from '@/components/ui/source-editor';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/cn';
 
@@ -18,6 +19,7 @@ interface MarkdownEditorProps {
   readonly limit?: TextLimit;
   readonly disabled?: boolean;
   readonly className?: string;
+  readonly variant?: 'document' | 'source';
 }
 
 export function measureText(value: string, unit: TextLimit['unit']): number {
@@ -33,6 +35,7 @@ export function MarkdownEditor({
   onChange,
   placeholder,
   value,
+  variant = 'document',
 }: MarkdownEditorProps) {
   const [mode, setMode] = useState<'write' | 'preview'>('write');
   const textareaId = useId();
@@ -62,20 +65,34 @@ export function MarkdownEditor({
         ) : null}
       </div>
       <TabsContent value="write">
-        <label className="sr-only" htmlFor={textareaId}>
-          {label}
-        </label>
-        <Textarea
-          aria-describedby={limit === undefined ? undefined : helpId}
-          aria-invalid={overLimit || undefined}
-          className="min-h-64 resize-y font-mono text-sm leading-relaxed"
-          disabled={disabled}
-          id={textareaId}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          spellCheck
-          value={value}
-        />
+        {variant === 'source' ? (
+          <SourceEditor
+            label={label}
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+            placeholder={placeholder}
+            aria-describedby={limit === undefined ? undefined : helpId}
+            aria-invalid={overLimit || undefined}
+          />
+        ) : (
+          <>
+            <label className="sr-only" htmlFor={textareaId}>
+              {label}
+            </label>
+            <Textarea
+              aria-describedby={limit === undefined ? undefined : helpId}
+              aria-invalid={overLimit || undefined}
+              className="min-h-64 resize-y font-mono text-sm leading-relaxed"
+              disabled={disabled}
+              id={textareaId}
+              onChange={(event) => onChange(event.target.value)}
+              placeholder={placeholder}
+              spellCheck
+              value={value}
+            />
+          </>
+        )}
       </TabsContent>
       <TabsContent value="preview">
         <MarkdownView

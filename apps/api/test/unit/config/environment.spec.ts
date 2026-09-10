@@ -18,6 +18,28 @@ const validEnvironment = Object.freeze({
 
 describe('parseEnvironment', () => {
   it.each([
+    'SKILLS_MAX_FILES',
+    'SKILLS_MAX_PACKAGE_BYTES',
+    'SKILLS_MAX_INSTRUCTIONS_BYTES',
+    'SKILLS_MAX_TOTAL_BYTES_PER_USER',
+  ])('validates the resource bound %s at startup', (key) => {
+    expect(parseEnvironment(validEnvironment)).toHaveProperty(key);
+    expect(() => parseEnvironment({ ...validEnvironment, [key]: '0' })).toThrow(key);
+    expect(() => parseEnvironment({ ...validEnvironment, [key]: 'unbounded' })).toThrow(key);
+  });
+  it('rejects inconsistent skills storage limits', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        SKILLS_MAX_PACKAGE_BYTES: '1024',
+        SKILLS_MAX_INSTRUCTIONS_BYTES: '2048',
+      }),
+    ).toThrow('SKILLS_MAX_INSTRUCTIONS_BYTES');
+    expect(() =>
+      parseEnvironment({ ...validEnvironment, SKILLS_MAX_TOTAL_BYTES_PER_USER: '1024' }),
+    ).toThrow('SKILLS_MAX_TOTAL_BYTES_PER_USER');
+  });
+  it.each([
     'FEATURE_OUTPUT_STYLES_ENABLED',
     'FEATURE_KNOWLEDGE_SCOPE_ENABLED',
     'FEATURE_CONVERSATION_FEEDBACK_ENABLED',
@@ -94,6 +116,10 @@ describe('parseEnvironment', () => {
       OBSERVABILITY_LOG_LEVEL: 'info',
       OBSERVABILITY_METRICS_ENABLED: false,
       REDIS_URL: 'redis://localhost:6379',
+      SKILLS_MAX_FILES: 50,
+      SKILLS_MAX_PACKAGE_BYTES: 1_048_576,
+      SKILLS_MAX_INSTRUCTIONS_BYTES: 131_072,
+      SKILLS_MAX_TOTAL_BYTES_PER_USER: 26_214_400,
       TRUST_PROXY_HOPS: 0,
       WEB_APP_URL: 'http://localhost:5173',
     });

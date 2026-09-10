@@ -1,4 +1,4 @@
-import type { AgentView, SkillView, TeamView } from '@/lib/workspace/workspace-tools.types';
+import type { AgentView, TeamView } from '@/lib/workspace/workspace-tools.types';
 
 export const previewAgents: readonly AgentView[] = [
   {
@@ -34,10 +34,4 @@ export const previewTeams: readonly TeamView[] = [
     description: 'Un autre regard sur vos sujets.',
     memberIds: ['researcher', 'analyst'],
   },
-];
-
-export const previewSkills: readonly SkillView[] = [
-  { id: 'synthesis', name: 'Synthèse', description: 'Faire ressortir les idées essentielles.' },
-  { id: 'writing', name: 'Rédaction', description: 'Adapter le ton et la structure.' },
-  { id: 'planning', name: 'Planification', description: 'Organiser un objectif en étapes.' },
 ];

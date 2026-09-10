@@ -65,7 +65,7 @@ export function ContextPanel({ scope, isLoading, tools }: ContextPanelProps) {
               <TeamBuilder tools={tools} />
             </TabsContent>
             <TabsContent value="skills" className="pt-5">
-              <SkillsPanel tools={tools} />
+              <SkillsPanel />
             </TabsContent>
             <TabsContent value="files" className="pt-5">
               <ContextResources resources={[]} />
@@ -81,7 +81,9 @@ export function ContextPanel({ scope, isLoading, tools }: ContextPanelProps) {
         <p className="text-2xs leading-relaxed">
           Votre espace prend forme.
           <br />
-          <span className="text-2xs">Équipes, skills et fichiers restent des aperçus locaux.</span>
+          <span className="text-2xs">
+            Les équipes restent des aperçus locaux. Les fichiers arrivent bientôt.
+          </span>
         </p>
       </div>
     </aside>

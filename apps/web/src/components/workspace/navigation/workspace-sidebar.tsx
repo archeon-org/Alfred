@@ -1,3 +1,4 @@
+import { FeatureGate } from '@/components/feature-flags/feature-gate';
 import { ConversationPagination } from '@/components/workspace/conversation/conversation-pagination';
 import { ArrowUpRight, FlaskConical, MessageSquareText, Plus, Search } from 'lucide-react';
 import { useId } from 'react';
@@ -113,6 +114,17 @@ export function WorkspaceSidebar({
           Conversations
           <span className="text-2xs text-sidebar-muted md:ml-auto">{conversations.length}</span>
         </a>
+        <FeatureGate feature="skills">
+          <Link
+            to="/app/skills"
+            className={cn(
+              buttonVariants({ variant: 'ghost', size: 'sm' }),
+              'text-sidebar-foreground md:justify-start',
+            )}
+          >
+            Mes skills
+          </Link>
+        </FeatureGate>
       </nav>
       <div
         id="conversation-history"

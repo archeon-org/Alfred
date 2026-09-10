@@ -6,6 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ContextPanel } from '@/components/workspace/context/context-panel';
 import { useWorkspaceTools } from '@/hooks/workspace/use-workspace-tools';
 
+vi.mock('@/hooks/feature-flags/use-feature-flags-query', () => ({
+  useFeatureFlagsQuery: () => ({ status: 'ready', flags: { skills: false } }),
+}));
+
 function ToolsPreview({
   loaded = false,
   isLoading = false,
@@ -46,7 +50,7 @@ describe('Workspace tools local preview', () => {
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('tab', { name: 'Skills' })).toHaveFocus();
     await user.keyboard('{Enter}');
-    expect(screen.getByRole('switch', { name: 'Synthèse' })).toBeVisible();
+    expect(screen.getByText('Le catalogue de skills est désactivé.')).toBeVisible();
     await user.click(screen.getByRole('tab', { name: 'Fichiers' }));
     expect(screen.getByText('Une place pour vos références.')).toBeVisible();
   });
@@ -64,18 +68,6 @@ describe('Workspace tools local preview', () => {
     await user.click(screen.getByRole('button', { name: 'Panneau' }));
     expect(screen.getByRole('combobox', { name: 'Équipe de la conversation' })).toHaveValue(
       'research',
-    );
-    await user.click(screen.getByRole('tab', { name: 'Skills' }));
-    await user.click(screen.getByRole('switch', { name: 'Synthèse' }));
-    expect(screen.getByRole('switch', { name: 'Synthèse' })).toHaveAttribute(
-      'aria-checked',
-      'false',
-    );
-    await user.click(screen.getByRole('button', { name: 'Panneau' }));
-    await user.click(screen.getByRole('button', { name: 'Panneau' }));
-    expect(screen.getByRole('switch', { name: 'Synthèse' })).toHaveAttribute(
-      'aria-checked',
-      'false',
     );
   });
 

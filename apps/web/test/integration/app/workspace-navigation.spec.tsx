@@ -217,7 +217,9 @@ describe('Workspace navigation', () => {
     expect(
       within(screen.getByRole('region', { name: 'Épinglés' })).getByRole('group', { name: 'Un' }),
     ).toBeVisible();
-    expect(api.calls[0]?.path).toContain('pinned=');
+    expect(api.calls.find((call) => call.path.startsWith('/api/projects'))?.path).toContain(
+      'pinned=',
+    );
 
     await user.click(within(recent).getByRole('button', { name: 'Afficher plus' }));
 

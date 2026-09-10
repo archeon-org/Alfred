@@ -4,8 +4,8 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  Post,
   Param,
+  Post,
   Query,
   Req,
   Res,
@@ -23,10 +23,10 @@ import {
 import { SameOriginGuard } from '../../../common/guards/same-origin.guard';
 import { RequiresFeature } from '../../feature-flags/requires-feature.decorator';
 import { AuthService } from '../application/auth.service';
-import { OauthCallbackQueryDto } from './dto/oauth-callback-query.dto';
-import { OauthStartQueryDto } from './dto/oauth-start-query.dto';
 import { AuthCookieService } from './cookies/auth-cookie.service';
 import { AuthProviderParamDto } from './dto/auth-provider-param.dto';
+import { OauthCallbackQueryDto } from './dto/oauth-callback-query.dto';
+import { OauthStartQueryDto } from './dto/oauth-start-query.dto';
 
 @Controller('auth')
 export class AuthController {

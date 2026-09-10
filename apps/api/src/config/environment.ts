@@ -129,6 +129,15 @@ const environmentSchema = z
       z.string().min(32).optional(),
     ),
     REDIS_URL: z.string().url().default('redis://localhost:6379'),
+    SKILLS_MAX_FILES: z.coerce.number().int().min(1).max(50).default(50),
+    SKILLS_MAX_PACKAGE_BYTES: z.coerce.number().int().min(1).max(1_048_576).default(1_048_576),
+    SKILLS_MAX_INSTRUCTIONS_BYTES: z.coerce.number().int().min(1).max(131_072).default(131_072),
+    SKILLS_MAX_TOTAL_BYTES_PER_USER: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(1_073_741_824)
+      .default(26_214_400),
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
     WEB_APP_URL: z
       .string()
@@ -137,6 +146,21 @@ const environmentSchema = z
       .transform((value) => new URL(value).origin),
   })
   .superRefine((environment, context) => {
+    if (environment.SKILLS_MAX_INSTRUCTIONS_BYTES > environment.SKILLS_MAX_PACKAGE_BYTES) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Instructions cannot exceed the package limit',
+        path: ['SKILLS_MAX_INSTRUCTIONS_BYTES'],
+      });
+    }
+    if (environment.SKILLS_MAX_PACKAGE_BYTES > environment.SKILLS_MAX_TOTAL_BYTES_PER_USER) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Package limit cannot exceed the user storage quota',
+        path: ['SKILLS_MAX_TOTAL_BYTES_PER_USER'],
+      });
+    }
+
     if (environment.NODE_ENV === 'production' && environment.API_CORS_ORIGINS.includes('*')) {
       context.addIssue({
         code: 'custom',

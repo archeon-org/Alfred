@@ -1,5 +1,8 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 
+import { SkillEditorScreen } from '@/screens/workspace/skill-editor-screen';
+import { SkillsLayout } from '@/screens/workspace/skills-layout';
+import { SkillsScreen } from '@/screens/workspace/skills-screen';
 import { SettingsScreen } from '@/screens/workspace/settings-screen';
 import { RequireSession } from '@/routes/guards/require-session';
 import { RouteFocusManager } from '@/routes/route-focus-manager';
@@ -23,6 +26,15 @@ export const routes: RouteObject[] = [
             children: [
               { element: <WorkspaceHomeScreen />, index: true },
               { element: <SettingsScreen />, path: 'settings' },
+              {
+                element: <SkillsLayout />,
+                path: 'skills',
+                children: [
+                  { element: <SkillsScreen />, index: true },
+                  { element: <SkillEditorScreen />, path: 'new' },
+                  { element: <SkillEditorScreen />, path: ':skillId/edit' },
+                ],
+              },
               { element: <ProjectScreen />, path: 'projects/:projectId' },
               { element: <ConversationScreen />, path: 'conversations/:conversationId' },
             ],

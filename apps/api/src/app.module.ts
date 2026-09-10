@@ -1,3 +1,4 @@
+import { SkillsModule } from './modules/skills/skills.module';
 import { ContextModule } from './modules/context/context.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { Module } from '@nestjs/common';
@@ -97,6 +98,7 @@ export function createThrottlerOptions(
     ProjectsModule,
     ConversationsModule,
     ContextModule,
+    SkillsModule,
     IdempotencyModule,
   ],
   providers: [

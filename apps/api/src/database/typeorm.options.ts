@@ -1,3 +1,6 @@
+import { SkillEntity } from '../modules/skills/infrastructure/skill.entity';
+import { SkillVersionEntity } from '../modules/skills/infrastructure/skill-version.entity';
+import { SkillFileEntity } from '../modules/skills/infrastructure/skill-file.entity';
 import { ContextDocumentEntity } from '../modules/context/infrastructure/context-document.entity';
 import { IdempotencyKeyEntity } from '../common/idempotency/idempotency-key.entity';
 import type { ConfigService } from '@nestjs/config';
@@ -25,6 +28,9 @@ export const databaseEntities = [
   ProjectEntity,
   ConversationEntity,
   ContextDocumentEntity,
+  SkillEntity,
+  SkillVersionEntity,
+  SkillFileEntity,
 ] as const;
 
 export function createTypeOrmOptions(config: ConfigService): TypeOrmModuleOptions {
