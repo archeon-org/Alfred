@@ -61,6 +61,11 @@ See the [standalone server documentation](https://docs.langchain.com/langsmith/d
 
 ## Migration gate
 
+Workspace membership replaces the former single-workspace user column with a junction table.
+Follow the writer-drain order and guarded rollback described in
+[workspace affiliation operations](workspace-affiliation.md); old API builds still reference the
+removed column and must not run against the upgraded schema.
+
 The first migration installs the only required extension with
 `CREATE EXTENSION IF NOT EXISTS "citext"`; the migration credential must be allowed to create that
 trusted extension. TypeORM extension auto-installation stays disabled.
