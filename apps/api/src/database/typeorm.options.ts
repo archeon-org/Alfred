@@ -1,10 +1,12 @@
+import type { ConfigService } from '@nestjs/config';
+import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { WorkspaceMembershipEntity } from '../modules/workspaces/infrastructure/workspace-membership.entity';
+import { WorkspaceEntity } from '../modules/workspaces/infrastructure/workspace.entity';
 import { SkillEntity } from '../modules/skills/infrastructure/skill.entity';
 import { SkillVersionEntity } from '../modules/skills/infrastructure/skill-version.entity';
 import { SkillFileEntity } from '../modules/skills/infrastructure/skill-file.entity';
 import { ContextDocumentEntity } from '../modules/context/infrastructure/context-document.entity';
 import { IdempotencyKeyEntity } from '../common/idempotency/idempotency-key.entity';
-import type { ConfigService } from '@nestjs/config';
-import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { OauthLoginStateEntity } from '../modules/auth/infrastructure/persistence/entities/oauth-login-state.entity';
 import { RefreshSessionEntity } from '../modules/auth/infrastructure/persistence/entities/refresh-session.entity';
 import { UserEntity } from '../modules/users/user.entity';
@@ -20,6 +22,8 @@ import {
 
 export const databaseEntities = [
   TenantEntity,
+  WorkspaceEntity,
+  WorkspaceMembershipEntity,
   UserEntity,
   UserIdentityEntity,
   RefreshSessionEntity,

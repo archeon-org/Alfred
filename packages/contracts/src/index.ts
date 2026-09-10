@@ -126,3 +126,9 @@ export {
 } from './context';
 
 export * from './skills';
+
+export {
+  currentWorkspacesSchema,
+  currentWorkspacesEnvelopeSchema,
+  type CurrentWorkspaces,
+} from './workspaces';

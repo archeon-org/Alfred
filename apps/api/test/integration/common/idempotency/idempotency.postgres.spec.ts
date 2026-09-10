@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { RequestValidationPipe } from '@api/common/validation/request-validation.pipe';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
@@ -8,12 +7,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { firstValueFrom, from, timeout } from 'rxjs';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AccessTokenGuard } from '@api/common/guards/access-token.guard';
 import { ApiExceptionFilter } from '@api/common/filters/api-exception.filter';
-import { IdempotencyModule } from '@api/common/idempotency/idempotency.module';
-import { IdempotencyStore } from '@api/common/idempotency/idempotency.store';
+import { AccessTokenGuard } from '@api/common/guards/access-token.guard';
 import { IdempotencyCleanupService } from '@api/common/idempotency/idempotency-cleanup.service';
 import { IdempotencyKeyEntity } from '@api/common/idempotency/idempotency-key.entity';
+import { IdempotencyModule } from '@api/common/idempotency/idempotency.module';
+import { IdempotencyStore } from '@api/common/idempotency/idempotency.store';
+import { RequestValidationPipe } from '@api/common/validation/request-validation.pipe';
 import { API_MIGRATIONS_TABLE } from '@api/database/database-options';
 import { databaseMigrations } from '@api/database/migrations';
 import { databaseEntities } from '@api/database/typeorm.options';
@@ -24,17 +24,10 @@ import {
   IdempotencyFixtureController,
   fixtureUrl,
 } from '../../../support/idempotency-fixture';
+import { addWorkspaceMembership } from '../../../support/workspace.fixture';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const migrationDatabaseUrl = process.env.TEST_MIGRATION_DATABASE_URL;
-if (
-  process.env.REQUIRE_DATABASE_E2E === 'true' &&
-  (!databaseUrl || !migrationDatabaseUrl || !process.env.TEST_DATABASE_ADMIN_URL)
-) {
-  throw new Error(
-    'REQUIRE_DATABASE_E2E=true requires TEST_DATABASE_URL, TEST_MIGRATION_DATABASE_URL and TEST_DATABASE_ADMIN_URL',
-  );
-}
 const postgres = databaseUrl && migrationDatabaseUrl ? describe : describe.skip;
 
 // Run sequentially with other DB suites: migrations and their historical global cleanup share public.
@@ -55,9 +48,13 @@ postgres('idempotency PostgreSQL and HTTP contract', () => {
   async function user(name: string): Promise<string> {
     const id = randomUUID();
     ownedUserIds.add(id);
-    await db
-      .getRepository(UserEntity)
-      .insert({ id, email: `${id}@example.test`, displayName: name, tenantId });
+    await db.getRepository(UserEntity).insert({
+      id,
+      email: `${id}@example.test`,
+      displayName: name,
+      tenantId,
+    });
+    await addWorkspaceMembership(db, tenantId, id);
     return id;
   }
 

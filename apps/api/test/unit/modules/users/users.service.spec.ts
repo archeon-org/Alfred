@@ -1,7 +1,8 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import type { DataSource, EntityManager } from 'typeorm';
 import { describe, expect, it, vi } from 'vitest';
-
+import { WorkspaceMembershipEntity } from '@api/modules/workspaces/infrastructure/workspace-membership.entity';
+import type { WorkspacesService } from '@api/modules/workspaces/application/workspaces.service';
 import type { TenantEntity } from '@api/modules/tenants/tenant.entity';
 import type { TenantsService } from '@api/modules/tenants/tenants.service';
 import { UserIdentityEntity } from '@api/modules/users/user-identity.entity';
@@ -27,6 +28,12 @@ const tenant: TenantEntity = {
 };
 
 // Built per test: the vitest `mockReset` option clears module-level mock implementations.
+function workspaces(): WorkspacesService {
+  return {
+    defaultWorkspaceId: vi.fn().mockResolvedValue('workspace-default'),
+  } as unknown as WorkspacesService;
+}
+
 function tenants(): TenantsService {
   return { defaultTenantId: vi.fn().mockResolvedValue(tenant.id) } as unknown as TenantsService;
 }
@@ -69,13 +76,26 @@ function linkedIdentity(overrides: Partial<UserIdentityEntity> = {}): UserIdenti
 function dataSourceWith(
   users: Readonly<Record<string, unknown>>,
   identities: Readonly<Record<string, unknown>>,
+  memberships: Readonly<Record<string, unknown>> = { insert: vi.fn() },
 ): DataSource {
   const manager = {
-    getRepository: vi.fn((entity: unknown) => (entity === UserIdentityEntity ? identities : users)),
+    getRepository: vi.fn((entity: unknown) =>
+      entity === UserIdentityEntity
+        ? identities
+        : entity === WorkspaceMembershipEntity
+          ? memberships
+          : users,
+    ),
   } as unknown as EntityManager;
 
   return {
-    getRepository: vi.fn((entity: unknown) => (entity === UserIdentityEntity ? identities : users)),
+    getRepository: vi.fn((entity: unknown) =>
+      entity === UserIdentityEntity
+        ? identities
+        : entity === WorkspaceMembershipEntity
+          ? memberships
+          : users,
+    ),
     transaction: vi.fn((work: (transaction: EntityManager) => unknown) =>
       Promise.resolve(work(manager)),
     ),
@@ -94,7 +114,7 @@ describe('UsersService', () => {
       findOne: vi.fn().mockResolvedValue(existingIdentity),
       save: vi.fn((value: UserIdentityEntity) => Promise.resolve(value)),
     };
-    const service = new UsersService(dataSourceWith(users, identities), tenants());
+    const service = new UsersService(dataSourceWith(users, identities), tenants(), workspaces());
 
     await expect(service.upsertVerifiedIdentity(identity)).resolves.toMatchObject({
       avatarUrl: identity.avatarUrl,
@@ -106,6 +126,31 @@ describe('UsersService', () => {
     expect(identities.save.mock.calls[0]?.[0].lastAuthenticatedAt).toBeInstanceOf(Date);
   });
 
+  it('preserves all memberships on later login without default reassignment', async () => {
+    const existingIdentity = linkedIdentity();
+    const existingUser = user();
+    const users = {
+      findOne: vi.fn().mockResolvedValue(existingUser),
+      create: vi.fn((value: Partial<UserEntity>) => value),
+      save: vi.fn((value: UserEntity) => Promise.resolve(value)),
+    };
+    const identities = { findOne: vi.fn().mockResolvedValue(existingIdentity), save: vi.fn() };
+    const workspaceService = workspaces();
+    const resolveDefault = vi.spyOn(workspaceService, 'defaultWorkspaceId');
+    const memberships = { insert: vi.fn(), delete: vi.fn() };
+    const service = new UsersService(
+      dataSourceWith(users, identities, memberships),
+      tenants(),
+      workspaceService,
+    );
+    await expect(service.upsertVerifiedIdentity(identity)).resolves.toMatchObject({
+      tenantId: tenant.id,
+    });
+    expect(resolveDefault).not.toHaveBeenCalled();
+    expect(memberships.insert).not.toHaveBeenCalled();
+    expect(memberships.delete).not.toHaveBeenCalled();
+  });
+
   it('rejects disabled accounts even when the external identity succeeds', async () => {
     const disabledUser = user({ status: 'disabled' });
     const identities = {
@@ -114,6 +159,7 @@ describe('UsersService', () => {
     const service = new UsersService(
       dataSourceWith({ findOne: vi.fn().mockResolvedValue(disabledUser) }, identities),
       tenants(),
+      workspaces(),
     );
 
     await expect(service.upsertVerifiedIdentity(identity)).rejects.toThrow(UnauthorizedException);
@@ -122,7 +168,7 @@ describe('UsersService', () => {
   it('does not silently link a new subject to an email owned by another user', async () => {
     const users = { findOne: vi.fn().mockResolvedValue(user()) };
     const identities = { findOne: vi.fn().mockResolvedValue(null) };
-    const service = new UsersService(dataSourceWith(users, identities), tenants());
+    const service = new UsersService(dataSourceWith(users, identities), tenants(), workspaces());
 
     await expect(service.upsertVerifiedIdentity(identity)).rejects.toThrow(ConflictException);
   });
@@ -139,9 +185,10 @@ describe('UsersService', () => {
       findOne: vi.fn().mockResolvedValue(null),
       save: vi.fn((value: UserIdentityEntity) => Promise.resolve(value)),
     };
-    const source = dataSourceWith(users, identities);
+    const memberships = { insert: vi.fn() };
+    const source = dataSourceWith(users, identities, memberships);
     const transaction = vi.spyOn(source, 'transaction');
-    const service = new UsersService(source, tenants());
+    const service = new UsersService(source, tenants(), workspaces());
 
     await expect(service.upsertVerifiedIdentity(identity)).resolves.toMatchObject({
       role: 'user',
@@ -149,6 +196,11 @@ describe('UsersService', () => {
     });
     expect(transaction).toHaveBeenCalledOnce();
     expect(users.create).toHaveBeenCalledWith(expect.objectContaining({ tenantId: tenant.id }));
+    expect(memberships.insert).toHaveBeenCalledWith({
+      tenantId: tenant.id,
+      userId: createdUser.id,
+      workspaceId: 'workspace-default',
+    });
     expect(identities.create).toHaveBeenCalledWith(
       expect.objectContaining({
         issuer: identity.issuer,
@@ -177,7 +229,7 @@ describe('UsersService', () => {
       findOne: vi.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(concurrentIdentity),
       save: vi.fn((value: UserIdentityEntity) => Promise.resolve(value)),
     };
-    const service = new UsersService(dataSourceWith(users, identities), tenants());
+    const service = new UsersService(dataSourceWith(users, identities), tenants(), workspaces());
 
     await expect(service.upsertVerifiedIdentity(identity)).resolves.toMatchObject({
       id: concurrentIdentity.user.id,
@@ -186,7 +238,7 @@ describe('UsersService', () => {
 
   it('resolves only active users for authenticated requests', async () => {
     const users = { findOne: vi.fn().mockResolvedValueOnce(user()).mockResolvedValueOnce(null) };
-    const service = new UsersService(dataSourceWith(users, {}), tenants());
+    const service = new UsersService(dataSourceWith(users, {}), tenants(), workspaces());
 
     await expect(service.findActiveById(user().id)).resolves.toMatchObject({ id: user().id });
     await expect(service.findActiveById('missing')).rejects.toThrow(UnauthorizedException);

@@ -18,7 +18,9 @@
     "migration:run:prod": "node dist/database/run-migrations.js",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "schema:check": "ts-node src/database/check-schema-drift.ts",
-    "schema:check:prod": "node dist/database/check-schema-drift.js"
+    "schema:check:prod": "node dist/database/check-schema-drift.js",
+    "workspace:provision": "ts-node src/database/provision-workspace.ts",
+    "workspace:provision:prod": "node dist/database/provision-workspace.js"
   },
   "dependencies": {
     "@alfred/contracts": "workspace:*",

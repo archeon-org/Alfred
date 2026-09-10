@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import './database-e2e.setup';
 
 process.env.API_CORS_ORIGINS ??= 'http://localhost:5173';
 process.env.API_HOST ??= '127.0.0.1';

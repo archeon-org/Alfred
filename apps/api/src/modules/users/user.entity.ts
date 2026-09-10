@@ -11,6 +11,7 @@ import {
   Unique,
   UpdateDateColumn,
 } from 'typeorm';
+import { WorkspaceMembershipEntity } from '../workspaces/infrastructure/workspace-membership.entity';
 import type { UserRole } from '../../common/auth/auth-principal';
 import { RefreshSessionEntity } from '../auth/infrastructure/persistence/entities/refresh-session.entity';
 import { TenantEntity } from '../tenants/tenant.entity';
@@ -35,6 +36,9 @@ export class UserEntity {
   @ManyToOne(() => TenantEntity, { nullable: false, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'tenant_id', foreignKeyConstraintName: 'fk_users_tenant' })
   tenant!: TenantEntity;
+
+  @OneToMany(() => WorkspaceMembershipEntity, (membership) => membership.user)
+  workspaceMemberships?: WorkspaceMembershipEntity[];
 
   @Column({ type: 'citext' })
   email!: string;

@@ -17,11 +17,6 @@ import { skillPackage, SkillsPostgresFixture } from './skills-postgres.fixture';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const migrationDatabaseUrl = process.env.TEST_MIGRATION_DATABASE_URL;
-if (process.env.REQUIRE_DATABASE_E2E === 'true' && (!databaseUrl || !migrationDatabaseUrl)) {
-  throw new Error(
-    'REQUIRE_DATABASE_E2E=true requires TEST_DATABASE_URL and TEST_MIGRATION_DATABASE_URL',
-  );
-}
 const postgres = databaseUrl && migrationDatabaseUrl ? describe : describe.skip;
 
 // Sequential with other PostgreSQL suites: these applications share the migrated schema.

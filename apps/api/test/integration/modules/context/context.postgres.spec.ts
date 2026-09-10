@@ -1,38 +1,33 @@
-import { TypeOrmContextRepository } from '@api/modules/context/infrastructure/typeorm-context.repository';
 import { randomUUID, createHash } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import type { INestApplication } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ContextModule } from '@api/modules/context/context.module';
-import { ContextResolverService } from '@api/modules/context/application/context-resolver.service';
-import { ContextDocumentEntity } from '@api/modules/context/infrastructure/context-document.entity';
-import { ProjectEntity } from '@api/modules/projects/infrastructure/persistence/project.entity';
-import { configureApplication } from '@api/bootstrap';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-
+import { configureApplication } from '@api/bootstrap';
 import { ApiExceptionFilter } from '@api/common/filters/api-exception.filter';
 import { AccessTokenGuard } from '@api/common/guards/access-token.guard';
 import { IdempotencyModule } from '@api/common/idempotency/idempotency.module';
 import { API_MIGRATIONS_TABLE } from '@api/database/database-options';
 import { databaseMigrations } from '@api/database/migrations';
 import { databaseEntities } from '@api/database/typeorm.options';
+import { ContextResolverService } from '@api/modules/context/application/context-resolver.service';
+import { ContextModule } from '@api/modules/context/context.module';
+import { ContextDocumentEntity } from '@api/modules/context/infrastructure/context-document.entity';
+import { TypeOrmContextRepository } from '@api/modules/context/infrastructure/typeorm-context.repository';
 import { ConversationsModule } from '@api/modules/conversations/conversations.module';
+import { ProjectEntity } from '@api/modules/projects/infrastructure/persistence/project.entity';
 import { ProjectsModule } from '@api/modules/projects/projects.module';
 import { TenantEntity } from '@api/modules/tenants/tenant.entity';
 import { UserEntity } from '@api/modules/users/user.entity';
+import { addWorkspaceMembership, removeTenantWorkspaces } from '../../../support/workspace.fixture';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const migrationDatabaseUrl = process.env.TEST_MIGRATION_DATABASE_URL;
-if (process.env.REQUIRE_DATABASE_E2E === 'true' && (!databaseUrl || !migrationDatabaseUrl)) {
-  throw new Error(
-    'REQUIRE_DATABASE_E2E=true requires TEST_DATABASE_URL and TEST_MIGRATION_DATABASE_URL',
-  );
-}
 const postgres = databaseUrl && migrationDatabaseUrl ? describe : describe.skip;
 
 interface Envelope {
@@ -63,9 +58,13 @@ postgres('context documents PostgreSQL HTTP contract', () => {
   async function user(tenantId = defaultTenantId): Promise<{ id: string; token: string }> {
     const id = randomUUID();
     createdUsers.add(id);
-    await db
-      .getRepository(UserEntity)
-      .insert({ displayName: 'Fixture', email: `${id}@example.test`, id, tenantId });
+    await db.getRepository(UserEntity).insert({
+      displayName: 'Fixture',
+      email: `${id}@example.test`,
+      id,
+      tenantId,
+    });
+    await addWorkspaceMembership(db, tenantId, id);
     const token = app.get(JwtService).sign({
       email: 'fixture@example.test',
       role: 'user',
@@ -156,7 +155,10 @@ postgres('context documents PostgreSQL HTTP contract', () => {
   afterAll(async () => {
     if (db?.isInitialized) {
       for (const id of createdUsers) await db.getRepository(UserEntity).delete(id);
-      for (const id of createdTenants) await db.getRepository(TenantEntity).delete(id);
+      for (const id of createdTenants) {
+        await removeTenantWorkspaces(db, id);
+        await db.getRepository(TenantEntity).delete(id);
+      }
     }
     await app?.close();
     if (migration?.isInitialized) await migration.destroy();

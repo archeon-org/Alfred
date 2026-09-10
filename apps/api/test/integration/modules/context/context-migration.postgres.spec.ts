@@ -34,7 +34,7 @@ postgres('context migration fidelity and guarded rollback', () => {
       const projectId = randomUUID();
       const content = '  # Historique\r\nTexte émoji 🧠\r\n  ';
       await runner.query(
-        `INSERT INTO api_users(id, tenant_id, email, display_name) SELECT $1, id, $2, 'Migration fixture' FROM api_tenants WHERE slug = 'default'`,
+        `INSERT INTO api_users(id, tenant_id, email, display_name) SELECT $1, tenant_id, $2, 'Migration fixture' FROM api_workspaces WHERE slug = 'default' AND tenant_id = (SELECT id FROM api_tenants WHERE slug = 'default')`,
         [userId, `${userId}@example.test`],
       );
       await runner.query(

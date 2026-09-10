@@ -8,25 +8,27 @@ import { API_MIGRATIONS_TABLE } from '@api/database/database-options';
 import { skillPackage, SkillsPostgresFixture } from './skills-postgres.fixture';
 
 const url = process.env.TEST_DATABASE_URL;
+// Migration round-trips require DDL privileges; HTTP requests keep the runtime DML role.
+const migrationUrl = process.env.TEST_MIGRATION_DATABASE_URL ?? url;
 const suite = url ? describe : describe.skip;
 suite.sequential('conversation skill bindings removed', () => {
   const fixture = new SkillsPostgresFixture();
+  let migrationDatabase: DataSource;
   beforeAll(async () => {
-    const db = await new DataSource({
+    migrationDatabase = await new DataSource({
       type: 'postgres',
-      url,
+      url: migrationUrl,
       entities: [...databaseEntities],
       migrations: [...databaseMigrations],
       migrationsTableName: API_MIGRATIONS_TABLE,
     }).initialize();
-    try {
-      await db.runMigrations({ transaction: 'each' });
-    } finally {
-      await db.destroy();
-    }
+    await migrationDatabase.runMigrations({ transaction: 'each' });
     await fixture.start(url!);
   });
-  afterAll(async () => fixture.close());
+  afterAll(async () => {
+    await fixture.close();
+    if (migrationDatabase?.isInitialized) await migrationDatabase.destroy();
+  });
   it('exposes neither GET nor PUT bindings routes, including in OpenAPI', async () => {
     const owner = await fixture.user();
     const id = await fixture.create(owner.token);
@@ -74,7 +76,7 @@ suite.sequential('conversation skill bindings removed', () => {
       ).status,
     ).toBe(200);
     const conversationId = await fixture.conversation(owner.token);
-    const runner = fixture.db.createQueryRunner();
+    const runner = migrationDatabase.createQueryRunner();
     await runner.connect();
     await runner.startTransaction();
     try {

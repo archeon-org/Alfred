@@ -12,25 +12,27 @@ import { skillEnvelopeSchema, skillVersionListEnvelopeSchema } from '@alfred/con
 import { skillPackage, SkillsPostgresFixture } from './skills-postgres.fixture';
 
 const url = process.env.TEST_DATABASE_URL;
+// Migration round-trips require DDL privileges; HTTP requests keep the runtime DML role.
+const migrationUrl = process.env.TEST_MIGRATION_DATABASE_URL ?? url;
 const suite = url ? describe : describe.skip;
 suite.sequential('personal skill lifecycle PostgreSQL', () => {
   const fixture = new SkillsPostgresFixture();
+  let migrationDatabase: DataSource;
   beforeAll(async () => {
-    const db = await new DataSource({
+    migrationDatabase = await new DataSource({
       type: 'postgres',
-      url,
+      url: migrationUrl,
       entities: [...databaseEntities],
       migrations: [...databaseMigrations],
       migrationsTableName: API_MIGRATIONS_TABLE,
     }).initialize();
-    try {
-      await db.runMigrations({ transaction: 'each' });
-    } finally {
-      await db.destroy();
-    }
+    await migrationDatabase.runMigrations({ transaction: 'each' });
     await fixture.start(url!);
   });
-  afterAll(async () => fixture.close());
+  afterAll(async () => {
+    await fixture.close();
+    if (migrationDatabase?.isInitialized) await migrationDatabase.destroy();
+  });
   it('repoints historical bytes without rewriting snapshots or published pointer', async () => {
     const owner = await fixture.user();
     const original = skillPackage('original');
@@ -192,7 +194,7 @@ suite.sequential('personal skill lifecycle PostgreSQL', () => {
     });
     await fixture.publish(owner.token, id, 2);
     const change = new SkillRollbackPointer1789260000000();
-    const runner = fixture.db.createQueryRunner();
+    const runner = migrationDatabase.createQueryRunner();
     await runner.connect();
     await runner.startTransaction();
     try {
@@ -328,7 +330,7 @@ suite.sequential('personal skill lifecycle PostgreSQL', () => {
   it('backfills existing rows additively and protects lifecycle metadata on rollback', async () => {
     const owner = await fixture.user();
     const id = await fixture.create(owner.token);
-    const runner = fixture.db.createQueryRunner();
+    const runner = migrationDatabase.createQueryRunner();
     await runner.connect();
     await runner.startTransaction();
     try {
@@ -348,7 +350,7 @@ suite.sequential('personal skill lifecycle PostgreSQL', () => {
       await runner.rollbackTransaction();
       await runner.release();
     }
-    const emptyRunner = fixture.db.createQueryRunner();
+    const emptyRunner = migrationDatabase.createQueryRunner();
     await emptyRunner.connect();
     await emptyRunner.startTransaction();
     try {

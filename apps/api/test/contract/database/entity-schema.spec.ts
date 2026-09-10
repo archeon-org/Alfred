@@ -32,6 +32,8 @@ describe('entity schema contract', () => {
       'api_tenants',
       'api_user_identities',
       'api_users',
+      'api_workspace_memberships',
+      'api_workspaces',
     ]);
     expect(tables.every(({ name }) => name?.startsWith(API_TABLE_PREFIX))).toBe(true);
     expect(API_MIGRATIONS_TABLE).toBe('api_migrations');

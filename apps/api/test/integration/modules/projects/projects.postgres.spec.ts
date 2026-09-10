@@ -1,4 +1,3 @@
-import { ContextModule } from '@api/modules/context/context.module';
 import { randomUUID } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { PROJECT_PIN_LIMIT } from '@alfred/contracts';
@@ -9,7 +8,6 @@ import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-
 import { ApiExceptionFilter } from '@api/common/filters/api-exception.filter';
 import { AccessTokenGuard } from '@api/common/guards/access-token.guard';
 import { IdempotencyModule } from '@api/common/idempotency/idempotency.module';
@@ -17,20 +15,22 @@ import { RequestValidationPipe } from '@api/common/validation/request-validation
 import { API_MIGRATIONS_TABLE } from '@api/database/database-options';
 import { databaseMigrations } from '@api/database/migrations';
 import { databaseEntities } from '@api/database/typeorm.options';
+import { ContextModule } from '@api/modules/context/context.module';
 import { ConversationsModule } from '@api/modules/conversations/conversations.module';
 import { ConversationEntity } from '@api/modules/conversations/infrastructure/persistence/conversation.entity';
 import { ProjectEntity } from '@api/modules/projects/infrastructure/persistence/project.entity';
 import { ProjectsModule } from '@api/modules/projects/projects.module';
 import { TenantEntity } from '@api/modules/tenants/tenant.entity';
 import { UserEntity } from '@api/modules/users/user.entity';
+import { UsersModule } from '@api/modules/users/users.module';
+import {
+  addWorkspaceMembership,
+  defaultWorkspace,
+  removeTenantWorkspaces,
+} from '../../../support/workspace.fixture';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const migrationDatabaseUrl = process.env.TEST_MIGRATION_DATABASE_URL;
-if (process.env.REQUIRE_DATABASE_E2E === 'true' && (!databaseUrl || !migrationDatabaseUrl)) {
-  throw new Error(
-    'REQUIRE_DATABASE_E2E=true requires TEST_DATABASE_URL and TEST_MIGRATION_DATABASE_URL',
-  );
-}
 const postgres = databaseUrl && migrationDatabaseUrl ? describe : describe.skip;
 
 interface Envelope {
@@ -47,6 +47,7 @@ postgres('projects and conversations PostgreSQL contract', () => {
   let url: string;
   let defaultTenantId: string;
   const createdUsers = new Set<string>();
+  const createdWorkspaces = new Set<string>();
   const createdTenants = new Set<string>();
 
   async function tenant(): Promise<string> {
@@ -58,12 +59,19 @@ postgres('projects and conversations PostgreSQL contract', () => {
     return id;
   }
 
-  async function user(tenantId = defaultTenantId): Promise<{ id: string; token: string }> {
+  async function user(
+    tenantId = defaultTenantId,
+    workspaceId?: string,
+  ): Promise<{ id: string; token: string }> {
     const id = randomUUID();
     createdUsers.add(id);
-    await db
-      .getRepository(UserEntity)
-      .insert({ displayName: 'Fixture', email: `${id}@example.test`, id, tenantId });
+    await db.getRepository(UserEntity).insert({
+      displayName: 'Fixture',
+      email: `${id}@example.test`,
+      id,
+      tenantId,
+    });
+    await addWorkspaceMembership(db, tenantId, id, workspaceId);
     const token = app.get(JwtService).sign({
       email: 'fixture@example.test',
       role: 'user',
@@ -121,6 +129,7 @@ postgres('projects and conversations PostgreSQL contract', () => {
         JwtModule.register({ secret: 'test-only-postgres-projects-secret' }),
         IdempotencyModule,
         ProjectsModule,
+        UsersModule,
         ContextModule,
         ConversationsModule,
       ],
@@ -142,7 +151,12 @@ postgres('projects and conversations PostgreSQL contract', () => {
   afterAll(async () => {
     if (db?.isInitialized) {
       for (const id of createdUsers) await db.getRepository(UserEntity).delete(id);
-      for (const id of createdTenants) await db.getRepository(TenantEntity).delete(id);
+      for (const id of createdWorkspaces)
+        await db.query('DELETE FROM api_workspaces WHERE id = $1', [id]);
+      for (const id of createdTenants) {
+        await removeTenantWorkspaces(db, id);
+        await db.getRepository(TenantEntity).delete(id);
+      }
     }
     await app?.close();
     if (migration?.isInitialized) await migration.destroy();
@@ -194,6 +208,12 @@ postgres('projects and conversations PostgreSQL contract', () => {
     const owner = await user();
     const neighbour = await user();
     const stranger = await user(await tenant());
+    const workspaceRows = await db.query<{ id: string }[]>(
+      "INSERT INTO api_workspaces(tenant_id, slug, name) VALUES ($1, $2, 'Other team') RETURNING id",
+      [defaultTenantId, randomUUID()],
+    );
+    createdWorkspaces.add(workspaceRows[0]!.id);
+    const colleague = await user(defaultTenantId, workspaceRows[0]!.id);
 
     const created = await api(
       'POST',
@@ -219,7 +239,7 @@ postgres('projects and conversations PostgreSQL contract', () => {
     expect(list.body?.data?.items?.map(({ id }) => id)).toEqual([project.id]);
     expect((await api('GET', '/projects', neighbour.token)).body?.data?.items).toEqual([]);
 
-    for (const other of [neighbour, stranger]) {
+    for (const other of [neighbour, colleague, stranger]) {
       expect((await api('GET', `/projects/${project.id}`, other.token)).status).toBe(404);
       expect(
         (await api('PATCH', `/projects/${project.id}`, other.token, { name: 'x' })).status,
@@ -250,6 +270,128 @@ postgres('projects and conversations PostgreSQL contract', () => {
 
     expect((await api('DELETE', `/projects/${project.id}`, owner.token)).status).toBe(204);
     expect((await api('GET', `/projects/${project.id}`, owner.token)).status).toBe(404);
+  });
+
+  it('keeps named and standalone conversations private within and across workspaces, including after adding membership', async () => {
+    const owner = await user();
+    const teammate = await user();
+    const rows = await db.query<{ id: string }[]>(
+      "INSERT INTO api_workspaces(tenant_id, slug, name) VALUES ($1, $2, 'Second team') RETURNING id",
+      [defaultTenantId, randomUUID()],
+    );
+    const otherWorkspaceId = rows[0]!.id;
+    createdWorkspaces.add(otherWorkspaceId);
+    const colleague = await user(defaultTenantId, otherWorkspaceId);
+    const project = (await api('POST', '/projects', owner.token, { name: 'Private' })).body!
+      .data as { id: string };
+    const named = (await api('POST', '/conversations', owner.token, { projectId: project.id }))
+      .body!.data as { id: string };
+    const standalone = (await api('POST', '/conversations', owner.token, {})).body!.data as {
+      id: string;
+      projectId: string;
+    };
+
+    for (const reassigned of [false, true]) {
+      if (reassigned) await addWorkspaceMembership(db, defaultTenantId, owner.id, otherWorkspaceId);
+      expect((await api('GET', `/projects/${project.id}`, owner.token)).status).toBe(200);
+      for (const chat of [named, standalone]) {
+        expect((await api('GET', `/conversations/${chat.id}`, owner.token)).status).toBe(200);
+        for (const other of [teammate, colleague]) {
+          expect((await api('GET', '/conversations', other.token)).body?.data?.items).toEqual([]);
+          expect((await api('GET', `/conversations/${chat.id}`, other.token)).status).toBe(404);
+          expect(
+            (await api('PATCH', `/conversations/${chat.id}`, other.token, { title: 'Intrusion' }))
+              .status,
+          ).toBe(404);
+          expect((await api('DELETE', `/conversations/${chat.id}`, other.token)).status).toBe(404);
+          expect((await api('GET', `/projects/${project.id}`, other.token)).status).toBe(404);
+        }
+      }
+    }
+    expect(await db.getRepository(ProjectEntity).findOneByOrFail({ id: project.id })).toMatchObject(
+      { ownerUserId: owner.id, tenantId: defaultTenantId },
+    );
+    expect(
+      await db.getRepository(ProjectEntity).findOneByOrFail({ id: standalone.projectId }),
+    ).toMatchObject({ ownerUserId: owner.id, kind: 'implicit' });
+  });
+
+  it('returns only the authenticated membership and lists multiple workspaces without accepting another user selector', async () => {
+    const owner = await user();
+    const neighbour = await user();
+    const stranger = await user(await tenant());
+    const membership = await api('GET', '/users/me/workspaces', owner.token);
+    const team = await defaultWorkspace(db, defaultTenantId);
+    const tenantRecord = await db
+      .getRepository(TenantEntity)
+      .findOneByOrFail({ id: defaultTenantId });
+    expect(membership).toMatchObject({
+      status: 200,
+      body: {
+        success: true,
+        data: {
+          tenant: { id: defaultTenantId, name: tenantRecord.name },
+          workspaces: [{ id: team, name: 'Équipe générale' }],
+        },
+      },
+    });
+    expect((await api('GET', '/users/me/workspaces', neighbour.token)).body).toEqual(
+      membership.body,
+    );
+    expect(
+      (
+        await api(
+          'GET',
+          `/users/me/workspaces?userId=${stranger.id}&tenantId=foreign&workspaceId=foreign`,
+          owner.token,
+        )
+      ).body,
+    ).toEqual(membership.body);
+    expect((await fetch(`${url}/users/me/workspaces`)).status).toBe(401);
+    expect((await api('GET', '/users/me/workspaces', 'invalid-token')).status).toBe(401);
+    expect(
+      (await api('POST', '/users/me/workspaces', owner.token, { userId: stranger.id })).status,
+    ).toBe(404);
+    expect((await api('GET', `/users/${stranger.id}/workspaces`, owner.token)).status).toBe(404);
+    const rows = await db.query<{ id: string }[]>(
+      "INSERT INTO api_workspaces(tenant_id, slug, name) VALUES ($1, $2, 'Reassigned team') RETURNING id",
+      [defaultTenantId, randomUUID()],
+    );
+    const workspaceId = rows[0]!.id;
+    createdWorkspaces.add(workspaceId);
+    await addWorkspaceMembership(db, defaultTenantId, owner.id, workspaceId);
+    expect((await api('GET', '/users/me/workspaces', owner.token)).body?.data).toEqual({
+      tenant: { id: defaultTenantId, name: tenantRecord.name },
+      workspaces: expect.arrayContaining([
+        { id: team, name: 'Équipe générale' },
+        { id: workspaceId, name: 'Reassigned team' },
+      ]) as unknown,
+    });
+    expect(
+      (await api('GET', `/users/me/workspaces?userId=${owner.id}`, neighbour.token)).body,
+    ).toEqual(membership.body);
+    expect((await api('GET', '/users/me/workspaces', stranger.token)).body?.data).not.toEqual(
+      membership.body?.data,
+    );
+    await db.getRepository(UserEntity).update(owner.id, { status: 'disabled' });
+    expect((await api('GET', '/users/me/workspaces', owner.token)).status).toBe(401);
+  });
+
+  it('keeps workspace reads consistent with private resource access for a suspended tenant', async () => {
+    const tenantId = await tenant();
+    const owner = await user(tenantId);
+    const neighbour = await user(tenantId);
+    const project = await api('POST', '/projects', owner.token, { name: 'Private project' });
+    expect(project.status).toBe(201);
+    const projectId = project.body!.data!.id as string;
+    const membership = await api('GET', '/users/me/workspaces', owner.token);
+    expect(membership.status).toBe(200);
+
+    await db.getRepository(TenantEntity).update(tenantId, { status: 'suspended' });
+
+    expect(await api('GET', '/users/me/workspaces', owner.token)).toEqual(membership);
+    expect((await api('GET', `/projects/${projectId}`, owner.token)).status).toBe(200);
+    expect((await api('GET', `/projects/${projectId}`, neighbour.token)).status).toBe(404);
   });
 
   it('paginates projects by most recent update with an opaque cursor', async () => {

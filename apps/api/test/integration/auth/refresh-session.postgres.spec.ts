@@ -2,7 +2,6 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { API_MIGRATIONS_TABLE } from '@api/database/database-options';
 import { databaseMigrations } from '@api/database/migrations';
 import { databaseEntities } from '@api/database/typeorm.options';
@@ -12,21 +11,11 @@ import { RefreshSessionService } from '@api/modules/auth/infrastructure/persiste
 import type { SessionTokenService } from '@api/modules/auth/infrastructure/security/session-token.service';
 import { TenantEntity } from '@api/modules/tenants/tenant.entity';
 import { UserEntity } from '@api/modules/users/user.entity';
+import { addWorkspaceMembership } from '../../support/workspace.fixture';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const migrationDatabaseUrl = process.env.TEST_MIGRATION_DATABASE_URL;
 const adminDatabaseUrl = process.env.TEST_DATABASE_ADMIN_URL;
-const requiresDatabase = process.env.REQUIRE_DATABASE_E2E === 'true';
-if (
-  requiresDatabase &&
-  (databaseUrl === undefined ||
-    migrationDatabaseUrl === undefined ||
-    adminDatabaseUrl === undefined)
-) {
-  throw new Error(
-    'REQUIRE_DATABASE_E2E=true requires TEST_DATABASE_URL, TEST_MIGRATION_DATABASE_URL and TEST_DATABASE_ADMIN_URL',
-  );
-}
 const describeWithPostgres =
   databaseUrl === undefined || migrationDatabaseUrl === undefined ? describe.skip : describe;
 const itWithDatabaseAdmin = adminDatabaseUrl === undefined ? it.skip : it;
@@ -188,6 +177,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         userId: user.id,
       }),
     );
+    await addWorkspaceMembership(dataSource, tenantId, user.id);
     const tokens = {
       createRefreshToken: vi.fn().mockReturnValue({
         hash: hashToken(nextRawToken),
@@ -246,6 +236,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         userId: user.id,
       }),
     );
+    await addWorkspaceMembership(dataSource, tenantId, user.id);
     const tokens = {
       createRefreshToken: vi.fn().mockReturnValue({
         hash: hashToken(nextRawToken),
@@ -298,6 +289,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         userId: user.id,
       }),
     );
+    await addWorkspaceMembership(dataSource, tenantId, user.id);
     let replacement = 0;
     const tokens = {
       createRefreshToken: vi.fn(() => {
@@ -351,6 +343,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         userId: user.id,
       }),
     );
+    await addWorkspaceMembership(dataSource, tenantId, user.id);
     const nextRawToken = 'logout-race-next-refresh-token';
     const tokens = {
       createRefreshToken: vi.fn().mockReturnValue({
@@ -385,6 +378,7 @@ describeWithPostgres('refresh-session PostgreSQL contract', () => {
         tenantId,
       }),
     );
+    await addWorkspaceMembership(dataSource, tenantId, user.id);
     const familyId = randomUUID();
     const previousRawToken = 'family-lock-previous-refresh-token';
     const currentRawToken = 'family-lock-current-refresh-token';

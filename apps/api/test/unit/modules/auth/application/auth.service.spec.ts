@@ -7,6 +7,7 @@ import type { UserEntity } from '@api/modules/users/user.entity';
 import type { UsersService } from '@api/modules/users/users.service';
 
 const user = {
+  workspaceMemberships: [],
   avatarUrl: null,
   createdAt: new Date(),
   displayName: 'Alfred User',

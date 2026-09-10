@@ -9,6 +9,7 @@ import type { SessionTokenService } from '@api/modules/auth/infrastructure/secur
 import type { UserEntity } from '@api/modules/users/user.entity';
 
 const user = {
+  workspaceMemberships: [],
   avatarUrl: null,
   createdAt: new Date('2026-09-03T10:00:00.000Z'),
   displayName: 'Alfred User',

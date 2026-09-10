@@ -8,9 +8,6 @@ import {
 } from '@api/common/ownership/find-owned';
 
 const url = process.env.TEST_MIGRATION_DATABASE_URL;
-if (process.env.REQUIRE_DATABASE_E2E === 'true' && !url) {
-  throw new Error('REQUIRE_DATABASE_E2E=true requires TEST_MIGRATION_DATABASE_URL');
-}
 interface Project {
   id: string;
   ownerUserId: string;

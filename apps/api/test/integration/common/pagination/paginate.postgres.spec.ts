@@ -23,9 +23,6 @@ const entity = new EntitySchema<Row>({
   },
 });
 const url = process.env.TEST_MIGRATION_DATABASE_URL;
-if (process.env.REQUIRE_DATABASE_E2E === 'true' && url === undefined) {
-  throw new Error('Pagination integration requires TEST_MIGRATION_DATABASE_URL');
-}
 
 describe.skipIf(url === undefined)('cursor pagination PostgreSQL', () => {
   const db = new DataSource({

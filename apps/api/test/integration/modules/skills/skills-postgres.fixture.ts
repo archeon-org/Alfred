@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import type { SkillWriteInput } from '@alfred/contracts';
 import type { INestApplication } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -22,6 +22,7 @@ import { ProjectsModule } from '@api/modules/projects/projects.module';
 import { SkillsModule } from '@api/modules/skills/skills.module';
 import { TenantEntity } from '@api/modules/tenants/tenant.entity';
 import { UserEntity } from '@api/modules/users/user.entity';
+import { addWorkspaceMembership, removeTenantWorkspaces } from '../../../support/workspace.fixture';
 
 export interface Envelope {
   readonly success: boolean;
@@ -114,7 +115,10 @@ export class SkillsPostgresFixture {
   async close(): Promise<void> {
     if (this.db?.isInitialized) {
       for (const id of this.users) await this.db.getRepository(UserEntity).delete(id);
-      for (const id of this.tenants) await this.db.getRepository(TenantEntity).delete(id);
+      for (const id of this.tenants) {
+        await removeTenantWorkspaces(this.db, id);
+        await this.db.getRepository(TenantEntity).delete(id);
+      }
     }
     await this.app?.close();
   }
@@ -134,9 +138,11 @@ export class SkillsPostgresFixture {
     await this.db.getRepository(UserEntity).insert({
       id,
       tenantId,
+
       displayName: 'Skills fixture',
       email: `${id}@example.test`,
     });
+    await addWorkspaceMembership(this.db, tenantId, id);
     const token = this.app.get(JwtService).sign({
       email: `${id}@example.test`,
       role: 'user',

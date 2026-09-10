@@ -1,5 +1,7 @@
 import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { DataSource, type EntityManager, type Repository } from 'typeorm';
+import { WorkspaceMembershipEntity } from '../workspaces/infrastructure/workspace-membership.entity';
+import { WorkspacesService } from '../workspaces/application/workspaces.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { UserEntity } from './user.entity';
 import { UserIdentityEntity } from './user-identity.entity';
@@ -18,6 +20,7 @@ export class UsersService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly tenants: TenantsService,
+    private readonly workspaces: WorkspacesService,
   ) {}
 
   async upsertVerifiedIdentity(identity: VerifiedIdentity): Promise<UserEntity> {
@@ -65,6 +68,8 @@ export class UsersService {
     const emailOwner = await users.findOne({ where: { email: identity.email } });
     if (emailOwner !== null) throw this.identityConflict();
 
+    const tenantId = await this.tenants.defaultTenantId(manager);
+    const workspaceId = await this.workspaces.defaultWorkspaceId(manager, tenantId);
     const now = new Date();
     const user = await users.save(
       users.create({
@@ -74,9 +79,12 @@ export class UsersService {
         lastLoginAt: now,
         role: 'user',
         status: 'active',
-        tenantId: await this.tenants.defaultTenantId(manager),
+        tenantId,
       }),
     );
+    await manager
+      .getRepository(WorkspaceMembershipEntity)
+      .insert({ tenantId, userId: user.id, workspaceId });
     await identities.save(
       identities.create({
         emailAtLink: identity.email,
