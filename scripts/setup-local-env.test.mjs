@@ -52,6 +52,16 @@ function parseEnvironment(content) {
   );
 }
 
+test('adds a context document limit without overwriting an explicit per-file limit', async (context) => {
+  const workspace = await createWorkspace(context);
+  await writeFile(join(workspace, '.env'), 'CONTEXT_DOCUMENT_MAX_BYTES=8192\n');
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  const root = parseEnvironment(await readFile(join(workspace, '.env'), 'utf8'));
+  const api = parseEnvironment(await readFile(join(workspace, 'apps/api/.env'), 'utf8'));
+  assert.equal(root.CONTEXT_DOCUMENT_MAX_BYTES, '8192');
+  assert.equal(api.CONTEXT_DOCUMENT_MAX_BYTES, '65536');
+});
+
 async function createWorkspace(context) {
   const workspace = await mkdtemp(join(tmpdir(), 'alfred-env-contract-'));
   context.after(async () => rm(workspace, { recursive: true, force: true }));

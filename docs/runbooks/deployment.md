@@ -111,6 +111,36 @@ orchestrator; do not publish them through the user-facing ingress. Both skip req
 failed Redis limiter cannot make liveness fail. Liveness is process-only; readiness performs the
 bounded PostgreSQL and Redis checks.
 
+### Context documents rollout
+
+`CreateContextDocuments1789160000000` adds `api_context_documents` and copies existing project
+context without changing its content. Run it once before starting the new API, then deploy the
+new web application. Stop legacy API writers during this transition: an older replica can update
+the legacy project column without updating the canonical document or its revision. Mixed API
+versions that allow those writes are unsupported.
+
+The new API maintains `api_projects.context` as a compatibility mirror in the same transaction
+as each versioned context save. Legacy project PATCH calls containing context now receive
+`context_revision_required`; clients must load and save through the context-document endpoints.
+Existing description remains in the database, although the new web no longer offers its editor.
+
+Prefer rolling back the web while retaining the new API and schema. Before any schema rollback,
+stop all writers and export context documents through an authorized, protected backup process.
+Personal instructions, personal preferences and project preferences have no destination in the old
+schema. The reverse migration refuses to proceed while any of these contains nonempty text; it
+copies the latest canonical project context back to the legacy column before removing the table.
+Do not clear documents merely to force a rollback. Empty-document revisions are also lost by a
+schema rollback, so old editor sessions must not be reused after a rollback/redeployment.
+
+`CONTEXT_DOCUMENT_MAX_BYTES` configures accepted UTF-8 bytes per document, from 1 to 65536
+(default 65536). Lowering it does not truncate existing content; editing an oversized existing
+document requires reducing it before save. The browser receives this limit from the API. JSON
+body parsing permits the escaped representation of a full document; reverse proxies must allow
+at least 394240 bytes for these requests. The default Nginx 1 MiB limit is sufficient.
+
+These settings do not enable agent execution or runtime memory. See
+[ADR 0017](../adr/0017-personal-and-project-context.md) for source classification and ownership.
+
 ## Image and process posture
 
 - Node.js, Nginx, Python, uv and LangGraph Agent Server references are pinned by digest.
@@ -145,6 +175,7 @@ The API receives the complete current backend contract from Compose:
   `GOOGLE_WORKSPACE_DOMAIN`;
 - topology: `WEB_APP_URL`, `REDIS_URL`, `TRUST_PROXY_HOPS`, and `DATA_NETWORK` for Compose;
 - database: `DATABASE_URL`, `DATABASE_POOL_MAX`, `DATABASE_SSL`.
+- context documents: `CONTEXT_DOCUMENT_MAX_BYTES` (1–65536, default 65536).
 
 The current API has no Agent Server URL because the AG-UI invocation adapter is not implemented.
 Do not add a credentialed runtime URL before its service-authentication and principal-handoff

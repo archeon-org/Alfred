@@ -1,3 +1,4 @@
+import { ContextDocumentEntity } from '../modules/context/infrastructure/context-document.entity';
 import { IdempotencyKeyEntity } from '../common/idempotency/idempotency-key.entity';
 import type { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
@@ -23,6 +24,7 @@ export const databaseEntities = [
   IdempotencyKeyEntity,
   ProjectEntity,
   ConversationEntity,
+  ContextDocumentEntity,
 ] as const;
 
 export function createTypeOrmOptions(config: ConfigService): TypeOrmModuleOptions {

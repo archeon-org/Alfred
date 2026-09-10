@@ -110,3 +110,17 @@ export const featureFlagsSchema = z.readonly(
 export type FeatureFlags = z.infer<typeof featureFlagsSchema>;
 
 export { successEnvelopeSchema } from './envelope';
+
+export {
+  CONTEXT_DOCUMENT_MAX_BYTES,
+  contextDocumentKindSchema,
+  contextDocumentSchema,
+  contextDocumentSetSchema,
+  saveContextDocumentInputSchema,
+  contextDocumentEnvelopeSchema,
+  contextDocumentSetEnvelopeSchema,
+  type ContextDocumentKind,
+  type ContextDocument,
+  type ContextDocumentSet,
+  type SaveContextDocumentInput,
+} from './context';

@@ -51,7 +51,6 @@ describe('ProjectsService', () => {
     const { service } = serviceWith(repository);
 
     const created = await service.create(principal, {
-      context: '   ',
       description: 'Une description',
       name: 'Refonte du portail',
     });
@@ -68,6 +67,14 @@ describe('ProjectsService', () => {
     expect(created).not.toHaveProperty('tenantId');
     expect(created).not.toHaveProperty('ownerUserId');
     expect(created.createdAt).toBe('2026-09-09T10:00:00.000Z');
+  });
+
+  it('refuses legacy context updates without a revision before writing', async () => {
+    const repository = repositoryWith();
+    await expect(
+      serviceWith(repository).service.update(principal, projectRow().id, { context: 'new' }),
+    ).rejects.toMatchObject({ code: 'context_revision_required' });
+    expect(repository.update).not.toHaveBeenCalled();
   });
 
   it('lists only named active projects of the caller through cursor pagination', async () => {
@@ -221,15 +228,14 @@ describe('ProjectsService', () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
-  it('locks the row, clears empty documents and returns the refreshed project', async () => {
-    const refreshed = projectRow({ context: null, name: 'Nouveau nom' });
+  it('locks the row and returns the refreshed project metadata', async () => {
+    const refreshed = projectRow({ name: 'Nouveau nom' });
     const repository = repositoryWith({
       findOne: vi.fn().mockResolvedValueOnce(projectRow()).mockResolvedValueOnce(refreshed),
     });
     const { service } = serviceWith(repository);
 
     const updated = await service.update(principal, projectRow().id, {
-      context: '',
       name: 'Nouveau nom',
     });
 
@@ -239,7 +245,7 @@ describe('ProjectsService', () => {
     });
     expect(repository.update).toHaveBeenCalledWith(
       { id: projectRow().id, ownerUserId: scope.ownerUserId, tenantId: scope.tenantId },
-      { context: null, name: 'Nouveau nom' },
+      { name: 'Nouveau nom' },
     );
     expect(updated.name).toBe('Nouveau nom');
   });

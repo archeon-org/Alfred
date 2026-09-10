@@ -16,8 +16,8 @@ import { UserEntity } from '../../../users/user.entity';
 @Entity({ name: 'api_projects' })
 @Check('chk_projects_kind', `"kind" IN ('implicit', 'named')`)
 @Check('chk_projects_name', `"kind" = 'implicit' OR "name" IS NOT NULL`)
-@Check('chk_projects_status', `"status" IN ('active', 'archived', 'deleting')`)
 @Check('chk_projects_context_size', `"context" IS NULL OR octet_length("context") <= 65536`)
+@Check('chk_projects_status', `"status" IN ('active', 'archived', 'deleting')`)
 // (tenant_id, owner_user_id, kind, status, updated_at DESC, id DESC) is created by the migration;
 // TypeORM decorators cannot express column order, so the index is only declared for drift checks.
 @Index('idx_projects_owner_list', { synchronize: false })

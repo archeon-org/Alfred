@@ -1,6 +1,7 @@
+import { ContextDocumentEntity } from '../../context/infrastructure/context-document.entity';
 import type { Conversation, MoveConversationInput } from '@alfred/contracts';
 import { Injectable } from '@nestjs/common';
-import { DataSource, type EntityManager } from 'typeorm';
+import { DataSource, Not, type EntityManager } from 'typeorm';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { ApiException } from '../../../common/errors/api.exception';
 import type { OwnerScope } from '../../../common/ownership/owner-scope';
@@ -53,7 +54,13 @@ export class ConversationMoveService {
       const source = projects.get(conversation.projectId);
       if (!source || conversation.projectId !== located.projectId) throw moveNotAllowed();
       assertProjectWritable(source);
-      assertConversationMoveSource(source, await conversations.countBy({ projectId: source.id }));
+      assertConversationMoveSource(
+        source,
+        await conversations.countBy({ projectId: source.id }),
+        await manager
+          .getRepository(ContextDocumentEntity)
+          .existsBy({ projectId: source.id, content: Not('') }),
+      );
 
       // Explicitly retain updated_at and its PostgreSQL microseconds: a move changes the FK only.
       await conversations

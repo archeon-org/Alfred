@@ -1,3 +1,4 @@
+import { CreateContextDocuments1789160000000 } from './1789160000000-create-context-documents';
 import { AddConversationPin1789080000000 } from './1789080000000-add-conversation-pin';
 import { CreateIdempotencyKeys1788739200000 } from './1788739200000-create-idempotency-keys';
 import { CreateIdentityFoundation1788464265141 } from './1788464265141-create-identity-foundation';
@@ -20,4 +21,5 @@ export const databaseMigrations = Object.freeze([
   CreateConversations1789000200000,
   AddProjectPin1789000300000,
   AddConversationPin1789080000000,
+  CreateContextDocuments1789160000000,
 ] as const);

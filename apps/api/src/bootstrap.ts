@@ -1,3 +1,4 @@
+import { bodyParserErrorMiddleware } from './common/validation/body-parser-error.middleware';
 import { type INestApplication, RequestMethod } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -23,6 +24,10 @@ export function configureApplication(app: INestApplication): void {
   app.use(helmet());
   app.use(preventResponseCaching);
   app.use(cookieParser());
+  // JSON escaping can expand a valid 64KiB document to six times its UTF8 size.
+  (app as NestExpressApplication).useBodyParser('json', { limit: 6 * 65_536 + 1024 });
+  app.use(bodyParserErrorMiddleware);
+
   app.enableCors({
     credentials: true,
     maxAge: 600,

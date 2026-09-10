@@ -1,3 +1,4 @@
+import { ContextModule } from './modules/context/context.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -95,6 +96,7 @@ export function createThrottlerOptions(
     UsersModule,
     ProjectsModule,
     ConversationsModule,
+    ContextModule,
     IdempotencyModule,
   ],
   providers: [

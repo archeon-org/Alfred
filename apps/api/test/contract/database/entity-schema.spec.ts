@@ -20,6 +20,7 @@ describe('entity schema contract', () => {
 
     expect(tables).toHaveLength(databaseEntities.length);
     expect(tables.map(({ name }) => name).sort()).toEqual([
+      'api_context_documents',
       'api_conversations',
       'api_idempotency_keys',
       'api_oauth_login_states',

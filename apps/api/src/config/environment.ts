@@ -87,6 +87,7 @@ const environmentSchema = z
       .max(31_536_000)
       .default(2_592_000),
     AUTH_USER_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).max(100_000).default(120),
+    CONTEXT_DOCUMENT_MAX_BYTES: z.coerce.number().int().min(1).max(65_536).default(65_536),
     DATABASE_POOL_MAX: z.coerce.number().int().min(2).max(100).default(20),
     DATABASE_SSL: booleanFromEnvironment.default(false),
     DATABASE_URL: z

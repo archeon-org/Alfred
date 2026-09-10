@@ -17,6 +17,7 @@ function fixture(source = projectRow(), target = source) {
     countBy: vi.fn().mockResolvedValue(1),
   };
   const projects = {
+    existsBy: vi.fn().mockResolvedValue(false),
     findOne: vi.fn(({ where }: { where: { id: string } }) =>
       Promise.resolve([source, target].find(({ id }) => id === where.id) ?? null),
     ),

@@ -71,11 +71,23 @@ function safeHttpMessage(exception: HttpException): string | readonly string[] {
   return exception.message;
 }
 
+/** Body-parser errors are not Nest exceptions; never reflect their body/message fields. */
+function normalizeParserException(exception: unknown): unknown {
+  if (!(exception instanceof Error) || !('type' in exception) || !('status' in exception))
+    return exception;
+  if (exception.type === 'entity.too.large' && exception.status === 413)
+    return new HttpException('Request body is too large.', 413);
+  if (exception.type === 'entity.parse.failed' && exception.status === 400)
+    return new HttpException('Invalid JSON body.', 400);
+  return exception;
+}
+
 @Catch()
 export class ApiExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(ApiExceptionFilter.name);
 
-  catch(exception: unknown, host: ArgumentsHost): void {
+  catch(original: unknown, host: ArgumentsHost): void {
+    const exception = normalizeParserException(original);
     const response = host.switchToHttp().getResponse<Response>();
     const isHttpException = exception instanceof HttpException;
     const status = isHttpException ? exception.getStatus() : INTERNAL_SERVER_ERROR_STATUS;

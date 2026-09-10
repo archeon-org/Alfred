@@ -1,5 +1,8 @@
+import { ConfigService } from '@nestjs/config';
+import { TypeOrmContextRepository } from '../../context/infrastructure/typeorm-context.repository';
+import { normalizeContextContent } from '../../context/domain/context-document';
 import { PROJECT_PIN_LIMIT, type Project } from '@alfred/contracts';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { DataSource, IsNull, Not, type EntityManager, type Repository } from 'typeorm';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { ApiException } from '../../../common/errors/api.exception';
@@ -46,22 +49,38 @@ export class ProjectsService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly tenants: TenantsService,
+    @Optional() private readonly config?: ConfigService,
   ) {}
 
   async create(principal: AuthPrincipal, command: CreateProjectCommand): Promise<Project> {
     const scope = await this.tenants.scopeFor(principal.id);
-    const repository = this.dataSource.getRepository(ProjectEntity);
-    const project = await repository.save(
-      repository.create({
-        ...scope,
-        context: optionalText(command.context) ?? null,
-        description: optionalText(command.description) ?? null,
-        kind: 'named',
-        name: command.name,
-        status: 'active',
-      }),
-    );
-    return toProjectDto(project);
+    return this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(ProjectEntity);
+      const project = await repository.save(
+        repository.create({
+          ...scope,
+          context: null,
+          description: optionalText(command.description) ?? null,
+          kind: 'named',
+          name: command.name,
+          status: 'active',
+        }),
+      );
+      if (command.context !== undefined) {
+        const content = normalizeContextContent(
+          command.context,
+          this.config?.get<number>('CONTEXT_DOCUMENT_MAX_BYTES', 65_536) ?? 65_536,
+        );
+        await new TypeOrmContextRepository(manager).save(
+          { type: 'project', id: project.id },
+          'context',
+          content,
+          0,
+        );
+        return toProjectDto({ ...project, context: content === '' ? null : content });
+      }
+      return toProjectDto(project);
+    });
   }
 
   /**
@@ -103,6 +122,13 @@ export class ProjectsService {
   }
 
   async update(principal: AuthPrincipal, id: string, changes: ProjectChanges): Promise<Project> {
+    if (changes.context !== undefined) {
+      throw new ApiException(
+        409,
+        'context_revision_required',
+        'Use the versioned context documents endpoint to update context.',
+      );
+    }
     if (!hasProjectChanges(changes)) {
       throw new ApiException(400, 'invalid_update', 'At least one field must be provided.');
     }
@@ -121,7 +147,6 @@ export class ProjectsService {
           ...(changes.description === undefined
             ? {}
             : { description: optionalText(changes.description) }),
-          ...(changes.context === undefined ? {} : { context: optionalText(changes.context) }),
         },
         PROJECT_RESOURCE,
       );

@@ -1,3 +1,4 @@
+import { ContextModule } from '@api/modules/context/context.module';
 import { randomUUID } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { PROJECT_PIN_LIMIT } from '@alfred/contracts';
@@ -120,6 +121,7 @@ postgres('projects and conversations PostgreSQL contract', () => {
         JwtModule.register({ secret: 'test-only-postgres-projects-secret' }),
         IdempotencyModule,
         ProjectsModule,
+        ContextModule,
         ConversationsModule,
       ],
       providers: [
@@ -225,8 +227,15 @@ postgres('projects and conversations PostgreSQL contract', () => {
       expect((await api('DELETE', `/projects/${project.id}`, other.token)).status).toBe(404);
     }
 
+    expect(
+      (
+        await api('PUT', `/projects/${project.id}/context-documents/context`, owner.token, {
+          content: '# Contexte\n\nDétails.',
+          expectedRevision: 0,
+        })
+      ).status,
+    ).toBe(200);
     const updated = await api('PATCH', `/projects/${project.id}`, owner.token, {
-      context: '# Contexte\n\nDétails.',
       name: 'Portail v2',
     });
     expect(updated.status).toBe(200);

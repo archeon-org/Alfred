@@ -13,9 +13,11 @@ export function moveNotAllowed(): ApiException {
 export function assertConversationMoveSource(
   project: ProjectEntity,
   conversationCount: number,
+  hasContextDocuments = false,
 ): void {
   if (project.kind !== 'implicit') throw moveNotAllowed();
   if (
+    hasContextDocuments ||
     project.context ||
     project.description ||
     project.name ||

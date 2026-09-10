@@ -39,6 +39,25 @@ describe('ApiExceptionFilter', () => {
     });
   });
 
+  it.each([
+    ['entity.too.large', 413],
+    ['entity.parse.failed', 400],
+  ])('bounds parser failure %s without echoing request content', (type, expectedStatus) => {
+    const { host, json, status } = responseHost();
+    const log = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    new ApiExceptionFilter().catch(
+      Object.assign(new Error('private content'), {
+        type,
+        status: expectedStatus,
+        body: 'private content',
+      }),
+      host,
+    );
+    expect(status).toHaveBeenCalledWith(expectedStatus);
+    expect(JSON.stringify(json.mock.calls)).not.toContain('private content');
+    expect(log).not.toHaveBeenCalled();
+  });
+
   it('keeps the fallback for ordinary HTTP errors', () => {
     const { host, json } = responseHost();
     new ApiExceptionFilter().catch(new NotFoundException(), host);

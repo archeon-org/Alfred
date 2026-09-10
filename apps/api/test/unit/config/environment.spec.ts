@@ -72,6 +72,7 @@ describe('parseEnvironment', () => {
       AUTH_SESSION_CLEANUP_INTERVAL_SECONDS: 3_600,
       AUTH_SESSION_RETENTION_SECONDS: 2_592_000,
       AUTH_USER_RATE_LIMIT_PER_MINUTE: 120,
+      CONTEXT_DOCUMENT_MAX_BYTES: 65536,
       DATABASE_POOL_MAX: 20,
       DATABASE_SSL: false,
       DATABASE_URL: 'postgresql://alfred:local-password@localhost:5432/alfred_app?schema=public',

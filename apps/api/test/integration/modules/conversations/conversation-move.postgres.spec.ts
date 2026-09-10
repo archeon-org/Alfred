@@ -1,3 +1,4 @@
+import { ContextModule } from '@api/modules/context/context.module';
 import { randomUUID } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import type { INestApplication } from '@nestjs/common';
@@ -118,6 +119,7 @@ postgres('conversation transfer PostgreSQL HTTP contract', () => {
         JwtModule.register({ secret: 'test-only-postgres-projects-secret' }),
         IdempotencyModule,
         ProjectsModule,
+        ContextModule,
         ConversationsModule,
       ],
       providers: [
@@ -254,7 +256,20 @@ postgres('conversation transfer PostgreSQL HTTP contract', () => {
   it('refuses source content and other chats without losing any of it', async () => {
     for (const changes of [{ description: 'Keep' }, { context: '# Keep' }]) {
       const { owner, chat, target } = await setupChat();
-      await api('PATCH', `/projects/${chat.projectId}`, owner.token, changes);
+      if (changes.context !== undefined) {
+        expect(
+          (
+            await api('PUT', `/projects/${chat.projectId}/context-documents/context`, owner.token, {
+              content: changes.context,
+              expectedRevision: 0,
+            })
+          ).status,
+        ).toBe(200);
+      } else {
+        expect(
+          (await api('PATCH', `/projects/${chat.projectId}`, owner.token, changes)).status,
+        ).toBe(200);
+      }
       expect(
         (await api('POST', `/conversations/${chat.id}/move`, owner.token, { projectId: target.id }))
           .body?.error?.code,

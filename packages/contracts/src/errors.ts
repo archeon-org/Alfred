@@ -1,6 +1,9 @@
 import { z } from 'zod/mini';
 
 export const API_ERROR_CODES = Object.freeze([
+  'context_revision_conflict',
+  'context_content_too_large',
+  'context_revision_required',
   'invalid_cursor',
   'invalid_name',
   'invalid_title',
