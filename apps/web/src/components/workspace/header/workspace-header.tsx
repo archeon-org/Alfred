@@ -5,14 +5,14 @@ import {
   PanelLeftOpen,
   PanelRight,
   SlidersHorizontal,
+  Settings,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { WorkspaceAccount } from '@/components/workspace/header/workspace-account';
 import { Separator } from '@/components/ui/separator';
 import { IconButton } from '@/components/ui/icon-button';
-import { WorkspaceSettings } from '@/components/workspace/header/workspace-settings';
-import type { WorkspacePreferences } from '@/lib/workspace/workspace-preferences.types';
+import { buttonVariants } from '@/components/ui/button';
 
 export interface WorkspaceScopeLink {
   readonly name: string;
@@ -30,7 +30,6 @@ interface WorkspaceHeaderProps {
   readonly onToggleLoading: () => void;
   readonly onToggleContext: () => void;
   readonly onToggleNavigation: () => void;
-  readonly preferences: WorkspacePreferences;
 }
 
 export function WorkspaceHeader({
@@ -43,7 +42,6 @@ export function WorkspaceHeader({
   onToggleLoading,
   onToggleContext,
   onToggleNavigation,
-  preferences,
 }: WorkspaceHeaderProps) {
   const SidebarIcon = isSidebarOpen ? PanelLeftClose : PanelLeftOpen;
   return (
@@ -97,7 +95,14 @@ export function WorkspaceHeader({
         >
           <SlidersHorizontal aria-hidden="true" size={16} />
         </IconButton>
-        <WorkspaceSettings preferences={preferences} />
+        <Link
+          aria-label="Paramètres"
+          title="Paramètres"
+          className={buttonVariants({ variant: 'ghost', size: 'icon' })}
+          to="/app/settings"
+        >
+          <Settings aria-hidden="true" size={18} />
+        </Link>
         <IconButton
           label={isContextOpen ? 'Masquer le contexte' : 'Afficher le contexte'}
           aria-controls="context-panel"

@@ -3,14 +3,14 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { WorkspaceSettings } from '@/components/workspace/header/workspace-settings';
+import { AppearanceSettings } from '@/components/workspace/personalization/appearance-settings';
 import { useWorkspacePreferences } from '@/hooks/workspace/use-workspace-preferences';
 
 function SettingsPreview() {
   const preferences = useWorkspacePreferences();
   return (
     <MemoryRouter>
-      <WorkspaceSettings preferences={preferences} />
+      <AppearanceSettings preferences={preferences} />
     </MemoryRouter>
   );
 }
@@ -19,7 +19,6 @@ describe('Workspace appearance preferences', () => {
   it('resets all appearance controls together and starts fresh after remount', async () => {
     const user = userEvent.setup();
     const view = render(<SettingsPreview />);
-    await user.click(screen.getByRole('button', { name: 'Paramètres' }));
 
     await user.selectOptions(
       screen.getByRole('combobox', { name: 'Taille du texte' }),
@@ -39,7 +38,6 @@ describe('Workspace appearance preferences', () => {
     );
     view.unmount();
     render(<SettingsPreview />);
-    await user.click(screen.getByRole('button', { name: 'Paramètres' }));
     expect(screen.getByRole('combobox', { name: 'Taille du texte' })).toHaveValue('standard');
   });
 });

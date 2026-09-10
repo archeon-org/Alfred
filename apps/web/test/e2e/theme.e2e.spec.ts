@@ -27,10 +27,12 @@ test('keeps a consistent light palette for the page and native controls when the
 }) => {
   await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('/app');
-  await page.getByRole('button', { name: 'Paramètres' }).click();
+  await page.getByRole('link', { name: 'Paramètres' }).click();
   const select = page.getByRole('combobox', { name: 'Taille du texte' });
   const switchControl = page.getByRole('switch', { name: 'Navigation compacte' });
-  const dialog = page.getByRole('dialog', { name: 'Paramètres' });
+  const dialog = page.getByRole('main');
+  await expect(page).toHaveURL(/\/app\/settings$/u);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   const readColors = (element: HTMLElement | SVGElement) => {
     const style = getComputedStyle(element);
     return {
@@ -99,7 +101,7 @@ test('keeps visible workspace and dialog text at least eleven CSS pixels', async
   await page.getByRole('button', { name: 'Refonte du portail', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Refonte du portail' })).toBeVisible();
   expect(await undersizedText()).toEqual([]);
-  await page.getByRole('button', { name: 'Paramètres' }).click();
+  await page.getByRole('link', { name: 'Paramètres' }).click();
   expect(await undersizedText()).toEqual([]);
 });
 
@@ -108,17 +110,19 @@ test('supports keyboard activation and reduced-motion loading without decorative
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/app');
-  const settings = page.getByRole('button', { name: 'Paramètres' });
+  const settings = page.getByRole('link', { name: 'Paramètres' });
   await settings.focus();
   await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog', { name: 'Paramètres' });
+  const dialog = page.getByRole('main');
+  await expect(page).toHaveURL(/\/app\/settings$/u);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(dialog).toBeVisible();
   const compact = dialog.getByRole('switch', { name: 'Navigation compacte' });
   await compact.focus();
   await page.keyboard.press('Space');
   await expect(compact).toBeChecked();
-  await page.keyboard.press('Escape');
-  await expect(settings).toBeFocused();
+  await page.goBack();
+  await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
 
   const loading = page.getByRole('button', { name: 'Aperçu du chargement' });
   await loading.focus();
@@ -149,9 +153,9 @@ test('gives buttons press feedback and removes movement with the application pre
     .toBe('0.98');
   await page.mouse.up();
   await loading.click();
-  await page.getByRole('button', { name: 'Paramètres', exact: true }).click();
+  await page.getByRole('link', { name: 'Paramètres', exact: true }).click();
   await page.getByRole('switch', { name: 'Réduire les animations' }).click();
-  await page.keyboard.press('Escape');
+  await page.goBack();
   await loading.hover();
   await page.mouse.down();
   await expect.poll(() => loading.evaluate((element) => getComputedStyle(element).scale)).toBe('1');

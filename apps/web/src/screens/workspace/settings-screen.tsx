@@ -9,7 +9,7 @@ export function SettingsScreen() {
       id="main-content"
       ref={conversationRef}
       tabIndex={-1}
-      className="min-w-0 space-y-8 overflow-y-auto rounded-xl border border-border bg-card p-4 outline-none focus-visible:ring-2 focus-visible:ring-ring md:p-6"
+      className="h-full min-h-0 min-w-0 space-y-8 overflow-y-auto rounded-xl border border-border bg-card p-4 outline-none focus-visible:ring-2 focus-visible:ring-ring md:p-6"
     >
       <header>
         <h1 className="text-xl font-semibold">Paramètres</h1>

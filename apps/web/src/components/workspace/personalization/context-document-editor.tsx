@@ -1,5 +1,8 @@
 import type { ContextDocument } from '@alfred/contracts';
 import { useId, useRef, useState } from 'react';
+import { Pencil, FileText } from 'lucide-react';
+import { MarkdownDocumentDialog } from '@/components/ui/markdown-document-dialog';
+import { markdownToText } from '@/lib/markdown/parse-markdown';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -27,6 +30,7 @@ export function ContextDocumentEditor({
   onDirtyChange,
   onReload,
 }: Props) {
+  const [open, setOpen] = useState(false);
   const [baseline, setBaseline] = useState(document);
   const [draft, setDraft] = useState(document.content);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +41,8 @@ export function ContextDocumentEditor({
   const [discard, setDiscard] = useState(false);
   const generation = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const closingAfterDiscard = useRef(false);
   const id = useId();
   const dirty = draft !== baseline.content;
   const invalid =
@@ -56,6 +62,7 @@ export function ContextDocumentEditor({
       setBaseline(saved);
       setDraft(saved.content);
       onDirtyChange(document.kind, false);
+      setOpen(false);
     } catch (reason) {
       setError(
         reason instanceof ApiRequestError && reason.code === 'context_revision_conflict'
@@ -80,81 +87,137 @@ export function ContextDocumentEditor({
       setReading(false);
     }
   }
+  function requestOpen(next: boolean) {
+    if (pending || reading) return;
+    if (next) {
+      setBaseline(document);
+      setDraft(document.content);
+      setError(null);
+      setOpen(true);
+    } else if (dirty) setDiscard(true);
+    else setOpen(false);
+  }
+  const summary = markdownToText(document.content, 180);
   return (
     <section
       aria-labelledby={`${id}-title`}
-      className="space-y-4 rounded-xl border border-border bg-card p-4 md:p-5"
+      className="flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
     >
-      <div>
-        <h3 id={`${id}-title`} className="font-semibold">
-          {title}
-        </h3>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      </div>
-      <MarkdownEditor
-        label={title}
-        value={draft}
-        onChange={change}
-        disabled={pending}
-        limit={{ max: maxBytes, unit: 'bytes' }}
-      />
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={pending || reading}
-          onClick={() => fileInput.current?.click()}
-        >
-          Importer un fichier
-        </Button>
-        <Input
-          ref={fileInput}
-          hidden
-          id={`${id}-import`}
-          aria-label={`Importer · ${title}`}
-          type="file"
-          accept=".txt,.md,text/plain,text/markdown"
-          disabled={pending || reading}
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0];
-            event.currentTarget.value = '';
-            if (file !== undefined) void importFile(file);
-          }}
-        />
-        <Button
-          size="sm"
-          disabled={!dirty || invalid || pending || reading}
-          onClick={() => void save()}
-          aria-label={`Enregistrer · ${title}`}
-        >
-          {pending ? 'Enregistrement…' : 'Enregistrer'}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={!dirty || pending || reading}
-          onClick={() => setDiscard(true)}
-        >
-          Annuler les modifications
-        </Button>
-        <p role="status" className="text-xs text-muted-foreground">
-          {reading ? 'Lecture du fichier…' : dirty ? 'Modifications non enregistrées' : 'À jour'}
-        </p>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Texte ou Markdown en UTF-8. Seul le contenu est enregistré lorsque vous cliquez sur
-        Enregistrer.
-      </p>
-      {error !== null ? (
-        <div className="space-y-2">
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-          <Button variant="outline" size="sm" disabled={pending} onClick={() => setReload(true)}>
-            Recharger la version enregistrée
-          </Button>
+      <div className="flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-muted text-muted-foreground">
+          <FileText aria-hidden="true" size={17} />
+        </span>
+        <div className="min-w-0">
+          <h3 id={`${id}-title`} className="text-sm font-semibold">
+            {title}
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         </div>
-      ) : null}
+      </div>
+      <p className="line-clamp-3 min-h-10 text-sm leading-relaxed text-muted-foreground wrap-anywhere">
+        {summary || 'Aucun contenu pour le moment.'}
+      </p>
+      <Button
+        ref={trigger}
+        className="self-start"
+        variant="outline"
+        size="sm"
+        aria-label={`Modifier · ${title}`}
+        onClick={() => requestOpen(true)}
+      >
+        <Pencil aria-hidden="true" size={14} />
+        Modifier
+      </Button>
+      <MarkdownDocumentDialog
+        open={open}
+        onOpenChange={requestOpen}
+        title={title}
+        description={description}
+        value={draft}
+        onSave={() => void save()}
+        isPending={pending || reading}
+      >
+        <div className="grid gap-4">
+          <MarkdownEditor
+            label={title}
+            value={draft}
+            onChange={change}
+            disabled={pending}
+            limit={{ max: maxBytes, unit: 'bytes' }}
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pending || reading}
+              onClick={() => fileInput.current?.click()}
+            >
+              Importer un fichier
+            </Button>
+            <Input
+              ref={fileInput}
+              hidden
+              id={`${id}-import`}
+              aria-label={`Importer · ${title}`}
+              type="file"
+              accept=".txt,.md,text/plain,text/markdown"
+              disabled={pending || reading}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = '';
+                if (file !== undefined) void importFile(file);
+              }}
+            />
+            <Button
+              size="sm"
+              disabled={!dirty || invalid || pending || reading}
+              onClick={() => void save()}
+              aria-label={`Enregistrer · ${title}`}
+            >
+              {pending ? 'Enregistrement…' : 'Enregistrer'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={pending || reading}
+              onClick={() => requestOpen(false)}
+            >
+              Annuler
+            </Button>
+            <p role="status" className="text-xs text-muted-foreground">
+              {reading
+                ? 'Lecture du fichier…'
+                : dirty
+                  ? 'Modifications non enregistrées'
+                  : 'À jour'}
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Texte ou Markdown en UTF-8. Seul le contenu est enregistré lorsque vous cliquez sur
+            Enregistrer.
+          </p>
+          {error !== null ? (
+            <div className="space-y-2">
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pending}
+                onClick={() => setReload(true)}
+              >
+                Recharger la version enregistrée
+              </Button>
+            </div>
+          ) : null}
+          {invalid ? (
+            <p role="alert" className="text-sm text-destructive">
+              Le contenu dépasse la limite ou contient un caractère interdit.
+            </p>
+          ) : null}
+        </div>
+      </MarkdownDocumentDialog>
       <ConfirmDialog
         open={reload}
         title="Recharger ce document ?"
@@ -179,11 +242,6 @@ export function ContextDocumentEditor({
             .finally(() => setPending(false));
         }}
       />
-      {invalid ? (
-        <p role="alert" className="text-sm text-destructive">
-          Le contenu dépasse la limite ou contient un caractère interdit.
-        </p>
-      ) : null}
       <ConfirmDialog
         open={replacement !== null}
         title="Remplacer le brouillon ?"
@@ -199,6 +257,13 @@ export function ContextDocumentEditor({
       />
       <ConfirmDialog
         open={discard}
+        onCloseAutoFocus={(event) => {
+          if (closingAfterDiscard.current) {
+            event.preventDefault();
+            trigger.current?.focus();
+            closingAfterDiscard.current = false;
+          }
+        }}
         title="Abandonner les modifications ?"
         description="Le brouillon sera remplacé par la dernière version chargée."
         confirmLabel="Abandonner les modifications"
@@ -208,7 +273,9 @@ export function ContextDocumentEditor({
           setDraft(document.content);
           onDirtyChange(document.kind, false);
           setError(null);
+          closingAfterDiscard.current = true;
           setDiscard(false);
+          setOpen(false);
         }}
       />
     </section>

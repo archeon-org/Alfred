@@ -37,8 +37,8 @@ function ContextDocumentScope({ scope }: { readonly scope: ContextScope }) {
   if (query.isPending)
     return (
       <div role="status" aria-label="Chargement des contenus" className="space-y-4">
-        <Skeleton className="h-64 w-full" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-44 w-full" />
+        <Skeleton className="h-44 w-full" />
       </div>
     );
   if (query.data === undefined)
@@ -64,41 +64,43 @@ function ContextDocumentScope({ scope }: { readonly scope: ContextScope }) {
           </Link>
         ) : null}
       </p>
-      {query.data.documents.map((document) => {
-        const title =
-          document.kind === 'instructions'
-            ? 'Instructions générales'
-            : document.kind === 'context'
-              ? 'Contexte du projet'
-              : personal
-                ? 'Préférences de réponse'
-                : 'Préférences du projet';
-        const description =
-          document.kind === 'instructions'
-            ? 'Les consignes générales que vous souhaitez donner à Alfred.'
-            : document.kind === 'context'
-              ? 'Les informations utiles pour comprendre ce projet : objectifs, fonctionnement et vocabulaire.'
-              : 'Vos choix de langue, de ton, de format et de niveau de détail.';
-        return (
-          <ContextDocumentEditor
-            key={document.kind}
-            document={document}
-            title={title}
-            description={description}
-            maxBytes={query.data.maxBytes}
-            onDirtyChange={markDirty}
-            onSave={(content, revision) =>
-              save({ kind: document.kind, input: { content, expectedRevision: revision } })
-            }
-            onReload={async () => {
-              const result = await query.refetch();
-              const latest = result.data?.documents.find((item) => item.kind === document.kind);
-              if (result.isError || latest === undefined) throw new Error('Reload failed');
-              return latest;
-            }}
-          />
-        );
-      })}
+      <div className="grid gap-4 xl:grid-cols-2">
+        {query.data.documents.map((document) => {
+          const title =
+            document.kind === 'instructions'
+              ? 'Instructions générales'
+              : document.kind === 'context'
+                ? 'Contexte du projet'
+                : personal
+                  ? 'Préférences de réponse'
+                  : 'Préférences du projet';
+          const description =
+            document.kind === 'instructions'
+              ? 'Les consignes générales que vous souhaitez donner à Alfred.'
+              : document.kind === 'context'
+                ? 'Les informations utiles pour comprendre ce projet : objectifs, fonctionnement et vocabulaire.'
+                : 'Vos choix de langue, de ton, de format et de niveau de détail.';
+          return (
+            <ContextDocumentEditor
+              key={document.kind}
+              document={document}
+              title={title}
+              description={description}
+              maxBytes={query.data.maxBytes}
+              onDirtyChange={markDirty}
+              onSave={(content, revision) =>
+                save({ kind: document.kind, input: { content, expectedRevision: revision } })
+              }
+              onReload={async () => {
+                const result = await query.refetch();
+                const latest = result.data?.documents.find((item) => item.kind === document.kind);
+                if (result.isError || latest === undefined) throw new Error('Reload failed');
+                return latest;
+              }}
+            />
+          );
+        })}
+      </div>
       <ConfirmDialog
         open={blocker.state === 'blocked'}
         title="Quitter sans enregistrer ?"

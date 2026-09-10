@@ -167,7 +167,8 @@ describe('Workspace projects', () => {
         name: 'Contexte',
       }),
     );
-    const editor = screen.getByRole('region', { name: 'Contexte du projet' });
+    await user.click(await screen.findByRole('button', { name: 'Modifier · Contexte du projet' }));
+    const editor = screen.getByRole('dialog', { name: 'Contexte du projet' });
     const textarea = within(editor).getByRole('textbox', { name: 'Contexte du projet' });
     expect(textarea).toHaveValue('');
     await user.clear(textarea);
@@ -186,7 +187,10 @@ describe('Workspace projects', () => {
       within(editor).getByRole('button', { name: 'Enregistrer · Contexte du projet' }),
     );
 
-    await waitFor(() => expect(within(editor).getByRole('status')).toHaveTextContent('À jour'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('region', { name: 'Contexte du projet' })).toHaveTextContent(
+      'Objectif',
+    );
     expect(api.calls).toContainEqual(
       expect.objectContaining({
         body: {

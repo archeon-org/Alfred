@@ -385,16 +385,18 @@ test('creates a project, its first conversation and a separate standalone chat',
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
 });
 
-test('applies local display preferences and restores focus when settings close', async ({
+test('opens settings directly and preserves local display preferences across navigation', async ({
   page,
 }) => {
   await page.route('**/api/auth/refresh', async (route) =>
     route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
   );
   await page.goto('/app');
-  const settings = page.getByRole('button', { name: 'Paramètres' });
+  const settings = page.getByRole('link', { name: 'Paramètres' });
   await settings.click();
-  const dialog = page.getByRole('dialog', { name: 'Paramètres' });
+  const dialog = page.getByRole('main');
+  await expect(page).toHaveURL(/\/app\/settings$/u);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await dialog.getByRole('combobox', { name: 'Taille du texte' }).selectOption('comfortable');
   await dialog.getByRole('switch', { name: 'Navigation compacte' }).click();
   await dialog.getByRole('switch', { name: 'Réduire les animations' }).click();
@@ -402,9 +404,8 @@ test('applies local display preferences and restores focus when settings close',
   await expect(workspace).toHaveAttribute('data-density', 'compact');
   await expect(workspace).toHaveAttribute('data-text-size', 'comfortable');
   await expect(workspace).toHaveAttribute('data-reduced-motion', 'true');
-  await page.keyboard.press('Escape');
-  await expect(dialog).toHaveCount(0);
-  await expect(settings).toBeFocused();
+  await page.goBack();
+  await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
   await expect(workspace).toHaveAttribute('data-text-size', 'comfortable');
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
 });

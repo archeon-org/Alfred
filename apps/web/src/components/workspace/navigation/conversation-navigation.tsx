@@ -32,7 +32,7 @@ export function ConversationNavigation({
             variant="ghost"
             aria-current={selectedId === item.id ? 'page' : undefined}
             className={cn(
-              'flex h-auto min-w-0 flex-1 items-center justify-start whitespace-normal gap-2 rounded-lg px-2.5 text-left text-2xs font-normal leading-relaxed text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring motion-reduce:transition-none',
+              'flex h-auto min-w-0 flex-1 items-center justify-start whitespace-nowrap gap-2 rounded-lg px-2.5 text-left text-2xs font-normal leading-relaxed text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring motion-reduce:transition-none',
               compact
                 ? 'min-h-7 py-1 group-data-[density=compact]/workspace:min-h-6'
                 : 'min-h-10 py-2 group-data-[density=compact]/workspace:min-h-8 group-data-[density=compact]/workspace:py-1',
@@ -45,7 +45,9 @@ export function ConversationNavigation({
             {item.pinnedAt !== null ? (
               <Pin aria-hidden="true" size={12} className="shrink-0 text-muted-foreground" />
             ) : null}
-            <span className="min-w-0 wrap-anywhere">{item.title}</span>
+            <span className="min-w-0 flex-1 truncate" title={item.title}>
+              {item.title}
+            </span>
           </Button>
           <ConversationActionMenu conversation={item} {...conversationActions} />
         </li>

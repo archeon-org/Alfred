@@ -1,3 +1,5 @@
+import './conversation-welcome.css';
+
 import { cva } from 'class-variance-authority';
 import { ArrowUpRight, Compass, ListChecks, ScanText } from 'lucide-react';
 
@@ -31,12 +33,21 @@ export function ConversationWelcome({
   onSelect,
 }: ConversationWelcomeProps) {
   return (
-    <div className="m-auto w-full max-w-conversation animate-workspace-appear px-5 pt-8 pb-5 text-center motion-reduce:animate-none md:px-6 md:pt-9 md:pb-8 wide:px-9">
-      <div className="relative mx-auto mb-6 grid size-18 place-items-center md:size-22">
+    <div
+      data-slot="conversation-welcome"
+      className="m-auto w-full max-w-conversation animate-workspace-appear px-5 pt-8 pb-5 text-center motion-reduce:animate-none md:px-6 md:pt-9 md:pb-8 wide:px-9"
+    >
+      <div
+        data-slot="welcome-mark"
+        className="relative mx-auto mb-6 grid size-18 place-items-center md:size-22"
+      >
         <span className="absolute inset-0 rounded-full border border-border before:absolute before:-inset-2 before:rounded-full before:border before:border-border/50 after:absolute after:top-5 after:right-px after:size-1.5 after:rounded-full after:bg-primary/50 after:ring-4 after:ring-background" />
         <AlfredMark className="size-12 -rotate-6 rounded-2xl shadow-emblem md:size-14 md:rounded-3xl [&_svg]:size-10 [&_svg]:rotate-6" />
       </div>
-      <p className="mb-4 text-2xs font-semibold tracking-label text-muted-foreground">
+      <p
+        data-slot="welcome-eyebrow"
+        className="mb-4 text-2xs font-semibold tracking-label text-muted-foreground"
+      >
         L’ESPACE DES POSSIBLES
       </p>
       <h2 className="text-3xl leading-tight font-medium tracking-tight md:text-4xl">
@@ -54,7 +65,10 @@ export function ConversationWelcome({
       </p>
       {prompts.length > 0 ? (
         <>
-          <div className="mt-7 mb-3 flex justify-between gap-2.5 text-left text-2xs text-muted-foreground md:mt-8">
+          <div
+            data-slot="welcome-prompts-heading"
+            className="mt-7 mb-3 flex justify-between gap-2.5 text-left text-2xs text-muted-foreground md:mt-8"
+          >
             <span>Un point de départ</span>
             <span>{prompts.length} pistes pour ouvrir un chat</span>
           </div>

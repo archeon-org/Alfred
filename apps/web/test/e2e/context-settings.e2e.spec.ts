@@ -35,7 +35,9 @@ for (const viewport of [
     });
     await page.goto('/app/settings');
     const instructions = page.getByRole('textbox', { name: 'Instructions générales' });
-    await expect(instructions).toBeVisible();
+    await expect(instructions).toHaveCount(0);
+    await page.getByRole('button', { name: 'Modifier · Instructions générales' }).click();
+    await expect(page.getByRole('dialog', { name: 'Instructions générales' })).toBeVisible();
     await page.getByLabel('Importer · Instructions générales').setInputFiles({
       name: 'instructions.md',
       mimeType: 'text/markdown',
@@ -44,37 +46,34 @@ for (const viewport of [
     await expect(instructions).toHaveValue('# Règles\nRéponds clairement.');
     expect(writes).toHaveLength(0);
     await page.getByRole('button', { name: 'Enregistrer · Instructions générales' }).click();
-    await expect(
-      page.getByRole('button', { name: 'Enregistrer · Instructions générales' }),
-    ).toBeDisabled();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     expect(writes).toEqual([{ content: '# Règles\nRéponds clairement.', expectedRevision: 0 }]);
     await page.reload();
+    await page.getByRole('button', { name: 'Modifier · Instructions générales' }).click();
     await expect(instructions).toHaveValue('# Règles\nRéponds clairement.');
+    await page.getByRole('dialog').getByRole('button', { name: 'Fermer' }).click();
     await page.goto(`/app/projects/${PROJECT_ID}`);
     await page
       .getByRole('tablist', { name: 'Contenu du projet' })
       .getByRole('tab', { name: 'Contexte', exact: true })
       .click();
     await expect(page.getByRole('heading', { name: 'Description', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Modifier · Contexte du projet' }).click();
     const context = page.getByRole('textbox', { name: 'Contexte du projet' });
     await context.fill('Projet privé');
-    await page.getByRole('tab', { name: /Chats/u }).click();
-    await page
-      .getByRole('tablist', { name: 'Contenu du projet' })
-      .getByRole('tab', { name: 'Contexte', exact: true })
-      .click();
-    await expect(context).toHaveValue('Projet privé');
-    await page.getByRole('link', { name: 'Voir mes réglages personnels' }).click();
+    await page.keyboard.press('Escape');
     await expect(
-      page.getByRole('alertdialog', { name: 'Quitter sans enregistrer ?' }),
+      page.getByRole('alertdialog', { name: 'Abandonner les modifications ?' }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Continuer à modifier' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Annuler' }).click();
     await expect(context).toHaveValue('Projet privé');
     await page.getByRole('button', { name: 'Enregistrer · Contexte du projet' }).click();
-    await expect(
-      page.getByRole('button', { name: 'Enregistrer · Contexte du projet' }),
-    ).toBeDisabled();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByText('Projet privé', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Modifier · Préférences du projet' }).click();
     await expect(page.getByRole('textbox', { name: 'Préférences du projet' })).toHaveValue('');
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

@@ -1,0 +1,53 @@
+/* Fit the welcome to the space left by the header and composer, including resized panels.
+   Keep scrolling available when text zoom or a very short viewport needs more room. */
+@container welcome (max-height: 600px) {
+  [data-slot='conversation-welcome'] {
+    padding-top: 16px;
+    padding-bottom: 16px;
+  }
+
+  [data-slot='welcome-mark'] {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+  }
+
+  [data-slot='welcome-eyebrow'] {
+    margin-bottom: 8px;
+  }
+
+  [data-slot='conversation-welcome'] h2 {
+    font-size: 28px;
+  }
+
+  [data-slot='welcome-description'] {
+    margin-top: 12px;
+  }
+
+  [data-slot='welcome-prompts-heading'] {
+    margin-top: 16px;
+    margin-bottom: 8px;
+  }
+
+  [data-slot='conversation-welcome'] li button {
+    min-height: 0;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  [data-slot='prompt-icon'] {
+    margin-bottom: 8px;
+  }
+}
+
+@container welcome (max-height: 380px) {
+  [data-slot='conversation-welcome'] {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  [data-slot='welcome-mark'],
+  [data-slot='welcome-eyebrow'] {
+    display: none;
+  }
+}

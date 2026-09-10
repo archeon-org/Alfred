@@ -67,14 +67,16 @@ export function ProjectNavigationItem({
           aria-current={isSelected ? 'true' : undefined}
           aria-expanded={isExpanded}
           className={cn(
-            'flex h-auto min-h-8 min-w-0 flex-1 items-center justify-start gap-2 rounded-lg px-2 py-1 text-left text-xs font-medium whitespace-normal text-sidebar-foreground hover:bg-transparent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sidebar-ring group-data-[density=compact]/workspace:min-h-7',
+            'flex h-auto min-h-8 min-w-0 flex-1 items-center justify-start gap-2 rounded-lg px-2 py-1 text-left text-xs font-medium whitespace-nowrap text-sidebar-foreground hover:bg-transparent focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sidebar-ring group-data-[density=compact]/workspace:min-h-7',
             isSelected && 'text-sidebar-accent-foreground',
           )}
           onClick={() => onSelect(project)}
           type="button"
         >
           <Icon aria-hidden="true" className="shrink-0 text-sidebar-accent-foreground" size={15} />
-          <span className="min-w-0 flex-1 wrap-anywhere">{name}</span>
+          <span className="min-w-0 flex-1 truncate" title={name}>
+            {name}
+          </span>
         </Button>
         <ProjectActionMenu
           className="size-7 min-h-7 shrink-0 text-sidebar-muted opacity-70 hover:bg-transparent hover:text-sidebar-foreground focus-visible:opacity-100 focus-visible:-outline-offset-2 group-hover/project:opacity-100 data-[state=open]:opacity-100 data-[state=open]:text-sidebar-foreground"

@@ -140,8 +140,12 @@ describe('Workspace organization', () => {
     const { container } = renderWorkspaceAt('/app');
     const workspace = container.querySelector('[data-density]');
 
-    await user.click(await screen.findByRole('button', { name: 'Paramètres' }));
-    const dialog = screen.getByRole('dialog', { name: 'Paramètres' });
+    await user.click(await screen.findByRole('link', { name: 'Paramètres' }));
+    const dialog = screen.getByRole('main');
+    expect(
+      await within(dialog).findByRole('heading', { name: 'Paramètres', level: 1 }),
+    ).toBeVisible();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await user.selectOptions(
       within(dialog).getByRole('combobox', { name: 'Taille du texte' }),
       'comfortable',
@@ -156,7 +160,10 @@ describe('Workspace organization', () => {
 
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Paramètres' })).toHaveFocus();
+    expect(screen.getByRole('link', { name: 'Paramètres' })).toHaveAttribute(
+      'href',
+      '/app/settings',
+    );
   });
 
   it('dismisses project creation with Escape without any request', async () => {

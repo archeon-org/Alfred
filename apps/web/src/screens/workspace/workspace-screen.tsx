@@ -268,7 +268,6 @@ export function WorkspaceScreen() {
             onToggleContext={shell.toggleContext}
             onToggleNavigation={shell.toggleNavigation}
             onToggleSidebar={toggleSidebar}
-            preferences={preferences}
           />
         }
         conversation={<Outlet context={outlet} />}

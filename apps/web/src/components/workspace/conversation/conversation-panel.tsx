@@ -37,7 +37,7 @@ export function ConversationPanel({
       tabIndex={-1}
     >
       <section
-        className="flex min-h-170 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-panel md:rounded-2xl workspace:min-h-0"
+        className="flex min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-panel md:rounded-2xl workspace:min-h-0"
         id="conversation"
         aria-busy={isLoading || isBusy}
       >
@@ -45,11 +45,11 @@ export function ConversationPanel({
           <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-muted text-muted-foreground">
             <MessageSquareText aria-hidden="true" size={17} />
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="mb-1 text-2xs font-semibold tracking-label text-muted-foreground">
               VOTRE CONVERSATION
             </p>
-            <h1 className="text-xs font-semibold tracking-tight wrap-anywhere md:text-sm">
+            <h1 className="text-xs font-semibold truncate tracking-tight md:text-sm">
               {title ?? 'Nouvelle conversation'}
             </h1>
           </div>
@@ -58,7 +58,7 @@ export function ConversationPanel({
             <span className="sr-only md:not-sr-only">Personnel</span>
           </span>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] workspace:overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col workspace:[container-type:size] workspace:[container-name:welcome] [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] workspace:overflow-y-auto">
           {notice ? (
             <p
               className="mx-4 mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive md:mx-6"

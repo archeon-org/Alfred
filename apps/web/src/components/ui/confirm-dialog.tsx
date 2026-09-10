@@ -23,6 +23,8 @@ interface ConfirmDialogProps {
   readonly isPending?: boolean;
   readonly error?: string | null;
   readonly onConfirm: () => void;
+  /** Override focus restoration when a confirmation also closes its parent dialog. */
+  readonly onCloseAutoFocus?: (event: Event) => void;
   readonly onOpenChange: (open: boolean) => void;
 }
 
@@ -35,6 +37,7 @@ export function ConfirmDialog({
   error,
   isPending = false,
   onConfirm,
+  onCloseAutoFocus,
   onOpenChange,
   open,
   title,
@@ -48,7 +51,15 @@ export function ConfirmDialog({
         if (!isPending) onOpenChange(next);
       }}
     >
-      <DialogContent {...returnFocus} role="alertdialog" showCloseButton={!isPending}>
+      <DialogContent
+        {...returnFocus}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          if (!event.defaultPrevented) returnFocus.onCloseAutoFocus(event);
+        }}
+        role="alertdialog"
+        showCloseButton={!isPending}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

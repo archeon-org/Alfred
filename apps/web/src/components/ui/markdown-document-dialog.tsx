@@ -14,6 +14,8 @@ import { MarkdownEditor, measureText, type TextLimit } from '@/components/ui/mar
 import { useReturnFocus } from '@/hooks/ui/use-return-focus';
 
 interface MarkdownDocumentDialogProps {
+  /** Controlled document forms can supply import, revision and draft controls. */
+  readonly children?: ReactNode;
   readonly open: boolean;
   readonly title: string;
   readonly description?: ReactNode;
@@ -82,6 +84,7 @@ function DocumentForm({
 
 /** Reusable "open a Markdown document, edit, preview, save" dialog. */
 export function MarkdownDocumentDialog({
+  children,
   description,
   onOpenChange,
   open,
@@ -101,7 +104,7 @@ export function MarkdownDocumentDialog({
           <DialogTitle>{form.title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        {open ? <DocumentForm key={form.value} {...form} /> : null}
+        {open ? (children ?? <DocumentForm key={form.value} {...form} />) : null}
       </DialogContent>
     </Dialog>
   );
