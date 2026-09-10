@@ -83,7 +83,7 @@ export function WorkspaceLayout({
               resizeTargetMinimumSize={{ coarse: 24, fine: 10 }}
             >
               <ResizablePanel id="chat" minSize={430}>
-                <div className="h-full min-h-0 pb-5 pl-5 pr-2">{conversation}</div>
+                <div className="h-full min-h-0 pb-5 pl-5">{conversation}</div>
               </ResizablePanel>
               {isContextOpen ? (
                 <>

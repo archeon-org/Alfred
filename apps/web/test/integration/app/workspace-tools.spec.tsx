@@ -10,13 +10,7 @@ vi.mock('@/hooks/feature-flags/use-feature-flags-query', () => ({
   useFeatureFlagsQuery: () => ({ status: 'ready', flags: { skills: false } }),
 }));
 
-function ToolsPreview({
-  loaded = false,
-  isLoading = false,
-}: {
-  readonly loaded?: boolean;
-  readonly isLoading?: boolean;
-}) {
+function ToolsPreview({ isLoading = false }: { readonly isLoading?: boolean }) {
   const tools = useWorkspaceTools();
   const [visible, setVisible] = useState(true);
   return (
@@ -25,11 +19,7 @@ function ToolsPreview({
         Panneau
       </button>
       {visible && (
-        <ContextPanel
-          scope={loaded ? { conversationTitle: 'Sample', projectName: 'Analyse' } : {}}
-          isLoading={isLoading}
-          tools={tools}
-        />
+        <ContextPanel isLoading={isLoading} tools={tools} />
       )}
     </>
   );
@@ -41,12 +31,13 @@ afterEach(() => {
 });
 
 describe('Workspace tools local preview', () => {
-  it('switches between context, teams, skills and files using accessible tabs', async () => {
+  it('switches between teams, skills and files using accessible tabs', async () => {
     const user = userEvent.setup();
     render(<ToolsPreview />);
-    expect(screen.getByRole('tab', { name: 'Contexte' })).toHaveAttribute('aria-selected', 'true');
-    await user.click(screen.getByRole('tab', { name: 'Équipes' }));
+    expect(screen.queryByRole('tab', { name: 'Contexte' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Équipes' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('heading', { name: 'Team builder' })).toBeVisible();
+    await user.click(screen.getByRole('tab', { name: 'Équipes' }));
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('tab', { name: 'Skills' })).toHaveFocus();
     await user.keyboard('{Enter}');
@@ -110,11 +101,9 @@ describe('Workspace tools local preview', () => {
     expect(screen.queryByRole('option', { name: 'Abandonnée' })).not.toBeInTheDocument();
   });
 
-  it('describes the current scope and announces files as a later capability', async () => {
+  it('announces files as a later capability', async () => {
     const user = userEvent.setup();
-    render(<ToolsPreview loaded />);
-    expect(screen.getByText('Analyse')).toBeVisible();
-    expect(screen.getByText('Sample')).toBeVisible();
+    render(<ToolsPreview />);
     await user.click(screen.getByRole('tab', { name: 'Fichiers' }));
     expect(screen.getByText(/lecture de documents seront disponibles/)).toBeVisible();
     expect(screen.queryByRole('button', { name: /Ajouter un fichier/i })).not.toBeInTheDocument();

@@ -1,5 +1,5 @@
 /** Local presentation models, independent of future agent and API contracts. */
-export type WorkspaceToolTab = 'context' | 'teams' | 'skills' | 'files';
+export type WorkspaceToolTab = 'teams' | 'skills' | 'files';
 
 export interface AgentView {
   readonly id: string;

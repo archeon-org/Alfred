@@ -280,10 +280,6 @@ export function WorkspaceScreen() {
         context={
           <ContextPanel
             isLoading={isLoading}
-            scope={{
-              conversationTitle: selectedConversation?.title,
-              projectName: selectedProject?.name ?? undefined,
-            }}
             tools={tools}
           />
         }

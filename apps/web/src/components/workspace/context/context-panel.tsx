@@ -2,28 +2,24 @@ import { CircleHelp, Layers } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContextResources } from '@/components/workspace/context/context-resources';
-import { ContextOverview } from '@/components/workspace/context/context-overview';
 import { SkillsPanel } from '@/components/workspace/context/skills-panel';
 import { TeamBuilder } from '@/components/workspace/context/team-builder';
 import { ContextSkeleton } from '@/components/workspace/workspace-skeletons';
 import type { WorkspaceToolsState } from '@/lib/workspace/workspace-tools.types';
 import type { WorkspaceToolTab } from '@/lib/workspace/workspace-tools.types';
-import type { WorkspaceScope } from '@/lib/workspace/workspace.types';
 
 interface ContextPanelProps {
-  readonly scope: WorkspaceScope;
   readonly isLoading: boolean;
   readonly tools: WorkspaceToolsState;
 }
 
 const toolTabs: readonly { readonly id: WorkspaceToolTab; readonly label: string }[] = [
-  { id: 'context', label: 'Contexte' },
   { id: 'teams', label: 'Équipes' },
   { id: 'skills', label: 'Skills' },
   { id: 'files', label: 'Fichiers' },
 ];
 
-export function ContextPanel({ scope, isLoading, tools }: ContextPanelProps) {
+export function ContextPanel({ isLoading, tools }: ContextPanelProps) {
   return (
     <aside
       aria-label="Contexte de la conversation"
@@ -51,16 +47,13 @@ export function ContextPanel({ scope, isLoading, tools }: ContextPanelProps) {
                 tools.setActiveTab(value as WorkspaceToolTab);
             }}
           >
-            <TabsList aria-label="Outils de la conversation" className="grid w-full grid-cols-4">
+            <TabsList aria-label="Outils de la conversation" className="grid w-full grid-cols-3">
               {toolTabs.map((tab) => (
                 <TabsTrigger className="min-w-0 px-1.5 text-2xs" key={tab.id} value={tab.id}>
                   {tab.label}
                 </TabsTrigger>
               ))}
             </TabsList>
-            <TabsContent value="context" className="pt-5">
-              <ContextOverview scope={scope} />
-            </TabsContent>
             <TabsContent value="teams" className="pt-5">
               <TeamBuilder tools={tools} />
             </TabsContent>

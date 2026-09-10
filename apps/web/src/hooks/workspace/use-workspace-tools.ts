@@ -9,7 +9,7 @@ import { previewAgents, previewTeams } from '@/mock/workspace-tools';
 
 /** Mount at screen level so collapsing a panel never discards this in-memory preview. */
 export function useWorkspaceTools(): WorkspaceToolsState {
-  const [activeTab, setActiveTab] = useState<WorkspaceToolTab>('context');
+  const [activeTab, setActiveTab] = useState<WorkspaceToolTab>('teams');
   const [teams, setTeams] = useState<readonly TeamView[]>(previewTeams);
   const [selectedTeamId, setSelectedTeamId] = useState('editorial');
 

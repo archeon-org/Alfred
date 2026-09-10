@@ -18,9 +18,3 @@ export interface StarterPrompt {
   /** Text placed in the composer of the chat created from this starter. */
   readonly prompt: string;
 }
-
-/** What the header and context panel say about the current location. */
-export interface WorkspaceScope {
-  readonly projectName?: string;
-  readonly conversationTitle?: string;
-}
