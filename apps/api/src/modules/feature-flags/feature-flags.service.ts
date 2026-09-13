@@ -10,7 +10,7 @@ import {
 
 // Promote only with a real execution path and enabled/disabled contract tests.
 const IMPLEMENTED_PUBLIC_FEATURES = Object.freeze({
-  agentRuntime: false,
+  agentRuntime: true,
   agUiStreaming: false,
   fileUploads: false,
   generativeUi: false,

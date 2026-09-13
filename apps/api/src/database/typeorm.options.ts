@@ -14,6 +14,9 @@ import { UserIdentityEntity } from '../modules/users/user-identity.entity';
 import { TenantEntity } from '../modules/tenants/tenant.entity';
 import { ProjectEntity } from '../modules/projects/infrastructure/persistence/project.entity';
 import { ConversationEntity } from '../modules/conversations/infrastructure/persistence/conversation.entity';
+import { ExecutionEntity } from '../modules/executions/infrastructure/persistence/execution.entity';
+import { MessageEntity } from '../modules/executions/infrastructure/persistence/message.entity';
+import { RuntimeThreadEntity } from '../modules/executions/infrastructure/persistence/runtime-thread.entity';
 import {
   API_MIGRATIONS_TABLE,
   createPostgresConnectionExtra,
@@ -31,6 +34,9 @@ export const databaseEntities = [
   IdempotencyKeyEntity,
   ProjectEntity,
   ConversationEntity,
+  RuntimeThreadEntity,
+  ExecutionEntity,
+  MessageEntity,
   ContextDocumentEntity,
   SkillEntity,
   SkillVersionEntity,

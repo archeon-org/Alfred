@@ -17,39 +17,35 @@ describe('Workspace organization', () => {
     renderWorkspaceAt(`/app/projects/${PROJECT_ID}`, api);
 
     await user.click(await screen.findByRole('button', { name: 'Nouvelle conversation' }));
-    const conversationDialog = screen.getByRole('dialog', { name: 'Nouvelle conversation' });
-    expect(within(conversationDialog).getByText(/Projet Atlas/u)).toBeVisible();
-    await user.type(
-      within(conversationDialog).getByRole('textbox', { name: 'Titre de la conversation' }),
-      'Décisions de lancement',
-    );
-    await user.click(
-      within(conversationDialog).getByRole('button', { name: 'Créer la conversation' }),
-    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Nouveau chat dans Projet Atlas' }),
+    ).toBeVisible();
+    await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Décisions de lancement');
+    await user.click(screen.getByRole('button', { name: 'Envoyer le message' }));
 
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Décisions de lancement' }),
+      await screen.findByRole('heading', { level: 1, name: 'Nouvelle conversation' }),
     ).toBeVisible();
     const projectGroup = screen.getByRole('group', { name: 'Projet Atlas' });
     expect(
-      within(projectGroup).getByRole('button', { name: 'Décisions de lancement' }),
+      within(projectGroup).getByRole('button', { name: 'Nouvelle conversation' }),
     ).toBeVisible();
-    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
+    // Without the agent bridge the first message waits in the composer as a draft.
+    expect(await screen.findByDisplayValue('Décisions de lancement')).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Ouvrir un chat libre' }));
-    const sandboxDialog = screen.getByRole('dialog', { name: 'Nouveau chat libre' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     await user.type(
-      within(sandboxDialog).getByRole('textbox', { name: 'Titre du chat' }),
-      'Piste indépendante',
+      await screen.findByRole('textbox', { name: 'Message' }),
+      'Piste indépendante{Enter}',
     );
-    await user.click(within(sandboxDialog).getByRole('button', { name: 'Ouvrir le chat' }));
 
+    // The draft only exists once the created chat's screen has replaced the empty one.
+    expect(await screen.findByDisplayValue('Piste indépendante')).toBeVisible();
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Piste indépendante' }),
-    ).toBeVisible();
-    expect(
-      within(screen.getByRole('group', { name: 'Chats libres' })).getByRole('button', {
-        name: 'Piste indépendante',
+      within(await screen.findByRole('group', { name: 'Chats libres' })).getByRole('button', {
+        name: 'Nouvelle conversation',
       }),
     ).toBeVisible();
     expect(
@@ -60,11 +56,8 @@ describe('Workspace organization', () => {
     const standalone = api.calls.filter(
       ({ method, path }) => method === 'POST' && path === '/api/conversations',
     );
-    expect(standalone.map(({ body }) => body)).toEqual([
-      { projectId: PROJECT_ID, title: 'Décisions de lancement' },
-      { title: 'Piste indépendante' },
-    ]);
-    expect(screen.getByText('Chat libre')).toBeVisible();
+    expect(standalone.map(({ body }) => body)).toEqual([{ projectId: PROJECT_ID }, {}]);
+    expect(await screen.findByText('Chat libre')).toBeVisible();
   });
 
   it('opens a standalone chat from a starter and carries the starter text as a draft', async () => {
@@ -74,12 +67,9 @@ describe('Workspace organization', () => {
 
     await user.click(await screen.findByRole('button', { name: /Aller à l’essentiel/u }));
 
-    expect(
-      await screen.findByRole('heading', {
-        level: 1,
-        name: 'Aide-moi à synthétiser ce sujet et à en dégager les points clés.',
-      }),
-    ).toBeVisible();
+    // The draft only exists on the created chat's screen; the home heading reads the same.
+    expect(await screen.findByDisplayValue(/Aide-moi à synthétiser/u)).toBeVisible();
+    expect(screen.getByRole('heading', { level: 1, name: 'Nouvelle conversation' })).toBeVisible();
     expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(
       'Aide-moi à synthétiser ce sujet et à en dégager les points clés.',
     );

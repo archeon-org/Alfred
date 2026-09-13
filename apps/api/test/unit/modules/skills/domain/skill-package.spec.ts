@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { validateSkillPackage } from '../../../../../src/modules/skills/domain/skill-package';
+import {
+  SkillPackageValidationError,
+  validateSkillPackage,
+} from '../../../../../src/modules/skills/domain/skill-package';
 
 const markdown = '---\nname: analyze-data\ndescription: Analyze a dataset\n---\n# Instructions\n';
 const file = (path = 'SKILL.md', content = markdown) => ({
@@ -85,5 +88,31 @@ describe('validateSkillPackage', () => {
     expect(validateSkillPackage(input([file('SKILL.md', content)]))[0]?.content.toString()).toBe(
       content,
     );
+  });
+  it.each(['Analyze\0dataset', 'Analyze\ud800dataset', 'Analyze\udc00dataset'])(
+    'rejects descriptions that cannot round-trip through PostgreSQL text (%j)',
+    (description) => {
+      const content = `---\nname: analyze-data\ndescription: ${JSON.stringify(description)}\n---\n`;
+      expect(() =>
+        validateSkillPackage({ ...input([file('SKILL.md', content)]), description }),
+      ).toThrow(SkillPackageValidationError);
+    },
+  );
+  it.each(['assets/\ud800.txt', 'assets/\udc00.txt'])(
+    'rejects paths that cannot round-trip through UTF-8 (%j)',
+    (path) => {
+      expect(() => validateSkillPackage(input([file(), file(path)]))).toThrow(
+        SkillPackageValidationError,
+      );
+    },
+  );
+  it('preserves valid non-BMP Unicode in paths and descriptions', () => {
+    const description = 'Analyze \u{1f4ca} dataset';
+    const content = `---\nname: analyze-data\ndescription: ${JSON.stringify(description)}\n---\n`;
+    const path = 'assets/\u{1f4ca}.txt';
+    expect(
+      validateSkillPackage({ ...input([file('SKILL.md', content), file(path)]), description })[1]
+        ?.path,
+    ).toBe(path);
   });
 });

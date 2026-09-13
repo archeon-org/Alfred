@@ -34,8 +34,34 @@ const hasUrlPassword = (value: string): boolean => {
   }
 };
 
+/** Native LangGraph stream modes the API may request and relay unchanged. */
+export const AGENT_RUNTIME_STREAM_MODE_VALUES = Object.freeze([
+  'values',
+  'messages',
+  'messages-tuple',
+  'updates',
+  'events',
+  'debug',
+  'custom',
+  'tasks',
+  'checkpoints',
+] as const);
+export type AgentRuntimeStreamMode = (typeof AGENT_RUNTIME_STREAM_MODE_VALUES)[number];
+
+const commaSeparatedStreamModes = z
+  .string()
+  .min(1)
+  .transform((value) => value.split(',').map((mode) => mode.trim()))
+  .pipe(z.array(z.enum(AGENT_RUNTIME_STREAM_MODE_VALUES)).min(1));
+
 const environmentSchema = z
   .object({
+    // Private LangGraph server reached only by the API (ALF-DEC-003/050); no browser access.
+    AGENT_RUNTIME_ASSISTANT_ID: z.string().min(1).default('orchestrator'),
+    AGENT_RUNTIME_STREAM_MODES: commaSeparatedStreamModes.prefault('messages,updates'),
+    // Stateless graph that titles a conversation from its first message; empty disables it.
+    AGENT_RUNTIME_TITLE_ASSISTANT_ID: z.string().trim().default('title_agent'),
+    AGENT_RUNTIME_URL: z.string().url().default('http://localhost:8000'),
     API_CORS_ORIGINS: commaSeparatedOrigins.prefault('http://localhost:5173'),
     API_HOST: z.string().min(1).default('127.0.0.1'),
     API_PORT: z.coerce.number().int().positive().max(65_535).default(3000),

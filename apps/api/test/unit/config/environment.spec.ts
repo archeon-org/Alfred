@@ -17,6 +17,33 @@ const validEnvironment = Object.freeze({
 });
 
 describe('parseEnvironment', () => {
+  it('defaults the private agent runtime target and validates the relayed stream modes', () => {
+    expect(parseEnvironment(validEnvironment)).toMatchObject({
+      AGENT_RUNTIME_ASSISTANT_ID: 'orchestrator',
+      AGENT_RUNTIME_STREAM_MODES: ['messages', 'updates'],
+      AGENT_RUNTIME_TITLE_ASSISTANT_ID: 'title_agent',
+      AGENT_RUNTIME_URL: 'http://localhost:8000',
+    });
+    expect(
+      parseEnvironment({ ...validEnvironment, AGENT_RUNTIME_TITLE_ASSISTANT_ID: ' ' }),
+    ).toHaveProperty('AGENT_RUNTIME_TITLE_ASSISTANT_ID', '');
+    expect(
+      parseEnvironment({
+        ...validEnvironment,
+        AGENT_RUNTIME_STREAM_MODES: ' values , messages-tuple',
+        AGENT_RUNTIME_URL: 'http://agents-api:8000',
+      }),
+    ).toMatchObject({
+      AGENT_RUNTIME_STREAM_MODES: ['values', 'messages-tuple'],
+      AGENT_RUNTIME_URL: 'http://agents-api:8000',
+    });
+    expect(() =>
+      parseEnvironment({ ...validEnvironment, AGENT_RUNTIME_STREAM_MODES: 'messages,tokens' }),
+    ).toThrow('AGENT_RUNTIME_STREAM_MODES');
+    expect(() =>
+      parseEnvironment({ ...validEnvironment, AGENT_RUNTIME_URL: 'agents-api' }),
+    ).toThrow('AGENT_RUNTIME_URL');
+  });
   it.each([
     'SKILLS_MAX_FILES',
     'SKILLS_MAX_PACKAGE_BYTES',
@@ -77,6 +104,10 @@ describe('parseEnvironment', () => {
     const environment = parseEnvironment(validEnvironment);
 
     expect(environment).toEqual({
+      AGENT_RUNTIME_ASSISTANT_ID: 'orchestrator',
+      AGENT_RUNTIME_STREAM_MODES: ['messages', 'updates'],
+      AGENT_RUNTIME_TITLE_ASSISTANT_ID: 'title_agent',
+      AGENT_RUNTIME_URL: 'http://localhost:8000',
       API_CORS_ORIGINS: ['http://localhost:5173', 'https://app.alfred.dev'],
       API_HOST: '127.0.0.1',
       API_PORT: 3100,

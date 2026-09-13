@@ -67,7 +67,7 @@ describe('FeatureFlagsService', () => {
     const service = new FeatureFlagsService(config());
 
     expect(service.getPublicFlags()).toEqual({
-      agentRuntime: false,
+      agentRuntime: true,
       agUiStreaming: false,
       fileUploads: false,
       generativeUi: false,
@@ -92,7 +92,7 @@ describe('FeatureFlagsService', () => {
 
     expect(service.isEnabled('googleOAuth')).toBe(true);
     expect(service.isEnabled('skills')).toBe(true);
-    expect(service.isEnabled('agentRuntime')).toBe(false);
+    expect(service.isEnabled('agentRuntime')).toBe(true);
     expect(service.isEnabled('rateLimiting')).toBe(true);
   });
 
@@ -112,7 +112,6 @@ describe('FeatureFlagsService', () => {
   });
 
   it.each<FeatureFlagName>([
-    'agentRuntime',
     'agUiStreaming',
     'fileUploads',
     'generativeUi',

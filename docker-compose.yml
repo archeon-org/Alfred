@@ -35,6 +35,11 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     environment:
+      # `agents-api` is the LangGraph server alias on the shared platform network.
+      AGENT_RUNTIME_ASSISTANT_ID: ${AGENT_RUNTIME_ASSISTANT_ID:-orchestrator}
+      AGENT_RUNTIME_STREAM_MODES: ${AGENT_RUNTIME_STREAM_MODES:-messages,updates}
+      AGENT_RUNTIME_TITLE_ASSISTANT_ID: ${AGENT_RUNTIME_TITLE_ASSISTANT_ID-title_agent}
+      AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL:-http://agents-api:8000}
       API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:5173}
       API_HOST: 0.0.0.0
       API_PORT: 3000

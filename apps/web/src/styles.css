@@ -287,3 +287,27 @@ html[data-density='compact'] #conversation-history [data-slot='button']:not([dat
 html[data-reduced-motion='true'] [data-slot='skeleton'] {
   animation: none !important;
 }
+
+/* A conversation title replaced by the runtime title agent settles in rather than snapping. */
+@keyframes title-appear {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.title-appear {
+  animation: title-appear 500ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-appear {
+    animation: none;
+  }
+}

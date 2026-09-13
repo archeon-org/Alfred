@@ -106,7 +106,7 @@ describe('Workspace projects', () => {
     ).toHaveAttribute('aria-current', 'true');
   });
 
-  it('opens a chat from the project input, titles it from the text and keeps the draft', async () => {
+  it('opens a chat from the project input and carries the message as its first draft', async () => {
     const user = userEvent.setup();
     const api = seededApi();
     renderWorkspaceAt(`/app/projects/${PROJECT_ID}`, api);
@@ -117,22 +117,20 @@ describe('Workspace projects', () => {
     await user.type(input, 'Peux-tu résumer le dernier comité ?{Enter}');
 
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Peux-tu résumer le dernier comité ?' }),
+      await screen.findByRole('heading', { level: 1, name: 'Nouvelle conversation' }),
     ).toBeVisible();
-    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue(
-      'Peux-tu résumer le dernier comité ?',
-    );
+    expect(await screen.findByDisplayValue('Peux-tu résumer le dernier comité ?')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Envoyer le message' })).toBeDisabled();
     expect(api.calls).toContainEqual(
       expect.objectContaining({
-        body: { projectId: PROJECT_ID, title: 'Peux-tu résumer le dernier comité ?' },
+        body: { projectId: PROJECT_ID },
         method: 'POST',
         path: '/api/conversations',
       }),
     );
     expect(
       within(screen.getByRole('group', { name: 'Refonte du portail' })).getByRole('button', {
-        name: 'Peux-tu résumer le dernier comité ?',
+        name: 'Nouvelle conversation',
       }),
     ).toHaveAttribute('aria-current', 'page');
   });

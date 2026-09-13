@@ -83,6 +83,7 @@ export class SkillsPostgresFixture {
               FEATURE_GOOGLE_OAUTH_ENABLED: false,
               FEATURE_OPENAPI_ENABLED: false,
               FEATURE_RATE_LIMITING_ENABLED: false,
+              FEATURE_AGENT_RUNTIME_ENABLED: false,
               FEATURE_SKILLS_ENABLED: skillsEnabled,
               SKILLS_MAX_TOTAL_BYTES_PER_USER: quota,
             }),

@@ -18,9 +18,7 @@ function ToolsPreview({ isLoading = false }: { readonly isLoading?: boolean }) {
       <button onClick={() => setVisible(!visible)} type="button">
         Panneau
       </button>
-      {visible && (
-        <ContextPanel isLoading={isLoading} tools={tools} />
-      )}
+      {visible && <ContextPanel isLoading={isLoading} tools={tools} />}
     </>
   );
 }

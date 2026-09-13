@@ -1,3 +1,4 @@
+import { CreateRuntimeExecutions1789310000000 } from './1789310000000-create-runtime-executions';
 import { WorkspaceMemberships1789290000000 } from './1789290000000-workspace-memberships';
 import { CreateWorkspaces1789280000000 } from './1789280000000-create-workspaces';
 import { RemoveConversationSkills1789270000000 } from './1789270000000-remove-conversation-skills';
@@ -34,4 +35,5 @@ export const databaseMigrations = Object.freeze([
   RemoveConversationSkills1789270000000,
   CreateWorkspaces1789280000000,
   WorkspaceMemberships1789290000000,
+  CreateRuntimeExecutions1789310000000,
 ] as const);

@@ -21,6 +21,7 @@ import { RedisModule } from './infrastructure/redis/redis.module';
 import { RedisThrottlerStorage } from './infrastructure/redis/redis-throttler.storage';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
+import { ExecutionsModule } from './modules/executions/executions.module';
 import { FeatureFlagGuard } from './modules/feature-flags/feature-flag.guard';
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
 import { FeatureFlagsService } from './modules/feature-flags/feature-flags.service';
@@ -97,6 +98,7 @@ export function createThrottlerOptions(
     UsersModule,
     ProjectsModule,
     ConversationsModule,
+    ExecutionsModule,
     ContextModule,
     SkillsModule,
     IdempotencyModule,

@@ -12,6 +12,8 @@ interface ConversationNavigationProps {
   readonly conversationActions: ConversationActionHandlers;
   readonly conversations: readonly Conversation[];
   readonly selectedId: string | undefined;
+  /** Chat whose answer is streaming right now; its row shows a live indicator. */
+  readonly streamingId?: string;
   readonly onSelect: (id: string) => void;
   /** Tighter rows for chats nested under a project. */
   readonly compact?: boolean;
@@ -22,6 +24,7 @@ export function ConversationNavigation({
   conversationActions,
   conversations,
   selectedId,
+  streamingId,
   onSelect,
 }: ConversationNavigationProps) {
   return (
@@ -45,9 +48,23 @@ export function ConversationNavigation({
             {item.pinnedAt !== null ? (
               <Pin aria-hidden="true" size={12} className="shrink-0 text-muted-foreground" />
             ) : null}
-            <span className="min-w-0 flex-1 truncate" title={item.title}>
+            {/* Keyed by title so a runtime-generated title fades in over the provisional one. */}
+            <span
+              className="title-appear min-w-0 flex-1 truncate"
+              key={item.title}
+              title={item.title}
+            >
               {item.title}
             </span>
+            {streamingId === item.id ? (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 shrink-0 rounded-full bg-primary animate-pulse motion-reduce:animate-none"
+                />
+                <span className="sr-only">Réponse en cours</span>
+              </>
+            ) : null}
           </Button>
           <ConversationActionMenu conversation={item} {...conversationActions} />
         </li>

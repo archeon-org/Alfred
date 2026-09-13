@@ -1,9 +1,10 @@
-import { CONVERSATION_TITLE_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH } from '@alfred/contracts';
+import { PROJECT_NAME_MAX_LENGTH } from '@alfred/contracts';
 import { useRef, useState } from 'react';
-import { Outlet, useMatch, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 
 import { ConversationActionDialogs } from '@/components/workspace/conversation/conversation-action-dialogs';
+import { useChatSession } from '@/hooks/conversations/use-chat-session';
 import { useConversationActions } from '@/hooks/conversations/use-conversation-actions';
 import { TextFieldDialog } from '@/components/ui/text-field-dialog';
 import { ContextPanel } from '@/components/workspace/context/context-panel';
@@ -11,11 +12,11 @@ import { WorkspaceHeader } from '@/components/workspace/header/workspace-header'
 import { WorkspaceLayout } from '@/components/workspace/workspace-layout';
 import { WorkspaceSidebar } from '@/components/workspace/navigation/workspace-sidebar';
 import { ProjectActionDialogs } from '@/components/workspace/project/project-action-dialogs';
-import { useCreateConversation } from '@/hooks/conversations/use-conversation-mutations';
 import {
   useConversationQuery,
   useConversationsQuery,
 } from '@/hooks/conversations/use-conversations-query';
+import { useFeatureFlagsQuery } from '@/hooks/feature-flags/use-feature-flags-query';
 import { useProjectActions } from '@/hooks/projects/use-project-actions';
 import { useCreateProject } from '@/hooks/projects/use-project-mutations';
 import {
@@ -30,32 +31,24 @@ import { useWorkspaceTools } from '@/hooks/workspace/use-workspace-tools';
 import { describeApiError } from '@/lib/workspace/api-error-message';
 import type { Project, WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
 
-const creationLabels = {
-  conversation: {
-    field: 'Titre de la conversation',
-    maxLength: CONVERSATION_TITLE_MAX_LENGTH,
-    placeholder: 'Ex. Définir les prochaines étapes',
-    submit: 'Créer la conversation',
-    title: 'Nouvelle conversation',
-  },
-  project: {
-    field: 'Nom du projet',
-    maxLength: PROJECT_NAME_MAX_LENGTH,
-    placeholder: 'Ex. Préparation du comité',
-    submit: 'Créer le projet',
-    title: 'Nouveau projet',
-  },
-  sandbox: {
-    field: 'Titre du chat',
-    maxLength: CONVERSATION_TITLE_MAX_LENGTH,
-    placeholder: 'Ex. Une idée à explorer',
-    submit: 'Ouvrir le chat',
-    title: 'Nouveau chat libre',
-  },
-} as const satisfies Record<WorkspaceCreationKind, unknown>;
+// Only projects still ask for a name up front; a chat is named by its first message.
+const projectCreationLabels = {
+  field: 'Nom du projet',
+  maxLength: PROJECT_NAME_MAX_LENGTH,
+  placeholder: 'Ex. Préparation du comité',
+  submit: 'Créer le projet',
+  title: 'Nouveau projet',
+} as const;
 
 function projectHomePath(projectId: string): string {
   return `/app/projects/${projectId}`;
+}
+
+/** Composer-first creation: the home chat screen itself, scoped to a project when one is selected. */
+function newConversationPath(projectId: string | undefined): string {
+  return projectId === undefined
+    ? '/app'
+    : `/app/conversations/new?projectId=${encodeURIComponent(projectId)}`;
 }
 
 /** Workspace frame: navigation data, creation dialogs and the panels around the routed screen. */
@@ -65,29 +58,41 @@ export function WorkspaceScreen() {
   const tools = useWorkspaceTools();
   const isSettings = useMatch('/app/settings') !== null;
   const navigate = useNavigate();
+  const location = useLocation();
   const projectMatch = useMatch('/app/projects/:projectId');
   const skillEditorMatch = useMatch('/app/skills/:skillId/edit');
   const newSkillMatch = useMatch('/app/skills/new');
   const isSkillEditor = skillEditorMatch !== null || newSkillMatch !== null;
+  const newConversationMatch = useMatch('/app/conversations/new');
   const conversationMatch = useMatch('/app/conversations/:conversationId');
   const pinnedQuery = usePinnedProjectsQuery();
   const projectsQuery = useProjectsQuery();
   const recentQuery = useConversationsQuery(null);
   const createProject = useCreateProject();
-  const createConversation = useCreateConversation();
+  // Warms the capability manifest so a chat opened from the composer knows the bridge state at once.
+  useFeatureFlagsQuery();
+  const chatSession = useChatSession();
+  const streamingConversationId =
+    chatSession.live?.turn.status === 'streaming' ? chatSession.live.conversationId : undefined;
   const conversationRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<PanelImperativeHandle>(null);
-  const [creation, setCreation] = useState<WorkspaceCreationKind | null>(null);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   // The conversation itself is the source of truth: an older chat opened by link must keep its
   // project in the header and in "Nouvelle conversation". The recent list only bridges the
   // detail request so a chat picked from the sidebar keeps its scope without a flicker.
-  const selectedConversationId = conversationMatch?.params.conversationId;
+  const selectedConversationId =
+    newConversationMatch === null ? conversationMatch?.params.conversationId : undefined;
   const selectedConversation =
     useConversationQuery(selectedConversationId).conversation ??
     recentQuery.conversations.find(({ id }) => id === selectedConversationId);
+  const newConversationProjectId =
+    newConversationMatch === null
+      ? undefined
+      : (new URLSearchParams(location.search).get('projectId') ?? undefined);
   const selectedProjectId =
     projectMatch?.params.projectId ??
+    newConversationProjectId ??
     (selectedConversation?.projectKind === 'named' ? selectedConversation.projectId : undefined);
   const selectedProjectQuery = useProjectQuery(selectedProjectId);
   const selectedProject = selectedProjectQuery.project;
@@ -128,19 +133,13 @@ export function WorkspaceScreen() {
       : selectedConversation?.projectKind === 'implicit'
         ? 'Chat libre'
         : 'Espace personnel';
-  const creationError =
-    creation === 'project'
-      ? createProject.isError
-        ? describeApiError(createProject.error, 'Impossible de créer le projet.')
-        : null
-      : createConversation.isError
-        ? describeApiError(createConversation.error, 'Impossible de créer la conversation.')
-        : null;
+  const creationError = createProject.isError
+    ? describeApiError(createProject.error, 'Impossible de créer le projet.')
+    : null;
 
   function closeCreation() {
-    setCreation(null);
+    setIsCreatingProject(false);
     createProject.reset();
-    createConversation.reset();
   }
 
   function openProject(project: Project) {
@@ -148,31 +147,23 @@ export function WorkspaceScreen() {
     void navigate(projectHomePath(project.id));
   }
 
-  function submitCreation(value: string) {
-    if (creation === 'project') {
-      createProject.mutate(
-        { name: value },
-        {
-          onSuccess: (project) => {
-            closeCreation();
-            openProject(project);
-          },
-        },
-      );
+  function create(kind: WorkspaceCreationKind) {
+    if (kind === 'project') {
+      setIsCreatingProject(true);
       return;
     }
-    createConversation.mutate(
+    // No dialog: the empty chat screen opens and the first message creates the conversation.
+    shell.closeNavigation();
+    void navigate(newConversationPath(kind === 'conversation' ? selectedProject?.id : undefined));
+  }
+
+  function submitProject(value: string) {
+    createProject.mutate(
+      { name: value },
       {
-        title: value,
-        ...(creation === 'conversation' && selectedProject !== undefined
-          ? { projectId: selectedProject.id }
-          : {}),
-      },
-      {
-        onSuccess: (conversation) => {
+        onSuccess: (project) => {
           closeCreation();
-          shell.closeNavigation();
-          void navigate(`/app/conversations/${conversation.id}`);
+          openProject(project);
         },
       },
     );
@@ -190,7 +181,7 @@ export function WorkspaceScreen() {
     isLoading: shell.isPreviewLoading,
     selectedProject,
   };
-  const labels = creation === null ? creationLabels.project : creationLabels[creation];
+  const labels = projectCreationLabels;
 
   if (isSettings) return <Outlet context={outlet} />;
 
@@ -236,7 +227,8 @@ export function WorkspaceScreen() {
                 : null
             }
             selectedProjectId={selectedProjectId}
-            selectedConversationId={conversationMatch?.params.conversationId}
+            selectedConversationId={selectedConversationId}
+            streamingConversationId={streamingConversationId}
             isProjectHome={projectMatch !== null}
             search={shell.search}
             isLoading={isLoading}
@@ -250,7 +242,7 @@ export function WorkspaceScreen() {
               void navigate(`/app/conversations/${id}`);
             }}
             onSelectProject={openProject}
-            onCreate={(kind) => setCreation(kind)}
+            onCreate={create}
             actions={{
               onDelete: projectActions.remove,
               onRename: projectActions.rename,
@@ -277,30 +269,19 @@ export function WorkspaceScreen() {
           />
         }
         conversation={<Outlet context={outlet} />}
-        context={
-          <ContextPanel
-            isLoading={isLoading}
-            tools={tools}
-          />
-        }
+        context={<ContextPanel isLoading={isLoading} tools={tools} />}
       />
       <TextFieldDialog
-        description={
-          creation === 'conversation' && selectedProject?.name
-            ? `Dans le projet « ${selectedProject.name} ».`
-            : creation === 'sandbox'
-              ? 'Un chat hors projet, dans son propre espace privé.'
-              : 'Regroupez les conversations autour d’un même objectif.'
-        }
+        description="Regroupez les conversations autour d’un même objectif."
         error={creationError}
-        isPending={createProject.isPending || createConversation.isPending}
+        isPending={createProject.isPending}
         label={labels.field}
         maxLength={labels.maxLength}
         onOpenChange={(open) => {
           if (!open) closeCreation();
         }}
-        onSubmit={submitCreation}
-        open={creation !== null}
+        onSubmit={submitProject}
+        open={isCreatingProject}
         placeholder={labels.placeholder}
         submitLabel={labels.submit}
         title={labels.title}

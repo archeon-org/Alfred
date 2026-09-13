@@ -25,6 +25,7 @@ export interface ProjectNavigationItemProps {
   readonly isExpanded: boolean;
   readonly isSearching: boolean;
   readonly selectedConversationId: string | undefined;
+  readonly streamingConversationId?: string;
   /** Opens the project home; when already there, toggles the chat list instead. */
   readonly onSelect: (project: Project) => void;
   readonly onSelectConversation: (id: string) => void;
@@ -46,6 +47,7 @@ export function ProjectNavigationItem({
   panelId,
   project,
   selectedConversationId,
+  streamingConversationId,
 }: ProjectNavigationItemProps) {
   const chats = useConversationsQuery(project.id, isExpanded);
   const conversations = chats.conversations.filter((item) =>
@@ -100,6 +102,7 @@ export function ProjectNavigationItem({
             conversations={conversations}
             onSelect={onSelectConversation}
             selectedId={selectedConversationId}
+            streamingId={streamingConversationId}
           />
         ) : chats.status === 'ready' ? (
           <p className="px-2 py-2 text-2xs leading-relaxed text-sidebar-muted">

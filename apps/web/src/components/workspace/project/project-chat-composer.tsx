@@ -8,8 +8,11 @@ export interface ProjectChatComposerProps {
   readonly projectName: string;
   readonly isPending: boolean;
   readonly error: string | null;
-  /** Opens a chat in the project; the text becomes its title and travels as a draft. */
-  readonly onSubmit: (text: string) => void;
+  /**
+   * Opens a chat in the project with the text as its first message. The field is never cleared
+   * here: success navigates away and a failure keeps the draft next to its error.
+   */
+  readonly onSubmit: (text: string) => void | Promise<unknown>;
 }
 
 export function ProjectChatComposer({
@@ -23,7 +26,7 @@ export function ProjectChatComposer({
   const [text, setText] = useState('');
   const ready = text.trim().length > 0 && !isPending;
   const submit = () => {
-    if (ready) onSubmit(text.trim());
+    if (ready) void onSubmit(text.trim());
   };
   return (
     <form

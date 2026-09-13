@@ -169,8 +169,11 @@ export class ConversationsService {
     });
   }
 
-  /** Parent before child; revalidation after waiting prevents writes through a stale relation. */
-  private async lockOwned(manager: EntityManager, scope: OwnerScope, id: string) {
+  /**
+   * Locks an owned, writable conversation for a mutation inside `manager`'s transaction. Parent
+   * before child; revalidation after waiting prevents writes through a stale relation.
+   */
+  async lockOwned(manager: EntityManager, scope: OwnerScope, id: string) {
     const conversations = manager.getRepository(ConversationEntity);
     const located = await this.owned(conversations, scope)
       .andWhere('conversation.id = :id', { id })

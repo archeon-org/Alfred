@@ -9,9 +9,10 @@ import { RouteFocusManager } from '@/routes/route-focus-manager';
 import { LoginScreen } from '@/screens/auth/login-screen';
 import { OauthCallbackScreen } from '@/screens/auth/oauth-callback-screen';
 import { NotFoundScreen } from '@/screens/errors/not-found-screen';
+import { RouteErrorScreen, WorkspaceErrorScreen } from '@/screens/errors/route-error-screen';
+import { ChatSessionProvider } from '@/contexts/chat-session/chat-session-provider';
 import { ConversationScreen } from '@/screens/workspace/conversation-screen';
 import { ProjectScreen } from '@/screens/workspace/project-screen';
-import { WorkspaceHomeScreen } from '@/screens/workspace/workspace-home-screen';
 import { WorkspaceScreen } from '@/screens/workspace/workspace-screen';
 
 export const routes: RouteObject[] = [
@@ -24,21 +25,32 @@ export const routes: RouteObject[] = [
         children: [
           {
             children: [
-              { element: <WorkspaceHomeScreen />, index: true },
-              { element: <SettingsScreen />, path: 'settings' },
               {
-                element: <SkillsLayout />,
-                path: 'skills',
+                // Keeps the sidebar and header mounted when a screen throws during render.
+                errorElement: <WorkspaceErrorScreen />,
                 children: [
-                  { element: <SkillsScreen />, index: true },
-                  { element: <SkillEditorScreen />, path: 'new' },
-                  { element: <SkillEditorScreen />, path: ':skillId/edit' },
+                  { element: <ConversationScreen />, index: true },
+                  { element: <SettingsScreen />, path: 'settings' },
+                  {
+                    element: <SkillsLayout />,
+                    path: 'skills',
+                    children: [
+                      { element: <SkillsScreen />, index: true },
+                      { element: <SkillEditorScreen />, path: 'new' },
+                      { element: <SkillEditorScreen />, path: ':skillId/edit' },
+                    ],
+                  },
+                  { element: <ProjectScreen />, path: 'projects/:projectId' },
+                  { element: <ConversationScreen />, path: 'conversations/new' },
+                  { element: <ConversationScreen />, path: 'conversations/:conversationId' },
                 ],
               },
-              { element: <ProjectScreen />, path: 'projects/:projectId' },
-              { element: <ConversationScreen />, path: 'conversations/:conversationId' },
             ],
-            element: <WorkspaceScreen />,
+            element: (
+              <ChatSessionProvider>
+                <WorkspaceScreen />
+              </ChatSessionProvider>
+            ),
             path: '/app',
           },
           { element: <Navigate replace to="/app" />, path: '/workspace' },
@@ -48,6 +60,7 @@ export const routes: RouteObject[] = [
       { element: <NotFoundScreen />, path: '*' },
     ],
     element: <RouteFocusManager />,
+    errorElement: <RouteErrorScreen />,
   },
 ];
 

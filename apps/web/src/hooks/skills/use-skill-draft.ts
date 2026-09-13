@@ -62,19 +62,17 @@ export function useSkillDraft({
     ...draft,
     name: draft.name.trim(),
     description: draft.description.trim(),
-    files: draft.files.map((file) =>
-      file.path === 'SKILL.md'
-        ? encodeSkillFile(
-            'SKILL.md',
-            normalizeSkillMarkdown(
-              decodeSkillFile(file),
-              draft.name.trim(),
-              draft.description.trim(),
-            ),
-            'text/markdown',
-          )
-        : file,
-    ),
+    files: draft.files.map((file) => {
+      if (file.path !== 'SKILL.md') return file;
+      const original = decodeSkillFile(file);
+      const markdown = normalizeSkillMarkdown(
+        original,
+        draft.name.trim(),
+        draft.description.trim(),
+      );
+      // Decoding strips the UTF-8 BOM. Keep the original bytes when no metadata changed.
+      return markdown === original ? file : encodeSkillFile('SKILL.md', markdown, 'text/markdown');
+    }),
   });
   async function save() {
     if (saving.current || busy) return;

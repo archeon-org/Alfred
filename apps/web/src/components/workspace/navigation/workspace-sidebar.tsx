@@ -32,11 +32,14 @@ interface WorkspaceSidebarProps extends Omit<ProjectNavigationProps, 'onCreate' 
   readonly onRetry: () => void;
   readonly onSearch: (value: string) => void;
   readonly onCreate: (kind: WorkspaceCreationKind, trigger: HTMLButtonElement) => void;
+  /** Chat whose answer is streaming right now, wherever it is listed. */
+  readonly streamingConversationId?: string;
 }
 
 export function WorkspaceSidebar({
   conversationActions,
   conversations,
+  streamingConversationId,
   hasMoreConversations,
   isLoadingMoreConversations,
   onLoadMoreConversations,
@@ -156,6 +159,7 @@ export function WorkspaceSidebar({
                 onSelectConversation={onSelectConversation}
                 selectedConversationId={selectedConversationId}
                 selectedProjectId={selectedProjectId}
+                streamingConversationId={streamingConversationId}
               />
               <section role="group" aria-label="Chats libres" className="mt-6">
                 <div className="mb-1.5 flex min-h-8 items-center justify-between pl-2">
@@ -179,6 +183,7 @@ export function WorkspaceSidebar({
                   compact
                   conversations={standaloneChats}
                   selectedId={selectedConversationId}
+                  streamingId={streamingConversationId}
                   onSelect={onSelectConversation}
                 />
                 <ConversationPagination

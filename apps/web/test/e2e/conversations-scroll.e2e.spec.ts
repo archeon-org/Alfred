@@ -1,7 +1,17 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { DISABLED_FEATURE_FLAGS } from '../../src/services/feature-flags/feature-flags';
 import { defaultSeed, installWorkspaceApi, PROJECT_ID } from './support/workspace-api';
+
+async function scrollToLastConversation(chats: Locator, index: number) {
+  const row = chats.getByRole('listitem').nth(index);
+  // Bottom alignment exposes the next-page boundary without centering a row and
+  // leaving room for another page to intersect the mobile viewport in WebKit.
+  await row.evaluate((element) => element.scrollIntoView({ block: 'end', behavior: 'instant' }));
+  await expect(
+    row.getByRole('button', { name: `Conversation ${index}`, exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+}
 
 async function prepare(page: Page, kind: 'implicit' | 'named') {
   const seed = defaultSeed();
@@ -67,9 +77,9 @@ test('scrolls standalone pages, shows skeletons and recovers a next-page error w
   const chats = page.getByRole('group', { name: 'Chats libres' });
   await expect(chats.getByRole('listitem')).toHaveCount(10);
   const history = page.locator('#conversation-history');
-  await history.hover();
-  await page.mouse.wheel(0, 1500);
+  await scrollToLastConversation(chats, 9);
   await expect(chats.getByRole('status', { name: 'Chargement des conversations' })).toBeVisible();
+  await history.hover();
   await page.mouse.wheel(0, 1500);
   expect(pages.filter((cursor) => cursor === '10')).toHaveLength(1);
   release();
@@ -77,8 +87,7 @@ test('scrolls standalone pages, shows skeletons and recovers a next-page error w
   await expect(chats.getByRole('listitem')).toHaveCount(10);
   await chats.getByRole('button', { name: 'Réessayer le chargement des conversations' }).click();
   await expect(chats.getByRole('listitem')).toHaveCount(20);
-  await history.hover();
-  await page.mouse.wheel(0, 1500);
+  await scrollToLastConversation(chats, 19);
   await expect(chats.getByRole('listitem')).toHaveCount(27);
   await expect(chats.getByTestId('conversation-scroll-sentinel')).toHaveCount(0);
   expect(pages).toEqual(['first', '10', '10', '20']);
@@ -117,7 +126,7 @@ test('uses the mobile viewport so offscreen chat pages wait for scrolling', asyn
   await page.goto('/app');
   await page.getByRole('button', { name: 'Afficher les conversations' }).click();
   const chats = page.getByRole('group', { name: 'Chats libres' });
-  await expect(chats.getByRole('listitem')).toHaveCount(20);
+  await expect(chats.getByRole('listitem')).toHaveCount(10);
   // Two animation frames let pending layout/observer notifications settle without a fixed sleep.
   await page.evaluate(
     () =>
@@ -125,10 +134,12 @@ test('uses the mobile viewport so offscreen chat pages wait for scrolling', asyn
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       ),
   );
-  expect(pages).toEqual(['first', '10']);
+  expect(pages).toEqual(['first']);
   await expect(chats.getByTestId('conversation-scroll-sentinel')).not.toBeInViewport();
-  await chats
-    .getByRole('button', { name: 'Conversation 19', exact: true })
-    .scrollIntoViewIfNeeded();
+  await scrollToLastConversation(chats, 9);
+  await expect(chats.getByRole('listitem')).toHaveCount(20);
+  expect(pages).toEqual(['first', '10']);
+  await scrollToLastConversation(chats, 19);
   await expect(chats.getByRole('listitem')).toHaveCount(27);
+  expect(pages).toEqual(['first', '10', '20']);
 });

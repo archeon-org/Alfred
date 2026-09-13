@@ -6,13 +6,12 @@ import { buttonVariants } from '@/components/ui/button';
 import { ProjectActionDialogs } from '@/components/workspace/project/project-action-dialogs';
 import { ProjectOverview } from '@/components/workspace/project/project-overview';
 import { WorkspaceNotice } from '@/components/workspace/workspace-notice';
-import { useCreateConversation } from '@/hooks/conversations/use-conversation-mutations';
+import { useStartConversation } from '@/hooks/conversations/use-start-conversation';
 import { useConversationsQuery } from '@/hooks/conversations/use-conversations-query';
 import { useProjectActions } from '@/hooks/projects/use-project-actions';
 import { useProjectQuery } from '@/hooks/projects/use-projects-query';
 import { useWorkspaceOutlet } from '@/hooks/workspace/use-workspace-outlet';
 import { describeApiError } from '@/lib/workspace/api-error-message';
-import { deriveConversationTitle } from '@/lib/workspace/derive-title';
 
 /** `/app/projects/:projectId`: project home with its chats and Markdown sources. */
 export function ProjectScreen() {
@@ -21,7 +20,7 @@ export function ProjectScreen() {
   const navigate = useNavigate();
   const projectQuery = useProjectQuery(projectId);
   const chats = useConversationsQuery(projectId);
-  const createChat = useCreateConversation();
+  const creation = useStartConversation(projectId);
   const actions = useProjectActions({ onDeleted: () => void navigate('/app', { replace: true }) });
   const conversationActions = useConversationActions();
   if (projectQuery.status === 'error') {
@@ -81,21 +80,11 @@ export function ProjectScreen() {
           status: chats.status,
         }}
         composer={{
-          error: createChat.isError
-            ? describeApiError(createChat.error, 'Impossible d’ouvrir le chat.')
+          error: creation.error
+            ? describeApiError(creation.error, 'Impossible d’ouvrir le chat.')
             : null,
-          isPending: createChat.isPending,
-          onSubmit: (text) =>
-            createChat.mutate(
-              { projectId: project.id, title: deriveConversationTitle(text) },
-              {
-                onSuccess: (conversation) => {
-                  void navigate(`/app/conversations/${conversation.id}`, {
-                    state: { draft: text },
-                  });
-                },
-              },
-            ),
+          isPending: creation.isPending,
+          onSubmit: creation.start,
         }}
       />
       <ConversationActionDialogs {...conversationActions.dialogs} />

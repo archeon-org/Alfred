@@ -33,7 +33,7 @@ function validatePath(path: string): void {
   if (
     path.length > 240 ||
     path !== path.normalize('NFC') ||
-    /[\\:\p{Cc}]/u.test(path) ||
+    /[\\:\p{Cc}\p{Cs}]/u.test(path) ||
     path.split('/').some((part) => !part || part === '.' || part === '..' || part.trim() !== part)
   )
     invalid('Le chemin du fichier est invalide.');
@@ -102,6 +102,8 @@ export function validateSkillPackage(
     !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(input.name) ||
     input.name.length > 64 ||
     !input.description.trim() ||
+    input.description.includes('\0') ||
+    /\p{Cs}/u.test(input.description) ||
     input.description.length > 1024
   )
     invalid('Nom ou description invalide.');

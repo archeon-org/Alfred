@@ -22,10 +22,13 @@ describe('entity schema contract', () => {
     expect(tables.map(({ name }) => name).sort()).toEqual([
       'api_context_documents',
       'api_conversations',
+      'api_executions',
       'api_idempotency_keys',
+      'api_messages',
       'api_oauth_login_states',
       'api_projects',
       'api_refresh_sessions',
+      'api_runtime_threads',
       'api_skill_files',
       'api_skill_versions',
       'api_skills',

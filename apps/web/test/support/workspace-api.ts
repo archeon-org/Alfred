@@ -1,4 +1,4 @@
-import type { Conversation, Project } from '@alfred/contracts';
+import type { Conversation, FeatureFlags, Message, Project } from '@alfred/contracts';
 import { vi } from 'vitest';
 
 import { DISABLED_FEATURE_FLAGS } from '@/services/feature-flags/feature-flags';
@@ -68,6 +68,116 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
+type SseFrames = readonly (readonly [string, unknown])[];
+
+const SSE_HEADERS = { 'content-type': 'text/event-stream' };
+
+function encodeFrames(frames: SseFrames): string {
+  return frames
+    .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+    .join('');
+}
+
+/**
+ * Streams `frames`; with `hold`, the first two (conversation view, running execution) go out at
+ * once and the rest waits for the promise, so tests can observe an answer in progress.
+ */
+function sseResponse(frames: SseFrames, hold: Promise<void> | null): Response {
+  if (hold === null)
+    return new Response(encodeFrames(frames), { headers: SSE_HEADERS, status: 200 });
+  const encoder = new TextEncoder();
+  const body = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      controller.enqueue(encoder.encode(encodeFrames(frames.slice(0, 2))));
+      await hold;
+      controller.enqueue(encoder.encode(encodeFrames(frames.slice(2))));
+      controller.close();
+    },
+  });
+  return new Response(body, { headers: SSE_HEADERS, status: 200 });
+}
+
+/** Reply the fake runtime streams for `message`, so tests can assert on the transcript. */
+export function fakeReply(message: string): string {
+  return `Réponse à « ${message} »`;
+}
+
+/** Title the fake title agent produces for the first message of a chat. */
+export function fakeTitle(message: string): string {
+  return `Titre généré : ${message}`;
+}
+
+/**
+ * Mirrors the API bridge: provisional title from the first message, native-looking events, the
+ * stored transcript and the agent title pushed as `conversation` events.
+ */
+function runExecution(
+  conversations: Conversation[],
+  messages: Map<string, Message[]>,
+  index: number,
+  message: string,
+  interrupted: boolean,
+): (readonly [string, unknown])[] {
+  const current = conversations[index]!;
+  const now = new Date().toISOString();
+  const executionId = nextId();
+  const untitled = current.titleSource === 'none';
+  const provisional: Conversation = {
+    ...current,
+    lastActivityAt: now,
+    title: untitled ? message.split('\n')[0]!.trim() : current.title,
+    titleSource: untitled ? 'auto' : current.titleSource,
+    updatedAt: now,
+  };
+  const titled: Conversation = untitled
+    ? { ...provisional, title: fakeTitle(message) }
+    : provisional;
+  conversations[index] = titled;
+  const reply = fakeReply(message);
+  messages.set(current.id, [
+    ...(messages.get(current.id) ?? []),
+    {
+      content: message,
+      conversationId: current.id,
+      createdAt: now,
+      executionId,
+      id: nextId(),
+      role: 'user',
+    },
+    {
+      content: reply,
+      conversationId: current.id,
+      createdAt: now,
+      executionId,
+      id: nextId(),
+      role: 'assistant',
+    },
+  ]);
+  const execution = (status: 'running' | 'completed') => ({
+    conversationId: current.id,
+    createdAt: now,
+    error: null,
+    finishedAt: status === 'completed' ? now : null,
+    id: executionId,
+    startedAt: now,
+    status,
+  });
+  // An interrupted stream closes right after the answer, before any terminal execution state.
+  return [
+    ['conversation', provisional],
+    ['execution', execution('running')],
+    ['metadata', { run_id: nextId() }],
+    ['messages/partial', [{ content: reply.slice(0, 8), id: 'ai-1', type: 'AIMessageChunk' }]],
+    ['messages/complete', [{ content: reply, id: 'ai-1', type: 'ai' }]],
+    ...(interrupted
+      ? []
+      : [
+          ...(untitled ? [['conversation', titled] as const] : []),
+          ['execution', execution('completed')] as const,
+        ]),
+  ];
+}
+
 function failure(status: number, code: string, message = 'Request failed'): Response {
   return json({ error: { code, message }, success: false }, status);
 }
@@ -81,12 +191,18 @@ export function createWorkspaceApi(
   seed: {
     readonly projects?: readonly Project[];
     readonly conversations?: readonly Conversation[];
+    /** Capability manifest overrides; everything else stays disabled. */
+    readonly features?: Partial<FeatureFlags>;
   } = {},
 ) {
   const projects: Project[] = [...(seed.projects ?? [])];
   const conversations: Conversation[] = [...(seed.conversations ?? [])];
+  const features: FeatureFlags = { ...DISABLED_FEATURE_FLAGS, ...seed.features };
+  const messages = new Map<string, Message[]>();
   const calls: RecordedCall[] = [];
   const failures = new Map<string, Failure>();
+  let executionHold: Promise<void> | null = null;
+  let interruptExecutions = false;
   const documents = new Map<
     string,
     {
@@ -148,7 +264,7 @@ export function createWorkspaceApi(
           ],
         },
       });
-    if (path === '/api/features') return json({ data: DISABLED_FEATURE_FLAGS, success: true });
+    if (path === '/api/features') return json({ data: features, success: true });
     if (path === '/api/auth/providers') return json({ data: [], success: true });
     if (path === '/api/projects' && method === 'GET') {
       const pinned = url.searchParams.get('pinned');
@@ -287,6 +403,24 @@ export function createWorkspaceApi(
       };
       return json({ data: conversations[index], success: true });
     }
+    const messagesMatch = /^\/api\/conversations\/([^/]+)\/messages$/u.exec(path);
+    if (messagesMatch !== null && method === 'GET') {
+      if (!conversations.some((item) => item.id === messagesMatch[1])) {
+        return failure(404, 'conversation_not_found', 'Conversation not found.');
+      }
+      return json({ data: { items: messages.get(messagesMatch[1]!) ?? [] }, success: true });
+    }
+    const executionsMatch = /^\/api\/conversations\/([^/]+)\/executions$/u.exec(path);
+    if (executionsMatch !== null && method === 'POST') {
+      if (!features.agentRuntime) return failure(404, 'HTTP_404', 'Feature is not available');
+      const index = conversations.findIndex((item) => item.id === executionsMatch[1]);
+      if (index === -1) return failure(404, 'conversation_not_found', 'Conversation not found.');
+      const { message } = body as { message: string };
+      return sseResponse(
+        runExecution(conversations, messages, index, message, interruptExecutions),
+        executionHold,
+      );
+    }
     const conversationMatch = /^\/api\/conversations\/([^/]+)$/u.exec(path);
     if (conversationMatch !== null) {
       const index = conversations.findIndex((item) => item.id === conversationMatch[1]);
@@ -358,6 +492,21 @@ export function createWorkspaceApi(
       failures.set(request, { code, status });
     },
     fetch,
+    /** Keep every answer in progress until the returned function is called. */
+    holdExecutions(): () => void {
+      let release = () => undefined as void;
+      executionHold = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return () => {
+        executionHold = null;
+        release();
+      };
+    },
+    /** Close every answer stream before its terminal execution state. */
+    interruptExecutions() {
+      interruptExecutions = true;
+    },
     projects,
     recover() {
       failures.clear();

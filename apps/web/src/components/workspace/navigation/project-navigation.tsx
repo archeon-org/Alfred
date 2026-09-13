@@ -22,6 +22,8 @@ export interface ProjectNavigationProps {
   readonly search: string;
   readonly selectedProjectId: string | undefined;
   readonly selectedConversationId: string | undefined;
+  /** Chat whose answer is streaming right now; its row shows a live indicator. */
+  readonly streamingConversationId?: string;
   /** True while the project home of `selectedProjectId` is the current screen. */
   readonly isProjectHome: boolean;
   readonly isSearching: boolean;
@@ -117,6 +119,7 @@ export function ProjectNavigation({
   pinnedProjects,
   projects,
   selectedConversationId,
+  streamingConversationId,
   selectedProjectId,
 }: ProjectNavigationProps) {
   const id = useId();
@@ -152,6 +155,7 @@ export function ProjectNavigation({
         panelId={`${id}-project-${project.id}`}
         project={project}
         selectedConversationId={selectedConversationId}
+        streamingConversationId={streamingConversationId}
       />
     );
   };

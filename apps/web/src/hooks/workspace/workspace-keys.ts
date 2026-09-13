@@ -6,6 +6,10 @@ export const projectKeys = {
     ['projects', userId, 'list', scope] as const,
 };
 
+export const messageKeys = {
+  list: (userId: string, conversationId: string) => ['messages', userId, conversationId] as const,
+};
+
 export const conversationKeys = {
   lists: (userId: string) => ['conversations', userId, 'list'] as const,
   all: (userId: string) => ['conversations', userId] as const,

@@ -11,6 +11,7 @@ import {
   MaxLength,
   Min,
   MinLength,
+  NotContains,
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
@@ -40,6 +41,7 @@ export class SkillListQueryDto extends ListQueryDto {
   @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
   @IsString()
   @MaxLength(160)
+  @NotContains('\0')
   search?: string;
 }
 

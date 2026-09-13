@@ -237,11 +237,17 @@ test('browses conversations by keyboard while keeping drafts local', async ({ pa
   await expect(page.getByRole('button', { name: /joindre/i })).toBeDisabled();
 
   await page.getByRole('button', { name: 'Nouvelle conversation' }).click();
-  await page.getByRole('textbox', { name: 'Titre de la conversation' }).fill('Nouveau brouillon');
-  await page.getByRole('button', { name: 'Créer la conversation' }).click();
-
-  await expect(page.getByRole('heading', { level: 1, name: 'Nouveau brouillon' })).toBeVisible();
+  // No dialog: an empty chat opens in the project of the current conversation.
+  await expect(page.getByRole('heading', { level: 1, name: /^Nouveau chat/u })).toBeVisible();
   await expect(composer).toHaveValue('');
+  await composer.fill('Nouveau brouillon');
+  await composer.press('Enter');
+
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Nouvelle conversation' }),
+  ).toBeVisible();
+  // Without the agent bridge the first message waits in the composer as a draft.
+  await expect(composer).toHaveValue('Nouveau brouillon');
   expect(writes).toEqual(['POST /api/conversations']);
   expect(await page.evaluate(() => [localStorage.length, sessionStorage.length])).toEqual([0, 0]);
 });
@@ -348,36 +354,41 @@ test('creates a project, its first conversation and a separate standalone chat',
     page.getByRole('tablist', { name: 'Contenu du projet' }).getByRole('tab', { name: 'Contexte' }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Nouvelle conversation', exact: true }).click();
-  const conversationDialog = page.getByRole('dialog', { name: 'Nouvelle conversation' });
-  await expect(conversationDialog).toContainText('Projet Atlas');
-  await conversationDialog
-    .getByRole('textbox', { name: 'Titre de la conversation' })
-    .fill('Décisions de lancement');
-  await conversationDialog.getByRole('button', { name: 'Créer la conversation' }).click();
+  // No dialog: the first message creates the chat; the API names it once the message is sent.
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Nouveau chat dans Projet Atlas' }),
+  ).toBeVisible();
+  const composer = page.getByRole('textbox', { name: 'Message' });
+  await composer.fill('Décisions de lancement');
+  await composer.press('Enter');
 
   const project = page.getByRole('group', { name: 'Projet Atlas' });
   await expect(
-    project.getByRole('button', { name: 'Décisions de lancement', exact: true }),
+    project.getByRole('button', { name: 'Nouvelle conversation', exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Décisions de lancement' }),
+    page.getByRole('heading', { level: 1, name: 'Nouvelle conversation' }),
   ).toBeVisible();
+  await expect(composer).toHaveValue('Décisions de lancement');
   await page.getByRole('button', { name: 'Ouvrir un chat libre' }).click();
-  const standaloneDialog = page.getByRole('dialog', { name: 'Nouveau chat libre' });
-  await standaloneDialog.getByRole('textbox', { name: 'Titre du chat' }).fill('Piste indépendante');
-  await standaloneDialog.getByRole('button', { name: 'Ouvrir le chat' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/app$/u);
+  await composer.fill('Piste indépendante');
+  await composer.press('Enter');
   await expect(
     page
       .getByRole('group', { name: 'Chats libres' })
-      .getByRole('button', { name: 'Piste indépendante', exact: true }),
+      .getByRole('button', { name: 'Nouvelle conversation', exact: true }),
   ).toBeVisible();
+  await expect(composer).toHaveValue('Piste indépendante');
   await expect(
     project.getByRole('button', { name: 'Piste indépendante', exact: true }),
   ).toHaveCount(0);
   await project.getByRole('button', { name: 'Projet Atlas', exact: true }).click();
-  await project.getByRole('button', { name: 'Décisions de lancement', exact: true }).click();
+  await project.getByRole('button', { name: 'Nouvelle conversation', exact: true }).click();
   await expect(
-    page.getByRole('heading', { level: 1, name: 'Décisions de lancement' }),
+    page.getByRole('heading', { level: 1, name: 'Nouvelle conversation' }),
   ).toBeVisible();
   expect(writes).toEqual([
     'POST /api/projects',

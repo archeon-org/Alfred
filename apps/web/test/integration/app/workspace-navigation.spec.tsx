@@ -209,9 +209,18 @@ describe('Workspace navigation', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Nouvelle conversation' }));
-    const dialog = screen.getByRole('dialog', { name: 'Nouvelle conversation' });
-    expect(within(dialog).getByText(/Refonte du portail/u)).toBeVisible();
-    await user.keyboard('{Escape}');
+    // No dialog: the empty chat opens in the project of the current conversation.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Nouveau chat dans Refonte du portail',
+      }),
+    ).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Refonte du portail' })).toHaveAttribute(
+      'href',
+      `/app/projects/${PROJECT_ID}`,
+    );
 
     expect(api.calls.map(({ path }) => path)).toEqual(
       expect.arrayContaining([
