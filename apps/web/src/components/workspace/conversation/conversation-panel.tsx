@@ -1,13 +1,14 @@
 import { LockKeyhole, MessageSquareText } from 'lucide-react';
 import type { Ref } from 'react';
 
+import { RuntimeEvents } from '@/components/workspace/conversation/runtime-events';
 import { ConversationTranscript } from '@/components/workspace/conversation/conversation-transcript';
 import { ConversationWelcome } from '@/components/workspace/conversation/conversation-welcome';
 import { MessageComposer } from '@/components/workspace/conversation/message-composer';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConversationSkeleton } from '@/components/workspace/workspace-skeletons';
 import type { TurnFailure } from '@/hooks/conversations/use-conversation-chat';
-import type { LiveSession } from '@/contexts/chat-session/chat-session-context';
+import type { LiveSession, RuntimeEventView } from '@/contexts/chat-session/chat-session-context';
 import type { StarterPrompt } from '@/lib/workspace/workspace.types';
 import type { Message } from '@/services/executions/executions.service';
 
@@ -25,6 +26,8 @@ interface ConversationPanelProps {
   readonly messages?: readonly Message[];
   readonly sessions?: readonly LiveSession[];
   readonly failure?: TurnFailure | null;
+  readonly debugEvents?: readonly RuntimeEventView[];
+  readonly debugError?: string | null;
   /** Resolves true when the message was accepted; the composer keeps the draft otherwise. */
   readonly onSend?: (message: string) => boolean | Promise<boolean>;
   /** Shown instead of the composer help while sending is refused; typing stays possible. */
@@ -45,6 +48,8 @@ export function ConversationPanel({
   messages = [],
   sessions = [],
   failure = null,
+  debugEvents = [],
+  debugError = null,
   onSend,
   blockedReason = null,
   isStreaming = false,
@@ -96,6 +101,11 @@ export function ConversationPanel({
           ) : (
             <ConversationWelcome disabled={isBusy} prompts={prompts} onSelect={onPrompt} />
           )}
+          {!isLoading && (debugEvents.length > 0 || debugError !== null) ? (
+            <div className="mx-auto w-full min-w-0 max-w-conversation px-4 pb-4 md:px-6 wide:px-8">
+              <RuntimeEvents events={debugEvents} error={debugError} />
+            </div>
+          ) : null}
         </div>
         {isLoading ? (
           <div

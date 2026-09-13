@@ -10,6 +10,7 @@ services:
       ALFRED_DEV_API_PROXY_TARGET: http://api:3000
       HOME: /tmp
       VITE_API_URL: ${VITE_API_URL:-/api}
+      VITE_DEBUG_EVENTS: ${VITE_DEBUG_EVENTS:-false}
     volumes:
       - ./apps/web/src:/workspace/apps/web/src:ro
       - ./apps/web/public:/workspace/apps/web/public:ro

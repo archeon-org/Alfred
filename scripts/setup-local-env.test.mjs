@@ -209,3 +209,15 @@ test('preserves customized shared data-service URLs across re-runs', async (cont
   assert.equal(api.DATABASE_URL, customDatabaseUrl);
   assert.equal(api.REDIS_URL, customRedisUrl);
 });
+
+test('keeps explicit debug-event flags while adding the opt-in default', async (context) => {
+  const workspace = await createWorkspace(context);
+  await writeFile(join(workspace, '.env'), 'VITE_DEBUG_EVENTS=true\n');
+  await mkdir(join(workspace, 'apps/web'), { recursive: true });
+  await writeFile(join(workspace, 'apps/web/.env'), 'VITE_DEBUG_EVENTS=false\n');
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  const root = parseEnvironment(await readFile(join(workspace, '.env'), 'utf8'));
+  const web = parseEnvironment(await readFile(join(workspace, 'apps/web/.env'), 'utf8'));
+  assert.equal(root.VITE_DEBUG_EVENTS, 'true');
+  assert.equal(web.VITE_DEBUG_EVENTS, 'false');
+});

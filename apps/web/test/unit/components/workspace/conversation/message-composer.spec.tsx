@@ -100,7 +100,7 @@ describe('ConversationTranscript', () => {
     role: 'user' as const,
   };
 
-  it('renders stored turns, the live answer and the native event log', () => {
+  it('renders stored turns and the live answer without inline diagnostics', () => {
     render(
       <ConversationTranscript
         messages={[message]}
@@ -127,9 +127,7 @@ describe('ConversationTranscript', () => {
     expect(screen.getByText('Salut')).toBeVisible();
     expect(screen.getByText('Encore')).toBeVisible();
     expect(screen.getByText('Bonjour')).toBeVisible();
-    expect(screen.getByText('Événements du runtime (2)')).toBeInTheDocument();
-    expect(screen.getByText('{"run_id":"r"}')).toBeInTheDocument();
-    expect(screen.getByText(`${'x'.repeat(240)}…`)).toBeInTheDocument();
+    expect(screen.queryByText(/Événements du runtime/u)).not.toBeInTheDocument();
   });
 
   it('shows the thinking state, then the failure of a turn', () => {

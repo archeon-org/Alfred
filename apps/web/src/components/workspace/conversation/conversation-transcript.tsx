@@ -1,8 +1,8 @@
-import { Bot, ChevronRight, LoaderCircle, User } from 'lucide-react';
+import { Bot, LoaderCircle, User } from 'lucide-react';
 import { Fragment, useEffect, useRef } from 'react';
 
 import { MarkdownView } from '@/components/ui/markdown-view';
-import type { RuntimeEventView, TurnFailure } from '@/hooks/conversations/use-conversation-chat';
+import type { TurnFailure } from '@/hooks/conversations/use-conversation-chat';
 import { cn } from '@/lib/cn';
 import type { LiveSession } from '@/contexts/chat-session/chat-session-context';
 import { transcriptEntries } from '@/lib/workspace/transcript-entries';
@@ -14,8 +14,6 @@ interface ConversationTranscriptProps {
   /** Error of a settled turn, shown under the last stored row of its execution. */
   readonly failure?: TurnFailure | null;
 }
-
-const EVENT_PREVIEW_LENGTH = 240;
 
 /** Stored and local turns, kept in order until persistence takes over from each stream. */
 export function ConversationTranscript({
@@ -53,7 +51,6 @@ export function ConversationTranscript({
               pending={entry.session.turn.status === 'streaming'}
               error={entry.session.turn.error}
             />
-            <RuntimeEvents events={entry.session.turn.events} />
           </Fragment>
         ),
       )}
@@ -114,43 +111,4 @@ function Turn({ author, content, pending = false, error = null }: TurnProps) {
       </div>
     </li>
   );
-}
-
-function RuntimeEvents({ events }: { readonly events: readonly RuntimeEventView[] }) {
-  if (events.length === 0) return null;
-  return (
-    <li>
-      <details className="group rounded-xl border border-border bg-muted/40 text-xs">
-        <summary className="flex cursor-pointer items-center gap-1.5 px-3 py-2 font-medium text-muted-foreground select-none">
-          <ChevronRight
-            aria-hidden="true"
-            className="transition-transform group-open:rotate-90 motion-reduce:transition-none"
-            size={14}
-          />
-          Événements du runtime ({events.length})
-        </summary>
-        <ol className="max-h-72 overflow-y-auto border-t border-border font-mono [scrollbar-width:thin]">
-          {events.map((entry) => (
-            <li
-              key={entry.id}
-              className="flex gap-2 border-b border-border/60 px-3 py-1.5 last:border-b-0"
-            >
-              <span className="shrink-0 font-semibold text-foreground">{entry.event}</span>
-              <span className="min-w-0 truncate text-muted-foreground">{preview(entry.data)}</span>
-            </li>
-          ))}
-        </ol>
-      </details>
-    </li>
-  );
-}
-
-function preview(data: unknown): string {
-  let text: string;
-  try {
-    text = typeof data === 'string' ? data : (JSON.stringify(data) ?? 'null');
-  } catch {
-    text = '[non sérialisable]';
-  }
-  return text.length > EVENT_PREVIEW_LENGTH ? `${text.slice(0, EVENT_PREVIEW_LENGTH)}…` : text;
 }

@@ -22,7 +22,6 @@ import {
   ChatSessionContext,
   type ChatSessionContextValue,
   type LiveTurn,
-  type RuntimeEventView,
 } from '@/contexts/chat-session/chat-session-context';
 import {
   chatSessionReducer,
@@ -31,11 +30,11 @@ import {
 } from '@/contexts/chat-session/chat-session-state';
 import { useWorkspaceAccount } from '@/hooks/workspace/use-workspace-account';
 import { conversationKeys, messageKeys } from '@/hooks/workspace/workspace-keys';
+import { captureRuntimeEvent } from '@/lib/workspace/runtime-event-debug';
 import { describeApiError } from '@/lib/workspace/api-error-message';
 import { listMessages, streamExecution } from '@/services/executions/executions.service';
 import type { HttpClient } from '@/services/http/http-client';
 
-const EVENT_LOG_LIMIT = 200;
 /** After a stop, the API stores the partial answer while the browser already refetches. */
 const HANDOVER_ATTEMPTS = 3;
 const HANDOVER_RETRY_MS = 500;
@@ -151,7 +150,8 @@ async function runExecution(run: ExecutionRun): Promise<void> {
         }
       }
       const view = { data: event.data, event: event.event, id: sequence++ };
-      update((current) => applyEvent(current, event, view, reply.text));
+      captureRuntimeEvent(userId, conversationId, view);
+      update((current) => applyEvent(current, event, reply.text));
       // The answer is settled; the stream may stay open for the generated title only.
       if (turn.status !== 'streaming') {
         release();
@@ -180,19 +180,10 @@ async function runExecution(run: ExecutionRun): Promise<void> {
   }
 }
 
-function applyEvent(
-  turn: LiveTurn,
-  event: ExecutionStreamEvent,
-  view: RuntimeEventView,
-  assistantText: string,
-): LiveTurn {
-  const events =
-    turn.events.length >= EVENT_LOG_LIMIT
-      ? [...turn.events.slice(1), view]
-      : [...turn.events, view];
-  if (event.event !== EXECUTION_SSE_EVENT) return { ...turn, assistantText, events };
+function applyEvent(turn: LiveTurn, event: ExecutionStreamEvent, assistantText: string): LiveTurn {
+  if (event.event !== EXECUTION_SSE_EVENT) return { ...turn, assistantText };
   const parsed = executionSchema.safeParse(event.data);
-  if (!parsed.success) return { ...turn, assistantText, events };
+  if (!parsed.success) return { ...turn, assistantText };
   const execution = parsed.data;
   const failed = execution.status === 'failed';
   const settled = failed || execution.status === 'completed' || execution.status === 'cancelled';
@@ -200,7 +191,6 @@ function applyEvent(
     ...turn,
     assistantText,
     error: failed ? (execution.error ?? 'L’agent a échoué.') : turn.error,
-    events,
     execution,
     status: failed ? 'error' : settled ? 'done' : turn.status,
   };

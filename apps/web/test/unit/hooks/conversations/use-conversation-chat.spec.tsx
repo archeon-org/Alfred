@@ -2,7 +2,7 @@ import type { ExecutionStreamEvent } from '@alfred/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ConversationTranscript } from '@/components/workspace/conversation/conversation-transcript';
 import { ChatSessionProvider } from '@/contexts/chat-session/chat-session-provider';
@@ -100,12 +100,14 @@ function controlledStream(events: readonly ExecutionStreamEvent[]) {
 }
 
 describe('useConversationChat with the workspace chat session', () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     mockedAccount.mockReturnValue({ client: { request: vi.fn() }, userId: 'user-1' });
     mockedList.mockResolvedValue([]);
   });
 
-  it('streams the live answer, then hands over to the stored transcript', async () => {
+  it.each(['false', 'true'])('streams and hands over while debug is %s', async (flag) => {
+    vi.stubEnv('VITE_DEBUG_EVENTS', flag);
     const stream = controlledStream([
       { data: execution('running'), event: 'execution' },
       { data: [{ content: 'Bon', id: 'ai-1', type: 'AIMessageChunk' }], event: 'messages/partial' },
@@ -136,6 +138,7 @@ describe('useConversationChat with the workspace chat session', () => {
     await waitFor(() => expect(result.current.live).toBeNull());
     expect(result.current.isStreaming).toBe(false);
     expect(result.current.failure).toBeNull();
+    expect(result.current.debug.events).toHaveLength(flag === 'true' ? 4 : 0);
     expect(mockedStream).toHaveBeenCalledWith(
       expect.anything(),
       CONVERSATION_ID,
@@ -283,6 +286,7 @@ describe('useConversationChat with the workspace chat session', () => {
       titleSource: 'auto' as const,
       updatedAt: '2026-09-11T09:00:01.000Z',
     };
+    vi.stubEnv('VITE_DEBUG_EVENTS', 'true');
     const first = controlledStream([
       { data: execution('running'), event: 'execution' },
       { data: execution('completed'), event: 'execution' },
@@ -403,6 +407,7 @@ describe('useConversationChat with the workspace chat session', () => {
     ]);
   });
   it('retains the first answer when next send starts before title closes', async () => {
+    vi.stubEnv('VITE_DEBUG_EVENTS', 'true');
     const first = controlledStream([
       { event: 'execution', data: execution('running') },
       {
@@ -489,6 +494,7 @@ describe('useConversationChat with the workspace chat session', () => {
         createdAt: secondTime,
       }),
     );
+    vi.stubEnv('VITE_DEBUG_EVENTS', 'true');
     const first = controlledStream([
       { event: 'execution', data: execution('running') },
       {
@@ -559,6 +565,7 @@ describe('useConversationChat with the workspace chat session', () => {
   });
 
   it('retains a completed answer in its conversation while sending in another conversation', async () => {
+    vi.stubEnv('VITE_DEBUG_EVENTS', 'true');
     const first = controlledStream([
       { event: 'execution', data: execution('running') },
       {
@@ -596,7 +603,7 @@ describe('useConversationChat with the workspace chat session', () => {
     expect(result.current.other.sessions).toHaveLength(1);
     // The first stream closing cannot retire or mutate the second run.
     act(() => first.release(3));
-    await waitFor(() => expect(result.current.here.live?.events.at(-1)?.event).toBe('custom'));
+    await waitFor(() => expect(result.current.here.debug.events.at(-1)?.event).toBe('custom'));
     expect(result.current.other.live?.userMessage).toBe('second');
     expect(result.current.other.isStreaming).toBe(true);
   });

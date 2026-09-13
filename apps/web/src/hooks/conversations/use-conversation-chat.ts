@@ -1,9 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import type { LiveTurn } from '@/contexts/chat-session/chat-session-context';
 import { useChatSession } from '@/hooks/conversations/use-chat-session';
 import { useWorkspaceAccount } from '@/hooks/workspace/use-workspace-account';
+import {
+  getRuntimeEventDebugSnapshot,
+  subscribeRuntimeEventDebug,
+} from '@/lib/workspace/runtime-event-debug';
 import { messageKeys } from '@/hooks/workspace/workspace-keys';
 import { listMessages, type Message } from '@/services/executions/executions.service';
 
@@ -17,6 +21,9 @@ export type {
 export function useConversationChat(conversationId: string) {
   const { client, userId } = useWorkspaceAccount();
   const session = useChatSession();
+  const debug = useSyncExternalStore(subscribeRuntimeEventDebug, () =>
+    getRuntimeEventDebugSnapshot(userId, conversationId),
+  );
   const history = useQuery({
     queryFn: () => listMessages(client, conversationId),
     queryKey: messageKeys.list(userId, conversationId),
@@ -46,6 +53,7 @@ export function useConversationChat(conversationId: string) {
   );
 
   return {
+    debug,
     /** Another chat is still being answered: a send would be refused. */
     busyElsewhere:
       session.live !== null &&

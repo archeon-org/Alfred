@@ -144,3 +144,28 @@ pour rendre la preview plus facile à tester.
 Un audit est un point de départ : vérifier ses constats dans le code et distinguer bug, règle
 retenue et capacité future. Les nombres historiques, la disponibilité d'un paquet ou une cible
 architecturale ne prouvent ni l'état courant ni une fonctionnalité livrée.
+
+## Runtime event diagnostics
+
+`VITE_DEBUG_EVENTS=true` enables the conversation's runtime event viewer, localStorage capture and
+JSON download. The default is `false`; absent or other values disable capture, storage access and
+the viewer while normal message processing continues. Set it in `apps/web/.env` for host Vite and
+restart Vite. For Compose, set the root `.env` value and recreate the development web container or
+rebuild the production web image. This is public build configuration, not an authorization control.
+
+Debug copies are keyed by user and conversation under `alfred:runtime-event-debug:v1:` and survive
+reload. They contain full event payloads, which can include conversation/tool content. This is the
+explicit opt-in exception to the ordinary browser-content storage rule; credentials must never be
+included in events. Disabling the flag leaves earlier captures untouched and unread. Remove those
+keys through browser storage tools to erase existing captures. Downloads include every captured
+event in that conversation, across runs, without the former 200-event/240-character truncation.
+
+Persistence is attempted every 250 ms while events arrive and on page hide. A 4 MiB serialized
+UTF-16 per-conversation storage cap or browser quota failure produces an explicit warning; complete
+in-memory events remain downloadable until reload. A failed save replaces stale saved events with
+an incomplete-history marker when storage access permits; it never intentionally presents an older
+snapshot as the complete capture. A 16 MiB aggregate serialized capture budget
+stops further capture with an explicit warning. This bounds debug copies, not exact JavaScript heap
+usage. This browser diagnostic history does not replace server-owned transcripts or replay/audit
+contracts (ALF-DEC-001 accepted; ALF-DEC-006 accepted-with-risk; ALF-DEC-008/051 remain in discussion).
+Production content-diagnostic retention policy remains an operator/privacy-owner responsibility.

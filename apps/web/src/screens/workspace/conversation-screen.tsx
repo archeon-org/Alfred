@@ -113,6 +113,8 @@ function ExistingConversation({ conversationId }: { readonly conversationId: str
       messages={chat.messages}
       sessions={chat.sessions}
       failure={chat.failure}
+      debugEvents={chat.debug.events}
+      debugError={chat.debug.error}
       onSend={bridgeAvailable ? chat.send : undefined}
       blockedReason={chat.busyElsewhere ? BUSY_ELSEWHERE : null}
       isStreaming={chat.isStreaming}

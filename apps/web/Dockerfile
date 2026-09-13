@@ -44,6 +44,8 @@ COPY packages/contracts ./packages/contracts
 
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
+ARG VITE_DEBUG_EVENTS=false
+ENV VITE_DEBUG_EVENTS=$VITE_DEBUG_EVENTS
 
 RUN pnpm --filter @alfred/contracts build \
     && pnpm --filter @alfred/web build

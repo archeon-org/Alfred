@@ -121,6 +121,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_DEBUG_EVENTS: ${VITE_DEBUG_EVENTS:-false}
     ports:
       - '127.0.0.1:${WEB_PORT:-5173}:8080'
     depends_on:
