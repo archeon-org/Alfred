@@ -464,6 +464,41 @@ ALF-DEC-006 §5 and ALF-DEC-033 are unchanged; ALF-DEC-008 stays in discussion.
   and stream deltas publish at most once per animation frame (`createTurnPublisher`), so rows
   keep their DOM nodes and a folded or unfolded row keeps its state.
 
+## Revision 2026-09-17: a work-log cache with a memory budget, and recovery reads that count
+
+An implementation review on 2026-09-17 found two reliability defects in the revisions above. Both
+were reproduced on the committed code, then fixed without changing a contract. They refine, not
+change, ALF-DEC-006 §5 and ALF-DEC-033; ALF-DEC-008 stays in discussion.
+
+- **The shared work-log cache has a byte budget.** This supersedes "observers of one instance
+  share the work log of a committed revision" (review corrections of 2026-09-16). The cache kept
+  the logs of the last 256 revisions read, whatever their execution, and each log holds the text
+  of its own freshly parsed row. One run within the reducer bounds therefore retained 259 MiB of
+  heap: four intermediate messages of 200 000 characters, eight reasoning texts of 32 768, then
+  256 answer deltas, each revision reduced, serialized, parsed again and read through the cache,
+  heap measured after a forced collection. The cache now keeps only the latest revision of each
+  execution; a read that raced behind a newer commit gets its log without replacing the newer
+  one. Each entry costs 1 024 bytes, plus two bytes per UTF-16 code unit of its keys and of its
+  step strings, plus 128 bytes per step. This is an upper bound of its heap: 774 bytes were
+  measured for a log without steps (keys included) and about 121 per step. All logs stay within
+  16 MiB (`WORK_CACHE_MAX_BYTES`) and 1 024 executions (`WORK_CACHE_MAX_ENTRIES`), the least
+  recently read leaving first. A second review the same day found that a first version counted a
+  log without steps as zero bytes, so 100 000 of them kept about 74 MiB with no eviction; the
+  entry cost and the entry cap close that gap. The cache never keeps a log larger than the
+  budget, and drops a log nobody read for 30 s (`WORK_CACHE_IDLE_MS`, longer than the longest
+  reconnect backoff, checked at the next access). The long-run measurement now retains 1.2 MiB,
+  one revision. Each observer still keeps the view it last sent, to translate the next revision.
+- **A recovery read that progresses keeps the browser following the run.** This corrects "the
+  browser never abandons a progressing run" (revision 2026-09-16 night), which held only for
+  progress an attach delivered. With every attach refused (503 before headers) and each JSON read
+  showing a longer answer, the browser still gave up after six attaches. The read before a
+  re-attach now counts as progress when it shows an element never shown or a later stage, using
+  the same element-by-element record as the attaches, even when the attach after it fails. Such
+  an attempt keeps the budget whole but still backs off (up to 8 s) because the stream delivered
+  nothing. A replay, an identical or older snapshot and a handler exception are never progress.
+  Six attempts in a row in which neither the read nor the attach progressed still end with the
+  reconnect affordance.
+
 ## Remaining decisions
 
 DEC-008/009/016/019/038/051 retain their open event/HITL, continuation, operations, capability and

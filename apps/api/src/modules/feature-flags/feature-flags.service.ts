@@ -21,7 +21,7 @@ const IMPLEMENTED_PUBLIC_FEATURES = Object.freeze({
   conversationFeedback: false,
   runtimeMemory: false,
   skills: true,
-  teams: false,
+  teams: true,
   traceLinks: true,
 } as const satisfies Readonly<Record<FeatureFlagName, boolean>>);
 

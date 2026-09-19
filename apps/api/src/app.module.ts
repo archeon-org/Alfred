@@ -1,4 +1,5 @@
 import { SkillsModule } from './modules/skills/skills.module';
+import { AgentsModule } from './modules/agents/agents.module';
 import { ContextModule } from './modules/context/context.module';
 import { IdempotencyModule } from './common/idempotency/idempotency.module';
 import { Module } from '@nestjs/common';
@@ -101,6 +102,7 @@ export function createThrottlerOptions(
     ExecutionsModule,
     ContextModule,
     SkillsModule,
+    AgentsModule,
     IdempotencyModule,
   ],
   providers: [

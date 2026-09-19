@@ -79,7 +79,7 @@ describe('FeatureFlagsService', () => {
       conversationFeedback: false,
       runtimeMemory: false,
       skills: true,
-      teams: false,
+      teams: true,
       traceLinks: true,
     });
     expect(Object.isFrozen(service.getPublicFlags())).toBe(true);
@@ -94,6 +94,7 @@ describe('FeatureFlagsService', () => {
 
     expect(service.isEnabled('googleOAuth')).toBe(true);
     expect(service.isEnabled('skills')).toBe(true);
+    expect(service.isEnabled('teams')).toBe(true);
     expect(service.isEnabled('traceLinks')).toBe(true);
     expect(service.isEnabled('agentRuntime')).toBe(true);
     expect(service.isEnabled('rateLimiting')).toBe(true);
@@ -123,7 +124,6 @@ describe('FeatureFlagsService', () => {
     'knowledgeScope',
     'conversationFeedback',
     'runtimeMemory',
-    'teams',
   ])('keeps %s unavailable until its execution path is implemented', (feature) => {
     const service = new FeatureFlagsService(config());
 

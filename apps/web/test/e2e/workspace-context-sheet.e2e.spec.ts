@@ -28,7 +28,8 @@ for (const viewport of SHEET_VIEWPORTS) {
 
     await opener.click();
     await expect(sheet).toBeVisible();
-    await expect(sheet.getByRole('tab', { name: 'Équipes' })).toBeVisible();
+    // Équipes follows the teams capability, off in this seed; Skills is always there.
+    await expect(sheet.getByRole('tab', { name: 'Skills' })).toBeVisible();
     await expect(close).toBeFocused();
     expect(await chat.boundingBox()).toEqual(chatBefore);
     expect(await sheet.evaluate((element) => getComputedStyle(element).position)).toBe('fixed');

@@ -179,6 +179,8 @@ export {
 
 export * from './skills';
 
+export * from './agents';
+
 export {
   currentWorkspacesSchema,
   currentWorkspacesEnvelopeSchema,

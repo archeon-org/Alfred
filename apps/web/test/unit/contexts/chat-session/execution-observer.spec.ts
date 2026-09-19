@@ -16,7 +16,7 @@ import {
   observeExecution,
 } from '@/services/executions/executions.service';
 import type * as RecoveryModule from '@/services/executions/recovery';
-import { reattachDelay, recoveryDelay } from '@/services/executions/recovery';
+import { reattachDelay, RECOVERY_ATTEMPTS, recoveryDelay } from '@/services/executions/recovery';
 import type * as DebugModule from '@/lib/workspace/runtime-event-debug';
 import { ApiRequestError } from '@/services/http/api-json';
 import { synthesizeFrames, type AgUiFrame } from '../../../support/ag-ui-synth';
@@ -75,6 +75,15 @@ function attach(from: ExecutionSnapshot, to: readonly ExecutionSnapshot[], end?:
       yield frame;
     }
     if (end !== undefined) throw end;
+  };
+}
+
+/** An attach the API refuses before its first frame, as a 503 before headers. */
+function refused(error: Error) {
+  return async function* (): AsyncGenerator<AgUiFrame> {
+    await Promise.resolve();
+    yield* [];
+    throw error;
   };
 }
 
@@ -224,17 +233,57 @@ describe('execution observer recovery', () => {
     expect(view.last()?.work.steps).toHaveLength(3);
   });
 
+  it('follows a run through its recovery reads while its stream stays unavailable', async () => {
+    observe.mockImplementation(
+      refused(new ApiRequestError(503, 'execution_stream_unavailable', 'Indisponible')),
+    );
+    // Far more reads than the budget, each one showing a longer answer, then the confirmed end.
+    const reads = RECOVERY_ATTEMPTS * 2;
+    for (let index = 1; index < reads; index += 1) read.mockResolvedValueOnce(commit(index));
+    read.mockResolvedValueOnce(commit(reads, 'completed'));
+    const view = launch();
+    await waitFor(() => expect(view.last()?.status).toBe('done'));
+    expect(read).toHaveBeenCalledTimes(reads);
+    expect(observe).toHaveBeenCalledTimes(reads);
+    expect(view.turns.some((turn) => turn.connection === 'disconnected')).toBe(false);
+    // The stream never delivered: the attaches keep backing off, never re-attach promptly.
+    expect(reattachDelay).not.toHaveBeenCalled();
+    expect(vi.mocked(recoveryDelay).mock.calls.map(([attempt]) => attempt)).toEqual(
+      Array.from({ length: reads }, (_, attempt) => attempt),
+    );
+    expect(view.last()?.assistantText).toBe('Mot '.repeat(reads));
+  });
+
+  it.each([
+    ['repeat the same snapshot', () => commit(2)],
+    ['answer older than what was shown', (call: number) => (call === 1 ? commit(3) : commit(1))],
+  ])(
+    'stops after the budget when its stream is unavailable and its reads %s',
+    async (_case, next) => {
+      observe.mockImplementation(refused(new TypeError('offline')));
+      let calls = 0;
+      read.mockImplementation(() => Promise.resolve(next((calls += 1))));
+      const view = launch();
+      await waitFor(() => expect(view.last()?.connection).toBe('disconnected'));
+      // The first read shows the run; only the fruitless attempts after it count.
+      expect(read).toHaveBeenCalledTimes(RECOVERY_ATTEMPTS + 1);
+      expect(observe).toHaveBeenCalledTimes(RECOVERY_ATTEMPTS + 2);
+      expect(view.last()?.status).toBe('streaming');
+    },
+  );
+
   it('treats a handler exception as a fruitless attempt reported once, never as a transport loop', async () => {
     vi.mocked(captureRuntimeEvent).mockImplementation((_user, _conversation, event) => {
       if (event.event === 'TEXT_MESSAGE_CONTENT') throw new TypeError('bug');
     });
     // Every attach delivers new work before the handler fails: it still never counts as progress.
+    // The reads show nothing new, so only the attaches could have reset the budget.
     let attaches = 0;
     observe.mockImplementation((client, id, signal) => {
       attaches += 1;
       return attach(commit(attaches), [])(client, id, signal);
     });
-    read.mockImplementation(() => Promise.resolve(commit(attaches)));
+    read.mockResolvedValue(snapshot());
     const view = launch();
     await waitFor(() => expect(view.last()?.connection).toBe('disconnected'));
     expect(observe).toHaveBeenCalledTimes(6);

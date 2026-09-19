@@ -68,7 +68,7 @@ export function createExecutionObserver(options: ObserverOptions) {
   let isObserving = false;
   let isStopping = false;
   let faultReported = false;
-  /** Every element any attach or read has shown: an attach progresses only beyond it. */
+  /** Every element any attach or read has shown: either progresses only beyond it. */
   const shown = new AttachProgress();
   let handover: Promise<void> | undefined;
   const content = () => ({
@@ -273,9 +273,10 @@ export function createExecutionObserver(options: ObserverOptions) {
   };
 
   /**
-   * Observes until the run settles. An attach that brought progress re-attaches promptly; only
-   * consecutive fruitless attempts back off and count toward the budget. The recovery read before
-   * each re-attach decides whether the execution settled while no stream was open.
+   * Observes until the run settles. An attach that brought progress re-attaches promptly; the
+   * others back off. The recovery read before each re-attach decides whether the execution settled
+   * while no stream was open, and a read that shows what was never shown keeps the budget whole,
+   * even when the attach after it fails: only attempts in which nothing progressed exhaust it.
    */
   const observe = async () => {
     const executionId = turn().execution?.id;
@@ -283,8 +284,13 @@ export function createExecutionObserver(options: ObserverOptions) {
     const budget = new RecoveryBudget();
     for (let attempt = 0; ; attempt += 1) {
       let prompt = false;
+      let read = false;
       try {
-        if (attempt > 0) acceptSnapshot(await getExecution(client, executionId, controller.signal));
+        if (attempt > 0) {
+          const stage = turn().execution?.status;
+          acceptSnapshot(await getExecution(client, executionId, controller.signal));
+          read = shown.record(turn()) || turn().execution?.status !== stage;
+        }
         if (turn().status !== 'streaming') return;
         const outcome = await attach(executionId);
         if (outcome === null || controller.signal.aborted || turn().status !== 'streaming') return;
@@ -292,15 +298,15 @@ export function createExecutionObserver(options: ObserverOptions) {
           disconnect();
           return;
         }
-        if (outcome.progressed) budget.progressed();
         prompt = outcome.progressed;
-        if (!prompt && !budget.failed()) {
+        if (prompt) budget.progressed();
+        else if (!budget.failed(read)) {
           disconnect();
           return;
         }
       } catch (error) {
         if (controller.signal.aborted || turn().status !== 'streaming') return;
-        if (!isRetryable(error) || !budget.failed()) {
+        if (!isRetryable(error) || !budget.failed(read)) {
           disconnect();
           return;
         }

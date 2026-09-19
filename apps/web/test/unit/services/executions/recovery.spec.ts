@@ -80,6 +80,21 @@ describe('bounded observer recovery', () => {
     expect(budget.failed()).toBe(false);
   });
 
+  it('keeps the budget whole while recovery reads progress, yet keeps backing off the stream', () => {
+    const budget = new RecoveryBudget();
+    for (let attempt = 1; attempt <= RECOVERY_ATTEMPTS * 3; attempt += 1) {
+      expect(budget.failed(true)).toBe(true);
+      expect(budget.attempt).toBe(attempt);
+    }
+    // Once the reads stop progressing too, the budget runs out as usual.
+    for (let attempt = 1; attempt < RECOVERY_ATTEMPTS; attempt += 1)
+      expect(budget.failed()).toBe(true);
+    expect(budget.failed()).toBe(false);
+    budget.progressed();
+    expect(budget.attempt).toBe(0);
+    expect(budget.failed()).toBe(true);
+  });
+
   it('retries transient availability failures but fails closed on authorization and malformed data', () => {
     expect(isRetryable(new TypeError('offline'))).toBe(true);
     expect(isRetryable(new ApiRequestError(429, 'limited', 'Wait'))).toBe(true);

@@ -44,25 +44,35 @@ export function reattachDelay(signal: AbortSignal): Promise<void> {
 }
 
 /**
- * Counts consecutive attempts that brought nothing. An attach that delivered progress resets it,
- * so a live run is never abandoned because its observation was closed a few times; only
- * `RECOVERY_ATTEMPTS` fruitless attempts in a row exhaust it.
+ * Paces recovery and decides when the browser stops on its own. An attach that delivered progress
+ * resets it, so a live run is never abandoned because its observation was closed a few times.
+ * Every attach that brought nothing backs off further, while only `RECOVERY_ATTEMPTS` attempts in
+ * a row in which neither the recovery read nor the attach showed anything new exhaust it: a run
+ * whose reads keep progressing is still followed, slowly, while its stream stays unavailable.
  */
 export class RecoveryBudget {
-  private failures = 0;
+  /** Attaches without progress since the last one that progressed. */
+  private stalled = 0;
+  /** Attempts in a row in which nothing progressed, the recovery read included. */
+  private fruitless = 0;
 
-  /** Fruitless attempts since the last progress: the backoff step of the next one. */
+  /** The backoff step of the next attempt. */
   get attempt(): number {
-    return this.failures;
+    return this.stalled;
   }
 
   progressed(): void {
-    this.failures = 0;
+    this.stalled = 0;
+    this.fruitless = 0;
   }
 
-  /** Records a fruitless attempt; false once no attempt remains. */
-  failed(): boolean {
-    this.failures += 1;
-    return this.failures < RECOVERY_ATTEMPTS;
+  /**
+   * Records an attach that brought nothing; `readProgressed` when the recovery read before it
+   * showed what was never shown. False once no attempt remains.
+   */
+  failed(readProgressed = false): boolean {
+    this.stalled += 1;
+    this.fruitless = readProgressed ? 0 : this.fruitless + 1;
+    return this.fruitless < RECOVERY_ATTEMPTS;
   }
 }

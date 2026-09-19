@@ -2,11 +2,14 @@ import { CircleHelp, PanelRightClose } from 'lucide-react';
 
 import { IconButton } from '@/components/ui/icon-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AgentCatalog } from '@/components/workspace/context/agent-catalog';
 import { ContextResources } from '@/components/workspace/context/context-resources';
 import { SkillsPanel } from '@/components/workspace/context/skills-panel';
 import { TeamBuilder } from '@/components/workspace/context/team-builder';
 import { ContextSkeleton } from '@/components/workspace/workspace-skeletons';
+import { useFeatureFlagsQuery } from '@/hooks/feature-flags/use-feature-flags-query';
 import { useShortcutHint } from '@/hooks/workspace/use-shortcut-preferences';
+import { cn } from '@/lib/cn';
 import type { WorkspaceToolsState } from '@/lib/workspace/workspace-tools.types';
 import type { WorkspaceToolTab } from '@/lib/workspace/workspace-tools.types';
 
@@ -25,6 +28,12 @@ const toolTabs: readonly { readonly id: WorkspaceToolTab; readonly label: string
 
 export function ContextPanel({ isLoading, tools, onClose }: ContextPanelProps) {
   const closeHint = useShortcutHint('toggleContext', 'Masquer le contexte');
+  const { flags, status } = useFeatureFlagsQuery();
+  // The Équipes tab exists only while the API serves the `teams` capability.
+  const tabs = toolTabs.filter((tab) => tab.id !== 'teams' || (status === 'ready' && flags.teams));
+  const activeTab = tabs.some((tab) => tab.id === tools.activeTab)
+    ? tools.activeTab
+    : (tabs[0]?.id ?? 'skills');
   return (
     <aside
       aria-label="Contexte de la conversation"
@@ -60,22 +69,28 @@ export function ContextPanel({ isLoading, tools, onClose }: ContextPanelProps) {
           <ContextSkeleton />
         ) : (
           <Tabs
-            value={tools.activeTab}
+            value={activeTab}
             onValueChange={(value) => {
-              if (toolTabs.some((tab) => tab.id === value))
+              if (tabs.some((tab) => tab.id === value))
                 tools.setActiveTab(value as WorkspaceToolTab);
             }}
           >
-            <TabsList aria-label="Outils de la conversation" className="grid w-full grid-cols-3">
-              {toolTabs.map((tab) => (
+            <TabsList
+              aria-label="Outils de la conversation"
+              className={cn('grid w-full', tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}
+            >
+              {tabs.map((tab) => (
                 <TabsTrigger className="min-w-0 px-1.5 text-2xs" key={tab.id} value={tab.id}>
                   {tab.label}
                 </TabsTrigger>
               ))}
             </TabsList>
-            <TabsContent value="teams" className="pt-5">
-              <TeamBuilder tools={tools} />
-            </TabsContent>
+            {tabs.some((tab) => tab.id === 'teams') ? (
+              <TabsContent value="teams" className="space-y-8 pt-5">
+                <AgentCatalog />
+                <TeamBuilder tools={tools} />
+              </TabsContent>
+            ) : null}
             <TabsContent value="skills" className="pt-5">
               <SkillsPanel />
             </TabsContent>
