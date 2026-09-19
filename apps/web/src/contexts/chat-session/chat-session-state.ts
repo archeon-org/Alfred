@@ -8,6 +8,7 @@ export interface ChatSessionState {
 }
 
 export type ChatSessionAction =
+  | { readonly type: 'reset' }
   | { readonly type: 'start'; readonly session: LiveSession }
   | { readonly type: 'update'; readonly id: number; readonly turn: LiveTurn }
   | {
@@ -20,6 +21,7 @@ export function chatSessionReducer(
   state: ChatSessionState,
   action: ChatSessionAction,
 ): ChatSessionState {
+  if (action.type === 'reset') return { sessions: [], failures: new Map() };
   if (action.type === 'start') {
     const failures = new Map(state.failures);
     failures.delete(action.session.conversationId);
@@ -61,6 +63,9 @@ export function transcriptHoldsTurn(messages: readonly Message[], turn: LiveTurn
   const rows = messages.filter((message) => message.executionId === turn.execution?.id);
   return (
     rows.some((message) => message.role === 'user') &&
-    (turn.assistantText.length === 0 || rows.some((message) => message.role === 'assistant'))
+    (turn.assistantText.length === 0 ||
+      rows.some(
+        (message) => message.role === 'assistant' && message.content === turn.assistantText,
+      ))
   );
 }

@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef } from 'react';
 import { MarkdownView } from '@/components/ui/markdown-view';
 import type { TurnFailure } from '@/hooks/conversations/use-conversation-chat';
 import { cn } from '@/lib/cn';
-import type { LiveSession } from '@/contexts/chat-session/chat-session-context';
+import type { LiveSession, LiveTurn } from '@/contexts/chat-session/chat-session-context';
 import { transcriptEntries } from '@/lib/workspace/transcript-entries';
 import type { Message } from '@/services/executions/executions.service';
 
@@ -50,6 +50,7 @@ export function ConversationTranscript({
               content={entry.session.turn.assistantText}
               pending={entry.session.turn.status === 'streaming'}
               error={entry.session.turn.error}
+              statusText={observationStatus(entry.session.turn)}
             />
           </Fragment>
         ),
@@ -64,9 +65,10 @@ interface TurnProps {
   readonly content: string;
   readonly pending?: boolean;
   readonly error?: string | null;
+  readonly statusText?: string | null;
 }
 
-function Turn({ author, content, pending = false, error = null }: TurnProps) {
+function Turn({ author, content, pending = false, error = null, statusText = null }: TurnProps) {
   const isUser = author === 'user';
   return (
     <li className={cn('flex gap-3', isUser && 'flex-row-reverse')}>
@@ -103,6 +105,11 @@ function Turn({ author, content, pending = false, error = null }: TurnProps) {
             Réponse en cours
           </span>
         ) : null}
+        {statusText ? (
+          <p className="mt-2 text-xs text-muted-foreground" role="status">
+            {statusText}
+          </p>
+        ) : null}
         {error ? (
           <p className="mt-2 text-xs text-destructive" role="alert">
             {error}
@@ -111,4 +118,15 @@ function Turn({ author, content, pending = false, error = null }: TurnProps) {
       </div>
     </li>
   );
+}
+
+function observationStatus(turn: LiveTurn): string | null {
+  if (turn.status !== 'streaming') return null;
+  if (turn.stopPending) return 'Arrêt demandé… confirmation en cours.';
+  if (turn.execution?.status === 'interrupted') return 'L’exécution attend une intervention.';
+  if (turn.execution?.status === 'recovery_required')
+    return 'L’exécution nécessite une vérification avant de poursuivre.';
+  if (turn.connection === 'recovering') return 'Connexion interrompue… reconnexion en cours.';
+  if (turn.connection === 'connecting') return 'Connexion en cours…';
+  return null;
 }

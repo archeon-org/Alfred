@@ -12,9 +12,6 @@ import { useWorkspaceOutlet } from '@/hooks/workspace/use-workspace-outlet';
 import { describeApiError } from '@/lib/workspace/api-error-message';
 import { starterPrompts } from '@/lib/workspace/starter-prompts';
 
-const BUSY_ELSEWHERE =
-  'Alfred répond dans une autre conversation ; votre message partira dès que cette réponse sera terminée.';
-
 /**
  * The one chat screen. Without a conversation id (`/app`, `/app/conversations/new?projectId=…`)
  * it is a fresh chat whose first message creates the conversation; with an id it is that chat.
@@ -76,9 +73,9 @@ function ExistingConversation({ conversationId }: { readonly conversationId: str
   const { conversationRef, isLoading } = useWorkspaceOutlet();
   const location = useLocation();
   const query = useConversationQuery(conversationId);
-  const chat = useConversationChat(conversationId);
   const { flags, status: flagsStatus } = useFeatureFlagsQuery();
   const bridgeAvailable = flagsStatus === 'ready' && flags.agentRuntime;
+  const chat = useConversationChat(conversationId, bridgeAvailable);
 
   if (query.status === 'error') {
     return (
@@ -116,7 +113,15 @@ function ExistingConversation({ conversationId }: { readonly conversationId: str
       debugEvents={chat.debug.events}
       debugError={chat.debug.error}
       onSend={bridgeAvailable ? chat.send : undefined}
-      blockedReason={chat.busyElsewhere ? BUSY_ELSEWHERE : null}
+      blockedReason={
+        chat.isDiscovering
+          ? 'Vérification des exécutions en cours…'
+          : chat.discoveryFailed
+            ? 'Vérifiez la connexion avant d’envoyer un nouveau message.'
+            : null
+      }
+      onReconnect={chat.reload}
+      recoveryAvailable={chat.discoveryFailed || chat.live?.connection === 'disconnected'}
       isStreaming={chat.isStreaming}
       onStop={chat.stop}
     />

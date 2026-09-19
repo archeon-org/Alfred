@@ -92,6 +92,43 @@ test('fresh generation matches every versioned environment example', async (cont
   }
 });
 
+test('generates direct native runtime settings without adding shared service credentials', async (context) => {
+  const workspace = await createWorkspace(context);
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  const root = parseEnvironment(await readFile(join(workspace, '.env'), 'utf8'));
+  const api = parseEnvironment(await readFile(join(workspace, 'apps/api/.env'), 'utf8'));
+  assert.equal(root.AGENT_RUNTIME_URL, 'http://agents-api:8000');
+  assert.equal(api.AGENT_RUNTIME_URL, 'http://localhost:8000');
+  for (const environment of [root, api]) {
+    assert.equal(environment.AGENT_RUNTIME_API_KEY, undefined);
+    assert.equal(environment.AGENT_RUNTIME_API_KEY_PREVIOUS, undefined);
+    assert.equal(environment.ALFRED_PRODUCT_API_KEY, undefined);
+    assert.equal(environment.ALFRED_PRODUCT_API_KEY_PREVIOUS, undefined);
+    assert.equal(environment.EXECUTION_CURSOR_KEY, '');
+    assert.equal(environment.FEATURE_AGENT_RUNTIME_ENABLED, 'false');
+    assert.equal(environment.EXECUTION_DEADLINE_MS, '600000');
+  }
+});
+
+test('adds runtime bounds while preserving an explicit cursor key and native target', async (context) => {
+  const workspace = await createWorkspace(context);
+  const previous =
+    [
+      'AGENT_RUNTIME_URL=https://runtime.internal',
+      'EXECUTION_CURSOR_KEY=existing-cursor-key-with-more-than-32-characters',
+      'EXECUTION_DEADLINE_MS=240000',
+    ].join('\n') + '\n';
+  await writeFile(join(workspace, '.env'), previous);
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  const first = await readFile(join(workspace, '.env'), 'utf8');
+  for (const [key, value] of Object.entries(parseEnvironment(previous))) {
+    assert.equal(parseEnvironment(first)[key], value);
+  }
+  assert.equal(parseEnvironment(first).EXECUTION_SSE_HEARTBEAT_MS, '25000');
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  assert.equal(await readFile(join(workspace, '.env'), 'utf8'), first);
+});
+
 test('migrates generated local environment files to the current contract', async (context) => {
   const workspace = await createWorkspace(context);
 

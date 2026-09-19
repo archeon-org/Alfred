@@ -21,6 +21,7 @@ function repositories(
   overrides: {
     readonly projects?: Record<string, unknown>;
     readonly conversations?: Record<string, unknown>;
+    readonly query?: ReturnType<typeof vi.fn>;
   } = {},
 ) {
   const projects = {
@@ -47,7 +48,8 @@ function repositories(
   const getRepository = vi.fn((entity: unknown) =>
     entity === ConversationEntity ? conversations : projects,
   );
-  const manager = { getRepository } as unknown as EntityManager;
+  const query = overrides.query ?? vi.fn().mockResolvedValue([]);
+  const manager = { getRepository, query } as unknown as EntityManager;
   const dataSource = {
     getRepository,
     transaction: vi.fn((work: (manager: EntityManager) => unknown) => work(manager)),
@@ -55,6 +57,7 @@ function repositories(
   return {
     conversations,
     projects,
+    query,
     service: new ConversationsService(dataSource, tenantsService()),
   };
 }
@@ -314,6 +317,28 @@ describe('ConversationsService', () => {
       ownerUserId: scope.ownerUserId,
       tenantId: scope.tenantId,
     });
+  });
+
+  it('refuses deletion while an execution is active or awaiting recovery after locking its parents', async () => {
+    const { conversations, projects, query, service } = repositories({
+      conversations: {
+        createQueryBuilder: vi.fn().mockReturnValue(queryBuilder(conversationRow())),
+      },
+      query: vi.fn().mockResolvedValue([{ active: 1 }]),
+    });
+    await expect(service.remove(principal, conversationRow().id)).rejects.toMatchObject({
+      code: 'thread_busy',
+    });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('api_executions'), [
+      [conversationRow().id],
+      ['pending', 'running', 'stopping'],
+      30_000,
+    ]);
+    expect(conversations.findOne.mock.invocationCallOrder[0]).toBeLessThan(
+      query.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(conversations.delete).not.toHaveBeenCalled();
+    expect(projects.delete).not.toHaveBeenCalled();
   });
 
   it('answers 404 when the chat vanished while waiting for the project lock', async () => {

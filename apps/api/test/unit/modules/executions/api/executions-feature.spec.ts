@@ -8,6 +8,8 @@ import { configureApplication } from '@api/bootstrap';
 import { ApiExceptionFilter } from '@api/common/filters/api-exception.filter';
 import { parseEnvironment } from '@api/config/environment';
 import { ExecutionsController } from '@api/modules/executions/api/executions.controller';
+import { ExecutionSessionGuard } from '@api/modules/executions/api/execution-session.guard';
+import { ExecutionObservationService } from '@api/modules/executions/application/execution-observation.service';
 import { ExecutionsService } from '@api/modules/executions/application/executions.service';
 import { FeatureFlagGuard } from '@api/modules/feature-flags/feature-flag.guard';
 import { FeatureFlagsController } from '@api/modules/feature-flags/feature-flags.controller';
@@ -23,7 +25,7 @@ function createExecutionsService() {
   return {
     listMessages: vi.fn().mockResolvedValue([]),
     start: vi.fn(),
-    stream: vi.fn(),
+    active: vi.fn(),
   };
 }
 
@@ -34,6 +36,7 @@ async function buildApp(): Promise<INestApplication> {
       AUTH_JWT_SECRET: 'synthetic-test-signing-secret-at-least-32-characters',
       DATABASE_URL: 'postgresql://test:unused@localhost/unused',
       FEATURE_AGENT_RUNTIME_ENABLED: process.env.FEATURE_AGENT_RUNTIME_ENABLED,
+      EXECUTION_CURSOR_KEY: 'cursor-feature-fixture-key-123456789012345',
       NODE_ENV: 'test',
     }),
   );
@@ -44,9 +47,13 @@ async function buildApp(): Promise<INestApplication> {
       { provide: APP_GUARD, useClass: FeatureFlagGuard },
       { provide: APP_FILTER, useClass: ApiExceptionFilter },
       { provide: ExecutionsService, useValue: createExecutionsService() },
+      { provide: ExecutionObservationService, useValue: { snapshot: vi.fn() } },
       FeatureFlagsService,
     ],
-  }).compile();
+  })
+    .overrideGuard(ExecutionSessionGuard)
+    .useValue({ canActivate: () => true })
+    .compile();
   const app = moduleRef.createNestApplication({ logger: false });
   try {
     configureApplication(app);

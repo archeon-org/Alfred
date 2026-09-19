@@ -17,6 +17,7 @@ import { databaseEntities } from '@api/database/typeorm.options';
 import { ContextModule } from '@api/modules/context/context.module';
 import { ConversationsModule } from '@api/modules/conversations/conversations.module';
 import { ConversationEntity } from '@api/modules/conversations/infrastructure/persistence/conversation.entity';
+import { ExecutionEntity } from '@api/modules/executions/infrastructure/persistence/execution.entity';
 import { ProjectsModule } from '@api/modules/projects/projects.module';
 import { TenantEntity } from '@api/modules/tenants/tenant.entity';
 import { UserEntity } from '@api/modules/users/user.entity';
@@ -160,6 +161,106 @@ postgres('conversation transfer PostgreSQL HTTP contract', () => {
     ).body?.data as { id: string };
     return { owner, chat, target };
   }
+
+  function executionIntent(chat: { id: string; projectId: string }, ownerUserId: string) {
+    return {
+      id: randomUUID(),
+      conversationId: chat.id,
+      projectId: chat.projectId,
+      ownerUserId,
+      tenantId: defaultTenantId,
+      submissionId: randomUUID(),
+      submissionHash: 'a'.repeat(64),
+      responseProfile: 'application/vnd.alfred.execution+json;version=1',
+      invocationId: randomUUID(),
+      bindingGeneration: randomUUID(),
+      deadlineAt: new Date(Date.now() + 600_000),
+      status: 'pending' as const,
+    };
+  }
+
+  it.each(['interrupted', 'recovery_required'] as const)(
+    'lets a parked %s execution be moved and cascade-deleted: parked work never holds a resource',
+    async (status) => {
+      const { owner, chat, target } = await setupChat();
+      const execution = executionIntent(chat, owner.id);
+      await db.getRepository(ExecutionEntity).insert({ ...execution, status });
+      expect(
+        (await api('POST', `/conversations/${chat.id}/move`, owner.token, { projectId: target.id }))
+          .status,
+      ).toBe(200);
+      expect((await api('DELETE', `/projects/${target.id}`, owner.token)).status).toBe(204);
+      expect(await db.getRepository(ExecutionEntity).existsBy({ id: execution.id })).toBe(false);
+    },
+  );
+
+  it.each(['pending', 'running', 'stopping', 'recovering'] as const)(
+    'protects an advancing %s execution against move and cascading deletion',
+    async (status) => {
+      const { owner, chat, target } = await setupChat();
+      const execution = executionIntent(chat, owner.id);
+      await db.getRepository(ExecutionEntity).insert({ ...execution, status });
+      for (const [method, path, body] of [
+        ['POST', `/conversations/${chat.id}/move`, { projectId: target.id }],
+        ['DELETE', `/conversations/${chat.id}`, undefined],
+        ['DELETE', `/projects/${chat.projectId}`, undefined],
+      ] as const) {
+        const response = await api(method, path, owner.token, body);
+        expect(response.status).toBe(409);
+        expect(response.body?.error?.code).toBe('thread_busy');
+      }
+      expect(
+        (await db.getRepository(ConversationEntity).findOneByOrFail({ id: chat.id })).projectId,
+      ).toBe(chat.projectId);
+      expect(await db.getRepository(ExecutionEntity).existsBy({ id: execution.id })).toBe(true);
+      await db
+        .getRepository(ExecutionEntity)
+        .update(execution.id, { status: 'completed', finishedAt: new Date() });
+      expect(
+        (await api('POST', `/conversations/${chat.id}/move`, owner.token, { projectId: target.id }))
+          .status,
+      ).toBe(200);
+      expect((await api('DELETE', `/projects/${target.id}`, owner.token)).status).toBe(204);
+      expect(await db.getRepository(ExecutionEntity).existsBy({ id: execution.id })).toBe(false);
+    },
+  );
+
+  it.each(['conversation', 'project'] as const)(
+    'rechecks new execution intent after a %s deletion waits for the project lock',
+    async (resource) => {
+      const { owner, chat } = await setupChat();
+      const runner = migration.createQueryRunner();
+      await runner.startTransaction();
+      let pending: ReturnType<typeof api> | undefined;
+      try {
+        await runner.query('SELECT id FROM api_projects WHERE id=$1 FOR UPDATE', [chat.projectId]);
+        pending = api(
+          'DELETE',
+          resource === 'project' ? `/projects/${chat.projectId}` : `/conversations/${chat.id}`,
+          owner.token,
+        );
+        for (let attempt = 0; attempt < 100; attempt += 1) {
+          const waiting: { blocked: boolean }[] = await migration.query(
+            `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%api_projects%') AS blocked`,
+          );
+          if (waiting[0]?.blocked) break;
+          if (attempt === 99) throw new Error('Deletion did not wait for the project lock');
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        await runner.query('SELECT id FROM api_conversations WHERE id=$1 FOR UPDATE', [chat.id]);
+        await runner.manager.getRepository(ExecutionEntity).insert(executionIntent(chat, owner.id));
+        await runner.commitTransaction();
+        const response = await pending;
+        expect(response.status).toBe(409);
+        expect(response.body?.error?.code).toBe('thread_busy');
+        expect(await db.getRepository(ConversationEntity).existsBy({ id: chat.id })).toBe(true);
+      } finally {
+        if (runner.isTransactionActive) await runner.rollbackTransaction();
+        await pending;
+        await runner.release();
+      }
+    },
+  );
 
   it('moves only the relation, preserves metadata, deletes the empty shell and replays safely', async () => {
     const { owner, chat, target } = await setupChat();

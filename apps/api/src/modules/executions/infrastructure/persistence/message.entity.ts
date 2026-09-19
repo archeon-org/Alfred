@@ -17,6 +17,7 @@ import { ExecutionEntity } from './execution.entity';
 @Check('chk_messages_role', `"role" IN ('user', 'assistant')`)
 // (conversation_id, created_at, id) is created by the migration; declared for drift checks only.
 @Index('idx_messages_conversation_order', { synchronize: false })
+@Index('uq_messages_execution_role', { synchronize: false })
 export class MessageEntity {
   @PrimaryGeneratedColumn('uuid', { primaryKeyConstraintName: 'pk_messages' })
   id!: string;

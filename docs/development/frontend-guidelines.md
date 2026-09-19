@@ -153,12 +153,23 @@ the viewer while normal message processing continues. Set it in `apps/web/.env` 
 restart Vite. For Compose, set the root `.env` value and recreate the development web container or
 rebuild the production web image. This is public build configuration, not an authorization control.
 
-Debug copies are keyed by user and conversation under `alfred:runtime-event-debug:v1:` and survive
-reload. They contain full event payloads, which can include conversation/tool content. This is the
-explicit opt-in exception to the ordinary browser-content storage rule; credentials must never be
-included in events. Disabling the flag leaves earlier captures untouched and unread. Remove those
-keys through browser storage tools to erase existing captures. Downloads include every captured
-event in that conversation, across runs, without the former 200-event/240-character truncation.
+Debug copies are keyed by user and conversation under
+`alfred:runtime-event-debug:v2:<encoded-user-id>:<encoded-conversation-id>` and store `version: 2`.
+The stream also carries `delta` frames; the observer applies each one to the snapshot it holds
+(reconnecting on a revision gap) and captures the reconstructed snapshot, never the wire delta.
+Capture and reload accept only the public `snapshot` and `conversation` events, canonicalized
+through `executionSnapshotSchema` or `conversationSchema`. Both Conversation IDs in a snapshot
+must match the selected conversation; a conversation event must match it too. Unknown extra fields
+are stripped, while raw native event names, invalid payloads and mismatched scope produce an
+explicit diagnostic error. Downloads contain the validated public payloads, which can still include
+visible conversation content; they are not raw provider/tool exports or an authorization boundary.
+
+Legacy `alfred:runtime-event-debug:v1:` records are not read, migrated or automatically deleted,
+even with diagnostics enabled. Disabling the flag returns before validation or any storage access,
+leaving both namespaces untouched. Remove existing keys through browser storage tools when erasure
+is required. Within the stated budgets, downloads include every captured public event across runs;
+there is no 200-event/240-character truncation. This remains the explicit opt-in exception to the
+ordinary browser-content storage rule, and credentials must never enter the public schema.
 
 Persistence is attempted every 250 ms while events arrive and on page hide. A 4 MiB serialized
 UTF-16 per-conversation storage cap or browser quota failure produces an explicit warning; complete

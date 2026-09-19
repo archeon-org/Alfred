@@ -13,6 +13,8 @@ import {
 } from '../../../common/ownership/find-owned';
 import { paginateByCursor } from '../../../common/pagination/paginate';
 import { TenantsService } from '../../tenants/tenants.service';
+import { ConversationEntity } from '../../conversations/infrastructure/persistence/conversation.entity';
+import { assertNoActiveExecutions } from '../../executions/domain/execution-lifecycle';
 import {
   PROJECT_RESOURCE,
   hasProjectChanges,
@@ -182,9 +184,8 @@ export class ProjectsService {
   }
 
   /**
-   * Immediate transactional deletion (story PRJ-06 option C1): no artifact, runtime binding or
-   * Execution exists yet, so the row lock plus SQL cascade removes the project and its chats
-   * atomically. Asynchronous cleanup with receipts (C2) arrives with artifacts.
+   * Lock parent then children before checking executions, matching dispatch and projection.
+   * Nonterminal work reserves the project and its chats until its runtime outcome is known.
    */
   async remove(principal: AuthPrincipal, id: string): Promise<void> {
     const scope = await this.tenants.scopeFor(principal.id);
@@ -192,6 +193,17 @@ export class ProjectsService {
       const repository = manager.getRepository(ProjectEntity);
       const ownership = { id, ...scope };
       await findOwnedOrThrow(repository, ownership, PROJECT_RESOURCE, ROW_LOCK);
+      const conversations = await manager
+        .getRepository(ConversationEntity)
+        .createQueryBuilder('conversation')
+        .where('conversation.projectId = :projectId', { projectId: id })
+        .orderBy('conversation.id', 'ASC')
+        .setLock('pessimistic_write')
+        .getMany();
+      await assertNoActiveExecutions(
+        manager,
+        conversations.map((conversation) => conversation.id),
+      );
       await deleteOwnedOrThrow(repository, ownership, PROJECT_RESOURCE);
     });
   }

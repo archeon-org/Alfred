@@ -1,3 +1,4 @@
+import { conversationSchema, executionSnapshotSchema } from '@alfred/contracts';
 import type { RuntimeEventView } from '@/contexts/chat-session/chat-session-context';
 
 interface DebugSnapshot {
@@ -25,7 +26,7 @@ export function isRuntimeEventDebugEnabled(): boolean {
 }
 
 function storageKey(userId: string, conversationId: string): string {
-  return `alfred:runtime-event-debug:v1:${encodeURIComponent(userId)}:${encodeURIComponent(conversationId)}`;
+  return `alfred:runtime-event-debug:v2:${encodeURIComponent(userId)}:${encodeURIComponent(conversationId)}`;
 }
 
 function notify(): void {
@@ -52,25 +53,48 @@ function isStoredEvent(value: unknown): value is RuntimeEventView {
   );
 }
 
-function parseSnapshot(raw: string): DebugSnapshot {
+/** Canonical copies prevent persisted native payloads or extra private fields re-entering exports. */
+function parsePublicEvent(value: unknown, conversationId: string): RuntimeEventView | null {
+  if (!isStoredEvent(value)) return null;
+  if (value.event === 'snapshot') {
+    const parsed = executionSnapshotSchema.safeParse(value.data);
+    if (
+      !parsed.success ||
+      parsed.data.conversation.id !== conversationId ||
+      parsed.data.execution.conversationId !== conversationId
+    )
+      return null;
+    return { id: value.id, event: value.event, data: parsed.data };
+  }
+  if (value.event === 'conversation') {
+    const parsed = conversationSchema.safeParse(value.data);
+    if (!parsed.success || parsed.data.id !== conversationId) return null;
+    return { id: value.id, event: value.event, data: parsed.data };
+  }
+  return null;
+}
+
+function parseSnapshot(raw: string, conversationId: string): DebugSnapshot {
   const value: unknown = JSON.parse(raw);
   if (
     typeof value !== 'object' ||
     value === null ||
     !('version' in value) ||
-    value.version !== 1 ||
+    value.version !== 2 ||
     !('events' in value) ||
     !Array.isArray(value.events) ||
     !value.events.every(isStoredEvent)
   ) {
     throw new Error('Invalid debug history');
   }
-  const events: RuntimeEventView[] = value.events;
-  if (events.some((event, index) => event.id <= (events[index - 1]?.id ?? 0))) {
+  const events = value.events.map((event: unknown) => parsePublicEvent(event, conversationId));
+  if (events.some((event) => event === null)) throw new Error('Invalid public debug history');
+  const publicEvents = events.filter((event): event is RuntimeEventView => event !== null);
+  if (publicEvents.some((event, index) => event.id <= (publicEvents[index - 1]?.id ?? 0))) {
     throw new Error('Invalid event sequence');
   }
   return {
-    events,
+    events: publicEvents,
     error:
       'incomplete' in value && value.incomplete === true
         ? 'Historique de débogage incomplet : certains événements n’ont pas été sauvegardés.'
@@ -78,7 +102,7 @@ function parseSnapshot(raw: string): DebugSnapshot {
   };
 }
 
-function getEntry(key: string): DebugEntry {
+function getEntry(key: string, conversationId: string): DebugEntry {
   const existing = entries.get(key);
   if (existing) return existing;
   let entry: DebugEntry = { snapshot: EMPTY, bytes: 0 };
@@ -96,7 +120,7 @@ function getEntry(key: string): DebugEntry {
           },
         };
       } else {
-        entry = { snapshot: parseSnapshot(raw), bytes };
+        entry = { snapshot: parseSnapshot(raw, conversationId), bytes };
       }
     }
   } catch {
@@ -118,14 +142,14 @@ export function getRuntimeEventDebugSnapshot(
   conversationId: string,
 ): DebugSnapshot {
   if (!isRuntimeEventDebugEnabled()) return EMPTY;
-  return getEntry(storageKey(userId, conversationId)).snapshot;
+  return getEntry(storageKey(userId, conversationId), conversationId).snapshot;
 }
 
 /** Never let a stale successful save masquerade as a complete capture after reload. */
 function invalidateStoredCapture(key: string): void {
   try {
     window.localStorage.removeItem(key);
-    window.localStorage.setItem(key, JSON.stringify({ version: 1, events: [], incomplete: true }));
+    window.localStorage.setItem(key, JSON.stringify({ version: 2, events: [], incomplete: true }));
   } catch {
     // The caller already reports the storage failure. A denied browser store may prevent cleanup.
   }
@@ -142,7 +166,7 @@ function flush(): void {
     if (!entry) continue;
     try {
       const raw = JSON.stringify({
-        version: 1,
+        version: 2,
         events: entry.snapshot.events,
         incomplete: entry.snapshot.error !== null,
       });
@@ -176,11 +200,13 @@ export function captureRuntimeEvent(
 ): void {
   if (!isRuntimeEventDebugEnabled()) return;
   const key = storageKey(userId, conversationId);
-  const entry = getEntry(key);
+  const entry = getEntry(key, conversationId);
   if (entry.stopped) return;
   try {
     const id = (entry.snapshot.events.at(-1)?.id ?? 0) + 1;
-    const raw = JSON.stringify({ id, event: event.event, data: event.data });
+    const captured = parsePublicEvent({ id, event: event.event, data: event.data }, conversationId);
+    if (captured === null) throw new Error('Invalid public event');
+    const raw = JSON.stringify(captured);
     const bytes = raw.length * 2;
     if (memoryBytes + bytes > MEMORY_LIMIT || !Number.isSafeInteger(id)) {
       entries.set(key, { ...entry, stopped: true });
@@ -191,8 +217,6 @@ export function captureRuntimeEvent(
       scheduleSave(key);
       return;
     }
-    const captured: unknown = JSON.parse(raw);
-    if (!isStoredEvent(captured)) throw new Error('Invalid event');
     entries.set(key, {
       bytes: entry.bytes + bytes,
       snapshot: { ...entry.snapshot, events: [...entry.snapshot.events, captured] },
@@ -201,10 +225,7 @@ export function captureRuntimeEvent(
     scheduleSave(key);
     notify();
   } catch {
-    reportError(
-      key,
-      'Événement non sérialisable : cet événement de débogage n’a pas pu être capturé.',
-    );
+    reportError(key, 'Événement public invalide : cet événement de débogage n’a pas été capturé.');
   }
 }
 

@@ -4,12 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { paginateByCursor } from '@api/common/pagination/paginate';
 import { ProjectsService } from '@api/modules/projects/application/projects.service';
+import { ConversationEntity } from '@api/modules/conversations/infrastructure/persistence/conversation.entity';
 import {
   principal,
   projectRow,
   queryBuilder,
   scope,
   tenantsService,
+  conversationRow,
 } from '../../../../support/project-fixtures';
 
 vi.mock('@api/common/pagination/paginate', () => ({ paginateByCursor: vi.fn() }));
@@ -29,8 +31,13 @@ function repositoryWith(overrides: Record<string, unknown> = {}) {
 
 function serviceWith(repository: ReturnType<typeof repositoryWith>) {
   const query = vi.fn().mockResolvedValue([]);
+  const conversations = queryBuilder([conversationRow()]);
   const manager = {
-    getRepository: vi.fn().mockReturnValue(repository),
+    getRepository: vi.fn((entity: unknown) =>
+      entity === ConversationEntity
+        ? { createQueryBuilder: vi.fn().mockReturnValue(conversations) }
+        : repository,
+    ),
     query,
   } as unknown as EntityManager;
   const transaction = vi.fn((work: (manager: EntityManager) => unknown) => work(manager));
@@ -38,7 +45,12 @@ function serviceWith(repository: ReturnType<typeof repositoryWith>) {
     getRepository: vi.fn().mockReturnValue(repository),
     transaction,
   } as unknown as DataSource;
-  return { query, service: new ProjectsService(dataSource, tenantsService()), transaction };
+  return {
+    conversations,
+    query,
+    service: new ProjectsService(dataSource, tenantsService()),
+    transaction,
+  };
 }
 
 describe('ProjectsService', () => {
@@ -282,5 +294,31 @@ describe('ProjectsService', () => {
       ownerUserId: scope.ownerUserId,
       tenantId: scope.tenantId,
     });
+  });
+
+  it('locks project then conversations in UUID order and refuses an active cascading deletion', async () => {
+    const repository = repositoryWith();
+    const { conversations, query, service } = serviceWith(repository);
+    query.mockResolvedValue([{ active: 1 }]);
+    await expect(service.remove(principal, projectRow().id)).rejects.toMatchObject({
+      code: 'thread_busy',
+    });
+    expect(conversations.where).toHaveBeenCalledWith('conversation.projectId = :projectId', {
+      projectId: projectRow().id,
+    });
+    expect(conversations.orderBy).toHaveBeenCalledWith('conversation.id', 'ASC');
+    expect(conversations.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(repository.findOne.mock.invocationCallOrder[0]).toBeLessThan(
+      conversations.getMany.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(conversations.getMany.mock.invocationCallOrder[0]).toBeLessThan(
+      query.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('api_executions'), [
+      [conversationRow().id],
+      ['pending', 'running', 'stopping'],
+      30_000,
+    ]);
+    expect(repository.delete).not.toHaveBeenCalled();
   });
 });

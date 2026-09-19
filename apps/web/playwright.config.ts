@@ -1,6 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isCi = process.env.CI !== undefined;
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:4173';
+const previewPort = new URL(baseURL).port || '4173';
+if (!/^\d+$/u.test(previewPort)) {
+  throw new Error(`Invalid PLAYWRIGHT_BASE_URL port: ${baseURL}`);
+}
 
 export default defineConfig({
   testDir: './test/e2e',
@@ -13,7 +18,7 @@ export default defineConfig({
     ? [['line'], ['html', { open: 'never', outputFolder: 'playwright-report' }]]
     : [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:4173',
+    baseURL,
     actionTimeout: 10_000,
     navigationTimeout: 30_000,
     trace: 'on-first-retry',
@@ -29,8 +34,8 @@ export default defineConfig({
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
   webServer: {
-    command: 'pnpm run dev:e2e',
-    url: 'http://127.0.0.1:4173',
+    command: `pnpm build && vite preview --host 127.0.0.1 --port ${previewPort} --strictPort`,
+    url: baseURL,
     reuseExistingServer: !isCi,
     timeout: 120_000,
   },

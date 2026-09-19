@@ -6,6 +6,7 @@ import { ConversationTranscript } from '@/components/workspace/conversation/conv
 import { ConversationWelcome } from '@/components/workspace/conversation/conversation-welcome';
 import { MessageComposer } from '@/components/workspace/conversation/message-composer';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { ConversationSkeleton } from '@/components/workspace/workspace-skeletons';
 import type { TurnFailure } from '@/hooks/conversations/use-conversation-chat';
 import type { LiveSession, RuntimeEventView } from '@/contexts/chat-session/chat-session-context';
@@ -34,6 +35,8 @@ interface ConversationPanelProps {
   readonly blockedReason?: string | null;
   readonly isStreaming?: boolean;
   readonly onStop?: () => void;
+  readonly onReconnect?: () => void;
+  readonly recoveryAvailable?: boolean;
 }
 
 export function ConversationPanel({
@@ -54,6 +57,8 @@ export function ConversationPanel({
   blockedReason = null,
   isStreaming = false,
   onStop,
+  onReconnect,
+  recoveryAvailable = false,
 }: ConversationPanelProps) {
   const hasTranscript = messages.length > 0 || sessions.length > 0;
   return (
@@ -94,6 +99,13 @@ export function ConversationPanel({
               {notice}
             </p>
           ) : null}
+          {recoveryAvailable ? (
+            <div className="mx-4 mt-3 md:mx-6">
+              <Button onClick={onReconnect} variant="outline" size="sm">
+                Reconnecter et vérifier l’état
+              </Button>
+            </div>
+          ) : null}
           {isLoading ? (
             <ConversationSkeleton />
           ) : hasTranscript ? (
@@ -123,6 +135,7 @@ export function ConversationPanel({
             blockedReason={blockedReason}
             isStreaming={isStreaming}
             onStop={onStop}
+            isStopping={sessions.at(-1)?.turn.stopPending}
           />
         )}
       </section>

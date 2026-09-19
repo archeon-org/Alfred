@@ -10,5 +10,7 @@ process.env.AUTH_JWT_SECRET ??= 'test-only-signing-secret-that-is-longer-than-32
 process.env.DATABASE_URL ??=
   'postgresql://alfred:test-password@localhost:5432/alfred_test?schema=public';
 process.env.FEATURE_GOOGLE_OAUTH_ENABLED ??= 'false';
+// Opt-in runtime profiles are selected explicitly by each integration fixture, never private .env.
+process.env.FEATURE_AGENT_RUNTIME_ENABLED ??= 'false';
 process.env.NODE_ENV ??= 'test';
 process.env.WEB_APP_URL ??= 'http://localhost:5173';

@@ -12,8 +12,8 @@ interface ConversationNavigationProps {
   readonly conversationActions: ConversationActionHandlers;
   readonly conversations: readonly Conversation[];
   readonly selectedId: string | undefined;
-  /** Chat whose answer is streaming right now; its row shows a live indicator. */
-  readonly streamingId?: string;
+  /** Chats whose answers remain unresolved; each row shows a live indicator. */
+  readonly streamingIds?: ReadonlySet<string>;
   readonly onSelect: (id: string) => void;
   /** Tighter rows for chats nested under a project. */
   readonly compact?: boolean;
@@ -24,7 +24,7 @@ export function ConversationNavigation({
   conversationActions,
   conversations,
   selectedId,
-  streamingId,
+  streamingIds,
   onSelect,
 }: ConversationNavigationProps) {
   return (
@@ -56,7 +56,7 @@ export function ConversationNavigation({
             >
               {item.title}
             </span>
-            {streamingId === item.id ? (
+            {streamingIds?.has(item.id) ? (
               <>
                 <span
                   aria-hidden="true"

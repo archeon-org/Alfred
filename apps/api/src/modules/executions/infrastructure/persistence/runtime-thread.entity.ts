@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Generated,
   JoinColumn,
   OneToOne,
   PrimaryColumn,
@@ -35,6 +36,10 @@ export class RuntimeThreadEntity {
 
   @Column({ name: 'thread_id', type: 'varchar', length: 128 })
   threadId!: string;
+
+  @Column({ type: 'uuid' })
+  @Generated('uuid')
+  generation!: string;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

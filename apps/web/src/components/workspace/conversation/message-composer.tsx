@@ -15,10 +15,11 @@ interface MessageComposerProps {
   readonly onSend?: (message: string) => boolean | Promise<boolean>;
   /** Sending is paused (the chat is being created); typing stays possible. */
   readonly isBusy?: boolean;
-  /** Why sending is refused right now (another chat is answering); typing stays possible. */
+  /** Why sending is refused right now (for example, state discovery); typing stays possible. */
   readonly blockedReason?: string | null;
   readonly isStreaming?: boolean;
   readonly onStop?: () => void;
+  readonly isStopping?: boolean | undefined;
 }
 
 export function MessageComposer({
@@ -28,6 +29,7 @@ export function MessageComposer({
   blockedReason = null,
   isStreaming = false,
   onStop,
+  isStopping = false,
 }: MessageComposerProps) {
   const messageId = useId();
   const helpId = useId();
@@ -97,10 +99,12 @@ export function MessageComposer({
           {isStreaming ? (
             <Button
               className="ml-auto"
-              aria-label="Arrêter la réponse"
+              aria-label={isStopping ? 'Réessayer l’arrêt de la réponse' : 'Arrêter la réponse'}
               onClick={onStop}
               size="icon-sm"
-              title="Arrêter la réponse"
+              title={
+                isStopping ? 'Arrêt demandé, en attente de confirmation' : 'Arrêter la réponse'
+              }
               type="button"
               variant="outline"
             >

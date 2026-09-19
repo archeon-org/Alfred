@@ -72,8 +72,11 @@ export function WorkspaceScreen() {
   // Warms the capability manifest so a chat opened from the composer knows the bridge state at once.
   useFeatureFlagsQuery();
   const chatSession = useChatSession();
-  const streamingConversationId =
-    chatSession.live?.turn.status === 'streaming' ? chatSession.live.conversationId : undefined;
+  const streamingConversationIds = new Set(
+    chatSession.sessions
+      .filter((session) => session.turn.status === 'streaming')
+      .map((session) => session.conversationId),
+  );
   const conversationRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<PanelImperativeHandle>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -228,7 +231,7 @@ export function WorkspaceScreen() {
             }
             selectedProjectId={selectedProjectId}
             selectedConversationId={selectedConversationId}
-            streamingConversationId={streamingConversationId}
+            streamingConversationIds={streamingConversationIds}
             isProjectHome={projectMatch !== null}
             search={shell.search}
             isLoading={isLoading}

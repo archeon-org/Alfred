@@ -98,7 +98,25 @@ describe('execution domain helpers', () => {
   });
 
   it('bounds runtime error descriptions and hides non-error values', () => {
-    expect(describeRuntimeError(new Error('x'.repeat(600)))).toHaveLength(512);
+    expect(describeRuntimeError(new Error('SYNTHETIC_PRIVATE_TOKEN'))).toBe(
+      'Runtime execution failed.',
+    );
     expect(describeRuntimeError({ secret: 'no' })).toBe('Runtime execution failed.');
   });
+});
+
+it('redacts historical provider error text from the public execution DTO', async () => {
+  const { toExecutionDto } = await import('@api/modules/executions/domain/execution');
+  const result = toExecutionDto({
+    id: 'execution',
+    conversationId: 'conversation',
+    status: 'failed',
+    error: 'SYNTHETIC_PRIVATE_TOKEN raw upstream stack',
+    createdAt: new Date(),
+    startedAt: null,
+    finishedAt: new Date(),
+  });
+  expect(result.error).toBe('The runtime could not complete this execution.');
+  expect(result.errorCode).toBe('runtime_failed');
+  expect(JSON.stringify(result)).not.toContain('SYNTHETIC_PRIVATE_TOKEN');
 });

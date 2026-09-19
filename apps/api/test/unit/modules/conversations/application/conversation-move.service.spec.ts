@@ -12,23 +12,39 @@ import {
 
 function fixture(source = projectRow(), target = source) {
   const row = conversationRow({ projectId: source.id });
+  const update = {
+    update: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    execute: vi.fn().mockResolvedValue({ affected: 1 }),
+  };
   const conversations = {
+    createQueryBuilder: vi.fn().mockReturnValue(update),
     findOne: vi.fn().mockResolvedValue(row),
     countBy: vi.fn().mockResolvedValue(1),
   };
   const projects = {
+    delete: vi.fn().mockResolvedValue({ affected: 1 }),
     existsBy: vi.fn().mockResolvedValue(false),
     findOne: vi.fn(({ where }: { where: { id: string } }) =>
       Promise.resolve([source, target].find(({ id }) => id === where.id) ?? null),
     ),
   };
+  const query = vi.fn().mockResolvedValue([]);
   const manager = {
     getRepository: (entity: unknown) => (entity === ConversationEntity ? conversations : projects),
+    query,
   } as unknown as EntityManager;
   const db = {
     transaction: (work: (manager: EntityManager) => unknown) => work(manager),
   } as unknown as DataSource;
-  return { service: new ConversationMoveService(db, tenantsService()), projects, row };
+  return {
+    service: new ConversationMoveService(db, tenantsService()),
+    conversations,
+    projects,
+    query,
+    row,
+  };
 }
 
 describe('conversation move UUID canonicalization', () => {
@@ -54,5 +70,41 @@ describe('conversation move UUID canonicalization', () => {
       target.id,
       source.id,
     ]);
+  });
+
+  it('refuses moving an active standalone execution after locking both projects and its conversation', async () => {
+    const source = projectRow({
+      id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      kind: 'implicit',
+      name: null,
+      description: null,
+    });
+    const target = projectRow({ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' });
+    const { service, conversations, projects, query, row } = fixture(source, target);
+    query.mockResolvedValue([{ active: 1 }]);
+    await expect(service.move(principal, row.id, { projectId: target.id })).rejects.toMatchObject({
+      code: 'thread_busy',
+    });
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('api_executions'), [
+      [row.id],
+      ['pending', 'running', 'stopping'],
+      30_000,
+    ]);
+    expect(projects.findOne.mock.invocationCallOrder[1]).toBeLessThan(
+      conversations.findOne.mock.invocationCallOrder[2] ?? 0,
+    );
+    expect(conversations.findOne.mock.invocationCallOrder[2]).toBeLessThan(
+      query.mock.invocationCallOrder[0] ?? 0,
+    );
+    expect(conversations.countBy).not.toHaveBeenCalled();
+  });
+
+  it('allows an idempotent same-target retry while an execution is active', async () => {
+    const { service, query, row } = fixture();
+    query.mockResolvedValue([{ active: 1 }]);
+    await expect(
+      service.move(principal, row.id, { projectId: row.projectId }),
+    ).resolves.toMatchObject({ id: row.id });
+    expect(query).not.toHaveBeenCalled();
   });
 });

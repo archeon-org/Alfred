@@ -1,15 +1,24 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
-import { DISABLED_FEATURE_FLAGS } from '../../src/services/feature-flags/feature-flags';
-import { CONVERSATION_ID, installWorkspaceApi } from './support/workspace-api';
+import {
+  EXECUTION_ID,
+  executionSnapshot,
+  installExecutionApi,
+  sse,
+} from './support/executions-api';
+import { CONVERSATION_ID } from './support/workspace-api';
 
 const userId = '21dd1aaa-d564-4a45-9a07-dbc5777d25d5';
-const key = `alfred:runtime-event-debug:v1:${userId}:${CONVERSATION_ID}`;
+const key = `alfred:runtime-event-debug:v2:${userId}:${CONVERSATION_ID}`;
 const enabled = process.env.VITE_DEBUG_EVENTS === 'true';
 const events = Array.from({ length: 205 }, (_, id) => ({
-  event: 'custom',
-  data: { sequence: id, content: `event-${id}-${'x'.repeat(700)}` },
+  event: 'snapshot',
+  data: executionSnapshot(
+    id + 1,
+    `event-${id}-${'x'.repeat(700)}`,
+    id === 204 ? 'completed' : 'running',
+  ),
 }));
 
 for (const width of [390, 1440]) {
@@ -17,51 +26,18 @@ for (const width of [390, 1440]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 950 });
-    await installWorkspaceApi(page);
-    await page.route('**/api/auth/refresh', (route) =>
-      route.fulfill({
-        json: {
-          success: true,
-          data: {
-            accessToken: 'e2e-memory-only-token',
-            user: {
-              id: userId,
-              displayName: 'Ada',
-              email: 'ada@example.test',
-              role: 'user',
-            },
-          },
-        },
-      }),
-    );
-    await page.route('**/api/features', (route) =>
-      route.fulfill({
-        json: {
-          success: true,
-          data: { ...DISABLED_FEATURE_FLAGS, agentRuntime: true },
-        },
-      }),
-    );
-    await page.route('**/api/conversations/*/messages', (route) =>
-      route.fulfill({
-        json: {
-          success: true,
-          data: { items: [] },
-        },
-      }),
-    );
-    await page.route('**/api/conversations/*/executions', (route) =>
-      route.fulfill({
+    const api = await installExecutionApi(page);
+    await page.route(`**/api/executions/${EXECUTION_ID}/events`, (route) => {
+      api.set(events.at(-1)!.data);
+      return route.fulfill({
         contentType: 'text/event-stream',
-        body: events
-          .map((event) => `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`)
-          .join(''),
-      }),
-    );
+        body: events.map((event) => sse(event.data)).join(''),
+      });
+    });
     await page.goto(`/app/conversations/${CONVERSATION_ID}`);
     await page.getByLabel('Message', { exact: true }).fill('Diagnostic test');
     await page.getByRole('button', { name: 'Envoyer le message' }).click();
-    await expect(page.getByText('La réponse a été interrompue avant la fin.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Envoyer le message' })).toBeVisible();
     if (!enabled) {
       await expect(page.getByText(/Événements du runtime/u)).toHaveCount(0);
       expect(await page.evaluate((storageKey) => localStorage.getItem(storageKey), key)).toBeNull();

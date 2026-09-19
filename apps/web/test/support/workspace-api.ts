@@ -1,4 +1,10 @@
-import type { Conversation, FeatureFlags, Message, Project } from '@alfred/contracts';
+import type {
+  Conversation,
+  ExecutionSnapshot,
+  FeatureFlags,
+  Message,
+  Project,
+} from '@alfred/contracts';
 import { vi } from 'vitest';
 
 import { DISABLED_FEATURE_FLAGS } from '@/services/feature-flags/feature-flags';
@@ -117,7 +123,7 @@ function runExecution(
   index: number,
   message: string,
   interrupted: boolean,
-): (readonly [string, unknown])[] {
+): { initial: ExecutionSnapshot; final: ExecutionSnapshot; frames: SseFrames } {
   const current = conversations[index]!;
   const now = new Date().toISOString();
   const executionId = nextId();
@@ -162,20 +168,39 @@ function runExecution(
     startedAt: now,
     status,
   });
-  // An interrupted stream closes right after the answer, before any terminal execution state.
-  return [
-    ['conversation', provisional],
-    ['execution', execution('running')],
-    ['metadata', { run_id: nextId() }],
-    ['messages/partial', [{ content: reply.slice(0, 8), id: 'ai-1', type: 'AIMessageChunk' }]],
-    ['messages/complete', [{ content: reply, id: 'ai-1', type: 'ai' }]],
-    ...(interrupted
-      ? []
-      : [
-          ...(untitled ? [['conversation', titled] as const] : []),
-          ['execution', execution('completed')] as const,
-        ]),
-  ];
+  const initial: ExecutionSnapshot = {
+    execution: execution('running'),
+    conversation: provisional,
+    userMessage: message,
+    assistantText: '',
+    activities: [],
+    cursor: 'cursor:0',
+    revision: 0,
+  };
+  const final: ExecutionSnapshot = {
+    ...initial,
+    execution: execution('completed'),
+    conversation: titled,
+    assistantText: reply,
+    cursor: 'cursor:2',
+    revision: 2,
+  };
+  return {
+    initial,
+    final,
+    frames: [
+      ['conversation', provisional],
+      ['snapshot', initial],
+      [
+        'snapshot',
+        { ...initial, assistantText: reply.slice(0, 8), revision: 1, cursor: 'cursor:1' },
+      ],
+      ['snapshot', { ...initial, assistantText: reply, revision: 2, cursor: 'cursor:2' }],
+      ...(interrupted
+        ? []
+        : [...(untitled ? [['conversation', titled] as const] : []), ['snapshot', final] as const]),
+    ],
+  };
 }
 
 function failure(status: number, code: string, message = 'Request failed'): Response {
@@ -203,6 +228,7 @@ export function createWorkspaceApi(
   const failures = new Map<string, Failure>();
   let executionHold: Promise<void> | null = null;
   let interruptExecutions = false;
+  const executions = new Map<string, ReturnType<typeof runExecution>>();
   const documents = new Map<
     string,
     {
@@ -416,10 +442,27 @@ export function createWorkspaceApi(
       const index = conversations.findIndex((item) => item.id === executionsMatch[1]);
       if (index === -1) return failure(404, 'conversation_not_found', 'Conversation not found.');
       const { message } = body as { message: string };
-      return sseResponse(
-        runExecution(conversations, messages, index, message, interruptExecutions),
-        executionHold,
-      );
+      const run = runExecution(conversations, messages, index, message, interruptExecutions);
+      executions.set(run.initial.execution.id, run);
+      return json({ success: true, data: { snapshot: run.initial } }, 202);
+    }
+    const activeMatch = /^\/api\/conversations\/([^/]+)\/executions\/active$/u.exec(path);
+    if (activeMatch && method === 'GET') {
+      const active =
+        executionHold === null
+          ? null
+          : ([...executions.values()].find(
+              (run) => run.initial.execution.conversationId === activeMatch[1],
+            )?.initial ?? null);
+      return json({ success: true, data: { snapshot: active } });
+    }
+    const executionMatch = /^\/api\/executions\/([^/]+)(?:\/(events|stop))?$/u.exec(path);
+    if (executionMatch) {
+      const run = executions.get(executionMatch[1]!);
+      if (!run) return failure(404, 'execution_not_found');
+      if (executionMatch[2] === 'events') return sseResponse(run.frames, executionHold);
+      const snapshot = executionHold === null ? run.final : run.initial;
+      return json({ success: true, data: { snapshot } });
     }
     const conversationMatch = /^\/api\/conversations\/([^/]+)$/u.exec(path);
     if (conversationMatch !== null) {

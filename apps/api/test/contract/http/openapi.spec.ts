@@ -53,6 +53,7 @@ describe('OpenAPI HTTP documentation', () => {
   });
 
   beforeAll(async () => {
+    vi.stubEnv('FEATURE_AGENT_RUNTIME_ENABLED', 'false');
     vi.stubEnv('AUTH_JWT_SECRET', sensitiveValues[0]);
     vi.stubEnv(
       'DATABASE_URL',

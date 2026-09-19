@@ -49,7 +49,7 @@ describe('Workspace chat with the agent bridge', () => {
     const id = router.state.location.pathname.split('/').at(-1);
     expect(api.calls).toContainEqual(
       expect.objectContaining({
-        body: { message: 'hello' },
+        body: { message: 'hello', submissionId: expect.any(String) as unknown },
         method: 'POST',
         path: `/api/conversations/${id}/executions`,
       }),
@@ -112,7 +112,7 @@ describe('Workspace chat with the agent bridge', () => {
     );
   });
 
-  it('keeps a draft typed in another chat while an answer is streaming, then sends it', async () => {
+  it('runs two chats concurrently and preserves each answer while navigating between them', async () => {
     const user = userEvent.setup();
     const api = createWorkspaceApi({
       conversations: [
@@ -136,20 +136,40 @@ describe('Workspace chat with the agent bridge', () => {
     await user.click(await sidebar().findByRole('button', { name: 'Chat libre' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Chat libre' })).toBeVisible();
     await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Deux{Enter}');
-    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Deux');
-    expect(screen.getByText(/répond dans une autre conversation/u)).toBeVisible();
-    expect(api.calls.filter(({ path }) => path.endsWith('/executions'))).toHaveLength(1);
+    await waitFor(() =>
+      expect(api.calls.filter(({ path }) => path.endsWith('/executions'))).toHaveLength(2),
+    );
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
+    expect(await findInMain('Deux')).toBeVisible();
+    expect(await findInMain('Alfred réfléchit…')).toBeVisible();
+    expect(within(screen.getByRole('main')).queryByText('Un')).not.toBeInTheDocument();
+
+    await user.click(await sidebar().findByRole('button', { name: 'Refonte du portail' }));
+    await waitFor(() =>
+      expect(sidebar().getByRole('button', { name: 'Refonte du portail' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      ),
+    );
+    await user.click(await sidebar().findByRole('button', { name: /^Synthèse du comité projet/u }));
+    expect(await findInMain('Un')).toBeVisible();
+    expect(await findInMain('Alfred réfléchit…')).toBeVisible();
+    expect(within(screen.getByRole('main')).queryByText('Deux')).not.toBeInTheDocument();
+    expect(sidebar().getAllByText('Réponse en cours')).toHaveLength(2);
 
     release();
     await waitFor(() =>
-      expect(screen.queryByText(/répond dans une autre conversation/u)).not.toBeInTheDocument(),
+      expect(within(screen.getByRole('main')).getByText(fakeReply('Un'))).toBeVisible(),
     );
-    await user.keyboard('{Enter}');
+    await user.click(await sidebar().findByRole('button', { name: /^Chat libre/u }));
     expect(await findInMain(fakeReply('Deux'))).toBeVisible();
+    expect(within(screen.getByRole('main')).getAllByText(fakeReply('Deux'))).toHaveLength(1);
     expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Envoyer le message' })).toBeVisible();
+    expect(api.calls.filter(({ path }) => path.endsWith('/executions'))).toHaveLength(2);
   });
 
-  it('shows an answer as interrupted when its stream closes without a terminal state', async () => {
+  it('reconciles the authoritative execution after its stream closes before the terminal snapshot', async () => {
     const user = userEvent.setup();
     const api = createWorkspaceApi({
       conversations: [conversation()],
@@ -161,9 +181,42 @@ describe('Workspace chat with the agent bridge', () => {
 
     await user.type(await screen.findByRole('textbox', { name: 'Message' }), 'Suite ?{Enter}');
 
-    const alert = await within(screen.getByRole('main')).findByRole('alert');
-    expect(alert).toHaveTextContent('La réponse a été interrompue avant la fin.');
-    expect(alert.closest('li')).toHaveTextContent(fakeReply('Suite ?'));
-    expect(screen.getByRole('button', { name: 'Envoyer le message' })).toBeInTheDocument();
+    expect(await findInMain(fakeReply('Suite ?'))).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Envoyer le message' })).toBeInTheDocument(),
+    );
+    expect(within(screen.getByRole('main')).queryByRole('alert')).not.toBeInTheDocument();
+    expect(
+      api.calls.filter(({ path, method }) => path.includes('/api/executions/') && method === 'GET'),
+    ).not.toHaveLength(0);
+    expect(api.calls.filter(({ path }) => path.endsWith('/executions'))).toHaveLength(1);
+  });
+
+  it('creates and starts a new conversation while the previous chat is still thinking', async () => {
+    const user = userEvent.setup();
+    const api = createWorkspaceApi({
+      conversations: [conversation()],
+      projects: [project()],
+      features: { agentRuntime: true },
+    });
+    const release = api.holdExecutions();
+    const { router } = renderWorkspaceAt(`/app/conversations/${CONVERSATION_ID}`, api);
+    await user.type(await screen.findByRole('textbox', { name: 'Message' }), 'First{Enter}');
+    expect(await findInMain('Alfred réfléchit…')).toBeVisible();
+    await user.click(sidebar().getByRole('button', { name: 'Nouvelle conversation' }));
+    await user.type(await screen.findByRole('textbox', { name: 'Message' }), 'Second{Enter}');
+    await waitFor(() =>
+      expect(api.calls.filter(({ path }) => path.endsWith('/executions'))).toHaveLength(2),
+    );
+    expect(router.state.location.pathname).not.toBe(`/app/conversations/${CONVERSATION_ID}`);
+    expect(router.state.location.state).toBeNull();
+    expect(await findInMain('Second')).toBeVisible();
+    expect(await findInMain('Alfred réfléchit…')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('');
+    release();
+    await waitFor(() => {
+      expect(within(screen.getByRole('main')).getByText(fakeReply('Second'))).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Envoyer le message' })).toBeVisible();
+    });
   });
 });

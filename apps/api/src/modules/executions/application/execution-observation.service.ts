@@ -1,0 +1,113 @@
+import type { ExecutionSnapshot } from '@alfred/contracts';
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { DataSource } from 'typeorm';
+import type { AuthPrincipal } from '../../../common/auth/auth-principal';
+import { ApiException } from '../../../common/errors/api.exception';
+import { ConversationsService } from '../../conversations/application/conversations.service';
+import { createResumeCursor, readResumeCursor } from '../../stream/api/resume-cursor';
+import { toExecutionDto } from '../domain/execution';
+import {
+  emptyProjection,
+  projectionActivities,
+  projectionText,
+  type ProjectionState,
+} from '../infrastructure/langgraph/runtime-projection';
+import { ExecutionEntity } from '../infrastructure/persistence/execution.entity';
+import { MessageEntity } from '../infrastructure/persistence/message.entity';
+import { ExecutionsService } from './executions.service';
+
+@Injectable()
+export class ExecutionObservationService {
+  constructor(
+    private readonly executions: ExecutionsService,
+    private readonly conversations: ConversationsService,
+    private readonly dataSource: DataSource,
+    private readonly config: ConfigService,
+  ) {}
+
+  async load(principal: AuthPrincipal, id: string, cursor?: string) {
+    const row = await this.executions.getObservation(principal, id);
+    if (cursor !== undefined) {
+      try {
+        this.readCursor(cursor, row);
+      } catch {
+        throw new ApiException(
+          409,
+          'invalid_cursor',
+          'The stream position is no longer available.',
+        );
+      }
+    }
+    const conversation = await this.conversations.get(principal, row.conversationId);
+    const user = await this.dataSource
+      .getRepository(MessageEntity)
+      .findOne({ where: { executionId: id, role: 'user' } });
+    return { row, conversation, userMessage: user?.content ?? '', state: this.state(row) };
+  }
+
+  async snapshot(principal: AuthPrincipal, id: string): Promise<ExecutionSnapshot> {
+    const loaded = await this.load(principal, id);
+    return this.present(loaded);
+  }
+
+  present(
+    loaded: Awaited<ReturnType<ExecutionObservationService['load']>>,
+    state = loaded.state,
+  ): ExecutionSnapshot {
+    const cursor = createResumeCursor(
+      { ...this.scope(loaded.row), nativePosition: state.sourceId, outputSubposition: 0 },
+      this.config.getOrThrow<string>('EXECUTION_CURSOR_KEY'),
+      { ttlMs: this.config.get<number>('EXECUTION_CURSOR_TTL_MS') ?? 3_600_000 },
+    );
+    return {
+      execution: toExecutionDto(loaded.row),
+      conversation: loaded.conversation,
+      userMessage: loaded.userMessage,
+      assistantText: state.sourceId === null ? loaded.row.publicText : projectionText(state),
+      activities: [...projectionActivities(state)],
+      cursor,
+      revision: state.sequence,
+    };
+  }
+
+  private readCursor(cursor: string, row: ExecutionEntity): void {
+    const keys = [
+      this.config.getOrThrow<string>('EXECUTION_CURSOR_KEY'),
+      this.config.get<string>('EXECUTION_CURSOR_KEY_PREVIOUS'),
+    ].filter((key): key is string => typeof key === 'string' && key.length >= 32);
+    for (const key of keys) {
+      try {
+        readResumeCursor(cursor, this.scope(row), key);
+        return;
+      } catch {
+        /* Try configured rotation key. */
+      }
+    }
+    throw new Error('Invalid cursor');
+  }
+
+  private scope(row: ExecutionEntity) {
+    return {
+      executionId: row.id,
+      invocationId: row.invocationId,
+      generation: row.bindingGeneration,
+      projectionVersion: 1,
+      schemaVersion: 1 as const,
+    };
+  }
+
+  private state(row: ExecutionEntity): ProjectionState {
+    // The row and its reducer/watermark are read together from one atomic projection commit.
+    if (row.sourceWatermark === null) return emptyProjection();
+    const state = row.reducerState as unknown as ProjectionState;
+    if (
+      state.version !== 1 ||
+      state.sourceId !== row.sourceWatermark ||
+      state.sequence !== row.projectionRevision
+    ) {
+      throw new ApiException(409, 'runtime_recovery_required', 'The saved stream needs recovery.');
+    }
+    return state;
+  }
+}

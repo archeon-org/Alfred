@@ -1,3 +1,4 @@
+import { DurableRuntimeExecutions1789400000000 } from './1789400000000-durable-runtime-executions';
 import { CreateRuntimeExecutions1789310000000 } from './1789310000000-create-runtime-executions';
 import { WorkspaceMemberships1789290000000 } from './1789290000000-workspace-memberships';
 import { CreateWorkspaces1789280000000 } from './1789280000000-create-workspaces';
@@ -36,4 +37,5 @@ export const databaseMigrations = Object.freeze([
   CreateWorkspaces1789280000000,
   WorkspaceMemberships1789290000000,
   CreateRuntimeExecutions1789310000000,
+  DurableRuntimeExecutions1789400000000,
 ] as const);
