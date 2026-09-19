@@ -39,7 +39,7 @@ was set aside: the native `POST /assistants/search` carries enough metadata.
 - The browser follows `route → screen → hook → service`: `listAgents` validates the envelope with
   `agentCatalogEnvelopeSchema`, `useAgentCatalog` caches it 60 s, and `AgentCatalog` renders loading,
   retryable failure, empty and list states as plain text. The local team builder preview is kept
-  unchanged below the catalog.
+  unchanged below the catalog (superseded by the 2026-09-17 evening revision).
 
 ## Consequences
 
@@ -52,3 +52,37 @@ was set aside: the native `POST /assistants/search` carries enough metadata.
 - Selecting, pinning or binding agents to an Execution (ALF-DEC-024 follow-ups), manifests
   (ALF-DEC-038) and `visible`/`public`/`enabled` as distinct runtime fields (ALF-DEC-052 §4) are
   not implemented; the runtime metadata exposes no `enabled` field yet.
+
+## Revision 2026-09-17 (evening): search, cursor pages and a compact list
+
+The owner asked for a searchable, infinitely scrolled specialist list with details in a dialog, and
+removed the local team builder preview. Probed against LangGraph API 0.14.0, `POST /assistants/search`
+filters `name` by case-insensitive substring but cannot filter on `description` (a JSON string) nor
+on `is_subagent`, which is absent from `metadata`; runtime `limit`/`offset` would therefore page
+native assistants, not specialists, and could not search descriptions or tags.
+
+- `GET /api/agents?search=&cursor=&limit=` now answers the standard list shape
+  `{ items, nextCursor }` (`agentListEnvelopeSchema`, `limit` 1–100, default 20; `search` at most
+  100 characters). The adapter and its bounds are unchanged; while the 30 s cache is valid,
+  searching and paging make no runtime call.
+- Each cache load becomes one immutable catalog version: agents sorted once (case-insensitive
+  name, then exact name and assistant identifier), search text folded once, and a version
+  fingerprint (SHA-256 prefix of the sorted content) that changes only when the content does.
+- Search folds case, accents, `_` and `-`, splits on whitespace and requires every term in the
+  name, graph identifier, short description, description or tags.
+- The cursor is an opaque base64url `{ v, q, o }`: catalog version, search fingerprint and offset.
+  It carries no agent text, so its size is fixed (under 100 characters) whatever the names. It is
+  validated for format only (exact keys, hexadecimal fingerprints, offset 1–200); it proves no
+  origin, and a forged cursor can only select a position in the same shared catalog. A malformed
+  cursor, or one used with another search, answers `400 invalid_cursor`. A cursor of an older
+  catalog version answers `409 agent_catalog_changed` and the browser reloads the list from the
+  first page, so a reader never mixes two versions (no repeats or gaps from renames).
+- The browser debounces input with the shared `useDebouncedSearch` (300 ms, moved from the skills
+  hooks), pages 10 agents with `useInfiniteQuery` (previous results kept while a new search
+  loads) and loads the next page through `useInfiniteScroll`, never while any request of the list
+  is in flight and never in an error state. `useInfiniteScroll` returns a callback ref, so a
+  replaced sentinel element is observed again. Rows show only the display name
+  (`agentDisplayName` in `@alfred/contracts`); « Détails » opens a dialog with descriptions, tags
+  and the runtime identifier. The team builder preview and its mock data are removed.
+- Native runtime paging stays an option once the runtime moves `is_subagent` (and tags) into
+  `metadata`; description search would still need the product-side filter.

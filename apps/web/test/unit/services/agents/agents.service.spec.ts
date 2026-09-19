@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { listAgents } from '@/services/agents/agents.service';
+import { AGENT_PAGE_SIZE, listAgents } from '@/services/agents/agents.service';
 
 const client = (data: unknown, status = 200) => ({
   request: vi
@@ -16,18 +16,32 @@ const agent = {
 };
 
 describe('Agents HTTP boundary', () => {
-  it('reads the catalog through the API client', async () => {
-    const http = client({ success: true, data: { items: [agent] } });
-    await expect(listAgents(http)).resolves.toEqual({ items: [agent] });
+  it('reads one page of the catalog through the API client', async () => {
+    const http = client({ success: true, data: { items: [agent], nextCursor: 'next' } });
+    await expect(listAgents(http)).resolves.toEqual({ items: [agent], nextCursor: 'next' });
     expect(http.request).toHaveBeenCalledWith(
-      '/agents',
+      `/agents?limit=${AGENT_PAGE_SIZE}`,
       expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  it('sends the cursor and a non-empty search as query parameters', async () => {
+    const http = client({ success: true, data: { items: [], nextCursor: null } });
+    await listAgents(http, 'abc', 'light rag');
+    expect(http.request).toHaveBeenCalledWith(
+      `/agents?cursor=abc&limit=${AGENT_PAGE_SIZE}&search=light+rag`,
+      expect.anything(),
+    );
+    await listAgents(http, undefined, '');
+    expect(http.request).toHaveBeenLastCalledWith(
+      `/agents?limit=${AGENT_PAGE_SIZE}`,
+      expect.anything(),
     );
   });
 
   it('fails closed on a malformed catalog', async () => {
     await expect(
-      listAgents(client({ success: true, data: { items: [{ id: 'x' }] } })),
+      listAgents(client({ success: true, data: { items: [{ id: 'x' }], nextCursor: null } })),
     ).rejects.toThrow('Le catalogue d’agents est invalide.');
   });
 

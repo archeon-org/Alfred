@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { agentDisplayName } from '@/lib/agents/agent-display-name';
+import { agentDisplayName } from '@alfred/contracts';
 
 describe('agentDisplayName', () => {
   it.each([

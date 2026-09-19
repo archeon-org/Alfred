@@ -1,7 +1,7 @@
-import { useId } from 'react';
+import { useCallback, useId } from 'react';
 
-import type { AgentSummary } from '@alfred/contracts';
-import { Bot } from 'lucide-react';
+import { AGENT_SEARCH_MAX_LENGTH, agentDisplayName, type AgentSummary } from '@alfred/contracts';
+import { Bot, Search } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,14 +13,26 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAgentCatalog } from '@/hooks/agents/use-agent-catalog';
-import { agentDisplayName } from '@/lib/agents/agent-display-name';
+import { useInfiniteScroll } from '@/hooks/ui/use-infinite-scroll';
+import { cn } from '@/lib/cn';
 
 /** The specialists the runtime declares as sub-agents. Listing one grants no access to it. */
 export function AgentCatalog() {
   const id = useId();
-  const { agents, query } = useAgentCatalog();
+  const { agents, input, query, search, setInput } = useAgentCatalog();
+  const { fetchNextPage, hasNextPage, isFetching, isFetchNextPageError } = query;
+  // Any request in flight (a refresh, a new search, a page) blocks the next one: fetching a page
+  // during a refresh would discard the refreshed result.
+  const loadMore = useCallback(() => {
+    if (!isFetching) void fetchNextPage({ cancelRefetch: false });
+  }, [fetchNextPage, isFetching]);
+  const sentinel = useInfiniteScroll(
+    hasNextPage && !isFetching && !isFetchNextPageError && !query.isError,
+    loadMore,
+  );
   return (
     <section aria-labelledby={`${id}-title`} className="space-y-4">
       <div>
@@ -34,13 +46,31 @@ export function AgentCatalog() {
           Les spécialistes auxquels Alfred peut confier une partie du travail.
         </p>
       </div>
+      <div className="relative">
+        <label className="sr-only" htmlFor={`${id}-search`}>
+          Rechercher un agent
+        </label>
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+        />
+        <Input
+          className="h-8 pl-8 text-xs md:text-xs"
+          id={`${id}-search`}
+          maxLength={AGENT_SEARCH_MAX_LENGTH}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder="Nom, description, thème…"
+          type="search"
+          value={input}
+        />
+      </div>
       {query.isPending ? (
-        <div aria-busy="true" className="space-y-3" role="status">
+        <div aria-busy="true" className="space-y-1.5" role="status">
           <span className="sr-only">Chargement des agents…</span>
           <Skeleton className="h-9 rounded-lg" />
           <Skeleton className="h-9 rounded-lg" />
         </div>
-      ) : query.isError ? (
+      ) : query.isError && !isFetchNextPageError ? (
         <div className="space-y-2" role="alert">
           <p className="text-xs text-muted-foreground">Impossible de charger les agents.</p>
           <Button
@@ -54,13 +84,42 @@ export function AgentCatalog() {
           </Button>
         </div>
       ) : agents.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Aucun agent spécialiste n’est déclaré.</p>
+        <p className="text-xs text-muted-foreground" role="status">
+          {search === ''
+            ? 'Aucun agent spécialiste n’est déclaré.'
+            : `Aucun agent ne correspond à « ${search} ».`}
+        </p>
       ) : (
-        <ul aria-label="Agents spécialistes" className="space-y-1.5">
-          {agents.map((agent) => (
-            <AgentRow agent={agent} key={agent.id} />
-          ))}
-        </ul>
+        <div aria-busy={isFetching}>
+          <ul
+            aria-label="Agents spécialistes"
+            className={cn(
+              'space-y-1.5 transition-opacity motion-reduce:transition-none',
+              query.isPlaceholderData && 'opacity-60',
+            )}
+          >
+            {agents.map((agent) => (
+              <AgentRow agent={agent} key={agent.id} />
+            ))}
+          </ul>
+          {query.isFetchingNextPage ? (
+            <div className="mt-1.5" role="status">
+              <span className="sr-only">Chargement d’autres agents…</span>
+              <Skeleton className="h-9 rounded-lg" />
+            </div>
+          ) : null}
+          {isFetchNextPageError ? (
+            <div className="mt-2 space-y-2" role="alert">
+              <p className="text-xs text-muted-foreground">
+                Impossible de charger la suite des agents.
+              </p>
+              <Button size="sm" variant="outline" onClick={loadMore}>
+                Réessayer
+              </Button>
+            </div>
+          ) : null}
+          {hasNextPage ? <div aria-hidden="true" className="h-px" ref={sentinel} /> : null}
+        </div>
       )}
     </section>
   );

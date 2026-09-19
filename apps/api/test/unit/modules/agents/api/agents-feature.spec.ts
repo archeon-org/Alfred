@@ -28,6 +28,7 @@ const CATALOG = {
       tags: ['topology'],
     },
   ],
+  nextCursor: null,
 };
 
 /** Focused HTTP module: the real flag guard and filter, the catalog service stubbed. */
@@ -63,9 +64,20 @@ async function buildApp(): Promise<INestApplication> {
 
 describeFeatureBothStates('teams', buildApp, {
   whenEnabled: async (app) => {
-    const response = await fetch(`${await app.getUrl()}/api/agents`);
+    const url = await app.getUrl();
+    const response = await fetch(`${url}/api/agents?search=topo&limit=10&cursor=abc`);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true, data: CATALOG });
+    const list = app.get<{ list: ReturnType<typeof vi.fn> }>(AgentCatalogService).list;
+    expect(list).toHaveBeenCalledWith(
+      expect.objectContaining({ search: 'topo', limit: 10, cursor: 'abc' }),
+    );
+
+    const tooLong = await fetch(`${url}/api/agents?search=${'a'.repeat(101)}`);
+    expect(tooLong.status).toBe(400);
+    const tooMany = await fetch(`${url}/api/agents?limit=101`);
+    expect(tooMany.status).toBe(400);
+    expect(list).toHaveBeenCalledOnce();
   },
   whenDisabled: async (app) => {
     await expectFeatureRouteHidden(app, 'GET', '/api/agents');
