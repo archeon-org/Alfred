@@ -131,3 +131,33 @@ export const activeExecutionEnvelopeSchema = successEnvelopeSchema(
     snapshot: z.nullable(executionSnapshotSchema),
   }),
 );
+
+/**
+ * Development diagnostic: the address of an execution's trace in the observability console of the
+ * runtime (ALF-DEC-008 observability-only trace). Served only while `traceLinks` is enabled.
+ */
+/** A web address that carries no credentials: `https://user:secret@host` is refused. */
+export function isCredentialFreeUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.username === '' && url.password === '';
+  } catch {
+    return false;
+  }
+}
+
+/** The longest trace link the API serves and the browser opens. */
+export const EXECUTION_TRACE_LINK_MAX_LENGTH = 2048;
+
+export const executionTraceLinkSchema = z.readonly(
+  z.object({
+    url: z
+      .url({ protocol: /^https?$/u })
+      .check(
+        z.maxLength(EXECUTION_TRACE_LINK_MAX_LENGTH),
+        z.refine(isCredentialFreeUrl, 'URL must not carry credentials'),
+      ),
+  }),
+);
+export type ExecutionTraceLink = z.infer<typeof executionTraceLinkSchema>;
+export const executionTraceLinkEnvelopeSchema = successEnvelopeSchema(executionTraceLinkSchema);

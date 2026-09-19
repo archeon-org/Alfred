@@ -89,7 +89,6 @@ export function createExecutionObserver(options: ObserverOptions) {
     assistantText: '',
     activities: [],
     error: null,
-    events: [],
     execution: null,
     status: 'streaming',
     userMessage: text,
@@ -243,12 +242,15 @@ export function createExecutionObserver(options: ObserverOptions) {
       ),
     event: async (event: { readonly type: string }) => {
       cursor = agent.cursor;
-      // Services accept only the validated public profile; native runtime payloads never enter diagnostics.
-      captureRuntimeEvent(userId, conversationId, {
-        id: ++diagnosticSequence,
-        event: event.type,
-        data: event,
-      });
+      // Validated public events only, each filed under the execution being observed.
+      if (turn.execution !== null) {
+        captureRuntimeEvent(userId, conversationId, {
+          id: ++diagnosticSequence,
+          executionId: turn.execution.id,
+          event: event.type,
+          data: event,
+        });
+      }
       if (diagnosticSequence % EVENT_BATCH === 0)
         await new Promise((resolve) => setTimeout(resolve, 0));
     },

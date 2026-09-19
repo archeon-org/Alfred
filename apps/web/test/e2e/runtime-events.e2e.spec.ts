@@ -6,7 +6,7 @@ import { EXECUTION_ID, executionSnapshot, installExecutionApi } from './support/
 import { CONVERSATION_ID } from './support/workspace-api';
 
 const userId = '21dd1aaa-d564-4a45-9a07-dbc5777d25d5';
-const key = `alfred:runtime-event-debug:v3:${userId}:${CONVERSATION_ID}`;
+const key = `alfred:runtime-event-debug:v4:${userId}:${CONVERSATION_ID}`;
 const enabled = process.env.VITE_DEBUG_EVENTS === 'true';
 // Cumulative answers: every snapshot extends the previous one, as the API projection does.
 const snapshots = Array.from({ length: 205 }, (_, id) =>
@@ -17,10 +17,11 @@ const snapshots = Array.from({ length: 205 }, (_, id) =>
   ),
 );
 const frames = synthesizeRun(snapshots).flat();
-const events = diagnosticEvents(frames);
+const events = diagnosticEvents(frames, EXECUTION_ID);
+const eventsButton = `Événements du runtime (${events.length})`;
 
 for (const width of [390, 1440]) {
-  test(`debug events capture, download and reload at ${width}px (enabled=${enabled})`, async ({
+  test(`debug events per answer: capture, dialog, download and reload at ${width}px (enabled=${enabled})`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 950 });
@@ -36,37 +37,39 @@ for (const width of [390, 1440]) {
     await page.getByLabel('Message', { exact: true }).fill('Diagnostic test');
     await page.getByRole('button', { name: 'Envoyer le message' }).click();
     await expect(page.getByRole('button', { name: 'Envoyer le message' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Copier la réponse' })).toBeVisible();
     if (!enabled) {
-      await expect(page.getByText(/Événements du runtime/u)).toHaveCount(0);
+      await expect(page.getByRole('button', { name: /Événements du runtime/u })).toHaveCount(0);
       expect(await page.evaluate((storageKey) => localStorage.getItem(storageKey), key)).toBeNull();
       return;
     }
-    await expect(page.getByText(`Événements du runtime (${events.length})`)).toBeVisible();
-    await page.getByText(`Événements du runtime (${events.length})`).click();
-    const region = page.getByRole('region', { name: 'Événements capturés' });
-    await expect(region).toBeVisible();
+    // The events belong to this answer: one button under it, none elsewhere.
+    await expect(page.getByRole('button', { name: /Événements du runtime/u })).toHaveCount(1);
+    await page.getByRole('button', { name: eventsButton }).click();
+    const dialog = page.getByRole('dialog', { name: 'Événements du runtime' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(EXECUTION_ID);
+    const region = dialog.getByRole('region', { name: 'Événements capturés' });
+    await expect(region.getByRole('listitem')).toHaveCount(events.length);
+    await region.getByText('TEXT_MESSAGE_CONTENT', { exact: true }).last().click();
     expect(
       await region.evaluate((element) => ({
         horizontal: element.scrollWidth > element.clientWidth,
         vertical: element.scrollHeight > element.clientHeight,
       })),
     ).toEqual({ horizontal: true, vertical: true });
-    await region.evaluate((element) => {
-      element.scrollLeft = 200;
-      element.scrollTop = 200;
-    });
-    expect(
-      await region.evaluate((element) => element.scrollLeft > 0 && element.scrollTop > 0),
-    ).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
     const downloaded = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Télécharger les événements' }).click();
+    await dialog.getByRole('button', { name: 'Télécharger le JSON' }).click();
     const download = await downloaded;
-    const path = await download.path();
-    const exported = JSON.parse(await readFile(path, 'utf8')) as unknown[];
+    expect(download.suggestedFilename()).toBe(`alfred-events-${EXECUTION_ID}.json`);
+    const exported = JSON.parse(await readFile(await download.path(), 'utf8')) as unknown[];
     expect(exported).toEqual(events);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('button', { name: eventsButton })).toBeFocused();
     await expect
       .poll(() =>
         page.evaluate((storageKey) => {
@@ -75,11 +78,36 @@ for (const width of [390, 1440]) {
         }, key),
       )
       .toBe(events.length);
-    await page.reload();
-    await expect(page.getByText(`Événements du runtime (${events.length})`)).toBeVisible();
-    await page.getByText(`Événements du runtime (${events.length})`).click();
-    await expect(page.getByRole('region', { name: 'Événements capturés' })).toContainText(
-      'event-204-',
+    // After a reload the stored answer still owns its events through its execution id.
+    const stored = (role: 'user' | 'assistant', content: string, id: string) => ({
+      id,
+      conversationId: CONVERSATION_ID,
+      executionId: EXECUTION_ID,
+      role,
+      content,
+      createdAt: '2026-09-11T09:00:01.000Z',
+    });
+    await page.route('**/api/conversations/*/messages', (route) =>
+      route.fulfill({
+        json: {
+          success: true,
+          data: {
+            items: [
+              stored('user', 'Diagnostic test', '33333333-3333-4333-8333-333333333333'),
+              stored(
+                'assistant',
+                snapshots.at(-1)!.assistantText,
+                '44444444-4444-4444-8444-444444444444',
+              ),
+            ],
+          },
+        },
+      }),
     );
+    await page.reload();
+    await expect(page.getByRole('button', { name: eventsButton })).toBeVisible();
+    await page.getByRole('button', { name: eventsButton }).click();
+    await region.getByText('TEXT_MESSAGE_CONTENT', { exact: true }).last().click();
+    await expect(region).toContainText('event-204-');
   });
 }

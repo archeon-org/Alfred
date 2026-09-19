@@ -297,6 +297,13 @@ observation; commands, projection, cursor, heartbeat, authorization and limits a
 Verification for this revision is recorded in
 [the session record](../memory-bank/sessions/2026-09-15-ag-ui-observation-profile.md).
 
+## Revision 2026-09-16: development trace links
+
+[ADR 0024](0024-development-trace-links.md) adds one bounded exception to the browser contract
+above: while the `traceLinks` capability is enabled (development only, refused in production),
+`GET /api/executions/:id/trace-link` returns the LangSmith console address of the execution's
+runtime run. Execution DTOs, `AlfredRunState` and the AG-UI identities are unchanged.
+
 ## Remaining decisions
 
 DEC-008/009/016/019/038/051 retain their open event/HITL, continuation, operations, capability and

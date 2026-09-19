@@ -2,7 +2,7 @@ import type { ContextDocument } from '@alfred/contracts';
 import { useId, useRef, useState } from 'react';
 import { Pencil, FileText } from 'lucide-react';
 import { MarkdownDocumentDialog } from '@/components/ui/markdown-document-dialog';
-import { markdownToText } from '@/lib/markdown/parse-markdown';
+import { markdownToText } from '@/lib/markdown/markdown-text';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';

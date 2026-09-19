@@ -21,6 +21,7 @@ export const FEATURE_FLAG_ENVIRONMENT_KEYS = Object.freeze({
   runtimeMemory: 'FEATURE_RUNTIME_MEMORY_ENABLED',
   skills: 'FEATURE_SKILLS_ENABLED',
   teams: 'FEATURE_TEAMS_ENABLED',
+  traceLinks: 'FEATURE_TRACE_LINKS_ENABLED',
 } as const satisfies Readonly<Record<BackendFeatureFlagName, string>>);
 
 export type { FeatureFlagName, FeatureFlags } from '@alfred/contracts';

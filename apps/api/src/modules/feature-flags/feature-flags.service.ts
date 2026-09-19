@@ -22,6 +22,7 @@ const IMPLEMENTED_PUBLIC_FEATURES = Object.freeze({
   runtimeMemory: false,
   skills: true,
   teams: false,
+  traceLinks: true,
 } as const satisfies Readonly<Record<FeatureFlagName, boolean>>);
 
 @Injectable()

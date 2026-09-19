@@ -447,10 +447,23 @@ export function createWorkspaceApi(
             )?.initial ?? null);
       return json({ success: true, data: { snapshot: active } });
     }
-    const executionMatch = /^\/api\/executions\/([^/]+)(?:\/(events|stop))?$/u.exec(path);
+    const executionMatch = /^\/api\/executions\/([^/]+)(?:\/(events|stop|trace-link))?$/u.exec(
+      path,
+    );
     if (executionMatch) {
+      if (executionMatch[2] === 'trace-link' && !features.traceLinks) {
+        return failure(404, 'HTTP_404', 'Feature is not available');
+      }
       const run = executions.get(executionMatch[1]!);
       if (!run) return failure(404, 'execution_not_found');
+      if (executionMatch[2] === 'trace-link') {
+        return json({
+          success: true,
+          data: {
+            url: `https://smith.langchain.com/o/org/projects/p/proj/r/${run.initial.execution.id}?poll=true`,
+          },
+        });
+      }
       if (executionMatch[2] === 'events') return sseResponse(run.frames, executionHold);
       const snapshot = executionHold === null ? run.final : run.initial;
       return json({ success: true, data: { snapshot } });

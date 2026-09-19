@@ -24,6 +24,7 @@ const configuredFlags = Object.freeze({
   FEATURE_RUNTIME_MEMORY_ENABLED: true,
   FEATURE_SKILLS_ENABLED: true,
   FEATURE_TEAMS_ENABLED: true,
+  FEATURE_TRACE_LINKS_ENABLED: true,
   NODE_ENV: 'test',
 });
 
@@ -79,6 +80,7 @@ describe('FeatureFlagsService', () => {
       runtimeMemory: false,
       skills: true,
       teams: false,
+      traceLinks: true,
     });
     expect(Object.isFrozen(service.getPublicFlags())).toBe(true);
     expect(new FeatureFlagsController(service).getFlags()).toEqual({
@@ -92,6 +94,7 @@ describe('FeatureFlagsService', () => {
 
     expect(service.isEnabled('googleOAuth')).toBe(true);
     expect(service.isEnabled('skills')).toBe(true);
+    expect(service.isEnabled('traceLinks')).toBe(true);
     expect(service.isEnabled('agentRuntime')).toBe(true);
     expect(service.isEnabled('rateLimiting')).toBe(true);
   });

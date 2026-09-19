@@ -70,7 +70,8 @@
   "pnpm": {
     "overrides": {
       "deepmerge-ts": "^8.0.0",
-      "multer": ">=2.3.0"
+      "multer": ">=2.3.0",
+      "lodash-es": ">=4.18.1"
     }
   }
 }

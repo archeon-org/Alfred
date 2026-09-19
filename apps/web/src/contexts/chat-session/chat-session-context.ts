@@ -1,9 +1,10 @@
 import type { Execution, ExecutionActivity, ExecutionSnapshot, Message } from '@alfred/contracts';
 import { createContext } from 'react';
 
-/** One validated public event kept for the visibility panel. */
+/** One validated public event kept for diagnostics, attached to the execution that produced it. */
 export interface RuntimeEventView {
   readonly id: number;
+  readonly executionId: string;
   readonly event: string;
   readonly data: unknown;
 }
@@ -17,7 +18,6 @@ export interface LiveTurn {
   readonly assistantText: string;
   /** Tool calls of this turn as AG-UI reported them: safe label and status only. */
   readonly activities: readonly ExecutionActivity[];
-  readonly events: readonly RuntimeEventView[];
   readonly execution: Execution | null;
   readonly status: 'streaming' | 'done' | 'error';
   readonly error: string | null;

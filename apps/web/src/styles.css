@@ -311,3 +311,28 @@ html[data-reduced-motion='true'] [data-slot='skeleton'] {
     animation: none;
   }
 }
+
+/* Code highlighting: colours for the CSS-variables Shiki theme, per appearance. */
+:root {
+  --shiki-foreground: var(--foreground);
+  --shiki-background: transparent;
+  --shiki-token-constant: #8a4b12;
+  --shiki-token-string: #2f6f3e;
+  --shiki-token-comment: #6b7570;
+  --shiki-token-keyword: #8a2e6b;
+  --shiki-token-parameter: #4d5f8f;
+  --shiki-token-function: #2a5fb0;
+  --shiki-token-string-expression: #2f6f3e;
+  --shiki-token-punctuation: var(--muted-foreground);
+  --shiki-token-link: var(--primary);
+}
+
+html[data-theme='dark'] {
+  --shiki-token-constant: #e2a86b;
+  --shiki-token-string: #9ccf9d;
+  --shiki-token-comment: #8b948e;
+  --shiki-token-keyword: #d9a0cb;
+  --shiki-token-parameter: #a9b6e6;
+  --shiki-token-function: #8fb8ff;
+  --shiki-token-string-expression: #9ccf9d;
+}

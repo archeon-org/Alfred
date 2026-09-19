@@ -34,6 +34,7 @@ const disabledFeatures = {
   runtimeMemory: false,
   skills: false,
   teams: false,
+  traceLinks: false,
 };
 
 test.beforeEach(async ({ page }) => {

@@ -10,6 +10,7 @@ import { ExecutionObservationService } from './application/execution-observation
 import { ExecutionProcessor } from './application/execution-processor';
 import { ExecutionRecoveryWorker } from './application/execution-recovery.worker';
 import { ExecutionStreamConsumer } from './application/execution-stream.consumer';
+import { TraceLinkService } from './application/trace-link.service';
 import { RUNTIME_CLIENT } from './application/runtime-client.port';
 import { LangGraphRuntimeClient } from './infrastructure/langgraph/langgraph-runtime.client';
 import { ExecutionLeaseStore } from './infrastructure/persistence/execution-lease.store';
@@ -28,6 +29,7 @@ import { ExecutionStateStore } from './infrastructure/persistence/execution-stat
     ExecutionStreamConsumer,
     ExecutionProcessor,
     ExecutionRecoveryWorker,
+    TraceLinkService,
     { provide: RUNTIME_CLIENT, useClass: LangGraphRuntimeClient },
   ],
   exports: [ExecutionsService, ExecutionObservationService, StreamAuthorityService, RUNTIME_CLIENT],

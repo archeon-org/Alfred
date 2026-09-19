@@ -170,23 +170,101 @@ repli US pour les touches mortes ; sans code physique (clavier virtuel, événem
 correspondance se fait sur ce glyphe. Le `/` par défaut accepte Maj ou non, car il en a besoin sur
 AZERTY seulement ; une touche personnelle exige exactement l'état de Maj enregistré.
 
+## Transcript, Markdown et diagrammes
+
+Le transcript ne met en bulle que le message de la personne (`bg-primary/10`, aligné à droite) ;
+la réponse d'Alfred se lit comme du texte de page, sans bordure ni fond, sur la largeur de la
+colonne de lecture. Sous chaque réponse posée, une barre d'actions discrète (`TurnActions`) porte
+« Copier la réponse » (source Markdown), « Événements du runtime (N) » quand les diagnostics sont
+actifs (voir plus bas) et « Voir la trace de cette réponse » quand l'API sert des liens de trace.
+Aucun avatar : l'alignement suffit, et les libellés « Vous » / « Alfred » restent en `sr-only`.
+
+`MarkdownView` (`components/ui/markdown-view.tsx`) est l'unique rendu Markdown : chat, aperçu de
+l'éditeur de skills, documents de contexte. Il s'appuie sur `react-markdown` + `remark-gfm`
+(tables, listes imbriquées, cases à cocher en lecture seule, barré, liens automatiques), avec une
+table de composants maison pour les styles. Règles de sécurité, toutes structurelles : le HTML brut
+est ignoré (`skipHtml`, jamais parsé), une URL n'est conservée que si elle commence par `http(s)://`
+ou `mailto:` (sinon le libellé reste du texte), les images ne sont **jamais chargées** et
+apparaissent comme un lien « Image : … », et rien ne passe par `dangerouslySetInnerHTML`. Un bloc
+de code (`MarkdownCodeBlock`) affiche son langage et un bouton Copier. `markdownToText`
+(`lib/markdown/markdown-text.ts`) aplatit un document sur le même parseur pour les résumés.
+
+Un bloc ` ```mermaid ` **fermé** est dessiné par `MermaidDiagram` (`components/ui/mermaid-diagram.tsx`) :
+`mermaid` est importé dynamiquement au premier diagramme (chunk séparé), initialisé en
+`securityLevel: 'strict'` (sortie assainie par DOMPurify, pas d'HTML dans les étiquettes, pas de
+`click`), `suppressErrorRendering: true`, `htmlLabels: false` (les étiquettes restent du texte SVG : ni
+`<img>`, ni `<iframe>`, ni fond CSS), thème `base` alimenté par nos jetons (`--background`,
+`--foreground`, `--primary`, `--muted`, `--border`…) et redessiné quand `data-theme`/`data-accent`
+changent. Mermaid mesure le diagramme dans le DOM vivant avant de rendre la main : une source qui
+demande une ressource (forme `img:`/`image:`, `url(...)`, `@import`, `themeCSS`, média HTML,
+`src=`, `xlink:`) n'est **jamais** dessinée (`referencesExternalContent`) et s'affiche en source
+avec une note. Le SVG produit est ensuite adopté comme nœuds DOM via `DOMParser`, jamais comme
+chaîne HTML, après `scrubExternalReferences` (`lib/markdown/svg-scrub.ts`) qui retire `image`,
+`foreignObject`, `use` externe, `href` non locaux, attributs de ressource, `on*` et styles avec
+`url(...)`/`@import` : défense en profondeur, car le niveau strict de Mermaid seul laisse passer une
+image distante. Un diagramme ne provoque donc aucune requête réseau. Une source de plus de 20 000
+caractères, une erreur de syntaxe ou un échec de chargement montrent la source en bloc de code avec
+la raison ; « Voir la source » bascule à la demande. Pendant le streaming, un bloc n'est dessiné (ni
+colorié) que si **sa propre** ligne de clôture existe (`isFenceUnterminated` : même caractère,
+longueur au moins égale à l'ouverture, à partir des positions du parseur), ce qui accepte un bloc
+`~~~` contenant des `` et un bloc ` ```` ` contenant des ` `` `. La clôture d'un bloc est décidée
+à partir du parseur (`isFenceUnterminated`) : le texte du nœud contient toutes les lignes après
+l'ouverture tant que la clôture manque, une de moins (la ligne de clôture) une fois fermé, quels
+que soient le préfixe de conteneur (`> `, indentation de liste), le caractère ou la longueur de la
+clôture. En production, nginx sert `style-src 'self' 'unsafe-inline'`parce que Mermaid injecte
+une balise`<style>`dans chaque SVG, et`script-src 'self' 'wasm-unsafe-eval'` pour compiler le
+moteur Oniguruma (ADR 0025) ; aucune autre source de script.
+
+Un diagramme Mermaid n'est dessiné qu'après deux contrôles : un regard sur le texte
+(`referencesExternalContent` : `img:`, `url(`, `@import`, `themeCSS`, balises HTML) puis, dans
+`lib/markdown/mermaid-render.ts`, l'inspection du diagramme **parsé** (`getDiagramFromText`) : un
+nœud portant une image (`img`, quelle que soit la graphie YAML de la clé) n'est jamais rendu, car la
+forme image charge son adresse en mesurant le nœud. Les directives `%%{init}%%` et le front
+matter ne peuvent toucher ni `htmlLabels`, ni `themeCSS`, ni `themeVariables`, ni `theme`, ni
+`fontFamily` (`secure`, appliqué à tout niveau). L'inspection et le rendu s'enchaînent dans une
+file unique : Mermaid parse dans une base partagée par type de diagramme. Le SVG rendu passe
+enfin par `scrubExternalReferences`.
+
+Coloration syntaxique : un bloc **fermé** dont le langage a une grammaire embarquée est tokenisé
+par `shiki` (`lib/markdown/highlight.ts`, hook `useHighlightedCode`) : moteur Oniguruma en
+WebAssembly, chargé au premier bloc (le moteur JavaScript laissait WebKit rendre des lignes
+entières en un seul jeton sur les grammaires TypeScript), grammaire importée à la demande depuis
+`@shikijs/langs/<id>` (TypeScript, JavaScript, JSON, Python, Bash, YAML, SQL, HTML, CSS, Markdown,
+Mermaid, Java, Go, Rust, Diff, Dockerfile, TOML, avec alias `ts`, `js`, `py`, `sh`…), thème en
+variables CSS (`--shiki-token-*`, définies dans `styles.css` pour le clair et le sombre). Les
+jetons deviennent des `span` React avec une couleur CSSOM : ni HTML injecté, ni style en ligne
+bloqué par la CSP. Un langage inconnu, une source de plus de 30 000 caractères ou une clôture
+manquante laissent le texte brut ; `data-highlighted="true"` marque un bloc colorié.
+
+Performance : `MarkdownView` est mémoïsé (un transcript se re-rend à chaque événement streamé
+alors que les réponses enregistrées ne changent pas ; re-parser une longue réponse coûte ~100 ms)
+et le texte d'une réponse en cours passe par `useDeferredValue` : React garde l'ancien rendu à
+l'écran et re-rend avec la valeur la plus récente en priorité basse, ce qui laisse passer les
+interactions ; cela ne borne pas le nombre de parses ni n'interrompt un parse synchrone commencé.
+
 ## Runtime event diagnostics
 
-`VITE_DEBUG_EVENTS=true` enables the conversation's runtime event viewer, localStorage capture and
+`VITE_DEBUG_EVENTS=true` enables the per-answer runtime event dialog, localStorage capture and
 JSON download. The default is `false`; absent or other values disable capture, storage access and
-the viewer while normal message processing continues. Set it in `apps/web/.env` for host Vite and
+the controls while normal message processing continues. Set it in `apps/web/.env` for host Vite and
 restart Vite. For Compose, set the root `.env` value and recreate the development web container or
 rebuild the production web image. This is public build configuration, not an authorization control.
 
-Debug copies are keyed by user and conversation under
-`alfred:runtime-event-debug:v3:<encoded-user-id>:<encoded-conversation-id>` and store `version: 3`.
-The observation stream carries AG-UI protocol events (ADR 0023, revision of 2026-09-15 evening);
-the observer records each validated event as `{ id, event: <AG-UI type>, data: <event> }`.
-Capture and reload accept only the AG-UI events of the Alfred contract (`RUN_STARTED`,
-`RUN_FINISHED`, `RUN_ERROR`, `STATE_SNAPSHOT`, `TEXT_MESSAGE_START/CONTENT/END`,
+Every captured event is filed under the execution that produced it: the observer records
+`{ id, executionId, event: <AG-UI type>, data: <event> }` and each answer of the transcript (live
+turn through `turn.execution.id`, stored row through `Message.executionId`) shows
+« Événements du runtime (N) » for its own events. The control opens `RuntimeEventsDialog`: the
+events of that execution in order, each expandable to its JSON, and a download of that execution's
+events as `alfred-events-<executionId>.json`. Debug copies are keyed by user and conversation under
+`alfred:runtime-event-debug:v4:<encoded-user-id>:<encoded-conversation-id>` and store `version: 4`;
+sending another message never discards the events of earlier answers, and a reload restores them
+against the stored rows. The observation stream carries AG-UI protocol events (ADR 0023, revision of
+2026-09-15 evening). Capture and reload accept only the AG-UI events of the Alfred contract
+(`RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`, `STATE_SNAPSHOT`, `TEXT_MESSAGE_START/CONTENT/END`,
 `TOOL_CALL_START/END/RESULT`), canonicalized by `canonicalAgUiEvent` in
-`lib/workspace/ag-ui-events.ts`: only known fields survive, a `STATE_SNAPSHOT` must carry an
-`AlfredRunState` whose execution and conversation belong to the selected conversation, a
+`lib/workspace/ag-ui-events.ts` with the conversation **and** the execution as scope: only known
+fields survive, a run event whose `runId` is not the execution it is filed under is dropped, a
+`STATE_SNAPSHOT` must carry an `AlfredRunState` whose execution and conversation match, a
 `RUN_FINISHED` may only carry a `success` outcome, a `TEXT_MESSAGE_START` must be an `assistant`
 message, a `TOOL_CALL_RESULT` may only carry `completed` or `failed`, and one text delta is bounded
 by the answer limit. Raw native event names, other AG-UI events (`TOOL_CALL_ARGS`, `RAW`, `CUSTOM`, …),
@@ -194,12 +272,15 @@ invalid payloads and mismatched scope produce an explicit diagnostic error. Down
 public payloads, which can still include visible conversation content; they are not raw
 provider/tool exports or an authorization boundary.
 
-Legacy `alfred:runtime-event-debug:v1:` and `v2:` records are not read, migrated or automatically
-deleted, even with diagnostics enabled. Disabling the flag returns before validation or any storage access,
-leaving both namespaces untouched. Remove existing keys through browser storage tools when erasure
-is required. Within the stated budgets, downloads include every captured public event across runs;
-there is no 200-event/240-character truncation. This remains the explicit opt-in exception to the
-ordinary browser-content storage rule, and credentials must never enter the public schema.
+Legacy `alfred:runtime-event-debug:v1:`, `v2:` and `v3:` records are never read or migrated
+(`v3` predates the per-execution filing). Because they may hold conversation content, the first use
+of diagnostics in a page removes them by key, without parsing them, and touches nothing else in
+storage: the sweep covers every `v1`–`v3` record of the origin, whatever conversation or execution
+it belonged to, since all three formats are abandoned. Disabling the flag returns before validation
+or any storage access, leaving every namespace untouched. Within the stated budgets, downloads include every captured public event of
+an execution; there is no 200-event/240-character truncation. This remains the explicit opt-in
+exception to the ordinary browser-content storage rule, and credentials must never enter the public
+schema.
 
 Persistence is attempted every 250 ms while events arrive and on page hide. A 4 MiB serialized
 UTF-16 per-conversation storage cap or browser quota failure produces an explicit warning; complete
@@ -210,3 +291,21 @@ stops further capture with an explicit warning. This bounds debug copies, not ex
 usage. This browser diagnostic history does not replace server-owned transcripts or replay/audit
 contracts (ALF-DEC-001 accepted; ALF-DEC-006 accepted-with-risk; ALF-DEC-008/051 remain in discussion).
 Production content-diagnostic retention policy remains an operator/privacy-owner responsibility.
+
+## Trace links (development diagnostic)
+
+`FEATURE_TRACE_LINKS_ENABLED=true` on the API (with `TRACE_LINK_UI_URL`,
+`TRACE_LINK_ORGANIZATION_ID` and `TRACE_LINK_PROJECT_ID`, all public address parts of the runtime's
+LangSmith console) publishes `traceLinks: true` in `GET /api/features` and serves
+`GET /api/executions/:id/trace-link` → `{ url }` for an execution the caller may observe. The
+browser then shows « Voir la trace de cette réponse » under each answer (`TraceLinkAction`): the
+address is fetched on click, opened in a new tab (`noopener,noreferrer`) and kept as a plain link so
+a blocked pop-up never loses it; `404 trace_unavailable` reads as an inline notice. No `VITE_*`
+flag is involved: the server manifest is the single source of truth, and the browser never calls the
+console itself (`connect-src 'self'`). `TRACE_LINK_UI_URL` must be a plain `http(s)` origin with an optional
+path: credentials, query and fragment are refused at startup, `buildTraceUrl` refuses credentials
+again, and the shared contract rejects any link carrying them. Additive manifest fields such as
+`traceLinks` carry a `false` default in `featureFlagsSchema`, so a newer browser in front of an
+older API loses only the new capability instead of failing closed on every flag. The API refuses the flag in production: this is a development
+diagnostic governed by [ADR 0024](../adr/0024-development-trace-links.md), which records the bounded
+exception to the "no native runtime identifier on the wire" rule of ADR 0023.

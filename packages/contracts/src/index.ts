@@ -67,6 +67,11 @@ export {
   type Message,
   type MessageRole,
   type StartExecutionInput,
+  EXECUTION_TRACE_LINK_MAX_LENGTH,
+  executionTraceLinkEnvelopeSchema,
+  executionTraceLinkSchema,
+  isCredentialFreeUrl,
+  type ExecutionTraceLink,
 } from './executions';
 export { contentText, createAssistantReply, type AssistantReply } from './assistant-reply';
 
@@ -117,6 +122,7 @@ export const FEATURE_FLAG_NAMES = Object.freeze([
   'runtimeMemory',
   'skills',
   'teams',
+  'traceLinks',
 ] as const);
 export type FeatureFlagName = (typeof FEATURE_FLAG_NAMES)[number];
 
@@ -134,6 +140,8 @@ export const featureFlagsSchema = z.readonly(
     runtimeMemory: z.boolean(),
     skills: z.boolean(),
     teams: z.boolean(),
+    // Added 2026-09-16: a manifest from an older API omits it and reads as disabled.
+    traceLinks: z._default(z.boolean(), false),
   }),
 );
 export type FeatureFlags = z.infer<typeof featureFlagsSchema>;

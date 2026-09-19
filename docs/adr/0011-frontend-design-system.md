@@ -44,3 +44,14 @@ The [frontend guidelines](../development/frontend-guidelines.md) are the impleme
 They supersede conflicting UI-placement, theme and styling assumptions in the earlier architecture
 target. This decision does not implement future AG-UI, editors, branding presets or real workspace
 persistence, and does not claim a full accessibility certification.
+
+## Revision 2026-09-16: Markdown and diagram rendering dependencies
+
+The chat answer rendering is a specialised integration, not a presentation retouch: `MarkdownView`
+now renders GitHub-flavoured Markdown through `react-markdown` + `remark-gfm` (React elements only,
+raw HTML skipped, links filtered, images never fetched) and a completed ` ```mermaid ` fence through
+`mermaid` (dynamic import, strict security level, palette from the semantic tokens), and finished
+code blocks through `shiki` (Oniguruma WebAssembly engine, grammars imported on demand, colours as
+`--shiki-*` variables of the theme). No other UI kit enters; every construct keeps a local component with the design tokens. nginx's production
+policy adds `'unsafe-inline'` to `style-src`, for the styles Mermaid embeds in its SVG, and
+`'wasm-unsafe-eval'` to `script-src`, for the Oniguruma engine ([ADR 0025](0025-content-security-policy-webassembly.md)).

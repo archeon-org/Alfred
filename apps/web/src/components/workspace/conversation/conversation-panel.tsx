@@ -1,6 +1,5 @@
 import type { Ref } from 'react';
 
-import { RuntimeEvents } from '@/components/workspace/conversation/runtime-events';
 import { ConversationTranscript } from '@/components/workspace/conversation/conversation-transcript';
 import { ConversationWelcome } from '@/components/workspace/conversation/conversation-welcome';
 import { MessageComposer } from '@/components/workspace/conversation/message-composer';
@@ -28,6 +27,8 @@ interface ConversationPanelProps {
   readonly failure?: TurnFailure | null;
   readonly debugEvents?: readonly RuntimeEventView[];
   readonly debugError?: string | null;
+  /** The API serves trace links for answers (development diagnostic). */
+  readonly traceLinksEnabled?: boolean;
   /** Resolves true when the message was accepted; the composer keeps the draft otherwise. */
   readonly onSend?: (message: string) => boolean | Promise<boolean>;
   /** Shown instead of the composer help while sending is refused; typing stays possible. */
@@ -52,6 +53,7 @@ export function ConversationPanel({
   failure = null,
   debugEvents = [],
   debugError = null,
+  traceLinksEnabled = false,
   onSend,
   blockedReason = null,
   isStreaming = false,
@@ -91,18 +93,27 @@ export function ConversationPanel({
               </Button>
             </div>
           ) : null}
+          {debugError !== null ? (
+            <p
+              className="mx-auto mt-3 w-full max-w-conversation px-4 text-xs text-destructive md:px-6 wide:px-8"
+              role="alert"
+            >
+              {debugError}
+            </p>
+          ) : null}
           {isLoading ? (
             <ConversationSkeleton />
           ) : hasTranscript ? (
-            <ConversationTranscript messages={messages} sessions={sessions} failure={failure} />
+            <ConversationTranscript
+              messages={messages}
+              sessions={sessions}
+              failure={failure}
+              debugEvents={debugEvents}
+              traceLinksEnabled={traceLinksEnabled}
+            />
           ) : (
             <ConversationWelcome disabled={isBusy} prompts={prompts} onSelect={onPrompt} />
           )}
-          {!isLoading && (debugEvents.length > 0 || debugError !== null) ? (
-            <div className="mx-auto w-full min-w-0 max-w-conversation px-4 pb-4 md:px-6 wide:px-8">
-              <RuntimeEvents events={debugEvents} error={debugError} />
-            </div>
-          ) : null}
         </div>
         {isLoading ? (
           <div

@@ -63,7 +63,8 @@ export default defineConfig(({ mode }) => {
       rolldownOptions: {
         output: {
           manualChunks: (id) => {
-            if (id.includes('/node_modules/react') || id.includes('/node_modules/react-dom')) {
+            // The React runtime alone: `react-markdown`, `react-router-dom`… stay with the app code.
+            if (/\/node_modules\/(?:react|react-dom|scheduler)\//u.test(id)) {
               return 'react-vendor';
             }
 

@@ -26,6 +26,7 @@ const featureFlagKeys = Object.freeze([
   'FEATURE_RUNTIME_MEMORY_ENABLED',
   'FEATURE_SKILLS_ENABLED',
   'FEATURE_TEAMS_ENABLED',
+  'FEATURE_TRACE_LINKS_ENABLED',
 ]);
 const managedSecretKeys = new Set([
   'AUTH_JWT_SECRET',
@@ -144,6 +145,7 @@ function renderFeatureFlags(flags) {
     `FEATURE_RUNTIME_MEMORY_ENABLED=${flags.runtimeMemory}`,
     `FEATURE_SKILLS_ENABLED=${flags.skills}`,
     `FEATURE_TEAMS_ENABLED=${flags.teams}`,
+    `FEATURE_TRACE_LINKS_ENABLED=${flags.traceLinks}`,
   ];
 }
 
@@ -309,6 +311,13 @@ const google = Object.freeze({
   workspaceDomain: firstNonEmptyValue('GOOGLE_WORKSPACE_DOMAIN', environments),
 });
 
+// Development-only trace links: public address parts of the runtime's LangSmith console.
+const traceLinks = Object.freeze({
+  uiUrl: firstNonEmptyValue('TRACE_LINK_UI_URL', environments, 'https://smith.langchain.com'),
+  organizationId: firstNonEmptyValue('TRACE_LINK_ORGANIZATION_ID', environments),
+  projectId: firstNonEmptyValue('TRACE_LINK_PROJECT_ID', environments),
+});
+
 const featureFlags = Object.freeze({
   agentRuntime: firstValue('FEATURE_AGENT_RUNTIME_ENABLED', environments, 'false'),
   agUiStreaming: firstValue('FEATURE_AG_UI_STREAMING_ENABLED', environments, 'false'),
@@ -328,6 +337,7 @@ const featureFlags = Object.freeze({
   runtimeMemory: firstValue('FEATURE_RUNTIME_MEMORY_ENABLED', environments, 'false'),
   skills: firstValue('FEATURE_SKILLS_ENABLED', environments, 'false'),
   teams: firstValue('FEATURE_TEAMS_ENABLED', environments, 'false'),
+  traceLinks: firstValue('FEATURE_TRACE_LINKS_ENABLED', environments, 'false'),
 });
 
 const ports = Object.freeze({
@@ -423,6 +433,11 @@ const rootContent = renderEnvironment([
   `GOOGLE_OAUTH_CALLBACK_URL=${google.callbackUrl}`,
   `GOOGLE_WORKSPACE_DOMAIN=${google.workspaceDomain}`,
   '',
+  '# Trace links (development diagnostic): ids from any LangSmith trace URL, then enable the flag.',
+  `TRACE_LINK_UI_URL=${traceLinks.uiUrl}`,
+  `TRACE_LINK_ORGANIZATION_ID=${traceLinks.organizationId}`,
+  `TRACE_LINK_PROJECT_ID=${traceLinks.projectId}`,
+  '',
   '# Public web build configuration',
   `WEB_PORT=${ports.web}`,
   'VITE_API_URL=/api',
@@ -481,6 +496,11 @@ const apiContent = renderEnvironment([
   `GOOGLE_OAUTH_CLIENT_SECRET=${google.clientSecret}`,
   `GOOGLE_OAUTH_CALLBACK_URL=${google.callbackUrl}`,
   `GOOGLE_WORKSPACE_DOMAIN=${google.workspaceDomain}`,
+  '',
+  '# Trace links (development diagnostic): ids from any LangSmith trace URL, then enable the flag.',
+  `TRACE_LINK_UI_URL=${traceLinks.uiUrl}`,
+  `TRACE_LINK_ORGANIZATION_ID=${traceLinks.organizationId}`,
+  `TRACE_LINK_PROJECT_ID=${traceLinks.projectId}`,
   '',
   `REDIS_URL=${dataServices.hostRedisUrl}`,
   '',
@@ -543,6 +563,9 @@ await Promise.all([
     ['GOOGLE_OAUTH_CLIENT_SECRET', google.clientSecret],
     ['GOOGLE_OAUTH_CALLBACK_URL', google.callbackUrl],
     ['GOOGLE_WORKSPACE_DOMAIN', google.workspaceDomain],
+    ['TRACE_LINK_UI_URL', traceLinks.uiUrl],
+    ['TRACE_LINK_ORGANIZATION_ID', traceLinks.organizationId],
+    ['TRACE_LINK_PROJECT_ID', traceLinks.projectId],
   ]),
   synchronizeEnvironmentContract(envPaths.api, [
     ...apiRuntimeEntries,
@@ -563,6 +586,9 @@ await Promise.all([
     ['GOOGLE_OAUTH_CLIENT_SECRET', google.clientSecret],
     ['GOOGLE_OAUTH_CALLBACK_URL', google.callbackUrl],
     ['GOOGLE_WORKSPACE_DOMAIN', google.workspaceDomain],
+    ['TRACE_LINK_UI_URL', traceLinks.uiUrl],
+    ['TRACE_LINK_ORGANIZATION_ID', traceLinks.organizationId],
+    ['TRACE_LINK_PROJECT_ID', traceLinks.projectId],
     ['REDIS_URL', dataServices.hostRedisUrl],
   ]),
   synchronizeEnvironmentContract(envPaths.web, [

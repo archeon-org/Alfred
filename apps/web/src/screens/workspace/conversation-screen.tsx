@@ -112,6 +112,7 @@ function ExistingConversation({ conversationId }: { readonly conversationId: str
       failure={chat.failure}
       debugEvents={chat.debug.events}
       debugError={chat.debug.error}
+      traceLinksEnabled={flagsStatus === 'ready' && flags.traceLinks}
       onSend={bridgeAvailable ? chat.send : undefined}
       blockedReason={
         chat.isDiscovering

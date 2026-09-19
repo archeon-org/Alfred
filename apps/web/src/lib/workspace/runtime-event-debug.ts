@@ -25,8 +25,33 @@ export function isRuntimeEventDebugEnabled(): boolean {
   return import.meta.env.VITE_DEBUG_EVENTS === 'true';
 }
 
+const STORAGE_VERSION = 4;
+const EXECUTION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/u;
+
+const LEGACY_KEY = /^alfred:runtime-event-debug:v[123]:/u;
+let legacySwept = false;
+
 function storageKey(userId: string, conversationId: string): string {
-  return `alfred:runtime-event-debug:v3:${encodeURIComponent(userId)}:${encodeURIComponent(conversationId)}`;
+  return `alfred:runtime-event-debug:v${STORAGE_VERSION}:${encodeURIComponent(userId)}:${encodeURIComponent(conversationId)}`;
+}
+
+/**
+ * Earlier capture formats are never read; they may hold conversation content, so the first use of
+ * diagnostics in a page removes them. Nothing else in storage is touched.
+ */
+function sweepLegacyCaptures(): void {
+  if (legacySwept) return;
+  legacySwept = true;
+  try {
+    const stale: string[] = [];
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (key !== null && LEGACY_KEY.test(key)) stale.push(key);
+    }
+    for (const key of stale) window.localStorage.removeItem(key);
+  } catch {
+    // A denied store simply keeps its stale copies; the caller reports storage state separately.
+  }
 }
 
 function notify(): void {
@@ -47,6 +72,9 @@ function isStoredEvent(value: unknown): value is RuntimeEventView {
     typeof value.id === 'number' &&
     Number.isSafeInteger(value.id) &&
     value.id > 0 &&
+    'executionId' in value &&
+    typeof value.executionId === 'string' &&
+    EXECUTION_ID_PATTERN.test(value.executionId) &&
     'event' in value &&
     typeof value.event === 'string' &&
     'data' in value
@@ -55,13 +83,27 @@ function isStoredEvent(value: unknown): value is RuntimeEventView {
 
 /**
  * Canonical copies prevent persisted native payloads or extra private fields re-entering exports:
- * only AG-UI events of the Alfred contract, scoped to this conversation, are kept.
+ * only AG-UI events of the Alfred contract, scoped to this conversation and to the execution they
+ * are filed under, are kept.
  */
 function parsePublicEvent(value: unknown, conversationId: string): RuntimeEventView | null {
   if (!isStoredEvent(value)) return null;
-  const event = canonicalAgUiEvent(value.data, { conversationId });
+  const event = canonicalAgUiEvent(value.data, { conversationId, executionId: value.executionId });
   if (event === null || (event.type as string) !== value.event) return null;
-  return { id: value.id, event: value.event, data: event };
+  return { id: value.id, executionId: value.executionId, event: value.event, data: event };
+}
+
+/** Events of one conversation filed by execution, in capture order; stable for identical input. */
+export function groupRuntimeEvents(
+  events: readonly RuntimeEventView[],
+): ReadonlyMap<string, readonly RuntimeEventView[]> {
+  const groups = new Map<string, RuntimeEventView[]>();
+  for (const event of events) {
+    const group = groups.get(event.executionId);
+    if (group === undefined) groups.set(event.executionId, [event]);
+    else group.push(event);
+  }
+  return groups;
 }
 
 function parseSnapshot(raw: string, conversationId: string): DebugSnapshot {
@@ -70,7 +112,7 @@ function parseSnapshot(raw: string, conversationId: string): DebugSnapshot {
     typeof value !== 'object' ||
     value === null ||
     !('version' in value) ||
-    value.version !== 3 ||
+    value.version !== STORAGE_VERSION ||
     !('events' in value) ||
     !Array.isArray(value.events) ||
     !value.events.every(isStoredEvent)
@@ -95,6 +137,7 @@ function parseSnapshot(raw: string, conversationId: string): DebugSnapshot {
 function getEntry(key: string, conversationId: string): DebugEntry {
   const existing = entries.get(key);
   if (existing) return existing;
+  sweepLegacyCaptures();
   let entry: DebugEntry = { snapshot: EMPTY, bytes: 0 };
   try {
     const raw = window.localStorage.getItem(key);
@@ -139,7 +182,10 @@ export function getRuntimeEventDebugSnapshot(
 function invalidateStoredCapture(key: string): void {
   try {
     window.localStorage.removeItem(key);
-    window.localStorage.setItem(key, JSON.stringify({ version: 3, events: [], incomplete: true }));
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({ version: STORAGE_VERSION, events: [], incomplete: true }),
+    );
   } catch {
     // The caller already reports the storage failure. A denied browser store may prevent cleanup.
   }
@@ -156,7 +202,7 @@ function flush(): void {
     if (!entry) continue;
     try {
       const raw = JSON.stringify({
-        version: 3,
+        version: STORAGE_VERSION,
         events: entry.snapshot.events,
         incomplete: entry.snapshot.error !== null,
       });
@@ -194,7 +240,10 @@ export function captureRuntimeEvent(
   if (entry.stopped) return;
   try {
     const id = (entry.snapshot.events.at(-1)?.id ?? 0) + 1;
-    const captured = parsePublicEvent({ id, event: event.event, data: event.data }, conversationId);
+    const captured = parsePublicEvent(
+      { id, executionId: event.executionId, event: event.event, data: event.data },
+      conversationId,
+    );
     if (captured === null) throw new Error('Invalid public event');
     const raw = JSON.stringify(captured);
     const bytes = raw.length * 2;

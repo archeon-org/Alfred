@@ -17,6 +17,7 @@ import {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -225,5 +226,87 @@ describe('Workspace chat with the agent bridge', () => {
       expect(within(screen.getByRole('main')).getByText(fakeReply('Second'))).toBeVisible();
       expect(screen.getByRole('button', { name: 'Envoyer le message' })).toBeVisible();
     });
+  });
+
+  it('keeps the runtime events of every answer behind its own button, across a reload', async () => {
+    vi.stubEnv('VITE_DEBUG_EVENTS', 'true');
+    localStorage.clear();
+    const user = userEvent.setup();
+    const api = createWorkspaceApi({
+      conversations: [conversation()],
+      projects: [project()],
+      features: { agentRuntime: true },
+    });
+    const view = renderWorkspaceAt(`/app/conversations/${CONVERSATION_ID}`, api);
+    await user.type(await screen.findByRole('textbox', { name: 'Message' }), 'First{Enter}');
+    await findInMain(fakeReply('First'));
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /Événements du runtime/u })).toHaveLength(1),
+    );
+    await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Second{Enter}');
+    await findInMain(fakeReply('Second'));
+    // The first answer keeps its events; the second answer gets its own, with the same count.
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /Événements du runtime/u })).toHaveLength(2),
+    );
+    const buttons = screen.getAllByRole('button', { name: /Événements du runtime/u });
+    expect(buttons[0]).toHaveAccessibleName(buttons[1]!.getAttribute('aria-label') ?? '');
+    await user.click(buttons[0]!);
+    const dialog = await screen.findByRole('dialog', { name: 'Événements du runtime' });
+    const firstExecution = api.calls.find(({ path }) => path.endsWith('/executions'));
+    expect(firstExecution).toBeDefined();
+    expect(within(dialog).getByRole('region', { name: 'Événements capturés' })).toHaveTextContent(
+      'RUN_STARTED',
+    );
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    // Stored rows own their events through their execution id after the screen is rebuilt.
+    view.unmount();
+    renderWorkspaceAt(`/app/conversations/${CONVERSATION_ID}`, api);
+    await findInMain(fakeReply('Second'));
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /Événements du runtime/u })).toHaveLength(2),
+    );
+  });
+
+  it('opens the trace of an answer in the runtime console only when the API serves trace links', async () => {
+    const user = userEvent.setup();
+    const open = vi.fn().mockReturnValue(null);
+    vi.stubGlobal('open', open);
+    const api = createWorkspaceApi({
+      conversations: [conversation()],
+      projects: [project()],
+      features: { agentRuntime: true, traceLinks: true },
+    });
+    renderWorkspaceAt(`/app/conversations/${CONVERSATION_ID}`, api);
+    await user.type(await screen.findByRole('textbox', { name: 'Message' }), 'Trace{Enter}');
+    await findInMain(fakeReply('Trace'));
+    await user.click(await screen.findByRole('button', { name: 'Voir la trace de cette réponse' }));
+    const link = await screen.findByRole('link', { name: 'Ouvrir la trace de cette réponse' });
+    const executionId = api.calls
+      .map(({ path }) => /^\/api\/executions\/([^/]+)\/trace-link$/u.exec(path)?.[1])
+      .find((id) => id !== undefined);
+    expect(executionId).toBeDefined();
+    const url = `https://smith.langchain.com/o/org/projects/p/proj/r/${executionId}?poll=true`;
+    expect(open).toHaveBeenCalledWith(url, '_blank', 'noopener,noreferrer');
+    expect(link).toHaveAttribute('href', url);
+    expect(link).toHaveAttribute('rel', 'noreferrer noopener');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows no trace control when the capability is off', async () => {
+    const user = userEvent.setup();
+    const api = createWorkspaceApi({
+      conversations: [conversation()],
+      projects: [project()],
+      features: { agentRuntime: true },
+    });
+    renderWorkspaceAt(`/app/conversations/${CONVERSATION_ID}`, api);
+    await user.type(await screen.findByRole('textbox', { name: 'Message' }), 'Sans trace{Enter}');
+    await findInMain(fakeReply('Sans trace'));
+    expect(await screen.findByRole('button', { name: 'Copier la réponse' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Voir la trace de cette réponse' })).toBeNull();
+    expect(api.calls.some(({ path }) => path.endsWith('/trace-link'))).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ import { RequiresFeature } from '../../feature-flags/requires-feature.decorator'
 import { StreamAuthorityService } from '../../stream/application/stream-authority.service';
 import { ExecutionObservationService } from '../application/execution-observation.service';
 import { ExecutionsService } from '../application/executions.service';
+import { TraceLinkService } from '../application/trace-link.service';
 
 @ApiTags('executions')
 @ApiBearerAuth('bearerAuth')
@@ -18,6 +19,7 @@ export class ExecutionResourceController {
     private readonly executions: ExecutionsService,
     private readonly observations: ExecutionObservationService,
     private readonly authority: StreamAuthorityService,
+    private readonly traceLinks: TraceLinkService,
   ) {}
 
   @Get(':id')
@@ -40,5 +42,17 @@ export class ExecutionResourceController {
     await this.authority.assert(principal, authorization);
     await this.executions.stop(principal, id);
     return ok({ snapshot: await this.observations.snapshot(principal, id) });
+  }
+
+  /** Development diagnostic; hidden unless `traceLinks` is enabled on top of `agentRuntime`. */
+  @Get(':id/trace-link')
+  @RequiresFeature('traceLinks')
+  async traceLink(
+    @CurrentUser() principal: AuthPrincipal,
+    @Param('id', new ResourceIdPipe('execution')) id: string,
+    @Headers('authorization') authorization: string | undefined,
+  ) {
+    await this.authority.assert(principal, authorization);
+    return ok(await this.traceLinks.linkFor(principal, id));
   }
 }

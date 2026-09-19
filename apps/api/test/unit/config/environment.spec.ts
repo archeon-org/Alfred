@@ -151,6 +151,7 @@ describe('parseEnvironment', () => {
       FEATURE_RUNTIME_MEMORY_ENABLED: false,
       FEATURE_SKILLS_ENABLED: false,
       FEATURE_TEAMS_ENABLED: false,
+      FEATURE_TRACE_LINKS_ENABLED: false,
       NODE_ENV: 'test',
       OBSERVABILITY_LOG_LEVEL: 'info',
       OBSERVABILITY_METRICS_ENABLED: false,
@@ -262,6 +263,78 @@ describe('parseEnvironment', () => {
         GOOGLE_OAUTH_CLIENT_ID: 'client-id.apps.googleusercontent.com',
       }),
     ).toThrow(/GOOGLE_OAUTH/u);
+  });
+
+  it('requires the trace console addresses when trace links are enabled', () => {
+    expect(() =>
+      parseEnvironment({ ...validEnvironment, FEATURE_TRACE_LINKS_ENABLED: 'true' }),
+    ).toThrow(/TRACE_LINK_UI_URL is required when FEATURE_TRACE_LINKS_ENABLED is true/u);
+    const environment = parseEnvironment({
+      ...validEnvironment,
+      FEATURE_TRACE_LINKS_ENABLED: 'true',
+      TRACE_LINK_UI_URL: 'https://smith.langchain.com',
+      TRACE_LINK_ORGANIZATION_ID: 'org',
+      TRACE_LINK_PROJECT_ID: 'proj',
+    });
+    expect(environment.FEATURE_TRACE_LINKS_ENABLED).toBe(true);
+    expect(environment.TRACE_LINK_PROJECT_ID).toBe('proj');
+    expect(
+      parseEnvironment({ ...validEnvironment, TRACE_LINK_PROJECT_ID: '' }).TRACE_LINK_PROJECT_ID,
+    ).toBeUndefined();
+  });
+
+  it('refuses a trace console address carrying credentials, a query or a fragment', () => {
+    for (const address of [
+      'https://user:secret@smith.langchain.com',
+      'https://smith.langchain.com/?token=1',
+      'https://smith.langchain.com/#frag',
+      'ftp://smith.langchain.com',
+    ]) {
+      expect(() => parseEnvironment({ ...validEnvironment, TRACE_LINK_UI_URL: address })).toThrow(
+        /TRACE_LINK_UI_URL must be an http\(s\) address without credentials/u,
+      );
+    }
+    expect(
+      parseEnvironment({
+        ...validEnvironment,
+        TRACE_LINK_UI_URL: 'https://observability.internal/ls/',
+      }).TRACE_LINK_UI_URL,
+    ).toBe('https://observability.internal/ls/');
+  });
+
+  it('refuses trace console settings that leave no room for a run identifier in a link', () => {
+    const settings = { TRACE_LINK_ORGANIZATION_ID: 'org', TRACE_LINK_PROJECT_ID: 'proj' };
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        ...settings,
+        TRACE_LINK_UI_URL: `https://observability.internal/${'p'.repeat(900)}`,
+      }),
+    ).toThrow(/must leave a trace link within 2048 characters for any run identifier/u);
+    expect(
+      parseEnvironment({
+        ...validEnvironment,
+        ...settings,
+        TRACE_LINK_UI_URL: `https://observability.internal/${'p'.repeat(800)}`,
+      }).TRACE_LINK_UI_URL,
+    ).toHaveLength(31 + 800);
+  });
+
+  it('refuses trace links in production: they are a development diagnostic', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        API_CORS_ORIGINS: 'https://alfred.example.test',
+        AUTH_COOKIE_SECURE: 'true',
+        NODE_ENV: 'production',
+        REDIS_URL: 'redis://default:a-real-redis-password@redis:6379/0',
+        WEB_APP_URL: 'https://alfred.example',
+        FEATURE_TRACE_LINKS_ENABLED: 'true',
+        TRACE_LINK_UI_URL: 'https://smith.langchain.com',
+        TRACE_LINK_ORGANIZATION_ID: 'org',
+        TRACE_LINK_PROJECT_ID: 'proj',
+      }),
+    ).toThrow(/must be false in production/u);
   });
 
   it('treats empty optional Google variables from container environments as absent', () => {

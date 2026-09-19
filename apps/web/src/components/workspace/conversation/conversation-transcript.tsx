@@ -1,11 +1,17 @@
 import type { ExecutionActivity } from '@alfred/contracts';
-import { Bot, Check, LoaderCircle, User, X } from 'lucide-react';
-import { Fragment, useEffect, useRef } from 'react';
+import { Check, LoaderCircle, X } from 'lucide-react';
+import { Fragment, useDeferredValue, useEffect, useRef } from 'react';
 
 import { MarkdownView } from '@/components/ui/markdown-view';
+import { TurnActions } from '@/components/workspace/conversation/turn-actions';
 import type { TurnFailure } from '@/hooks/conversations/use-conversation-chat';
 import { cn } from '@/lib/cn';
-import type { LiveSession, LiveTurn } from '@/contexts/chat-session/chat-session-context';
+import type {
+  LiveSession,
+  LiveTurn,
+  RuntimeEventView,
+} from '@/contexts/chat-session/chat-session-context';
+import { groupRuntimeEvents } from '@/lib/workspace/runtime-event-debug';
 import { transcriptEntries } from '@/lib/workspace/transcript-entries';
 import type { Message } from '@/services/executions/executions.service';
 
@@ -14,13 +20,20 @@ interface ConversationTranscriptProps {
   readonly sessions: readonly LiveSession[];
   /** Error of a settled turn, shown under the last stored row of its execution. */
   readonly failure?: TurnFailure | null;
+  /** Diagnostic events of this conversation; each answer shows the ones of its execution. */
+  readonly debugEvents?: readonly RuntimeEventView[];
+  readonly traceLinksEnabled?: boolean;
 }
+
+const NO_EVENTS: readonly RuntimeEventView[] = [];
 
 /** Stored and local turns, kept in order until persistence takes over from each stream. */
 export function ConversationTranscript({
   messages,
   sessions,
   failure = null,
+  debugEvents = NO_EVENTS,
+  traceLinksEnabled = false,
 }: ConversationTranscriptProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const live = sessions.at(-1)?.turn;
@@ -32,9 +45,12 @@ export function ConversationTranscript({
     failure === null
       ? undefined
       : messages.findLast((message) => message.executionId === failure.executionId)?.id;
+  const eventsByExecution = groupRuntimeEvents(debugEvents);
+  const eventsOf = (executionId: string | null) =>
+    executionId === null ? NO_EVENTS : (eventsByExecution.get(executionId) ?? NO_EVENTS);
 
   return (
-    <ol className="mx-auto flex w-full max-w-conversation flex-col gap-4 px-4 py-4 md:px-6 wide:px-8">
+    <ol className="mx-auto flex w-full max-w-conversation flex-col gap-6 px-4 py-4 md:px-6 wide:px-8">
       {transcriptEntries(messages, sessions).map((entry) =>
         entry.kind === 'message' ? (
           <Turn
@@ -42,6 +58,9 @@ export function ConversationTranscript({
             author={entry.message.role}
             content={entry.message.content}
             error={entry.message.id === failedRow ? failure?.error : null}
+            executionId={entry.message.executionId}
+            events={eventsOf(entry.message.executionId)}
+            traceLinksEnabled={traceLinksEnabled}
           />
         ) : (
           <Fragment key={`session-${entry.session.id}`}>
@@ -53,6 +72,9 @@ export function ConversationTranscript({
               error={entry.session.turn.error}
               statusText={observationStatus(entry.session.turn)}
               activities={entry.session.turn.activities}
+              executionId={entry.session.turn.execution?.id ?? null}
+              events={eventsOf(entry.session.turn.execution?.id ?? null)}
+              traceLinksEnabled={traceLinksEnabled}
             />
           </Fragment>
         ),
@@ -70,8 +92,15 @@ interface TurnProps {
   readonly statusText?: string | null;
   /** Tool calls reported for a live turn; stored rows carry none. */
   readonly activities?: readonly ExecutionActivity[];
+  readonly executionId?: string | null;
+  readonly events?: readonly RuntimeEventView[];
+  readonly traceLinksEnabled?: boolean;
 }
 
+/**
+ * One turn of the transcript. The person's message sits in a bubble on the right; Alfred's answer
+ * reads as page text, with its controls underneath once the answer has settled.
+ */
 function Turn({
   author,
   content,
@@ -79,55 +108,61 @@ function Turn({
   error = null,
   statusText = null,
   activities = [],
+  executionId = null,
+  events = NO_EVENTS,
+  traceLinksEnabled = false,
 }: TurnProps) {
-  const isUser = author === 'user';
-  return (
-    <li className={cn('flex gap-3', isUser && 'flex-row-reverse')}>
-      <span
-        aria-hidden="true"
-        className={cn(
-          'grid size-8 shrink-0 place-items-center rounded-full border border-border',
-          isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-        )}
-      >
-        {isUser ? <User size={15} /> : <Bot size={15} />}
-      </span>
-      <div
-        className={cn(
-          'min-w-0 max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
-          isUser ? 'bg-primary/10' : 'border border-border bg-background',
-        )}
-      >
-        <p className="sr-only">{isUser ? 'Vous' : 'Alfred'}</p>
-        {activities.length > 0 ? <Activities activities={activities} /> : null}
-        {isUser ? (
+  // Markdown of a streaming answer is parsed at most once per frame: deltas arrive faster than a
+  // long answer renders, and a stale parse is abandoned for the latest text instead of queued.
+  const shown = useDeferredValue(content);
+  if (author === 'user') {
+    return (
+      <li className="flex justify-end">
+        <div className="max-w-[85%] rounded-2xl bg-primary/10 px-4 py-3 text-sm leading-relaxed">
+          <p className="sr-only">Vous</p>
           <p className="whitespace-pre-wrap">{content}</p>
-        ) : content.length > 0 ? (
-          <MarkdownView source={content} />
-        ) : pending ? (
-          <span className="inline-flex items-center gap-2 text-muted-foreground">
-            <LoaderCircle aria-hidden="true" className="animate-spin" size={14} />
-            Alfred réfléchit…
-          </span>
-        ) : error ? null : (
-          <span className="text-muted-foreground">Aucune réponse.</span>
-        )}
-        {pending && content.length > 0 ? (
-          <span className="sr-only" aria-live="polite">
-            Réponse en cours
-          </span>
-        ) : null}
-        {statusText ? (
-          <p className="mt-2 text-xs text-muted-foreground" role="status">
-            {statusText}
-          </p>
-        ) : null}
-        {error ? (
-          <p className="mt-2 text-xs text-destructive" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+        </div>
+      </li>
+    );
+  }
+  return (
+    <li className="group/turn flex min-w-0 flex-col text-sm leading-relaxed">
+      <p className="sr-only">Alfred</p>
+      {activities.length > 0 ? <Activities activities={activities} /> : null}
+      {shown.length > 0 ? (
+        <MarkdownView source={shown} />
+      ) : pending ? (
+        <span className="inline-flex items-center gap-2 text-muted-foreground">
+          <LoaderCircle aria-hidden="true" className="animate-spin" size={14} />
+          Alfred réfléchit…
+        </span>
+      ) : error ? null : (
+        <span className="text-muted-foreground">Aucune réponse.</span>
+      )}
+      {pending && content.length > 0 ? (
+        <span className="sr-only" aria-live="polite">
+          Réponse en cours
+        </span>
+      ) : null}
+      {statusText ? (
+        <p className="mt-2 text-xs text-muted-foreground" role="status">
+          {statusText}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-2 text-xs text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {!pending && content.length > 0 ? (
+        <TurnActions
+          className="mt-1.5 -ml-1.5"
+          content={content}
+          executionId={executionId}
+          events={events}
+          traceLinksEnabled={traceLinksEnabled}
+        />
+      ) : null}
     </li>
   );
 }

@@ -131,10 +131,11 @@ export function encodeAgUiFrames(frames: readonly AgUiFrame[]): string {
     .join('');
 }
 
-/** The diagnostics view of the same frames, as the browser records them. */
-export function diagnosticEvents(frames: readonly AgUiFrame[]) {
+/** The diagnostics view of the same frames, as the browser files them under their execution. */
+export function diagnosticEvents(frames: readonly AgUiFrame[], executionId: string) {
   return frames.map((frame, index) => ({
     id: index + 1,
+    executionId,
     event: frame.event.type,
     data: frame.event,
   }));

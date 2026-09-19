@@ -18,6 +18,7 @@ describe('PlatformService', () => {
       runtimeMemory: true,
       skills: true,
       teams: false,
+      traceLinks: false,
     });
     const flags = { getPublicFlags: () => features } as unknown as FeatureFlagsService;
     const service = new PlatformService(flags);

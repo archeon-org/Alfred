@@ -5,6 +5,7 @@ import {
   runtimeEnvironmentFields,
   validateRuntimeEnvironment,
 } from './runtime-environment';
+import { validateTraceLinkEnvironment } from './trace-link';
 
 const booleanFromEnvironment = z.preprocess((value) => {
   if (value === 'true') return true;
@@ -24,6 +25,7 @@ const emptyStringToUndefined = (value: unknown): unknown =>
 const containsCommittedPlaceholder = (value: string | undefined): boolean =>
   value?.toLowerCase().includes('replace-with') === true;
 
+/** An origin with an optional path: no userinfo, query or fragment may reach a generated link. */
 const usesHttps = (value: string): boolean => {
   try {
     return new URL(value).protocol === 'https:';
@@ -117,6 +119,17 @@ const environmentSchema = z
     FEATURE_RUNTIME_MEMORY_ENABLED: booleanFromEnvironment.default(false),
     FEATURE_SKILLS_ENABLED: booleanFromEnvironment.default(false),
     FEATURE_TEAMS_ENABLED: booleanFromEnvironment.default(false),
+    FEATURE_TRACE_LINKS_ENABLED: booleanFromEnvironment.default(false),
+    // Public address parts of the runtime's trace console; no credential is ever involved.
+    TRACE_LINK_UI_URL: z.preprocess(emptyStringToUndefined, z.string().url().optional()),
+    TRACE_LINK_ORGANIZATION_ID: z.preprocess(
+      emptyStringToUndefined,
+      z.string().min(1).max(128).optional(),
+    ),
+    TRACE_LINK_PROJECT_ID: z.preprocess(
+      emptyStringToUndefined,
+      z.string().min(1).max(128).optional(),
+    ),
     GOOGLE_OAUTH_CALLBACK_URL: z.preprocess(emptyStringToUndefined, z.string().url().optional()),
     GOOGLE_OAUTH_CLIENT_ID: z.preprocess(emptyStringToUndefined, z.string().min(1).optional()),
     GOOGLE_OAUTH_CLIENT_SECRET: z.preprocess(emptyStringToUndefined, z.string().min(1).optional()),
@@ -235,6 +248,8 @@ const environmentSchema = z
         });
       }
     }
+
+    validateTraceLinkEnvironment(environment, context);
 
     if (environment.FEATURE_GOOGLE_OAUTH_ENABLED) {
       const requiredGoogleKeys = [

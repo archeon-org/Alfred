@@ -3,6 +3,7 @@ import {
   EXECUTION_STREAM_ERROR_EVENT,
   EXECUTION_STREAM_UNAVAILABLE_CODE,
   executionSnapshotEnvelopeSchema,
+  executionTraceLinkEnvelopeSchema,
   messageListEnvelopeSchema,
   type ExecutionSnapshot,
   type Message,
@@ -21,7 +22,12 @@ import {
 } from '@/services/http/api-json';
 import type { HttpClient, HttpRequestInit } from '@/services/http/http-client';
 
-export type { Execution, ExecutionStreamEvent, Message } from '@alfred/contracts';
+export type {
+  Execution,
+  ExecutionStreamEvent,
+  ExecutionTraceLink,
+  Message,
+} from '@alfred/contracts';
 export type { AlfredAgUiEvent } from '@/lib/workspace/ag-ui-events';
 
 /** One validated AG-UI event of the observed execution with the opaque cursor of its frame. */
@@ -225,5 +231,21 @@ function isTransientError(data: unknown): boolean {
     Object.keys(data).length === 1 &&
     'code' in data &&
     data.code === EXECUTION_STREAM_UNAVAILABLE_CODE
+  );
+}
+
+/** Development diagnostic: the console address of an execution's trace, while `traceLinks` is on. */
+export async function getExecutionTraceLink(
+  client: HttpClient,
+  executionId: string,
+  signal?: AbortSignal,
+) {
+  return parseEnvelope(
+    executionTraceLinkEnvelopeSchema,
+    await jsonRequest(client, `/executions/${encodeURIComponent(executionId)}/trace-link`, {
+      method: 'GET',
+      ...(signal ? { signal } : {}),
+    }),
+    'Le lien de trace est invalide.',
   );
 }
