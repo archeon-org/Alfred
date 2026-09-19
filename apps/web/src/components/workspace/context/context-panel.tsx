@@ -5,7 +5,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AgentCatalog } from '@/components/workspace/context/agent-catalog';
 import { ContextResources } from '@/components/workspace/context/context-resources';
 import { SkillsPanel } from '@/components/workspace/context/skills-panel';
-import { TeamBuilder } from '@/components/workspace/context/team-builder';
 import { ContextSkeleton } from '@/components/workspace/workspace-skeletons';
 import { useFeatureFlagsQuery } from '@/hooks/feature-flags/use-feature-flags-query';
 import { useShortcutHint } from '@/hooks/workspace/use-shortcut-preferences';
@@ -86,9 +85,8 @@ export function ContextPanel({ isLoading, tools, onClose }: ContextPanelProps) {
               ))}
             </TabsList>
             {tabs.some((tab) => tab.id === 'teams') ? (
-              <TabsContent value="teams" className="space-y-8 pt-5">
+              <TabsContent value="teams" className="pt-5">
                 <AgentCatalog />
-                <TeamBuilder tools={tools} />
               </TabsContent>
             ) : null}
             <TabsContent value="skills" className="pt-5">
@@ -108,9 +106,7 @@ export function ContextPanel({ isLoading, tools, onClose }: ContextPanelProps) {
         <p className="text-2xs leading-relaxed">
           Votre espace prend forme.
           <br />
-          <span className="text-2xs">
-            Les équipes restent des aperçus locaux. Les fichiers arrivent bientôt.
-          </span>
+          <span className="text-2xs">Les fichiers arrivent bientôt.</span>
         </p>
       </div>
     </aside>

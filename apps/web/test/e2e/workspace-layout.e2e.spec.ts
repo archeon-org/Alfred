@@ -196,6 +196,22 @@ for (const viewport of shellViewports) {
     await page.mouse.wheel(0, 20_000);
     await page.keyboard.press('End');
     await expectStillDocument(page);
+    // Nor may a wheel over the page scroll a resizable panel's own box, which pushed the chat
+    // out of view and left an empty band under it.
+    await page.mouse.move(viewport.width / 2, viewport.height - 10);
+    await page.mouse.wheel(0, 20_000);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          Math.max(
+            0,
+            ...[...document.querySelectorAll<HTMLElement>('[data-panel] > div')].map(
+              (box) => box.scrollTop,
+            ),
+          ),
+        ),
+      )
+      .toBe(0);
 
     const docked = page.getByRole('separator', { name: 'Redimensionner le panneau de contexte' });
     const context = page.getByRole('complementary', { name: 'Contexte de la conversation' });

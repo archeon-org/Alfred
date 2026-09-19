@@ -12,8 +12,20 @@ function ResizablePanelGroup({ className, ...props }: ResizablePrimitive.GroupPr
   );
 }
 
-function ResizablePanel({ ...props }: ResizablePrimitive.PanelProps) {
-  return <ResizablePrimitive.Panel data-slot="resizable-panel" {...props} />;
+/**
+ * The library makes each panel's inner box `overflow: auto`. Content scrolls inside the panel's
+ * own regions, so that box must never scroll: a visually hidden label deep in a scrolled
+ * transcript would otherwise lengthen it and a wheel over the page would push the whole panel
+ * out of view. `clip`, unlike `hidden`, cannot be scrolled by focus or `scrollIntoView` either.
+ */
+function ResizablePanel({ style, ...props }: ResizablePrimitive.PanelProps) {
+  return (
+    <ResizablePrimitive.Panel
+      data-slot="resizable-panel"
+      style={{ overflow: 'clip', ...style }}
+      {...props}
+    />
+  );
 }
 
 function ResizableHandle({
