@@ -1,10 +1,11 @@
-import type { ExecutionSnapshot } from '@alfred/contracts';
-import { Injectable } from '@nestjs/common';
+import type { ExecutionSnapshot, MessageAttachment } from '@alfred/contracts';
+import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { ApiException } from '../../../common/errors/api.exception';
 import { ConversationsService } from '../../conversations/application/conversations.service';
+import { MessageAttachmentsService } from '../../files/application/message-attachments.service';
 import { createResumeCursor, readResumeCursor } from '../../stream/api/resume-cursor';
 import { toExecutionDto } from '../domain/execution';
 import { isExecutionSettled } from '../domain/execution-lifecycle';
@@ -27,9 +28,19 @@ export class ExecutionObservationService {
     private readonly conversations: ConversationsService,
     private readonly dataSource: DataSource,
     private readonly config: ConfigService,
+    @Optional() private readonly attachments?: MessageAttachmentsService,
   ) {}
 
-  async load(principal: AuthPrincipal, id: string, cursor?: string) {
+  /**
+   * `known` carries the attachments an observer already read. A turn's files are fixed when it is
+   * sent, so a stream that polls twice a second per observer reads them once, not at every tick.
+   */
+  async load(
+    principal: AuthPrincipal,
+    id: string,
+    cursor?: string,
+    known?: readonly MessageAttachment[],
+  ) {
     const row = await this.executions.getObservation(principal, id);
     if (cursor !== undefined) {
       try {
@@ -46,7 +57,15 @@ export class ExecutionObservationService {
     const user = await this.dataSource
       .getRepository(MessageEntity)
       .findOne({ where: { executionId: id, role: 'user' } });
-    return { row, conversation, userMessage: user?.content ?? '', state: this.state(row) };
+    const attachments =
+      known ?? (user === null ? [] : ((await this.attachments?.forMessage(user.id)) ?? []));
+    return {
+      row,
+      conversation,
+      userMessage: user?.content ?? '',
+      attachments,
+      state: this.state(row),
+    };
   }
 
   async snapshot(principal: AuthPrincipal, id: string): Promise<ExecutionSnapshot> {
@@ -63,6 +82,7 @@ export class ExecutionObservationService {
       execution: toExecutionDto(loaded.row),
       conversation: loaded.conversation,
       userMessage: loaded.userMessage,
+      ...(loaded.attachments.length === 0 ? {} : { attachments: loaded.attachments }),
       assistantText: state.sourceId === null ? loaded.row.publicText : projectionText(state),
       activities: [...projectionActivities(state)],
       cursor: this.cursor(loaded, state),

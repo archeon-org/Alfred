@@ -12,7 +12,7 @@ import {
 const IMPLEMENTED_PUBLIC_FEATURES = Object.freeze({
   agentRuntime: true,
   agUiStreaming: false,
-  fileUploads: false,
+  fileUploads: true,
   generativeUi: false,
   googleOAuth: true,
   mcpApps: false,

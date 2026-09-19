@@ -14,6 +14,7 @@ import { validateEnv } from '@api/config/configuration';
 import { FeatureFlagsService } from '@api/modules/feature-flags/feature-flags.service';
 import { DatabaseHealthIndicator } from '@api/modules/health/database-health.indicator';
 import { HealthController } from '@api/modules/health/health.controller';
+import { ContentStoreLifecycle } from '@api/modules/files/infrastructure/storage/content-store.lifecycle';
 import { HealthService } from '@api/modules/health/health.service';
 import { RedisHealthIndicator } from '@api/modules/health/redis-health.indicator';
 import { MetricsService } from '@api/observability/metrics.service';
@@ -70,6 +71,10 @@ describe('operational health module', () => {
         { provide: DataSource, useValue: { query } },
         { provide: FeatureFlagsService, useValue: featureFlags },
         { provide: RedisHealthIndicator, useValue: { check: checkRedis } },
+        {
+          provide: ContentStoreLifecycle,
+          useValue: { check: () => Promise.resolve({}) },
+        },
       ],
     }).compile();
 

@@ -1,5 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service';
+import { ContentStoreLifecycle } from '../files/infrastructure/storage/content-store.lifecycle';
 import { DatabaseHealthIndicator } from './database-health.indicator';
 import { RedisHealthIndicator } from './redis-health.indicator';
 
@@ -9,6 +10,7 @@ export class HealthService {
     private readonly database: DatabaseHealthIndicator,
     private readonly redis: RedisHealthIndicator,
     private readonly featureFlags: FeatureFlagsService,
+    private readonly fileStorage: ContentStoreLifecycle,
   ) {}
 
   getHealth() {
@@ -25,14 +27,19 @@ export class HealthService {
 
   async checkReadiness() {
     const rateLimitingEnabled = this.featureFlags.isEnabled('rateLimiting');
-    const [database, redis] = await Promise.all([
+    const [database, redis, fileStorage] = await Promise.all([
       this.database.check(),
       rateLimitingEnabled
         ? this.redis.check()
         : Promise.resolve({ redis: { status: 'disabled' as const } }),
+      this.fileStorage.check(),
     ]);
-    const details = { ...database, ...redis };
-    if (database.database.status === 'down' || redis.redis.status === 'down') {
+    const details = { ...database, ...redis, ...fileStorage };
+    if (
+      database.database.status === 'down' ||
+      redis.redis.status === 'down' ||
+      ('storage' in fileStorage && fileStorage.storage.status === 'down')
+    ) {
       throw new ServiceUnavailableException({ details, status: 'error' });
     }
     return { details, status: 'ok' as const };

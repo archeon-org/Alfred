@@ -29,9 +29,12 @@ export function createTestQueryClient() {
   });
 }
 
-/** Renders the real routes at `path` against the in-memory workspace API. */
+/**
+ * Renders the real routes at `path` against the in-memory workspace API. An entry with `state`
+ * stands for a history entry the browser restored, such as a chat reloaded with its draft.
+ */
 export function renderWorkspaceAt(
-  path: string,
+  path: string | { readonly pathname: string; readonly state: unknown },
   api: ReturnType<typeof createWorkspaceApi> = createWorkspaceApi(),
   session: SessionContextValue = authenticatedSession,
 ) {

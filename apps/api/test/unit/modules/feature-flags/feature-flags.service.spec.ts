@@ -70,7 +70,7 @@ describe('FeatureFlagsService', () => {
     expect(service.getPublicFlags()).toEqual({
       agentRuntime: true,
       agUiStreaming: false,
-      fileUploads: false,
+      fileUploads: true,
       generativeUi: false,
       googleOAuth: true,
       mcpApps: false,
@@ -117,7 +117,6 @@ describe('FeatureFlagsService', () => {
 
   it.each<FeatureFlagName>([
     'agUiStreaming',
-    'fileUploads',
     'generativeUi',
     'mcpApps',
     'outputStyles',

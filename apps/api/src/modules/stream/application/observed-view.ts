@@ -143,7 +143,12 @@ export function observedView(loaded: Loaded, works?: ObservedWorkCache): Observe
   const execution = toExecutionDto(loaded.row);
   const settled = isExecutionSettled(loaded.row);
   const endedAt = settled ? (loaded.row.finishedAt?.getTime() ?? null) : null;
-  const state = { execution, conversation: loaded.conversation, userMessage: loaded.userMessage };
+  const state = {
+    execution,
+    conversation: loaded.conversation,
+    userMessage: loaded.userMessage,
+    ...(loaded.attachments.length === 0 ? {} : { attachments: loaded.attachments }),
+  };
   if (loaded.state.sourceId === null) {
     return {
       state,

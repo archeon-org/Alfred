@@ -204,6 +204,31 @@ const newFlagKeys = [
   'FEATURE_CONVERSATION_FEEDBACK_ENABLED',
 ];
 
+test('describes no bucket by default, keeps a described one, and gives MinIO its own administrator', async (context) => {
+  const workspace = await createWorkspace(context);
+  await writeFile(
+    join(workspace, 'apps/api/.env'),
+    'FILE_STORAGE_S3_BUCKET=alfred-files\nFILE_STORAGE_S3_REGION=auto\n',
+  );
+
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  const root = parseEnvironment(await readFile(join(workspace, '.env'), 'utf8'));
+  const api = parseEnvironment(await readFile(join(workspace, 'apps/api/.env'), 'utf8'));
+
+  assert.equal(api.FILE_STORAGE_S3_BUCKET, 'alfred-files');
+  assert.equal(api.FILE_STORAGE_S3_REGION, 'auto');
+  assert.equal(api.FILE_STORAGE_LOCAL_ROOT, 'var/uploads');
+  assert.equal(api.FILE_STORAGE_S3_SECRET_ACCESS_KEY, '');
+  // The storage administrator never reaches the API, and is not the API's own credential.
+  assert.equal('MINIO_ROOT_PASSWORD' in api, false);
+  assert.ok(root.MINIO_ROOT_PASSWORD.length >= 32);
+  assert.notEqual(root.MINIO_ROOT_PASSWORD, root.FILE_STORAGE_S3_SECRET_ACCESS_KEY);
+
+  await execFileAsync(process.execPath, [setupScript], { cwd: workspace });
+  const again = parseEnvironment(await readFile(join(workspace, '.env'), 'utf8'));
+  assert.equal(again.MINIO_ROOT_PASSWORD, root.MINIO_ROOT_PASSWORD);
+});
+
 test('generates all three reserved flags as false in root and API env', async (context) => {
   const workspace = await createWorkspace(context);
   await execFileAsync(process.execPath, [setupScript], { cwd: workspace });

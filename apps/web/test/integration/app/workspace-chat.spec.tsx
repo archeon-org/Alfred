@@ -63,6 +63,10 @@ describe('Workspace chat with the agent bridge', () => {
       }),
     );
     expect(api.calls.filter(({ path }) => path === '/api/conversations')).toHaveLength(1);
+    // `fileUploads` is off: the body above carries no `attachmentIds`, the composer offers no
+    // file control and the files API is never called.
+    expect(screen.queryByRole('button', { name: 'Joindre des fichiers' })).not.toBeInTheDocument();
+    expect(api.calls.filter(({ path }) => path.startsWith('/api/files'))).toEqual([]);
   });
 
   it('creates a project chat from the project composer and keeps its scope', async () => {

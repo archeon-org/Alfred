@@ -233,12 +233,14 @@ describe('recoverable chat observation', () => {
       expect(view.result.current.debug.events).toHaveLength(
         flag === 'true' ? synthesizeRun(run).flat().length : 0,
       );
+      // A message without files carries an empty attachment list, which the service leaves out.
       expect(mockedCreate).toHaveBeenCalledWith(
         expect.anything(),
         CONVERSATION_ID,
         'Salut',
         expect.any(String),
         expect.any(AbortSignal),
+        [],
       );
       expect(mockedStream).toHaveBeenCalledWith(
         expect.anything(),

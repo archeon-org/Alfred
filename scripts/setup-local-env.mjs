@@ -149,6 +149,48 @@ function renderFeatureFlags(flags) {
   ];
 }
 
+// Uploaded file bytes: an empty bucket block keeps files on this machine, which only a developer
+// may do. Filling every value switches the same adapter to any S3-compatible provider.
+function renderFileStorage(environments, minioRootPassword) {
+  return [
+    '# Uploaded files: size, quota, extraction and prompt bounds (Revision 86, ALF-DEC-010).',
+    `FILE_UPLOAD_MAX_BYTES=${firstValue('FILE_UPLOAD_MAX_BYTES', environments, '5242880')}`,
+    `FILE_QUOTA_BYTES_PER_USER=${firstValue('FILE_QUOTA_BYTES_PER_USER', environments, '26214400')}`,
+    `FILE_PENDING_UPLOAD_TTL_MS=${firstValue('FILE_PENDING_UPLOAD_TTL_MS', environments, '300000')}`,
+    `FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE=${firstValue('FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE', environments, '20')}`,
+    `FILE_UPLOAD_MAX_CONCURRENT=${firstValue('FILE_UPLOAD_MAX_CONCURRENT', environments, '4')}`,
+    `FILE_EXTRACTION_TIMEOUT_MS=${firstValue('FILE_EXTRACTION_TIMEOUT_MS', environments, '60000')}`,
+    `FILE_EXTRACTION_MAX_PDF_PAGES=${firstValue('FILE_EXTRACTION_MAX_PDF_PAGES', environments, '500')}`,
+    `FILE_EXTRACTED_TEXT_MAX_CHARS=${firstValue('FILE_EXTRACTED_TEXT_MAX_CHARS', environments, '1000000')}`,
+    `FILE_IMAGE_MAX_EDGE_PX=${firstValue('FILE_IMAGE_MAX_EDGE_PX', environments, '1568')}`,
+    `FILE_IMAGE_MAX_INPUT_PIXELS=${firstValue('FILE_IMAGE_MAX_INPUT_PIXELS', environments, '50000000')}`,
+    `FILE_PROMPT_TOKENS_PER_DOCUMENT=${firstValue('FILE_PROMPT_TOKENS_PER_DOCUMENT', environments, '10000')}`,
+    `FILE_PROMPT_TOKENS_PER_EXECUTION=${firstValue('FILE_PROMPT_TOKENS_PER_EXECUTION', environments, '30000')}`,
+    '# Uploaded file bytes. Empty FILE_STORAGE_S3_* values keep files under FILE_STORAGE_LOCAL_ROOT',
+    '# (development only). Set the bucket and region for AWS S3, MinIO, Cloudflare R2, IBM COS or',
+    '# another S3-compatible provider; the key pair is optional (IAM role). A partial description',
+    '# is refused at startup.',
+    `FILE_STORAGE_LOCAL_ROOT=${firstValue('FILE_STORAGE_LOCAL_ROOT', environments, 'var/uploads')}`,
+    `FILE_STORAGE_S3_ENDPOINT=${firstValue('FILE_STORAGE_S3_ENDPOINT', environments, '')}`,
+    `FILE_STORAGE_S3_BUCKET=${firstValue('FILE_STORAGE_S3_BUCKET', environments, '')}`,
+    `FILE_STORAGE_S3_REGION=${firstValue('FILE_STORAGE_S3_REGION', environments, '')}`,
+    `FILE_STORAGE_S3_ACCESS_KEY_ID=${firstValue('FILE_STORAGE_S3_ACCESS_KEY_ID', environments, '')}`,
+    `FILE_STORAGE_S3_SECRET_ACCESS_KEY=${firstValue('FILE_STORAGE_S3_SECRET_ACCESS_KEY', environments, '')}`,
+    `FILE_STORAGE_S3_SESSION_TOKEN=${firstValue('FILE_STORAGE_S3_SESSION_TOKEN', environments, '')}`,
+    `FILE_STORAGE_S3_FORCE_PATH_STYLE=${firstValue('FILE_STORAGE_S3_FORCE_PATH_STYLE', environments, '')}`,
+    `FILE_STORAGE_S3_PREFIX=${firstValue('FILE_STORAGE_S3_PREFIX', environments, '')}`,
+    ...(minioRootPassword === undefined
+      ? []
+      : [
+          '# MinIO administrator for `docker compose --profile files up minio minio-bucket`; the API',
+          '# never uses it. Point FILE_STORAGE_S3_ENDPOINT at http://minio:9000 from Compose, or',
+          '# http://localhost:9000 from the host, and set the FILE_STORAGE_S3_* user to enable uploads.',
+          `MINIO_ROOT_USER=${firstValue('MINIO_ROOT_USER', environments, 'alfred-minio-admin')}`,
+          `MINIO_ROOT_PASSWORD=${minioRootPassword}`,
+        ]),
+  ];
+}
+
 async function writePrivateEnvironment(path, content) {
   await mkdir(dirname(path), { recursive: true });
 
@@ -279,6 +321,7 @@ const environments = [rootEnvironment, apiEnvironment, agentEnvironment];
 const secrets = Object.freeze({
   jwt: firstUsableSecret('AUTH_JWT_SECRET', environments),
   metrics: firstUsableSecret('OBSERVABILITY_METRICS_TOKEN', environments),
+  minio: firstUsableSecret('MINIO_ROOT_PASSWORD', environments),
 });
 
 function preservedDataUrl(key, fallback) {
@@ -428,6 +471,8 @@ const rootContent = renderEnvironment([
   '',
   ...renderFeatureFlags(featureFlags),
   '',
+  ...renderFileStorage(environments, secrets.minio),
+  '',
   '# External/commercial Google OAuth credentials. Workspace restriction is optional.',
   `GOOGLE_OAUTH_CLIENT_ID=${google.clientId}`,
   `GOOGLE_OAUTH_CLIENT_SECRET=${google.clientSecret}`,
@@ -491,6 +536,8 @@ const apiContent = renderEnvironment([
   'WEB_APP_URL=http://localhost:5173',
   '',
   ...renderFeatureFlags(featureFlags),
+  '',
+  ...renderFileStorage(environments),
   '',
   '# External/commercial Google OAuth credentials. Workspace restriction is optional.',
   `GOOGLE_OAUTH_CLIENT_ID=${google.clientId}`,
@@ -560,6 +607,29 @@ await Promise.all([
     ['OBSERVABILITY_LOG_LEVEL', 'info'],
     ['OBSERVABILITY_METRICS_ENABLED', 'false'],
     ['OBSERVABILITY_METRICS_TOKEN', secrets.metrics],
+    ['FILE_UPLOAD_MAX_BYTES', '5242880'],
+    ['FILE_QUOTA_BYTES_PER_USER', '26214400'],
+    ['FILE_PENDING_UPLOAD_TTL_MS', '300000'],
+    ['FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE', '20'],
+    ['FILE_UPLOAD_MAX_CONCURRENT', '4'],
+    ['FILE_EXTRACTION_TIMEOUT_MS', '60000'],
+    ['FILE_EXTRACTION_MAX_PDF_PAGES', '500'],
+    ['FILE_EXTRACTED_TEXT_MAX_CHARS', '1000000'],
+    ['FILE_IMAGE_MAX_EDGE_PX', '1568'],
+    ['FILE_IMAGE_MAX_INPUT_PIXELS', '50000000'],
+    ['FILE_PROMPT_TOKENS_PER_DOCUMENT', '10000'],
+    ['FILE_PROMPT_TOKENS_PER_EXECUTION', '30000'],
+    ['FILE_STORAGE_LOCAL_ROOT', 'var/uploads'],
+    ['FILE_STORAGE_S3_ENDPOINT', ''],
+    ['FILE_STORAGE_S3_BUCKET', ''],
+    ['FILE_STORAGE_S3_REGION', ''],
+    ['FILE_STORAGE_S3_ACCESS_KEY_ID', ''],
+    ['FILE_STORAGE_S3_SECRET_ACCESS_KEY', ''],
+    ['FILE_STORAGE_S3_SESSION_TOKEN', ''],
+    ['FILE_STORAGE_S3_FORCE_PATH_STYLE', ''],
+    ['FILE_STORAGE_S3_PREFIX', ''],
+    ['MINIO_ROOT_USER', 'alfred-minio-admin'],
+    ['MINIO_ROOT_PASSWORD', secrets.minio],
     ['GOOGLE_OAUTH_CLIENT_ID', google.clientId],
     ['GOOGLE_OAUTH_CLIENT_SECRET', google.clientSecret],
     ['GOOGLE_OAUTH_CALLBACK_URL', google.callbackUrl],
@@ -580,6 +650,27 @@ await Promise.all([
     ['AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE', '1200'],
     ['AUTH_USER_RATE_LIMIT_PER_MINUTE', '120'],
     ['TRUST_PROXY_HOPS', '0'],
+    ['FILE_UPLOAD_MAX_BYTES', '5242880'],
+    ['FILE_QUOTA_BYTES_PER_USER', '26214400'],
+    ['FILE_PENDING_UPLOAD_TTL_MS', '300000'],
+    ['FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE', '20'],
+    ['FILE_UPLOAD_MAX_CONCURRENT', '4'],
+    ['FILE_EXTRACTION_TIMEOUT_MS', '60000'],
+    ['FILE_EXTRACTION_MAX_PDF_PAGES', '500'],
+    ['FILE_EXTRACTED_TEXT_MAX_CHARS', '1000000'],
+    ['FILE_IMAGE_MAX_EDGE_PX', '1568'],
+    ['FILE_IMAGE_MAX_INPUT_PIXELS', '50000000'],
+    ['FILE_PROMPT_TOKENS_PER_DOCUMENT', '10000'],
+    ['FILE_PROMPT_TOKENS_PER_EXECUTION', '30000'],
+    ['FILE_STORAGE_LOCAL_ROOT', 'var/uploads'],
+    ['FILE_STORAGE_S3_ENDPOINT', ''],
+    ['FILE_STORAGE_S3_BUCKET', ''],
+    ['FILE_STORAGE_S3_REGION', ''],
+    ['FILE_STORAGE_S3_ACCESS_KEY_ID', ''],
+    ['FILE_STORAGE_S3_SECRET_ACCESS_KEY', ''],
+    ['FILE_STORAGE_S3_SESSION_TOKEN', ''],
+    ['FILE_STORAGE_S3_FORCE_PATH_STYLE', ''],
+    ['FILE_STORAGE_S3_PREFIX', ''],
     ['OBSERVABILITY_LOG_LEVEL', 'info'],
     ['OBSERVABILITY_METRICS_ENABLED', 'false'],
     ['OBSERVABILITY_METRICS_TOKEN', secrets.metrics],

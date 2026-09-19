@@ -28,6 +28,8 @@ interface Observed {
   revision: number;
   /** What this client has been told so far; the next change is translated on top of it. */
   view: ObservedView | null;
+  /** The files of the user turn, read at attach and reused by every later poll. */
+  attachments: Loaded['attachments'];
 }
 
 /**
@@ -94,7 +96,11 @@ export class ExecutionObserverService {
     );
     try {
       writer.open();
-      const observed: Observed = { revision: -1, view: null };
+      const observed: Observed = {
+        revision: -1,
+        view: null,
+        attachments: loaded.attachments,
+      };
       const delivered = await this.send(writer, loaded, observed);
       if (writer.closed || !delivered) return;
       if (this.terminal(loaded)) return ending.record({ reason: 'terminal' });
@@ -168,7 +174,10 @@ export class ExecutionObserverService {
     // Browser reconnect is independent of the native server's finite replay retention.
     while (!writer.closed) {
       await delay(500, undefined, { signal: writer.signal });
-      const loaded = await this.bounded(() => this.observations.load(principal, id), writer.signal);
+      const loaded = await this.bounded(
+        () => this.observations.load(principal, id, undefined, observed.attachments),
+        writer.signal,
+      );
       if (writer.closed) return;
       if (loaded.state.sequence < observed.revision) {
         // A read older than what was sent is skipped. A settled one cannot be older than a running
@@ -191,7 +200,8 @@ export class ExecutionObserverService {
     try {
       await this.bounded(async () => {
         await this.authority.assert(principal, authorization);
-        await this.observations.load(principal, id);
+        // Only access is checked here: the turn's files are not read again.
+        await this.observations.load(principal, id, undefined, []);
       }, writer.signal);
     } catch {
       if (!writer.closed) ending.record({ reason: 'reauthorization_failed' });

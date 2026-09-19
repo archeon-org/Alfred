@@ -9,6 +9,7 @@ import { ConversationSkeleton } from '@/components/workspace/workspace-skeletons
 import type { TurnFailure } from '@/hooks/conversations/use-conversation-chat';
 import { useStickToBottom } from '@/hooks/ui/use-stick-to-bottom';
 import type { LiveSession, RuntimeEventView } from '@/contexts/chat-session/chat-session-context';
+import type { AttachmentView, ComposerAttachmentsControls } from '@/lib/files/composer-attachments';
 import type { StarterPrompt } from '@/lib/workspace/workspace.types';
 import type { Message } from '@/services/executions/executions.service';
 
@@ -31,7 +32,12 @@ interface ConversationPanelProps {
   /** The API serves trace links for answers (development diagnostic). */
   readonly traceLinksEnabled?: boolean;
   /** Resolves true when the message was accepted; the composer keeps the draft otherwise. */
-  readonly onSend?: (message: string) => boolean | Promise<boolean>;
+  readonly onSend?: (
+    message: string,
+    attachments: readonly AttachmentView[],
+  ) => boolean | Promise<boolean>;
+  /** Files of the next message; absent while the `fileUploads` capability is off. */
+  readonly attachments?: ComposerAttachmentsControls | undefined;
   /** Shown instead of the composer help while sending is refused; typing stays possible. */
   readonly blockedReason?: string | null;
   readonly isStreaming?: boolean;
@@ -56,6 +62,7 @@ export function ConversationPanel({
   debugError = null,
   traceLinksEnabled = false,
   onSend,
+  attachments,
   blockedReason = null,
   isStreaming = false,
   onStop,
@@ -69,9 +76,9 @@ export function ConversationPanel({
   const send =
     onSend === undefined
       ? undefined
-      : (message: string) => {
+      : (message: string, files: readonly AttachmentView[]) => {
           scrollToBottom();
-          return onSend(message);
+          return onSend(message, files);
         };
   return (
     <main
@@ -147,6 +154,7 @@ export function ConversationPanel({
             defaultValue={draft}
             key={draft ?? ''}
             onSend={send}
+            attachments={attachments}
             isBusy={isBusy}
             blockedReason={blockedReason}
             isStreaming={isStreaming}

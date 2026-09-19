@@ -4,6 +4,7 @@ import { ApiException } from '@api/common/errors/api.exception';
 import { ExecutionProcessor } from '@api/modules/executions/application/execution-processor';
 import { ExecutionStreamConsumer } from '@api/modules/executions/application/execution-stream.consumer';
 import {
+  RUNTIME_NOT_DISPATCHED,
   RuntimeClientError,
   type GeneratedTitle,
   type RuntimeClient,
@@ -265,6 +266,29 @@ describe('server-owned execution processor', () => {
     expect(b.dispatch).not.toHaveBeenCalled();
     expect(b.join).not.toHaveBeenCalled();
     expect(b.getRow().status).toBe('recovering');
+  });
+  it('dispatches again after local work failed before any run creation was requested', async () => {
+    const b = build('running', { dispatchState: 'pending', runtimeRunId: null });
+    b.dispatch.mockRejectedValueOnce(new RuntimeClientError(RUNTIME_NOT_DISPATCHED));
+
+    await b.processor.process(b.row);
+
+    expect(b.inspect).not.toHaveBeenCalled();
+    expect(b.join).not.toHaveBeenCalled();
+    expect(b.getRow()).toMatchObject({ status: 'recovering', dispatchState: 'pending' });
+
+    // The successor finds the invocation still to be dispatched, and dispatches it.
+    await b.processor.process(b.getRow());
+    expect(b.dispatch).toHaveBeenCalledTimes(2);
+    expect(b.getRow().dispatchState).toBe('accepted');
+  });
+  it('keeps an uncertain dispatch uncertain: any other failure is never dispatched again', async () => {
+    const b = build('running', { dispatchState: 'pending', runtimeRunId: null });
+    b.dispatch.mockRejectedValueOnce(new RuntimeClientError('runtime_unavailable'));
+
+    await b.processor.process(b.row);
+
+    expect(b.getRow()).toMatchObject({ status: 'recovering', dispatchState: 'dispatching' });
   });
   it('an unavailable inspect response never authorizes another dispatch attempt', async () => {
     const b = build('running', { dispatchState: 'dispatching', runtimeRunId: null });

@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+import { booleanFromEnvironment, emptyStringToUndefined } from './environment-primitives';
+import { fileStorageEnvironmentFields, validateFileStorageEnvironment } from './file-storage';
+import { fileUploadEnvironmentFields, validateFileUploadEnvironment } from './file-uploads';
 import {
   deriveExecutionCursorKey,
   runtimeEnvironmentFields,
@@ -7,20 +10,11 @@ import {
 } from './runtime-environment';
 import { validateTraceLinkEnvironment } from './trace-link';
 
-const booleanFromEnvironment = z.preprocess((value) => {
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  return value;
-}, z.boolean());
-
 const commaSeparatedOrigins = z
   .string()
   .min(1)
   .transform((value) => value.split(',').map((origin) => origin.trim()))
   .pipe(z.array(z.string().url()).min(1));
-
-const emptyStringToUndefined = (value: unknown): unknown =>
-  typeof value === 'string' && value.trim() === '' ? undefined : value;
 
 const containsCommittedPlaceholder = (value: string | undefined): boolean =>
   value?.toLowerCase().includes('replace-with') === true;
@@ -45,6 +39,8 @@ const hasUrlPassword = (value: string): boolean => {
 const environmentSchema = z
   .object({
     ...runtimeEnvironmentFields,
+    ...fileStorageEnvironmentFields,
+    ...fileUploadEnvironmentFields,
     API_CORS_ORIGINS: commaSeparatedOrigins.prefault('http://localhost:5173'),
     API_HOST: z.string().min(1).default('127.0.0.1'),
     API_PORT: z.coerce.number().int().positive().max(65_535).default(3000),
@@ -228,6 +224,11 @@ const environmentSchema = z
             }
           : {}),
         ...(environment.FEATURE_RATE_LIMITING_ENABLED ? { REDIS_URL: environment.REDIS_URL } : {}),
+        ...(environment.FILE_STORAGE_S3_SECRET_ACCESS_KEY === undefined
+          ? {}
+          : {
+              FILE_STORAGE_S3_SECRET_ACCESS_KEY: environment.FILE_STORAGE_S3_SECRET_ACCESS_KEY,
+            }),
       } as const;
 
       for (const [key, value] of Object.entries(credentials)) {
@@ -250,6 +251,8 @@ const environmentSchema = z
     }
 
     validateTraceLinkEnvironment(environment, context);
+    validateFileStorageEnvironment(environment, context);
+    validateFileUploadEnvironment(environment, context);
 
     if (environment.FEATURE_GOOGLE_OAUTH_ENABLED) {
       const requiredGoogleKeys = [

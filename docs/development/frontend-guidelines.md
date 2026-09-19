@@ -42,8 +42,14 @@ périmètre et ne doivent pas entrer dans une simple retouche de présentation.
 - Les interactions transverses ont une primitive unique sous `components/ui`, à réutiliser telle
   quelle plutôt qu'à recopier par domaine : `ConfirmDialog` pour toute confirmation (suppression,
   action irréversible), `TextFieldDialog` pour créer ou renommer une ressource nommée,
-  `MarkdownEditor` / `MarkdownDocumentDialog` / `MarkdownView` pour tout document Markdown. Une
-  nouvelle variante se fait par prop ou variante typée, jamais par duplication du composant.
+  `MarkdownEditor` / `MarkdownDocumentDialog` / `MarkdownView` pour tout document Markdown, `Chip`
+  pour une étiquette retirable avec état (pièce jointe du composer, filtre actif) et `Breadcrumbs`
+  pour un fil d'Ariane. Une nouvelle variante se fait par prop ou variante typée, jamais par
+  duplication du composant.
+- Les octets d'un fichier passent toujours par le client HTTP, puisque le jeton d'accès vit en
+  mémoire : ni `href`, ni `src`, ni `window.open` vers `/api`. Un téléchargement passe par
+  `lib/browser/download-blob.ts`, un aperçu d'image par une URL d'objet révoquée au démontage
+  ([ADR 0029](../adr/0029-content-security-policy-blob-images.md)).
 
 ## Couleurs, typographie et géométrie
 

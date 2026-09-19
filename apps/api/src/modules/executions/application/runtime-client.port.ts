@@ -54,4 +54,10 @@ export class RuntimeClientError extends Error {
   }
 }
 
+/**
+ * A dispatch that failed in local work, before any run creation was requested. It is the one
+ * dispatch failure that proves no native run exists, so the invocation may be dispatched again.
+ */
+export const RUNTIME_NOT_DISPATCHED = 'runtime_not_dispatched';
+
 export const RUNTIME_CLIENT = Symbol('RUNTIME_CLIENT');

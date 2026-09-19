@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConversationsModule } from '../conversations/conversations.module';
+import { FileAttachmentsModule } from '../files/file-attachments.module';
 import { TenantsModule } from '../tenants/tenants.module';
 import { StreamAuthorityService } from '../stream/application/stream-authority.service';
 import { ExecutionSessionGuard } from './api/execution-session.guard';
@@ -17,7 +18,7 @@ import { ExecutionLeaseStore } from './infrastructure/persistence/execution-leas
 import { ExecutionStateStore } from './infrastructure/persistence/execution-state.store';
 
 @Module({
-  imports: [TenantsModule, ConversationsModule],
+  imports: [TenantsModule, ConversationsModule, FileAttachmentsModule],
   controllers: [ExecutionsController, ExecutionResourceController],
   providers: [
     ExecutionSessionGuard,

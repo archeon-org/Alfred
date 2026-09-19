@@ -17,6 +17,8 @@ import {
   useConversationsQuery,
 } from '@/hooks/conversations/use-conversations-query';
 import { useFeatureFlagsQuery } from '@/hooks/feature-flags/use-feature-flags-query';
+import { freshComposerScope, useComposerAttachments } from '@/hooks/files/use-composer-attachments';
+import { useFileUpload } from '@/hooks/files/use-file-upload';
 import { useProjectActions } from '@/hooks/projects/use-project-actions';
 import { useCreateProject } from '@/hooks/projects/use-project-mutations';
 import {
@@ -59,6 +61,9 @@ export function WorkspaceScreen() {
   const preferences = useWorkspacePreferences();
   const shell = useWorkspaceShell(preferences.contextOpenByDefault);
   const tools = useWorkspaceTools();
+  // Mounted with the frame: an upload or a chip survives a closed panel and a change of screen.
+  const uploads = useFileUpload();
+  const attachments = useComposerAttachments(uploads);
   // Docked from the workspace breakpoint, an overlay sheet (closed until asked for) below it.
   const context = useContextPanel({ isOpen: shell.isContextOpen, toggle: shell.toggleContext });
   // Below md the narrow bar owns the conversations list; from md the navigation column folds itself.
@@ -73,6 +78,7 @@ export function WorkspaceScreen() {
   // Below the workspace breakpoint these screens grow with their content; the stage scrolls them.
   const conversationGrows = isSkillEditor || projectMatch !== null;
   const newConversationMatch = useMatch('/app/conversations/new');
+  const isHome = useMatch('/app') !== null;
   const conversationMatch = useMatch('/app/conversations/:conversationId');
   const pinnedQuery = usePinnedProjectsQuery();
   const projectsQuery = useProjectsQuery();
@@ -201,7 +207,14 @@ export function WorkspaceScreen() {
     conversationRef,
     isLoading: shell.isPreviewLoading,
     selectedProject,
+    files: { attachments, uploads },
   };
+  // The composer on screen, if any: the « Fichiers » tab attaches library files to it.
+  const composerScope =
+    selectedConversationId ??
+    (isHome || newConversationMatch !== null
+      ? freshComposerScope(newConversationProjectId)
+      : undefined);
   const labels = projectCreationLabels;
 
   if (isSettings) return <Outlet context={outlet} />;
@@ -295,7 +308,20 @@ export function WorkspaceScreen() {
           />
         }
         conversation={<Outlet context={outlet} />}
-        context={<ContextPanel isLoading={isLoading} tools={tools} onClose={context.close} />}
+        context={
+          <ContextPanel
+            isLoading={isLoading}
+            tools={tools}
+            onClose={context.close}
+            files={{
+              attachments: composerScope === undefined ? null : attachments.forScope(composerScope),
+              conversationId: selectedConversationId,
+              onDeleted: attachments.forget,
+              onUpdated: attachments.settle,
+              uploads,
+            }}
+          />
+        }
       />
       <TextFieldDialog
         description="Regroupez les conversations autour d’un même objectif."

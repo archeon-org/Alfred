@@ -10,6 +10,7 @@ import {
   subscribeRuntimeEventDebug,
 } from '@/lib/workspace/runtime-event-debug';
 import { messageKeys } from '@/hooks/workspace/workspace-keys';
+import type { AttachmentView } from '@/lib/files/composer-attachments';
 import {
   getActiveExecution,
   listMessages,
@@ -68,7 +69,8 @@ export function useConversationChat(conversationId: string, observeEnabled = tru
     [history.data, sessions],
   );
   const send = useCallback(
-    (text: string) => discoverySettled && session.send(conversationId, text),
+    (text: string, attachments: readonly AttachmentView[] = []) =>
+      discoverySettled && session.send(conversationId, text, attachments),
     [discoverySettled, conversationId, session],
   );
 

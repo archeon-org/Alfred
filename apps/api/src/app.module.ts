@@ -25,6 +25,7 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
 import { ExecutionsModule } from './modules/executions/executions.module';
 import { FeatureFlagGuard } from './modules/feature-flags/feature-flag.guard';
 import { FeatureFlagsModule } from './modules/feature-flags/feature-flags.module';
+import { FilesModule } from './modules/files/files.module';
 import { FeatureFlagsService } from './modules/feature-flags/feature-flags.service';
 import { HealthModule } from './modules/health/health.module';
 import { PlatformModule } from './modules/platform/platform.module';
@@ -70,6 +71,11 @@ export function createThrottlerOptions(
         name: 'refresh-ip',
         ttl: THROTTLE_WINDOW_MS,
       },
+      {
+        limit: config.getOrThrow<number>('FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE'),
+        name: 'file-upload-user',
+        ttl: THROTTLE_WINDOW_MS,
+      },
     ],
   };
 }
@@ -103,6 +109,7 @@ export function createThrottlerOptions(
     ContextModule,
     SkillsModule,
     AgentsModule,
+    FilesModule,
     IdempotencyModule,
   ],
   providers: [

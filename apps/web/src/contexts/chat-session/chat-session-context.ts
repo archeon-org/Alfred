@@ -7,6 +7,8 @@ import type {
 } from '@alfred/contracts';
 import { createContext } from 'react';
 
+import type { AttachmentView } from '@/lib/files/composer-attachments';
+
 /** One validated public event kept for diagnostics, attached to the execution that produced it. */
 export interface RuntimeEventView {
   readonly id: number;
@@ -21,6 +23,8 @@ export interface RuntimeEventView {
  */
 export interface LiveTurn {
   readonly userMessage: string;
+  /** The files the user turn carries: named by the composer at once, then by the API. */
+  readonly attachments?: readonly AttachmentView[];
   readonly assistantText: string;
   /** Tool calls of this turn as AG-UI reported them: safe label and status only. */
   readonly activities: readonly ExecutionActivity[];
@@ -58,7 +62,11 @@ export interface ChatSessionContextValue {
   /** Last failed turn per conversation id, shown under its stored rows until the next send. */
   readonly failures: ReadonlyMap<string, TurnFailure>;
   /** Starts an answer unless this conversation already has unresolved work. */
-  readonly send: (conversationId: string, text: string) => boolean;
+  readonly send: (
+    conversationId: string,
+    text: string,
+    attachments?: readonly AttachmentView[],
+  ) => boolean;
   /** Attach to work discovered after reload; never resubmit the prompt. */
   readonly recover: (snapshot: ExecutionSnapshot) => void;
   readonly reconnect: (conversationId: string) => void;

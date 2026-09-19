@@ -79,18 +79,27 @@ export async function listMessages(
   return items;
 }
 
-/** The submission id stays unchanged on every retry, including an ambiguous lost response. */
+/**
+ * The submission id stays unchanged on every retry, including an ambiguous lost response.
+ * `attachmentIds` is left out when empty: the API refuses unknown or empty extras, and a browser
+ * without files then talks to an older API unchanged.
+ */
 export async function createExecution(
   client: HttpClient,
   conversationId: string,
   message: string,
   submissionId: string,
   signal: AbortSignal,
+  attachmentIds: readonly string[] = [],
 ): Promise<ExecutionSnapshot> {
   const { snapshot } = parseEnvelope(
     executionSnapshotEnvelopeSchema,
     await jsonRequest(client, conversationPath(conversationId, 'executions'), {
-      body: JSON.stringify({ message, submissionId }),
+      body: JSON.stringify({
+        message,
+        submissionId,
+        ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
+      }),
       headers: { Accept: 'application/vnd.alfred.execution+json;version=1' },
       method: 'POST',
       retryOnUnauthorized: true,

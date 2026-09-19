@@ -4,6 +4,7 @@ import type {
   ExecutionSnapshot,
   FeatureFlags,
   Message,
+  MessageAttachment,
   Project,
 } from '@alfred/contracts';
 import { vi } from 'vitest';
@@ -123,6 +124,7 @@ function runExecution(
   index: number,
   message: string,
   interrupted: boolean,
+  attachments?: readonly MessageAttachment[],
 ): { initial: ExecutionSnapshot; final: ExecutionSnapshot; frames: SseFrames } {
   const current = conversations[index]!;
   const now = new Date().toISOString();
@@ -149,6 +151,7 @@ function runExecution(
       executionId,
       id: nextId(),
       role: 'user',
+      ...(attachments === undefined ? {} : { attachments }),
     },
     {
       content: reply,
@@ -176,6 +179,7 @@ function runExecution(
     activities: [],
     cursor: 'cursor:0',
     revision: 0,
+    ...(attachments === undefined ? {} : { attachments }),
   };
   const final: ExecutionSnapshot = {
     ...initial,
@@ -209,6 +213,8 @@ export function createWorkspaceApi(
     readonly conversations?: readonly Conversation[];
     /** Capability manifest overrides; everything else stays disabled. */
     readonly features?: Partial<FeatureFlags>;
+    /** Names the files a message carries, as the files API would; absent: rows carry none. */
+    readonly attachmentsOf?: (fileIds: readonly string[]) => readonly MessageAttachment[];
   } = {},
 ) {
   const projects: Project[] = [...(seed.projects ?? [])];
@@ -432,8 +438,18 @@ export function createWorkspaceApi(
       if (!features.agentRuntime) return failure(404, 'HTTP_404', 'Feature is not available');
       const index = conversations.findIndex((item) => item.id === executionsMatch[1]);
       if (index === -1) return failure(404, 'conversation_not_found', 'Conversation not found.');
-      const { message } = body as { message: string };
-      const run = runExecution(conversations, messages, index, message, interruptExecutions);
+      const { message, attachmentIds } = body as {
+        message: string;
+        attachmentIds?: readonly string[];
+      };
+      const run = runExecution(
+        conversations,
+        messages,
+        index,
+        message,
+        interruptExecutions,
+        attachmentIds === undefined ? undefined : seed.attachmentsOf?.(attachmentIds),
+      );
       executions.set(run.initial.execution.id, run);
       return json({ success: true, data: { snapshot: run.initial } }, 202);
     }

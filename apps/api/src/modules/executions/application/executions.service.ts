@@ -8,6 +8,7 @@ import { ApiException } from '../../../common/errors/api.exception';
 import { ConversationsService } from '../../conversations/application/conversations.service';
 import { toConversationDto } from '../../conversations/domain/conversation';
 import { ConversationEntity } from '../../conversations/infrastructure/persistence/conversation.entity';
+import { MessageAttachmentsService } from '../../files/application/message-attachments.service';
 import { ProjectEntity } from '../../projects/infrastructure/persistence/project.entity';
 import { TenantEntity } from '../../tenants/tenant.entity';
 import { TenantsService } from '../../tenants/tenants.service';
@@ -31,6 +32,8 @@ export interface StartedExecution {
 export interface SubmissionIdentity {
   readonly submissionId: string;
   readonly profile: string;
+  /** Library files sent with this message (ALF-DEC-010 "exact message attachments"). */
+  readonly attachmentIds?: readonly string[];
 }
 
 @Injectable()
@@ -40,6 +43,7 @@ export class ExecutionsService {
     private readonly tenants: TenantsService,
     private readonly conversations: ConversationsService,
     @Optional() private readonly config?: ConfigService,
+    @Optional() private readonly attachments?: MessageAttachmentsService,
   ) {}
 
   async listMessages(principal: AuthPrincipal, conversationId: string): Promise<Message[]> {
@@ -56,6 +60,9 @@ export class ExecutionsService {
         row.role === 'assistant' && row.executionId !== null ? [row.executionId] : [],
       ),
     );
+    const attached = await this.attachments?.forMessages(
+      rows.flatMap((row) => (row.role === 'user' ? [row.id] : [])),
+    );
     return rows
       .reverse()
       .map((row) =>
@@ -64,6 +71,7 @@ export class ExecutionsService {
           row.role === 'assistant' && row.executionId !== null
             ? summaries.get(row.executionId)
             : undefined,
+          attached?.get(row.id),
         ),
       );
   }
@@ -76,6 +84,10 @@ export class ExecutionsService {
     identity: SubmissionIdentity,
   ): Promise<StartedExecution> {
     const scope = await this.tenants.scopeFor(principal.id);
+    const attachmentIds = (identity.attachmentIds ?? []).map((id) => id.toLowerCase());
+    // Refused before anything is locked or superseded for a turn that cannot be kept: with the
+    // capability off, a busy conversation must not answer `thread_busy` for a file it ignores.
+    if (attachmentIds.length > 0) this.attachments?.assertAvailable();
     const submissionHash = createHash('sha256')
       .update(
         JSON.stringify({
@@ -84,6 +96,8 @@ export class ExecutionsService {
           conversationId,
           message,
           profile: identity.profile,
+          // Absent when empty, so submissions made before attachments existed still replay.
+          ...(attachmentIds.length === 0 ? {} : { attachmentIds }),
         }),
       )
       .digest('hex');
@@ -186,7 +200,7 @@ export class ExecutionsService {
         }),
       );
       const messages = manager.getRepository(MessageEntity);
-      await messages.save(
+      const userTurn = await messages.save(
         messages.create({
           content: message,
           conversationId,
@@ -194,9 +208,17 @@ export class ExecutionsService {
           role: 'user',
         }),
       );
+      if (attachmentIds.length > 0) {
+        if (this.attachments === undefined) {
+          throw new ApiException(404, 'attachment_not_found', 'An attached file was not found.');
+        }
+        await this.attachments.bind(manager, scope, userTurn.id, attachmentIds);
+      }
       const changes = {
         lastActivityAt: now,
-        ...(titleRequested ? { title: autoTitle(message), titleSource: 'auto' as const } : {}),
+        ...(titleRequested && message.length > 0
+          ? { title: autoTitle(message), titleSource: 'auto' as const }
+          : {}),
       };
       await manager.getRepository(ConversationEntity).update({ id: conversationId }, changes);
       return {

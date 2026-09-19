@@ -121,6 +121,7 @@ function loaded(
     conversation: toConversationDto(conversation, 'named'),
     state,
     userMessage: 'Hello?',
+    attachments: [],
   };
 }
 
@@ -225,6 +226,29 @@ describe('execution observer authorization, recovery and capacity', () => {
     res.destroy();
     await observed;
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('reads the files of the turn at attach and hands them back at every poll', async () => {
+    const f = fixture();
+    const files = [{ fileId: 'file', name: 'a.pdf' }] as never;
+    f.setLoaded({ ...loaded(), attachments: files });
+    const res = response();
+    const observed = f.service.observe(
+      principal,
+      executionId,
+      'Bearer valid',
+      undefined,
+      res.asExpress(),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    const polls = f.load.mock.calls.filter((call) => call.length === 4);
+    expect(polls.length).toBeGreaterThanOrEqual(2);
+    // The fourth argument is what spares two queries per observer and per 500 ms.
+    for (const poll of polls) expect(poll[3]).toBe(files);
+    res.destroy();
+    await observed;
   });
 
   it('streams committed progress and same-revision completion without native replay', async () => {

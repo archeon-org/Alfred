@@ -94,6 +94,7 @@ export function observedRow(state: ProjectionState, overrides: Partial<Execution
     conversation: toConversationDto(conversation, 'named'),
     state,
     userMessage: 'Hello?',
+    attachments: [],
   };
 }
 

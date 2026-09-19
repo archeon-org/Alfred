@@ -91,6 +91,7 @@ jobs:
           generate_secret AUTH_JWT_SECRET
       - run: docker compose --env-file .env.example config --quiet
       - run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml config --quiet
+      - run: docker compose --env-file .env.example --profile files config --quiet
       - name: Assert the production overlay contract
         run: |
           docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.platform.yml config --format json |

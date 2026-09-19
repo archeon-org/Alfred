@@ -14,15 +14,13 @@ import { LiveAnswer } from '@/contexts/chat-session/live-answer';
 import { EMPTY_WORK, LiveWork } from '@/contexts/chat-session/live-work';
 import { createLiveHandlers } from '@/contexts/chat-session/observer-handlers';
 import { handOver, type HandoverContext } from '@/contexts/chat-session/transcript-handover';
+import { namedAttachments as named, submitTurn } from '@/contexts/chat-session/turn-attachments';
 import { createTurnPublisher } from '@/contexts/chat-session/turn-publisher';
+import type { AttachmentView } from '@/lib/files/composer-attachments';
 import { describeApiError } from '@/lib/workspace/api-error-message';
 import { reportRuntimeEventFault } from '@/lib/workspace/runtime-event-debug';
 import type { AlfredExecutionAgent } from '@/services/executions/ag-ui-agent';
-import {
-  createExecution,
-  getExecution,
-  stopExecution,
-} from '@/services/executions/executions.service';
+import { getExecution, stopExecution } from '@/services/executions/executions.service';
 import {
   isRetryable,
   reattachDelay,
@@ -38,6 +36,8 @@ export { isBusyExecution, isSettledExecution } from '@/contexts/chat-session/exe
 interface ObserverOptions extends HandoverContext {
   readonly id: number;
   readonly text: string;
+  /** The files the composer sent with `text`; a recovered run takes them from its snapshot. */
+  readonly attachments?: readonly AttachmentView[];
   readonly snapshot?: ExecutionSnapshot;
   readonly onClose: () => void;
 }
@@ -85,6 +85,7 @@ export function createExecutionObserver(options: ObserverOptions) {
       execution: null,
       status: 'streaming',
       userMessage: text,
+      ...named(options),
       connection: 'connecting',
       stopPending: false,
     },
@@ -149,7 +150,10 @@ export function createExecutionObserver(options: ObserverOptions) {
       cursor = snapshot.cursor;
       work.read(snapshot);
     }
-    commit(snapshot.execution, taken ? { ...content(), userMessage: snapshot.userMessage } : {});
+    commit(
+      snapshot.execution,
+      taken ? { ...content(), userMessage: snapshot.userMessage, ...named(snapshot) } : {},
+    );
   };
   /**
    * AG-UI state carries the product DTOs; the answer and tools follow as message/tool events, so
@@ -162,10 +166,10 @@ export function createExecutionObserver(options: ObserverOptions) {
     if (isSettledExecution(state.execution)) {
       settledState = state.execution;
       if (turn().status === 'streaming')
-        update({ execution: state.execution, userMessage: state.userMessage });
+        update({ execution: state.execution, userMessage: state.userMessage, ...named(state) });
       return;
     }
-    commit(state.execution, { userMessage: state.userMessage });
+    commit(state.execution, { userMessage: state.userMessage, ...named(state) });
   };
   const finishRun = (fallback: () => void) => {
     if (turn().status !== 'streaming') return;
@@ -209,9 +213,7 @@ export function createExecutionObserver(options: ObserverOptions) {
   const create = async () => {
     for (let attempt = 0; attempt < RECOVERY_ATTEMPTS; attempt += 1) {
       try {
-        acceptSnapshot(
-          await createExecution(client, conversationId, text, submissionId, controller.signal),
-        );
+        acceptSnapshot(await submitTurn(options, text, submissionId));
         if (turn().stopPending) stop();
         return true;
       } catch (error) {

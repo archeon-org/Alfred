@@ -1,8 +1,12 @@
 import { ConfigService } from '@nestjs/config';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { RuntimeClientError } from '@api/modules/executions/application/runtime-client.port';
+import {
+  RUNTIME_NOT_DISPATCHED,
+  RuntimeClientError,
+} from '@api/modules/executions/application/runtime-client.port';
 import type { ExecutionsService } from '@api/modules/executions/application/executions.service';
 import { LangGraphRuntimeClient } from '@api/modules/executions/infrastructure/langgraph/langgraph-runtime.client';
+import type { MessageAttachmentsService } from '@api/modules/files/application/message-attachments.service';
 
 const executionId = '160c302b-10d5-49cf-81cd-f456f778efea';
 const invocationId = '6c858021-63c7-47b1-99d0-7ba67569cd37';
@@ -512,5 +516,61 @@ describe('native resumable event stream', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     await assertion;
     expect(cancelled).toHaveBeenCalled();
+  });
+});
+
+describe('the files of a turn at dispatch', () => {
+  const withAttachments = (runtimeContent: ReturnType<typeof vi.fn>) =>
+    new LangGraphRuntimeClient(
+      new ConfigService({
+        AGENT_RUNTIME_URL: 'https://private-runtime.example',
+        AGENT_RUNTIME_ASSISTANT_ID: 'agent',
+      }),
+      {
+        resolveRuntime: vi.fn().mockResolvedValue({
+          execution: {
+            id: executionId,
+            invocationId,
+            runtimeThreadId: threadId,
+            runtimeRunId: null,
+            bindingGeneration: metadata.alfred_binding_generation,
+            dispatchState: 'dispatching',
+            stopRequestedAt: null,
+          },
+          userMessage: 'Persisted user message',
+        }),
+      } as unknown as ExecutionsService,
+      { runtimeContent } as unknown as MessageAttachmentsService,
+    );
+
+  it('sends what the attachments service built, read under the dispatch signal', async () => {
+    const content = [
+      { type: 'text', text: 'Persisted user message' },
+      { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AAAA' } },
+    ];
+    const runtimeContent = vi.fn().mockResolvedValue(content);
+    const request = mockFetch()
+      .mockResolvedValueOnce(Response.json({ thread_id: threadId }))
+      .mockResolvedValueOnce(Response.json(nativeRun));
+    const dispatching = signal();
+
+    await withAttachments(runtimeContent).dispatch(executionId, invocationId, dispatching);
+
+    expect(runtimeContent).toHaveBeenCalledWith(executionId, 'Persisted user message', dispatching);
+    expect(JSON.parse(requestString(request.mock.calls[1]?.[1]?.body))).toMatchObject({
+      input: { messages: [{ role: 'user', content }] },
+    });
+  });
+
+  it('says that nothing was dispatched when the files cannot be read, and creates no run', async () => {
+    const runtimeContent = vi.fn().mockRejectedValue(new Error('database outage'));
+    const request = mockFetch().mockResolvedValueOnce(Response.json({ thread_id: threadId }));
+
+    await expect(
+      withAttachments(runtimeContent).dispatch(executionId, invocationId, signal()),
+    ).rejects.toMatchObject({ code: RUNTIME_NOT_DISPATCHED });
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls[0]?.[0]).toBe('https://private-runtime.example/threads');
   });
 });

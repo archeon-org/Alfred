@@ -10,3 +10,5 @@ coverage
 .DS_Store
 apps/agent/.venv
 apps/agent/.langgraph_api
+# Uploaded documents of a developer machine never enter a build context.
+**/var/uploads

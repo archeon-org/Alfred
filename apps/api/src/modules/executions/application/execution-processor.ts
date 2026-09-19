@@ -18,6 +18,7 @@ import {
 import { requestConversationTitle } from './execution-title';
 import {
   RUNTIME_CLIENT,
+  RUNTIME_NOT_DISPATCHED,
   RuntimeClientError,
   type RuntimeClient,
   type RuntimeRun,
@@ -131,7 +132,12 @@ export class ExecutionProcessor {
         const missingReplay =
           error instanceof RuntimeClientError && /gap|expired|replay/.test(error.code);
         const needsRecovery = missingReplay || this.expired(initial);
+        // Local work failed before any run creation was requested: nothing exists natively, so
+        // the successor dispatches again instead of inspecting a run that was never created.
+        const notDispatched =
+          error instanceof RuntimeClientError && error.code === RUNTIME_NOT_DISPATCHED;
         await this.states.update(initial, {
+          ...(notDispatched ? { dispatchState: 'pending' as const } : {}),
           status:
             initial.status === 'recovery_required' || needsRecovery
               ? 'recovery_required'

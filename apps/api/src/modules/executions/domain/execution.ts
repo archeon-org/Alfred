@@ -4,6 +4,7 @@ import {
   type ExecutionStatus,
   type ExecutionWorkSummary,
   type Message,
+  type MessageAttachment,
   type MessageRole,
 } from '@alfred/contracts';
 
@@ -42,7 +43,11 @@ export function toExecutionDto(record: ExecutionRecord): Execution {
   });
 }
 
-export function toMessageDto(record: MessageRecord, work?: ExecutionWorkSummary): Message {
+export function toMessageDto(
+  record: MessageRecord,
+  work?: ExecutionWorkSummary,
+  attachments?: readonly MessageAttachment[],
+): Message {
   return Object.freeze({
     content: record.content,
     conversationId: record.conversationId,
@@ -51,6 +56,7 @@ export function toMessageDto(record: MessageRecord, work?: ExecutionWorkSummary)
     id: record.id,
     role: record.role,
     ...(work === undefined ? {} : { work }),
+    ...(attachments === undefined || attachments.length === 0 ? {} : { attachments }),
   });
 }
 

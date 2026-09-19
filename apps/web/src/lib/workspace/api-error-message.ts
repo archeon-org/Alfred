@@ -1,8 +1,11 @@
 import { PROJECT_PIN_LIMIT } from '@alfred/contracts';
 
+import { ATTACHMENT_ERROR_MESSAGES } from '@/lib/files/file-errors';
 import { ApiRequestError } from '@/services/http/api-json';
 
 const MESSAGES: Readonly<Record<string, string>> = Object.freeze({
+  // A refused send names the file problem instead of a generic failure.
+  ...ATTACHMENT_ERROR_MESSAGES,
   HTTP_401: 'Votre session a expiré. Reconnectez-vous pour continuer.',
   HTTP_429: 'Trop de requêtes. Réessayez dans un instant.',
   conversation_move_not_allowed: 'Seul un chat libre peut être ajouté à un projet actif.',

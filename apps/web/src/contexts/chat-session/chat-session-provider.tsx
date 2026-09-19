@@ -12,6 +12,7 @@ import {
   isSettledExecution,
 } from '@/contexts/chat-session/execution-observer';
 import { useWorkspaceAccount } from '@/hooks/workspace/use-workspace-account';
+import type { AttachmentView } from '@/lib/files/composer-attachments';
 import type { HttpClient } from '@/services/http/http-client';
 
 type Observer = ReturnType<typeof createExecutionObserver>;
@@ -52,7 +53,12 @@ export function ChatSessionProvider({ children }: { readonly children: ReactNode
     dispatch({ type: 'reconcile', conversationId, messages });
   }, []);
   const launch = useCallback(
-    (conversationId: string, text: string, snapshot?: ExecutionSnapshot) => {
+    (
+      conversationId: string,
+      text: string,
+      snapshot?: ExecutionSnapshot,
+      attachments?: readonly AttachmentView[],
+    ) => {
       const id = sequence.current++;
       const observer = createExecutionObserver({
         client: freshClient,
@@ -64,6 +70,7 @@ export function ChatSessionProvider({ children }: { readonly children: ReactNode
         text,
         userId,
         ...(snapshot ? { snapshot } : {}),
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
         onClose: () => observers.current.delete(id),
       });
       observers.current.set(id, observer);
@@ -72,7 +79,7 @@ export function ChatSessionProvider({ children }: { readonly children: ReactNode
     [freshClient, queryClient, userId],
   );
   const send = useCallback(
-    (conversationId: string, text: string): boolean => {
+    (conversationId: string, text: string, attachments?: readonly AttachmentView[]): boolean => {
       // A parked or stalled answer never blocks the next message: the API supersedes it and the
       // old observer settles on its final snapshot.
       if (
@@ -81,7 +88,7 @@ export function ChatSessionProvider({ children }: { readonly children: ReactNode
         )
       )
         return false;
-      launch(conversationId, text);
+      launch(conversationId, text, undefined, attachments);
       return true;
     },
     [launch],

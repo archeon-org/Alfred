@@ -96,6 +96,28 @@ services:
       FEATURE_SKILLS_ENABLED: ${FEATURE_SKILLS_ENABLED:-false}
       FEATURE_TEAMS_ENABLED: ${FEATURE_TEAMS_ENABLED:-false}
       FEATURE_TRACE_LINKS_ENABLED: ${FEATURE_TRACE_LINKS_ENABLED:-false}
+      FILE_UPLOAD_MAX_BYTES: ${FILE_UPLOAD_MAX_BYTES:-5242880}
+      FILE_QUOTA_BYTES_PER_USER: ${FILE_QUOTA_BYTES_PER_USER:-26214400}
+      FILE_PENDING_UPLOAD_TTL_MS: ${FILE_PENDING_UPLOAD_TTL_MS:-300000}
+      FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE: ${FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE:-20}
+      FILE_UPLOAD_MAX_CONCURRENT: ${FILE_UPLOAD_MAX_CONCURRENT:-4}
+      FILE_EXTRACTION_TIMEOUT_MS: ${FILE_EXTRACTION_TIMEOUT_MS:-60000}
+      FILE_EXTRACTION_MAX_PDF_PAGES: ${FILE_EXTRACTION_MAX_PDF_PAGES:-500}
+      FILE_EXTRACTED_TEXT_MAX_CHARS: ${FILE_EXTRACTED_TEXT_MAX_CHARS:-1000000}
+      FILE_IMAGE_MAX_EDGE_PX: ${FILE_IMAGE_MAX_EDGE_PX:-1568}
+      FILE_IMAGE_MAX_INPUT_PIXELS: ${FILE_IMAGE_MAX_INPUT_PIXELS:-50000000}
+      FILE_PROMPT_TOKENS_PER_DOCUMENT: ${FILE_PROMPT_TOKENS_PER_DOCUMENT:-10000}
+      FILE_PROMPT_TOKENS_PER_EXECUTION: ${FILE_PROMPT_TOKENS_PER_EXECUTION:-30000}
+      # Uploaded file bytes. The API container has a read-only filesystem, so a Compose run that
+      # turns uploads on points at the `files` profile bucket below rather than at a local folder.
+      FILE_STORAGE_S3_ENDPOINT: ${FILE_STORAGE_S3_ENDPOINT:-}
+      FILE_STORAGE_S3_BUCKET: ${FILE_STORAGE_S3_BUCKET:-}
+      FILE_STORAGE_S3_REGION: ${FILE_STORAGE_S3_REGION:-}
+      FILE_STORAGE_S3_ACCESS_KEY_ID: ${FILE_STORAGE_S3_ACCESS_KEY_ID:-}
+      FILE_STORAGE_S3_SECRET_ACCESS_KEY: ${FILE_STORAGE_S3_SECRET_ACCESS_KEY:-}
+      FILE_STORAGE_S3_SESSION_TOKEN: ${FILE_STORAGE_S3_SESSION_TOKEN:-}
+      FILE_STORAGE_S3_FORCE_PATH_STYLE: ${FILE_STORAGE_S3_FORCE_PATH_STYLE:-}
+      FILE_STORAGE_S3_PREFIX: ${FILE_STORAGE_S3_PREFIX:-}
       TRACE_LINK_UI_URL: ${TRACE_LINK_UI_URL:-https://smith.langchain.com}
       TRACE_LINK_ORGANIZATION_ID: ${TRACE_LINK_ORGANIZATION_ID:-}
       TRACE_LINK_PROJECT_ID: ${TRACE_LINK_PROJECT_ID:-}
@@ -189,6 +211,83 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+
+  # An S3-compatible bucket for local work on uploads, started on demand:
+  # `docker compose --profile files up minio minio-bucket`. It stands in for whichever provider a
+  # deployment uses — AWS S3, Cloudflare R2, IBM COS or MinIO itself — and the API talks to all of
+  # them through the same adapter. The root credentials below administer the server; the API gets
+  # its own user, limited to the bucket, from the `minio-bucket` step. Both services keep `:-`
+  # defaults on purpose: a `:?` here would break every Compose command while the profile is off.
+  minio:
+    # MinIO publishes its images on quay.io; the Docker Hub repository is gone.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    profiles: ['files']
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-alfred-minio-admin}
+      # Empty makes the server refuse to start; `pnpm setup:env` generates a value.
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+    ports:
+      - '127.0.0.1:${MINIO_PORT:-9000}:9000'
+      - '127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001'
+    volumes:
+      - minio-data:/data
+    networks:
+      - app
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+    init: true
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  # Creates the bucket and a user that may only read, write and delete objects in it. Re-runnable.
+  minio-bucket:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    profiles: ['files']
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      # Every capability is dropped below, so `mc` cannot write its configuration under /root.
+      MC_CONFIG_DIR: /tmp/mc
+      ROOT_USER: ${MINIO_ROOT_USER:-alfred-minio-admin}
+      ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+      BUCKET: ${FILE_STORAGE_S3_BUCKET:-alfred-files}
+      APP_KEY: ${FILE_STORAGE_S3_ACCESS_KEY_ID:-alfred-api}
+      APP_SECRET: ${FILE_STORAGE_S3_SECRET_ACCESS_KEY:-}
+    entrypoint:
+      - /bin/sh
+      - -ceu
+      - |
+        if [ -z "$$APP_SECRET" ]; then
+          echo 'Set FILE_STORAGE_S3_SECRET_ACCESS_KEY (at least 8 characters) in .env to use the files profile' >&2
+          exit 1
+        fi
+        mc alias set local http://minio:9000 "$$ROOT_USER" "$$ROOT_PASSWORD"
+        mc mb --ignore-existing "local/$$BUCKET"
+        mc anonymous set none "local/$$BUCKET"
+        printf '%s' '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:PutObject","s3:GetObject","s3:DeleteObject"],"Resource":["arn:aws:s3:::'"$$BUCKET"'/*"]},{"Effect":"Allow","Action":["s3:ListBucket"],"Resource":["arn:aws:s3:::'"$$BUCKET"'"]}]}' > /tmp/policy.json
+        mc admin policy create local "$$BUCKET-objects" /tmp/policy.json
+        mc admin user add local "$$APP_KEY" "$$APP_SECRET"
+        mc admin policy attach local "$$BUCKET-objects" --user "$$APP_KEY" || true
+    networks:
+      - app
+    init: true
+    restart: 'no'
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  minio-data:
 
 networks:
   app:

@@ -180,6 +180,7 @@ export {
 export * from './skills';
 
 export * from './agents';
+export * from './files';
 
 export {
   currentWorkspacesSchema,

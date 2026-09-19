@@ -4,6 +4,7 @@ import { Fragment, useDeferredValue } from 'react';
 
 import { MarkdownView } from '@/components/ui/markdown-view';
 import { ExecutionWorkLog } from '@/components/workspace/conversation/execution-work-log';
+import { MessageAttachments } from '@/components/workspace/conversation/message-attachments';
 import { StoredWorkLog } from '@/components/workspace/conversation/stored-work-log';
 import { TurnActions } from '@/components/workspace/conversation/turn-actions';
 import type { TurnFailure } from '@/hooks/conversations/use-conversation-chat';
@@ -12,6 +13,7 @@ import type {
   LiveTurn,
   RuntimeEventView,
 } from '@/contexts/chat-session/chat-session-context';
+import type { AttachmentView } from '@/lib/files/composer-attachments';
 import { groupRuntimeEvents } from '@/lib/workspace/runtime-event-debug';
 import { transcriptEntries } from '@/lib/workspace/transcript-entries';
 import type { Message } from '@/services/executions/executions.service';
@@ -27,6 +29,7 @@ interface ConversationTranscriptProps {
 }
 
 const NO_EVENTS: readonly RuntimeEventView[] = [];
+const NO_ATTACHMENTS: readonly AttachmentView[] = [];
 
 /** Stored and local turns, kept in order until persistence takes over from each stream. */
 export function ConversationTranscript({
@@ -59,10 +62,19 @@ export function ConversationTranscript({
             events={eventsOf(entry.message.executionId)}
             traceLinksEnabled={traceLinksEnabled}
             {...(entry.message.work === undefined ? {} : { workSummary: entry.message.work })}
+            {...(entry.message.attachments === undefined
+              ? {}
+              : { attachments: entry.message.attachments })}
           />
         ) : (
           <Fragment key={`session-${entry.session.id}`}>
-            <Turn author="user" content={entry.session.turn.userMessage} />
+            <Turn
+              author="user"
+              content={entry.session.turn.userMessage}
+              {...(entry.session.turn.attachments === undefined
+                ? {}
+                : { attachments: entry.session.turn.attachments })}
+            />
             <Turn
               author="assistant"
               content={entry.session.turn.assistantText}
@@ -96,6 +108,8 @@ interface TurnProps {
   readonly executionId?: string | null;
   readonly events?: readonly RuntimeEventView[];
   readonly traceLinksEnabled?: boolean;
+  /** The files a user turn carried; listed under its bubble. */
+  readonly attachments?: readonly AttachmentView[];
 }
 
 /**
@@ -114,17 +128,22 @@ function Turn({
   executionId = null,
   events = NO_EVENTS,
   traceLinksEnabled = false,
+  attachments = NO_ATTACHMENTS,
 }: TurnProps) {
   // Markdown of a streaming answer is parsed at most once per frame: deltas arrive faster than a
   // long answer renders, and a stale parse is abandoned for the latest text instead of queued.
   const shown = useDeferredValue(content);
   if (author === 'user') {
     return (
-      <li className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl bg-primary/10 px-4 py-3 text-sm leading-relaxed">
-          <p className="sr-only">Vous</p>
-          <p className="whitespace-pre-wrap">{content}</p>
-        </div>
+      <li className="flex flex-col items-end">
+        <p className="sr-only">Vous</p>
+        {/* A message may be its files alone: no empty bubble then. */}
+        {content.length > 0 ? (
+          <div className="max-w-[85%] rounded-2xl bg-primary/10 px-4 py-3 text-sm leading-relaxed">
+            <p className="whitespace-pre-wrap">{content}</p>
+          </div>
+        ) : null}
+        <MessageAttachments attachments={attachments} />
       </li>
     );
   }

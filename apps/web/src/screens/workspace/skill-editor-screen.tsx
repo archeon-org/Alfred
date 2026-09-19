@@ -2,6 +2,7 @@ import type { SkillDetail, SkillWriteInput } from '@alfred/contracts';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { FeatureGate } from '@/components/feature-flags/feature-gate';
+import { BreadcrumbItem, Breadcrumbs, breadcrumbLinkClassName } from '@/components/ui/breadcrumbs';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SkillEditor } from '@/components/workspace/skills/skill-editor';
@@ -48,21 +49,16 @@ function SkillEditorPage() {
     void navigate('/app/skills');
   };
   const navigation = (
-    <nav
-      aria-label="Fil d’Ariane"
-      className="shrink-0 border-b border-border px-4 py-1.5 text-xs md:px-6"
-    >
-      <Link
-        className="rounded text-muted-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-        to="/app/skills"
-      >
-        Mes skills
-      </Link>
-      <span aria-hidden="true" className="mx-2 text-muted-foreground">
-        /
-      </span>
-      <span>{detail.data?.name ?? (skillId ? 'Éditeur' : 'Nouveau skill')}</span>
-    </nav>
+    <Breadcrumbs className="shrink-0 border-b border-border px-4 py-1.5 md:px-6">
+      <BreadcrumbItem>
+        <Link className={breadcrumbLinkClassName} to="/app/skills">
+          Mes skills
+        </Link>
+      </BreadcrumbItem>
+      <BreadcrumbItem current>
+        {detail.data?.name ?? (skillId ? 'Éditeur' : 'Nouveau skill')}
+      </BreadcrumbItem>
+    </Breadcrumbs>
   );
   return (
     <>

@@ -26,3 +26,6 @@ apps/agent/__pycache__/
 apps/agent/**/*.pyc
 
 docker-data/
+
+# Uploaded file bytes when no S3-compatible bucket is configured (development only).
+**/var/uploads/

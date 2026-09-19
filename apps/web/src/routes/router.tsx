@@ -12,6 +12,7 @@ import { NotFoundScreen } from '@/screens/errors/not-found-screen';
 import { RouteErrorScreen, WorkspaceErrorScreen } from '@/screens/errors/route-error-screen';
 import { ChatSessionProvider } from '@/contexts/chat-session/chat-session-provider';
 import { ConversationScreen } from '@/screens/workspace/conversation-screen';
+import { FilesScreen } from '@/screens/workspace/files-screen';
 import { ProjectScreen } from '@/screens/workspace/project-screen';
 import { WorkspaceScreen } from '@/screens/workspace/workspace-screen';
 
@@ -40,6 +41,9 @@ export const routes: RouteObject[] = [
                       { element: <SkillEditorScreen />, path: ':skillId/edit' },
                     ],
                   },
+                  // A page, not a dialog: the context panel is already one below 1200 px.
+                  { element: <FilesScreen />, path: 'files' },
+                  { element: <FilesScreen />, path: 'files/:folderId' },
                   { element: <ProjectScreen />, path: 'projects/:projectId' },
                   { element: <ConversationScreen />, path: 'conversations/new' },
                   { element: <ConversationScreen />, path: 'conversations/:conversationId' },

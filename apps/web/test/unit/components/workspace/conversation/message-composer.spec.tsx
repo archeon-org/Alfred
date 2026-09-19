@@ -27,7 +27,7 @@ describe('MessageComposer', () => {
     expect(onSend).not.toHaveBeenCalled();
     await user.keyboard('{Enter}');
 
-    expect(onSend).toHaveBeenCalledWith('Ligne un\nligne deux');
+    expect(onSend).toHaveBeenCalledWith('Ligne un\nligne deux', []);
     expect(field).toHaveValue('');
   });
 
@@ -36,7 +36,7 @@ describe('MessageComposer', () => {
     const onSend = vi.fn(() => false);
     render(<MessageComposer onSend={onSend} />);
     await user.type(screen.getByLabelText('Message'), 'Brouillon{Enter}');
-    expect(onSend).toHaveBeenCalledWith('Brouillon');
+    expect(onSend).toHaveBeenCalledWith('Brouillon', []);
     expect(screen.getByLabelText('Message')).toHaveValue('Brouillon');
   });
 

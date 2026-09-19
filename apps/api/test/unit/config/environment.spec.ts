@@ -48,6 +48,45 @@ describe('parseEnvironment', () => {
     expect(() => parseEnvironment({ ...validEnvironment, [key]: '0' })).toThrow(key);
     expect(() => parseEnvironment({ ...validEnvironment, [key]: 'unbounded' })).toThrow(key);
   });
+  it('bounds the memory uploads in flight may hold, and the file size the proxy lets through', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FILE_QUOTA_BYTES_PER_USER: '104857600',
+        FILE_UPLOAD_MAX_BYTES: '26214400',
+        FILE_UPLOAD_MAX_CONCURRENT: '8',
+      }),
+    ).toThrow('FILE_UPLOAD_MAX_CONCURRENT');
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FILE_QUOTA_BYTES_PER_USER: '104857600',
+        FILE_UPLOAD_MAX_BYTES: '26214400',
+        FILE_UPLOAD_MAX_CONCURRENT: '4',
+      }),
+    ).not.toThrow();
+    // Beyond what the web proxy is sized for, a limit would be unreachable from the application.
+    expect(() =>
+      parseEnvironment({ ...validEnvironment, FILE_UPLOAD_MAX_BYTES: '26214401' }),
+    ).toThrow('FILE_UPLOAD_MAX_BYTES');
+  });
+
+  it('rejects inconsistent file upload limits', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FILE_UPLOAD_MAX_BYTES: '2048',
+        FILE_QUOTA_BYTES_PER_USER: '1024',
+      }),
+    ).toThrow('FILE_QUOTA_BYTES_PER_USER');
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FILE_PROMPT_TOKENS_PER_DOCUMENT: '5000',
+        FILE_PROMPT_TOKENS_PER_EXECUTION: '1000',
+      }),
+    ).toThrow('FILE_PROMPT_TOKENS_PER_EXECUTION');
+  });
   it('rejects inconsistent skills storage limits', () => {
     expect(() =>
       parseEnvironment({
@@ -153,6 +192,19 @@ describe('parseEnvironment', () => {
       FEATURE_SKILLS_ENABLED: false,
       FEATURE_TEAMS_ENABLED: false,
       FEATURE_TRACE_LINKS_ENABLED: false,
+      FILE_EXTRACTED_TEXT_MAX_CHARS: 1_000_000,
+      FILE_EXTRACTION_MAX_PDF_PAGES: 500,
+      FILE_EXTRACTION_TIMEOUT_MS: 60_000,
+      FILE_IMAGE_MAX_EDGE_PX: 1_568,
+      FILE_IMAGE_MAX_INPUT_PIXELS: 50_000_000,
+      FILE_PENDING_UPLOAD_TTL_MS: 300_000,
+      FILE_PROMPT_TOKENS_PER_DOCUMENT: 10_000,
+      FILE_PROMPT_TOKENS_PER_EXECUTION: 30_000,
+      FILE_QUOTA_BYTES_PER_USER: 26_214_400,
+      FILE_STORAGE_LOCAL_ROOT: 'var/uploads',
+      FILE_UPLOAD_MAX_BYTES: 5_242_880,
+      FILE_UPLOAD_MAX_CONCURRENT: 4,
+      FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE: 20,
       NODE_ENV: 'test',
       OBSERVABILITY_LOG_LEVEL: 'info',
       OBSERVABILITY_METRICS_ENABLED: false,

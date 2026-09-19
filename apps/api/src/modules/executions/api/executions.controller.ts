@@ -63,6 +63,7 @@ export class ExecutionsController {
     const started = await this.executions.start(principal, id, body.message, {
       submissionId: body.submissionId,
       profile: 'snapshot-v1',
+      attachmentIds: body.attachmentIds,
     });
     return ok({ snapshot: await this.observations.snapshot(principal, started.execution.id) });
   }

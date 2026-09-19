@@ -26,3 +26,14 @@ export const conversationKeys = {
 export const workspaceKeys = {
   membership: (userId: string) => ['workspace', userId, 'membership'] as const,
 };
+
+/** The personal file library. `lists` covers every filtered list, so one invalidation refreshes them. */
+export const fileKeys = {
+  all: (userId: string) => ['files', userId] as const,
+  lists: (userId: string) => ['files', userId, 'list'] as const,
+  list: (userId: string, filters: object) => ['files', userId, 'list', filters] as const,
+  detail: (userId: string, fileId: string) => ['files', userId, 'detail', fileId] as const,
+  preview: (userId: string, fileId: string) => ['files', userId, 'preview', fileId] as const,
+  quota: (userId: string) => ['files', userId, 'quota'] as const,
+  folders: (userId: string) => ['files', userId, 'folders'] as const,
+};

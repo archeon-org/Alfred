@@ -1,5 +1,7 @@
 import { z } from 'zod/mini';
 
+import { FILE_MAX_ATTACHMENTS_PER_MESSAGE, messageAttachmentSchema } from './files';
+
 import { successEnvelopeSchema } from './envelope';
 import { conversationSchema } from './conversations';
 
@@ -40,10 +42,25 @@ export const executionSchema = z.readonly(
 );
 export type Execution = z.infer<typeof executionSchema>;
 
-export const startExecutionInputSchema = z.object({
-  message: z.string().check(z.trim(), z.minLength(1), z.maxLength(EXECUTION_MESSAGE_MAX_LENGTH)),
-  submissionId: z.uuid(),
-});
+/**
+ * `attachmentIds` names library files sent with this message (ALF-DEC-010 "exact message
+ * attachments"). The field is omitted when empty, so a browser still talks to an older API, and a
+ * message may be attachments only: the text is required only when nothing is attached.
+ */
+export const startExecutionInputSchema = z
+  .object({
+    message: z.string().check(z.trim(), z.maxLength(EXECUTION_MESSAGE_MAX_LENGTH)),
+    submissionId: z.uuid(),
+    attachmentIds: z.optional(
+      z.array(z.uuid()).check(z.maxLength(FILE_MAX_ATTACHMENTS_PER_MESSAGE)),
+    ),
+  })
+  .check(
+    z.refine(
+      (input) => input.message.length > 0 || (input.attachmentIds?.length ?? 0) > 0,
+      'A message needs text or at least one attachment.',
+    ),
+  );
 export type StartExecutionInput = z.infer<typeof startExecutionInputSchema>;
 
 /** One parsed SSE frame: the event name, its decoded payload and the opaque cursor if any. */
@@ -178,6 +195,8 @@ export const messageSchema = z.readonly(
     createdAt: isoDateTime,
     // Added 2026-09-16 for assistant rows; absent from older APIs and from user rows.
     work: z.optional(executionWorkSummarySchema),
+    // Added 2026-09-18 for user rows that carried files; absent from older APIs.
+    attachments: z.optional(z.readonly(z.array(messageAttachmentSchema))),
   }),
 );
 export type Message = z.infer<typeof messageSchema>;
@@ -196,6 +215,8 @@ export const alfredRunStateSchema = z.readonly(
     execution: executionSchema,
     conversation: conversationSchema,
     userMessage: z.string().check(z.maxLength(EXECUTION_MESSAGE_MAX_LENGTH)),
+    // Added 2026-09-18: the files the user turn carried; absent from older APIs.
+    attachments: z.optional(z.readonly(z.array(messageAttachmentSchema))),
   }),
 );
 export type AlfredRunState = z.infer<typeof alfredRunStateSchema>;
@@ -212,6 +233,8 @@ export const executionSnapshotSchema = z.readonly(
     revision: z.number().check(z.int(), z.minimum(0)),
     // Added 2026-09-16: the work log behind the answer; absent from older APIs.
     work: z.optional(executionWorkSchema),
+    // Added 2026-09-18: the files the user turn carried; absent from older APIs.
+    attachments: z.optional(z.readonly(z.array(messageAttachmentSchema))),
   }),
 );
 export type ExecutionSnapshot = z.infer<typeof executionSnapshotSchema>;

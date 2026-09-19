@@ -5,6 +5,7 @@ import type { DataSource } from 'typeorm';
 import { ExecutionObservationService } from '@api/modules/executions/application/execution-observation.service';
 import type { ExecutionsService } from '@api/modules/executions/application/executions.service';
 import type { ConversationsService } from '@api/modules/conversations/application/conversations.service';
+import type { MessageAttachmentsService } from '@api/modules/files/application/message-attachments.service';
 import {
   emptyProjection,
   projectRuntimeEvent,
@@ -103,6 +104,33 @@ describe('coherent public execution snapshots', () => {
     await expect(service.snapshot(principal, row.id)).rejects.toMatchObject({
       code: 'runtime_recovery_required',
     });
+  });
+  it('reads the files of a turn once: an observer that already holds them is not charged again', async () => {
+    const { row } = fixture();
+    const file = { fileId: 'file', name: 'a.pdf' };
+    const forMessage = vi.fn().mockResolvedValue([file]);
+    const service = new ExecutionObservationService(
+      { getObservation: vi.fn().mockResolvedValue(row) } as unknown as ExecutionsService,
+      {
+        get: vi.fn().mockResolvedValue({ id: row.conversationId }),
+      } as unknown as ConversationsService,
+      {
+        getRepository: () => ({
+          findOne: vi.fn().mockResolvedValue({ id: 'user-turn', content: 'Hello' }),
+        }),
+      } as unknown as DataSource,
+      new ConfigService({ EXECUTION_CURSOR_KEY: currentKey }),
+      { forMessage } as unknown as MessageAttachmentsService,
+    );
+
+    const first = await service.load(principal, row.id);
+    expect(first.attachments).toEqual([file]);
+    expect(forMessage).toHaveBeenCalledExactlyOnceWith('user-turn');
+
+    // What every 500 ms poll of a stream does: no further attachment query, same files.
+    const polled = await service.load(principal, row.id, undefined, first.attachments);
+    expect(polled.attachments).toBe(first.attachments);
+    expect(forMessage).toHaveBeenCalledOnce();
   });
   it('does authorization before examining an attacker cursor', async () => {
     const { service, row, getObservation } = fixture();

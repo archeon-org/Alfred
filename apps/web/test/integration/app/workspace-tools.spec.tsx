@@ -273,33 +273,34 @@ describe('Équipes tab behind the teams capability', () => {
     renderTools();
     expect(screen.queryByRole('tab', { name: 'Équipes' })).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Skills' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    // Fichiers is a capability too (`fileUploads`, off here): Skills is the only tab left, and
+    // the tab list lays out one column for it.
+    expect(screen.getAllByRole('tab')).toHaveLength(1);
+    expect(screen.getByRole('tablist')).toHaveClass('grid-cols-1');
     expect(screen.queryByRole('heading', { name: 'Agents spécialistes' })).not.toBeInTheDocument();
   });
 });
 
 describe('Workspace tools', () => {
-  it('switches between teams, skills and files using accessible tabs', async () => {
+  it('switches between teams and skills using accessible tabs', async () => {
     const user = userEvent.setup();
     renderTools();
     expect(screen.queryByRole('tab', { name: 'Contexte' })).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Équipes' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tablist')).toHaveClass('grid-cols-2');
     expect(screen.getByRole('heading', { name: 'Agents spécialistes' })).toBeVisible();
     await user.click(screen.getByRole('tab', { name: 'Équipes' }));
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('tab', { name: 'Skills' })).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(screen.getByText('Le catalogue de skills est désactivé.')).toBeVisible();
-    await user.click(screen.getByRole('tab', { name: 'Fichiers' }));
-    expect(screen.getByText('Une place pour vos références.')).toBeVisible();
   });
 
-  it('announces files as a later capability', async () => {
-    const user = userEvent.setup();
+  it('leaves no Fichiers tab and no placeholder while fileUploads is off', () => {
     renderTools();
-    await user.click(screen.getByRole('tab', { name: 'Fichiers' }));
-    expect(screen.getByText(/lecture de documents seront disponibles/)).toBeVisible();
-    expect(screen.queryByRole('button', { name: /Ajouter un fichier/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Fichiers' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/fichiers arrivent|documents seront disponibles/iu)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Importer/u })).not.toBeInTheDocument();
   });
 
   it('replaces tool controls with loading placeholders during the preview', () => {

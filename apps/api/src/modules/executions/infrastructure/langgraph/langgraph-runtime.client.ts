@@ -1,8 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { z } from 'zod';
+import {
+  MessageAttachmentsService,
+  type RuntimeUserContent,
+} from '../../../files/application/message-attachments.service';
 import { ExecutionsService } from '../../application/executions.service';
 import {
+  RUNTIME_NOT_DISPATCHED,
   RuntimeClientError,
   type GeneratedTitle,
   type RuntimeClient,
@@ -35,6 +40,7 @@ export class LangGraphRuntimeClient implements RuntimeClient {
   constructor(
     private readonly config: ConfigService,
     private readonly executions: ExecutionsService,
+    @Optional() private readonly attachments?: MessageAttachmentsService,
   ) {}
 
   async dispatch(
@@ -60,11 +66,14 @@ export class LangGraphRuntimeClient implements RuntimeClient {
     }
     const assistantId = this.config.get<string>('AGENT_RUNTIME_ASSISTANT_ID');
     if (!assistantId) throw new RuntimeClientError('runtime_not_configured');
+    // Attached files join the user turn here, at dispatch only: bounded text as evidence and
+    // reduced images, as multi-part content the orchestrator already accepts (ALF-DEC-010).
+    const content = await this.userContent(executionId, context.userMessage, signal);
     // A background run survives this HTTP response/connection. on_disconnect belongs only to
     // native streaming/wait creation, and is deliberately absent from this native schema.
     const body = await this.jsonRequest(`${this.threadPath(context)}/runs`, 'POST', signal, {
       assistant_id: assistantId,
-      input: { messages: [{ role: 'user', content: context.userMessage }] },
+      input: { messages: [{ role: 'user', content }] },
       metadata: this.metadata(context),
       stream_mode: STREAM_MODES,
       stream_subgraphs: true,
@@ -74,6 +83,24 @@ export class LangGraphRuntimeClient implements RuntimeClient {
       multitask_strategy: 'interrupt',
     });
     return this.present(this.parseRun(body, context), context);
+  }
+
+  /**
+   * Reading a turn's files is database and store work of this API. When it fails, no run creation
+   * was requested: saying so lets the processor dispatch again instead of inspecting, until the
+   * deadline, a run that was never created.
+   */
+  private async userContent(
+    executionId: string,
+    userMessage: string,
+    signal: AbortSignal,
+  ): Promise<RuntimeUserContent> {
+    if (this.attachments === undefined) return userMessage;
+    try {
+      return await this.attachments.runtimeContent(executionId, userMessage, signal);
+    } catch {
+      throw new RuntimeClientError(RUNTIME_NOT_DISPATCHED);
+    }
   }
 
   async inspect(
@@ -118,7 +145,8 @@ export class LangGraphRuntimeClient implements RuntimeClient {
   ): Promise<GeneratedTitle | null> {
     const context = await this.context(executionId, invocationId, signal);
     const assistantId = this.config.get<string>('AGENT_RUNTIME_TITLE_ASSISTANT_ID') ?? '';
-    if (!assistantId) return null;
+    // A message made of attachments only has no text to title; the first written turn will.
+    if (!assistantId || context.userMessage.trim().length === 0) return null;
     const body = await this.jsonRequest(
       '/runs/wait',
       'POST',

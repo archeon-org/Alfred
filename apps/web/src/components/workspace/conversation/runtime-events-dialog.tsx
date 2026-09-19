@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import type { RuntimeEventView } from '@/contexts/chat-session/chat-session-context';
 import { useReturnFocus } from '@/hooks/ui/use-return-focus';
+import { downloadBlob } from '@/lib/browser/download-blob';
 
 interface RuntimeEventsDialogProps {
   readonly open: boolean;
@@ -31,16 +32,10 @@ export function RuntimeEventsDialog({
   const returnFocus = useReturnFocus();
   const download = () => {
     try {
-      const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `alfred-events-${executionId}.json`;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      // Leave the browser time to start the download before releasing its backing bytes.
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadBlob(
+        new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' }),
+        `alfred-events-${executionId}.json`,
+      );
       setDownloadError(null);
     } catch {
       setDownloadError('Impossible de télécharger les événements. Réessayez.');
