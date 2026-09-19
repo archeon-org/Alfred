@@ -102,13 +102,18 @@ describe('Workspace organization', () => {
   it('previews loading placeholders and hides or restores the context panel', async () => {
     const user = userEvent.setup();
     renderWorkspaceAt('/app');
-    const toggle = await screen.findByRole('button', { name: 'Aperçu du chargement' });
-
+    // The preview lives in the account menu, which closes on every choice.
+    const account = await screen.findByRole('button', { name: /menu du compte/iu });
+    await user.click(account);
+    const toggle = await screen.findByRole('menuitemcheckbox', { name: 'Aperçu du chargement' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
     await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('status', { name: 'Chargement de l’espace de travail' })).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Message' })).not.toBeInTheDocument();
-    await user.click(toggle);
+    await user.click(account);
+    const checked = await screen.findByRole('menuitemcheckbox', { name: 'Aperçu du chargement' });
+    expect(checked).toHaveAttribute('aria-checked', 'true');
+    await user.click(checked);
     expect(screen.getByRole('textbox', { name: 'Message' })).toBeVisible();
 
     expect(
@@ -127,7 +132,8 @@ describe('Workspace organization', () => {
   it('applies display preferences and uses a dedicated settings frame', async () => {
     const user = userEvent.setup();
     renderWorkspaceAt('/app');
-    await user.click(await screen.findByRole('link', { name: 'Paramètres' }));
+    await user.click(await screen.findByRole('button', { name: /menu du compte/iu }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Paramètres' }));
     expect(
       screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
     ).not.toBeInTheDocument();

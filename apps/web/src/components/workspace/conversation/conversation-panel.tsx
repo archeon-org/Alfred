@@ -1,4 +1,3 @@
-import { LockKeyhole, MessageSquareText } from 'lucide-react';
 import type { Ref } from 'react';
 
 import { RuntimeEvents } from '@/components/workspace/conversation/runtime-events';
@@ -73,23 +72,9 @@ export function ConversationPanel({
         id="conversation"
         aria-busy={isLoading || isBusy || isStreaming}
       >
-        <div className="flex min-h-18 shrink-0 items-center gap-2.5 border-b border-border px-4 py-3 md:min-h-21 md:gap-3 md:px-6 md:py-4">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-muted text-muted-foreground">
-            <MessageSquareText aria-hidden="true" size={17} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="mb-1 text-2xs font-semibold tracking-label text-muted-foreground">
-              VOTRE CONVERSATION
-            </p>
-            <h1 className="text-xs font-semibold truncate tracking-tight md:text-sm">
-              {title ?? 'Nouvelle conversation'}
-            </h1>
-          </div>
-          <span className="ml-auto flex items-center gap-1 text-2xs whitespace-nowrap text-muted-foreground  [&_svg]:size-3.5 md:[&_svg]:size-3">
-            <LockKeyhole aria-hidden="true" size={12} />
-            <span className="sr-only md:not-sr-only">Personnel</span>
-          </span>
-        </div>
+        {/* The conversation title belongs to the page outline and to the sidebar's selection,
+            not to a band above the transcript: the transcript keeps the height. */}
+        <h1 className="sr-only">{title ?? 'Nouvelle conversation'}</h1>
         <div className="flex min-h-0 flex-1 flex-col workspace:[container-type:size] workspace:[container-name:welcome] [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] workspace:overflow-y-auto">
           {notice ? (
             <p

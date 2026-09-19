@@ -1,5 +1,12 @@
 import { expect, test } from '@playwright/test';
 
+import {
+  accountTrigger,
+  chooseAccountItem,
+  isPreviewLoadingOn,
+  openAccountMenu,
+  togglePreviewLoading,
+} from './support/account-menu';
 import { installWorkspaceApi } from './support/workspace-api';
 
 const authenticatedSession = {
@@ -126,7 +133,9 @@ test('keeps visible workspace and dialog text at least eleven CSS pixels', async
   await page.getByRole('button', { name: 'Refonte du portail', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Refonte du portail' })).toBeVisible();
   expect(await undersizedText()).toEqual([]);
-  await page.getByRole('link', { name: 'Paramètres' }).click();
+  await openAccountMenu(page);
+  expect(await undersizedText()).toEqual([]);
+  await page.getByRole('menuitem', { name: 'Paramètres' }).click();
   expect(await undersizedText()).toEqual([]);
 });
 
@@ -135,9 +144,10 @@ test('supports keyboard activation and reduced-motion loading without decorative
 }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/app');
-  const settings = page.getByRole('link', { name: 'Paramètres' });
-  await settings.focus();
+  // Keyboard only: the account trigger opens its menu, the first item is Paramètres.
+  await accountTrigger(page).focus();
   await page.keyboard.press('Enter');
+  await page.getByRole('menuitem', { name: 'Paramètres' }).press('Enter');
   const dialog = page.getByRole('main');
   await expect(page).toHaveURL(/\/app\/settings$/u);
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -149,10 +159,11 @@ test('supports keyboard activation and reduced-motion loading without decorative
   await page.goBack();
   await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
 
-  const loading = page.getByRole('button', { name: 'Aperçu du chargement' });
-  await loading.focus();
-  await page.keyboard.press('Space');
-  await expect(loading).toHaveAttribute('aria-pressed', 'true');
+  const preview = page.getByRole('menuitemcheckbox', { name: 'Aperçu du chargement' });
+  await accountTrigger(page).focus();
+  await page.keyboard.press('Enter');
+  await preview.press('Space');
+  expect(await isPreviewLoadingOn(page)).toBe(true);
   const skeletons = page.locator('[data-slot="skeleton"]');
   expect(await skeletons.count()).toBeGreaterThan(0);
   expect(
@@ -160,8 +171,10 @@ test('supports keyboard activation and reduced-motion loading without decorative
       elements.every((element) => getComputedStyle(element).animationName === 'none'),
     ),
   ).toBe(true);
-  await page.keyboard.press('Space');
-  await expect(loading).toHaveAttribute('aria-pressed', 'false');
+  await accountTrigger(page).focus();
+  await page.keyboard.press('Enter');
+  await preview.press('Space');
+  expect(await isPreviewLoadingOn(page)).toBe(false);
   await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
 });
 
@@ -170,22 +183,26 @@ test('gives buttons press feedback and removes movement with the application pre
 }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/app');
-  const loading = page.getByRole('button', { name: 'Aperçu du chargement' });
-  await loading.hover();
+  // A menu trigger prevents the default on pointer down, which hides :active in Firefox; a plain
+  // action button carries the press feedback of the shared primitive.
+  const pressable = page.getByRole('button', { name: 'Nouvelle conversation', exact: true });
+  await pressable.hover();
   await page.mouse.down();
   await expect
-    .poll(() => loading.evaluate((element) => getComputedStyle(element).scale))
+    .poll(() => pressable.evaluate((element) => getComputedStyle(element).scale))
     .toBe('0.98');
   await page.mouse.up();
-  await loading.click();
-  await page.getByRole('link', { name: 'Paramètres', exact: true }).click();
+  await togglePreviewLoading(page);
+  await chooseAccountItem(page, 'Paramètres');
   await page.getByRole('switch', { name: 'Réduire les animations' }).click();
   await page.goBack();
-  await loading.hover();
+  await pressable.hover();
   await page.mouse.down();
-  await expect.poll(() => loading.evaluate((element) => getComputedStyle(element).scale)).toBe('1');
+  await expect
+    .poll(() => pressable.evaluate((element) => getComputedStyle(element).scale))
+    .toBe('1');
   await page.mouse.up();
-  await expect(loading).toHaveAttribute('aria-pressed', 'true');
+  expect(await isPreviewLoadingOn(page)).toBe(true);
   expect(
     await page
       .locator('[data-slot="skeleton"]')
@@ -226,7 +243,7 @@ test('changes actual navigation spacing and reading width while preserving panel
   await page.getByRole('button', { name: 'Masquer le contexte' }).click();
   const composer = page.getByRole('textbox', { name: 'Message' });
   const centeredWidth = (await composer.boundingBox())!.width;
-  await page.getByRole('link', { name: 'Paramètres' }).click();
+  await chooseAccountItem(page, 'Paramètres');
   await page.getByRole('switch', { name: 'Navigation compacte' }).click();
   await page.getByRole('combobox', { name: 'Largeur de lecture' }).selectOption('wide');
   await page.getByRole('link', { name: 'Retour à Alfred' }).click();
@@ -259,10 +276,11 @@ test('keeps the same sidebar identity and accent surfaces when opening settings'
   const width = (await sidebar.boundingBox())!.width;
   const brand = sidebar.getByRole('link', { name: 'alfred.' });
   const brandY = (await brand.boundingBox())!.y;
-  const footer = sidebar.getByText('Alfred · Workspace');
+  // The account row is the sidebar's foot on every screen that shares the frame.
+  const footer = accountTrigger(page);
   const footerY = (await footer.boundingBox())!.y;
   await page.screenshot({ path: '/tmp/alfred-workspace-amber.png', animations: 'disabled' });
-  await page.getByRole('link', { name: 'Paramètres', exact: true }).click();
+  await chooseAccountItem(page, 'Paramètres');
   await expect(sidebar).toBeVisible();
   await expect(brand).toBeVisible();
   await expect(footer).toBeVisible();
@@ -305,7 +323,7 @@ test('keeps dark surfaces charcoal and neutral for every accent', async ({ page 
     initial = surfaces;
     if (name === 'Ambre')
       await page.screenshot({ path: '/tmp/alfred-neutral-dark.png', animations: 'disabled' });
-    await page.getByRole('link', { name: 'Paramètres', exact: true }).click();
+    await chooseAccountItem(page, 'Paramètres');
   }
 });
 

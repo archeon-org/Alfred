@@ -26,6 +26,10 @@ interface WorkspaceSidebarProps extends Omit<ProjectNavigationProps, 'onCreate' 
   readonly search: string;
   readonly isLoading: boolean;
   readonly isNavigationOpen: boolean;
+  /** Folds the navigation column away on wider screens. */
+  readonly onCollapse?: () => void;
+  readonly isPreviewLoading?: boolean;
+  readonly onTogglePreviewLoading?: () => void;
   readonly loadError: string | null;
   /** Transient message, for example a failed pin; announced as an alert. */
   readonly notice?: string | null;
@@ -48,6 +52,9 @@ export function WorkspaceSidebar({
   search,
   isLoading,
   isNavigationOpen,
+  onCollapse,
+  isPreviewLoading,
+  onTogglePreviewLoading,
   loadError,
   notice,
   onRetry,
@@ -62,7 +69,12 @@ export function WorkspaceSidebar({
   const isSearching = Boolean(search.trim());
   const standaloneChats = conversations.filter((item) => item.projectKind === 'implicit');
   return (
-    <SidebarFrame>
+    <SidebarFrame
+      isNavigationOpen={isNavigationOpen}
+      isPreviewLoading={isPreviewLoading}
+      onCollapse={onCollapse}
+      onTogglePreviewLoading={onTogglePreviewLoading}
+    >
       <nav
         aria-label="Navigation principale"
         className="mt-4 grid grid-cols-2 gap-3 md:mt-0 md:grid-cols-1"

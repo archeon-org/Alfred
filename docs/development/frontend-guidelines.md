@@ -95,9 +95,9 @@ src/
     layout/                   structures génériques si réellement réutilisées
     workspace/
       conversation/           transcript, accueil, composeur
-      navigation/             sidebar, projets, conversations
+      navigation/             sidebar, projets, conversations, compte (menu, déconnexion)
       context/                contexte, équipes, skills, fichiers
-      header/                 en-tête, compte, paramètres
+      header/                 barre des écrans étroits uniquement
   hooks/workspace/            état et adaptation React du workspace
   services/<domaine>/         requêtes et validation, sans React
   lib/workspace/              types de vue et fonctions pures

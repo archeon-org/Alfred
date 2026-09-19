@@ -1,5 +1,6 @@
-import { CircleHelp, Layers } from 'lucide-react';
+import { CircleHelp, PanelRightClose } from 'lucide-react';
 
+import { IconButton } from '@/components/ui/icon-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContextResources } from '@/components/workspace/context/context-resources';
 import { SkillsPanel } from '@/components/workspace/context/skills-panel';
@@ -11,6 +12,8 @@ import type { WorkspaceToolTab } from '@/lib/workspace/workspace-tools.types';
 interface ContextPanelProps {
   readonly isLoading: boolean;
   readonly tools: WorkspaceToolsState;
+  /** Folds the panel away; the chat gutter then offers the control to bring it back. */
+  readonly onClose?: () => void;
 }
 
 const toolTabs: readonly { readonly id: WorkspaceToolTab; readonly label: string }[] = [
@@ -19,22 +22,35 @@ const toolTabs: readonly { readonly id: WorkspaceToolTab; readonly label: string
   { id: 'files', label: 'Fichiers' },
 ];
 
-export function ContextPanel({ isLoading, tools }: ContextPanelProps) {
+export function ContextPanel({ isLoading, tools, onClose }: ContextPanelProps) {
   return (
     <aside
       aria-label="Contexte de la conversation"
       className="flex min-h-0 min-w-0 workspace:h-full flex-col overflow-y-auto px-5 pt-4 pb-6 text-foreground [scrollbar-width:thin]"
       id="context-panel"
     >
-      <div className="border-b border-border pt-0.5 pb-5">
-        <span className="text-2xs font-semibold tracking-widest text-muted-foreground">
-          À VOS CÔTÉS
-        </span>
-        <h2 className="mt-2 flex items-center justify-between text-xl font-medium tracking-tight">
-          Votre atelier
-          <Layers aria-hidden="true" className="size-4.5 text-primary/60" />
-        </h2>
-        <p className="mt-2 text-2xs text-muted-foreground">Le fil conducteur de votre travail.</p>
+      <div className="border-b border-border pt-0.5 pb-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <span className="text-2xs font-semibold tracking-widest text-muted-foreground">
+              À VOS CÔTÉS
+            </span>
+            <h2 className="mt-1.5 text-xl font-medium tracking-tight">Votre atelier</h2>
+          </div>
+          {onClose ? (
+            <IconButton
+              aria-controls="context-panel"
+              aria-expanded
+              className="-mt-1 -mr-2 shrink-0 text-muted-foreground"
+              label="Masquer le contexte"
+              onClick={onClose}
+              size="icon-sm"
+            >
+              <PanelRightClose aria-hidden="true" size={16} />
+            </IconButton>
+          ) : null}
+        </div>
+        <p className="mt-1.5 text-2xs text-muted-foreground">Le fil conducteur de votre travail.</p>
       </div>
       <div aria-busy={isLoading} className="pt-5">
         {isLoading ? (

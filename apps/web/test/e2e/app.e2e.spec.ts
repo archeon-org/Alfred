@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
 
+import {
+  accountTrigger,
+  chooseAccountItem,
+  isPreviewLoadingOn,
+  togglePreviewLoading,
+} from './support/account-menu';
 import { defaultSeed, installWorkspaceApi } from './support/workspace-api';
 
 const authenticatedSession = {
@@ -143,15 +149,13 @@ test('waits for another tab refresh before confirming logout', async ({ context,
     await route.fulfill({ status: 204 });
   });
   await page.goto('/app');
-  const logoutButton = page.getByRole('button', { name: 'Se déconnecter' });
-  await expect(logoutButton).toBeVisible();
+  await expect(accountTrigger(page)).toBeVisible();
   const secondPage = await context.newPage();
   await installWorkspaceApi(secondPage);
   await secondPage.goto('/app');
   await expect.poll(() => activeRefreshes).toBe(1);
 
-  await logoutButton.click();
-  await expect(logoutButton).toBeDisabled();
+  await chooseAccountItem(page, 'Se déconnecter');
   releaseRefresh();
   await expect(page.getByRole('heading', { name: 'Bienvenue sur Alfred' })).toBeVisible();
   expect(logoutOverlappedRefresh).toBe(false);
@@ -299,12 +303,11 @@ test('respects reduced motion while previewing loading placeholders', async ({ p
     route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
   );
   await page.goto('/app');
-  const loadingToggle = page.getByRole('button', { name: 'Aperçu du chargement' });
-  await loadingToggle.click();
+  await togglePreviewLoading(page);
   const status = page.getByRole('status', { name: 'Chargement de l’espace de travail' });
 
   await expect(status).toBeVisible();
-  await expect(loadingToggle).toHaveAttribute('aria-pressed', 'true');
+  expect(await isPreviewLoadingOn(page)).toBe(true);
   const skeletons = page.locator('[data-slot="skeleton"]');
   expect(await skeletons.count()).toBeGreaterThan(0);
   expect(
@@ -313,7 +316,7 @@ test('respects reduced motion while previewing loading placeholders', async ({ p
     ),
   ).toBe(true);
 
-  await loadingToggle.click();
+  await togglePreviewLoading(page);
   await expect(status).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
 });
@@ -405,8 +408,7 @@ test('opens settings directly and preserves local display preferences across nav
     route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
   );
   await page.goto('/app');
-  const settings = page.getByRole('link', { name: 'Paramètres' });
-  await settings.click();
+  await chooseAccountItem(page, 'Paramètres');
   const dialog = page.getByRole('main');
   await expect(page).toHaveURL(/\/app\/settings$/u);
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -590,7 +592,10 @@ test('moves a free chat into a project and restores menu focus when cancelling',
   await expect(page).toHaveURL(`/app/conversations/${chat.id}`);
   await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('Mon brouillon');
   await expect(page.getByRole('main')).toBeFocused();
-  await expect(page.getByRole('link', { name: 'Refonte du portail' })).toBeVisible();
+  // The chat now lives under its project: the sidebar row carries the scope.
+  await expect(
+    page.getByRole('button', { name: 'Refonte du portail', exact: true }),
+  ).toHaveAttribute('aria-current', 'true');
   await trigger.click();
   await expect(page.getByRole('menuitem', { name: 'Ajouter à un projet' })).toHaveCount(0);
 });

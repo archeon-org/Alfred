@@ -26,6 +26,7 @@ import {
 } from '@/hooks/projects/use-projects-query';
 import { useWorkspacePreferences } from '@/hooks/workspace/use-workspace-preferences';
 import type { WorkspaceOutletContext } from '@/hooks/workspace/use-workspace-outlet';
+import { useTabletWorkspace } from '@/hooks/workspace/use-tablet-workspace';
 import { useWorkspaceShell } from '@/hooks/workspace/use-workspace-shell';
 import { useWorkspaceTools } from '@/hooks/workspace/use-workspace-tools';
 import { describeApiError } from '@/lib/workspace/api-error-message';
@@ -56,6 +57,8 @@ export function WorkspaceScreen() {
   const preferences = useWorkspacePreferences();
   const shell = useWorkspaceShell(preferences.contextOpenByDefault);
   const tools = useWorkspaceTools();
+  // Below md the narrow bar owns the context toggle; from md the panel folds itself.
+  const isTablet = useTabletWorkspace();
   const isSettings = useMatch('/app/settings') !== null;
   const navigate = useNavigate();
   const location = useLocation();
@@ -202,10 +205,13 @@ export function WorkspaceScreen() {
         Aller au contenu principal
       </a>
       <WorkspaceLayout
+        contextAvailable={!isSkillEditor}
         isSidebarOpen={shell.isSidebarOpen}
         isContextOpen={shell.isContextOpen && !isSkillEditor}
         sidebarRef={sidebarRef}
         onSidebarOpenChange={shell.setIsSidebarOpen}
+        onOpenSidebar={toggleSidebar}
+        onOpenContext={shell.toggleContext}
         sidebar={
           <WorkspaceSidebar
             conversationActions={{
@@ -236,6 +242,9 @@ export function WorkspaceScreen() {
             search={shell.search}
             isLoading={isLoading}
             isNavigationOpen={shell.isNavigationOpen}
+            onCollapse={toggleSidebar}
+            isPreviewLoading={shell.isPreviewLoading}
+            onTogglePreviewLoading={shell.toggleLoading}
             loadError={loadError}
             notice={conversationActions.pinError ?? projectActions.pinError}
             onRetry={() => navigationQueries.forEach(({ query }) => query.reload())}
@@ -261,18 +270,20 @@ export function WorkspaceScreen() {
                 selectedProjectId === undefined ? undefined : projectHomePath(selectedProjectId),
               name: scopeName,
             }}
-            isLoading={shell.isPreviewLoading}
             isContextOpen={shell.isContextOpen && !isSkillEditor}
-            isSidebarOpen={shell.isSidebarOpen}
             isNavigationOpen={shell.isNavigationOpen}
-            onToggleLoading={shell.toggleLoading}
             onToggleContext={shell.toggleContext}
             onToggleNavigation={shell.toggleNavigation}
-            onToggleSidebar={toggleSidebar}
           />
         }
         conversation={<Outlet context={outlet} />}
-        context={<ContextPanel isLoading={isLoading} tools={tools} />}
+        context={
+          <ContextPanel
+            isLoading={isLoading}
+            tools={tools}
+            onClose={isTablet ? shell.toggleContext : undefined}
+          />
+        }
       />
       <TextFieldDialog
         description="Regroupez les conversations autour d’un même objectif."
