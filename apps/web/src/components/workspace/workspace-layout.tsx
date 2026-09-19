@@ -5,6 +5,7 @@ import type { PanelImperativeHandle } from 'react-resizable-panels';
 import { IconButton } from '@/components/ui/icon-button';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useDesktopWorkspace } from '@/hooks/workspace/use-desktop-workspace';
+import { useShortcutHint } from '@/hooks/workspace/use-shortcut-preferences';
 import { useTabletWorkspace } from '@/hooks/workspace/use-tablet-workspace';
 import { cn } from '@/lib/cn';
 
@@ -44,6 +45,8 @@ function PanelOpeners({
 }: PanelOpenersProps) {
   const floating =
     'bg-card/90 text-muted-foreground shadow-soft backdrop-blur-sm hover:bg-card hover:text-foreground';
+  const navigationHint = useShortcutHint('toggleNavigation', 'Afficher la navigation');
+  const contextHint = useShortcutHint('toggleContext', 'Afficher le contexte');
   return (
     <>
       {!isSidebarOpen ? (
@@ -54,6 +57,7 @@ function PanelOpeners({
           label="Afficher la navigation"
           onClick={onOpenSidebar}
           size="icon-sm"
+          {...navigationHint}
         >
           <PanelLeftOpen aria-hidden="true" size={16} />
         </IconButton>
@@ -66,6 +70,7 @@ function PanelOpeners({
           label="Afficher le contexte"
           onClick={onOpenContext}
           size="icon-sm"
+          {...contextHint}
         >
           <PanelRight aria-hidden="true" size={16} />
         </IconButton>

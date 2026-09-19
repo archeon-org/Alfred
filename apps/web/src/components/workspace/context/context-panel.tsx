@@ -6,6 +6,7 @@ import { ContextResources } from '@/components/workspace/context/context-resourc
 import { SkillsPanel } from '@/components/workspace/context/skills-panel';
 import { TeamBuilder } from '@/components/workspace/context/team-builder';
 import { ContextSkeleton } from '@/components/workspace/workspace-skeletons';
+import { useShortcutHint } from '@/hooks/workspace/use-shortcut-preferences';
 import type { WorkspaceToolsState } from '@/lib/workspace/workspace-tools.types';
 import type { WorkspaceToolTab } from '@/lib/workspace/workspace-tools.types';
 
@@ -23,6 +24,7 @@ const toolTabs: readonly { readonly id: WorkspaceToolTab; readonly label: string
 ];
 
 export function ContextPanel({ isLoading, tools, onClose }: ContextPanelProps) {
+  const closeHint = useShortcutHint('toggleContext', 'Masquer le contexte');
   return (
     <aside
       aria-label="Contexte de la conversation"
@@ -45,6 +47,7 @@ export function ContextPanel({ isLoading, tools, onClose }: ContextPanelProps) {
               label="Masquer le contexte"
               onClick={onClose}
               size="icon-sm"
+              {...closeHint}
             >
               <PanelRightClose aria-hidden="true" size={16} />
             </IconButton>

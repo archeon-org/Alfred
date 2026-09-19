@@ -37,3 +37,11 @@ Verify storage failure/corruption, cross-tab synchronization, reset, OS theme ch
 changes, responsive routing, portal themes and semantic contrast pairs. The contract adds no account
 synchronization, remote branding, product flags, or runtime configuration. The existing discrepancy
 between DEC-049's opaque-session target and ADR 0003 remains outside this presentation slice.
+
+## Revision History
+
+- 2026-09-16: keyboard shortcut bindings reuse this pattern under their own key
+  `alfred.shortcuts.v1` (`version: 1`, at most one bounded `{ code, shift, label }` per known
+  action, decoded by `decodeShortcutPreferences`). Same store factory, cross-tab synchronization,
+  reset and storage-failure behaviour; the record still holds no identity or content. Bindings are
+  validated against a reserved-key table before they are stored (`checkBinding`).

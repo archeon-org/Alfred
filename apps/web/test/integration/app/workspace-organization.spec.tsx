@@ -129,6 +129,59 @@ describe('Workspace organization', () => {
     ).toBeVisible();
   });
 
+  it('answers the keyboard shortcuts for the panels, a new conversation and the shortcut settings', async () => {
+    const user = userEvent.setup();
+    const { router } = renderWorkspaceAt(
+      `/app/projects/${PROJECT_ID}`,
+      createWorkspaceApi({ projects: [project()] }),
+    );
+    await screen.findByRole('heading', { level: 1, name: 'Refonte du portail' });
+    // jsdom is a narrow screen: the navigation shortcut drives the conversations drawer.
+    const drawer = () => screen.getByRole('button', { name: /les conversations$/u });
+    expect(drawer()).toHaveAttribute('aria-expanded', 'false');
+    await user.keyboard('{Control>}{Shift>},{/Shift}{/Control}');
+    expect(drawer()).toHaveAttribute('aria-expanded', 'true');
+    await user.keyboard('{Control>}{Shift>},{/Shift}{/Control}');
+    expect(drawer()).toHaveAttribute('aria-expanded', 'false');
+
+    expect(
+      screen.getByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).toBeVisible();
+    await user.keyboard('{Control>}{Shift>}.{/Shift}{/Control}');
+    expect(
+      screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).not.toBeInTheDocument();
+
+    // The shortcut list lives in the settings, where each key can be changed.
+    await user.keyboard('{Control>}/{/Control}');
+    await waitFor(() =>
+      expect(router.state.location.pathname + router.state.location.search).toBe(
+        '/app/settings?section=shortcuts',
+      ),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Raccourcis clavier' }),
+    ).toBeVisible();
+    expect(screen.getByText('Ctrl+Maj+Espace')).toBeVisible();
+    expect(screen.getAllByRole('button', { name: 'Modifier' })).toHaveLength(4);
+    await router.navigate(`/app/projects/${PROJECT_ID}`);
+    await screen.findByRole('heading', { level: 1, name: 'Refonte du portail' });
+
+    // From a project, the shortcut opens a new chat scoped to that project.
+    await user.keyboard('{Control>}{Shift>} {/Shift}{/Control}');
+    await waitFor(() =>
+      expect(router.state.location.pathname + router.state.location.search).toBe(
+        `/app/conversations/new?projectId=${PROJECT_ID}`,
+      ),
+    );
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Nouveau chat dans Refonte du portail',
+      }),
+    ).toBeVisible();
+  });
+
   it('applies display preferences and uses a dedicated settings frame', async () => {
     const user = userEvent.setup();
     renderWorkspaceAt('/app');

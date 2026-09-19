@@ -145,6 +145,31 @@ Un audit est un point de départ : vérifier ses constats dans le code et distin
 retenue et capacité future. Les nombres historiques, la disponibilité d'un paquet ou une cible
 architecturale ne prouvent ni l'état courant ni une fonctionnalité livrée.
 
+## Raccourcis clavier
+
+`lib/workspace/keyboard-shortcuts.ts` définit les quatre actions et leurs touches par défaut
+(`WORKSPACE_SHORTCUTS`) ; chaque personne peut les changer dans Paramètres › Raccourcis clavier
+(`/app/settings?section=shortcuts`, composant `ShortcutSettings`), aussi ouvert par ⌘/ ou Ctrl+/ et
+par l'entrée « Raccourcis clavier » du menu du compte. Les choix personnels sont un enregistrement
+borné dans le navigateur (`alfred.shortcuts.v1`, `services/workspace/shortcut-store.ts`, décodage
+`decodeShortcutPreferences`), partagé entre onglets comme l'apparence (ADR 0019) ; `resolveBindings`
+fusionne défauts et choix, et `useShortcutPreferences` est la seule source des touches effectives.
+`useWorkspaceShortcuts` les écoute sur la fenêtre et `useShortcutHint(action, label)` fournit
+`aria-keyshortcuts` et le `title` d'un contrôle qui répond aussi au raccourci.
+
+Règles, imposées aux défauts comme aux touches enregistrées (`checkBinding`) : le modificateur de la
+plateforme (⌘ sur Apple, Ctrl ailleurs, jamais Alt/Option) plus une touche physique identifiée par
+`KeyboardEvent.code`, jamais une touche de fonction, jamais une touche qu'un navigateur majeur ou
+l'édition de texte réserve avec ce modificateur (table `RESERVED` : lettres, chiffres, `-`, `=`, `[`,
+`]`, `,` et `.` sans Maj, Espace sans Maj, Tab, Entrée, Échap, effacement, flèches, Début, Fin), et
+jamais une touche qu'une autre action tient déjà. Un défaut doit en plus exister tel quel sur AZERTY
+et QWERTY. L'enregistreur capture la prochaine touche sur la fenêtre (phase de capture,
+`preventDefault`), ignore les modificateurs seuls, refuse avec la raison affichée (`role="alert"`) et
+s'annule par Échap. Le glyphe affiché est celui que la disposition a produit (`keyLabel`), avec un
+repli US pour les touches mortes ; sans code physique (clavier virtuel, événement synthétique) la
+correspondance se fait sur ce glyphe. Le `/` par défaut accepte Maj ou non, car il en a besoin sur
+AZERTY seulement ; une touche personnelle exige exactement l'état de Maj enregistré.
+
 ## Runtime event diagnostics
 
 `VITE_DEBUG_EVENTS=true` enables the conversation's runtime event viewer, localStorage capture and

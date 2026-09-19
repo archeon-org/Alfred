@@ -11,6 +11,7 @@ import {
   type ProjectNavigationProps,
 } from '@/components/workspace/navigation/project-navigation';
 import { HistorySkeleton } from '@/components/workspace/workspace-skeletons';
+import { useShortcutHint } from '@/hooks/workspace/use-shortcut-preferences';
 import type { Conversation, WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
 import { cn } from '@/lib/cn';
 
@@ -66,6 +67,7 @@ export function WorkspaceSidebar({
   ...projectNavigation
 }: WorkspaceSidebarProps) {
   const searchId = useId();
+  const newConversationHint = useShortcutHint('newConversation', 'Nouvelle conversation');
   const isSearching = Boolean(search.trim());
   const standaloneChats = conversations.filter((item) => item.projectKind === 'implicit');
   return (
@@ -80,6 +82,7 @@ export function WorkspaceSidebar({
         className="mt-4 grid grid-cols-2 gap-3 md:mt-0 md:grid-cols-1"
       >
         <Button
+          {...newConversationHint}
           className="h-auto rounded-lg border border-sidebar-primary px-2 py-3 text-2xs whitespace-normal md:text-xs"
           onClick={(event) =>
             onCreate(

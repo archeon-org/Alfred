@@ -548,6 +548,75 @@ test('renames, pins and deletes a conversation through accessible menus', async 
   await expect(page.getByRole('list', { name: 'Chats du projet' })).not.toBeVisible();
 });
 
+test('drives the panels, a new chat and the shortcut settings from the keyboard', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
+  );
+  await page.goto(`/app/conversations/${defaultSeed().conversations[0]!.id}`);
+  await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
+  const context = page.getByRole('complementary', { name: 'Contexte de la conversation' });
+  const navigation = page.getByRole('complementary', { name: 'Espace personnel', exact: true });
+
+  // Physical keys: the same gesture on AZERTY and QWERTY, none reserved by a browser.
+  await page.keyboard.press('ControlOrMeta+Shift+Period');
+  await expect(context).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+Shift+Period');
+  await expect(context).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+Shift+Comma');
+  await expect(navigation).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Afficher la navigation' })).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+Shift+Comma');
+  await expect(navigation).toBeVisible();
+
+  // The chord is safe while typing: nothing is inserted and the settings open on the shortcuts.
+  const composer = page.getByRole('textbox', { name: 'Message' });
+  await composer.fill('Brouillon');
+  await composer.press('ControlOrMeta+Slash');
+  await expect(page).toHaveURL(/\/app\/settings\?section=shortcuts$/u);
+  await expect(page.getByRole('heading', { level: 1, name: 'Raccourcis clavier' })).toBeVisible();
+  const rows = page.getByRole('list').filter({ hasText: 'Par défaut :' });
+  await expect(rows.getByRole('button', { name: 'Modifier' })).toHaveCount(4);
+  const contextRow = rows.getByRole('listitem').filter({ hasText: 'masquer le contexte' });
+  await expect(contextRow.getByText(/^(⌘⇧|Ctrl\+Maj\+)\.$/u)).toBeVisible();
+
+  // Rebinding: a reserved key is refused with the reason, a free key is recorded and applied.
+  await contextRow.getByRole('button', { name: 'Modifier' }).click();
+  await page.keyboard.press('ControlOrMeta+f');
+  await expect(contextRow.getByRole('alert')).toContainText('rechercher dans la page');
+  await page.keyboard.press('ControlOrMeta+Shift+Semicolon');
+  await expect(contextRow.getByRole('alert')).toHaveCount(0);
+  await expect(contextRow.getByText(/^(⌘⇧|Ctrl\+Maj\+)[:;]$/u)).toBeVisible();
+  await page.goBack();
+  await expect(composer).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+Shift+Period');
+  await expect(context).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+Shift+Semicolon');
+  await expect(context).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+Shift+Semicolon');
+  await expect(context).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Masquer le contexte' })).toHaveAttribute(
+    'aria-keyshortcuts',
+    /Shift\+.$/u,
+  );
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('alfred.shortcuts.v1')))
+    .toContain('"toggleContext"');
+
+  // The seed chat belongs to a project: the new chat opens inside that project.
+  await page.keyboard.press('ControlOrMeta+Shift+Space');
+  await expect(page).toHaveURL(/\/app\/conversations\/new\?projectId=/u);
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Nouveau chat dans Refonte du portail' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Masquer la navigation' })).toHaveAttribute(
+    'aria-keyshortcuts',
+    /Shift\+,$/u,
+  );
+});
+
 test('moves a free chat into a project and restores menu focus when cancelling', async ({
   page,
 }) => {

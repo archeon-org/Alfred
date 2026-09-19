@@ -1,4 +1,11 @@
-import { ChevronsUpDown, LogOut, PanelLeftClose, Settings, SlidersHorizontal } from 'lucide-react';
+import {
+  ChevronsUpDown,
+  Keyboard,
+  LogOut,
+  PanelLeftClose,
+  Settings,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -15,7 +22,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { IconButton } from '@/components/ui/icon-button';
 import { useSession } from '@/hooks/auth/use-session';
+import {
+  useShortcutHint,
+  useShortcutPreferences,
+} from '@/hooks/workspace/use-shortcut-preferences';
 import { cn } from '@/lib/cn';
+import { formatBinding } from '@/lib/workspace/keyboard-shortcuts';
 
 export interface SidebarAccountProps {
   /** Collapses the navigation column; absent where the column cannot collapse (settings). */
@@ -37,6 +49,8 @@ export function SidebarAccount({
   className,
 }: SidebarAccountProps) {
   const { logout, user } = useSession();
+  const { apple, bindings } = useShortcutPreferences();
+  const collapseHint = useShortcutHint('toggleNavigation', 'Masquer la navigation');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
 
@@ -100,6 +114,15 @@ export function SidebarAccount({
                 Paramètres
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/app/settings?section=shortcuts">
+                <Keyboard aria-hidden="true" />
+                Raccourcis clavier
+                <kbd className="ml-auto pl-4 font-sans text-xs text-muted-foreground">
+                  {formatBinding(bindings.showShortcuts, apple)}
+                </kbd>
+              </Link>
+            </DropdownMenuItem>
             {onTogglePreviewLoading ? (
               <DropdownMenuCheckboxItem
                 checked={isPreviewLoading}
@@ -128,6 +151,7 @@ export function SidebarAccount({
             label="Masquer la navigation"
             onClick={onCollapse}
             size="icon-sm"
+            {...collapseHint}
           >
             <PanelLeftClose aria-hidden="true" size={16} />
           </IconButton>

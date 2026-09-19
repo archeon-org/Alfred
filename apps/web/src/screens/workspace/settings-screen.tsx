@@ -1,9 +1,11 @@
 import { SidebarFrame } from '@/components/workspace/navigation/sidebar-frame';
 import { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Palette, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Keyboard, Palette, SlidersHorizontal } from 'lucide-react';
 import { AppearanceSettings } from '@/components/workspace/personalization/appearance-settings';
 import { ContextDocuments } from '@/components/workspace/personalization/context-documents';
+import { ShortcutSettings } from '@/components/workspace/personalization/shortcut-settings';
+import { useShortcutPreferences } from '@/hooks/workspace/use-shortcut-preferences';
 import { useWorkspaceOutlet } from '@/hooks/workspace/use-workspace-outlet';
 import { cn } from '@/lib/cn';
 
@@ -15,13 +17,40 @@ const sections = [
     icon: SlidersHorizontal,
     to: '/app/settings?section=personalization',
   },
+  {
+    key: 'shortcuts',
+    label: 'Raccourcis clavier',
+    icon: Keyboard,
+    to: '/app/settings?section=shortcuts',
+  },
 ] as const;
+
+type SectionKey = (typeof sections)[number]['key'];
+
+const copy: Record<SectionKey, { readonly title: string; readonly description: string }> = {
+  appearance: {
+    title: 'Apparence',
+    description: 'Un espace à votre image. Ajustez les couleurs et le confort de votre interface.',
+  },
+  personalization: {
+    title: 'Personnaliser Alfred',
+    description:
+      'Vos instructions et préférences pour un accompagnement adapté à votre façon de travailler.',
+  },
+  shortcuts: {
+    title: 'Raccourcis clavier',
+    description:
+      'Les gestes qui ouvrent un chat ou replient les panneaux. Changez-les pour qu’ils tombent sous vos doigts.',
+  },
+};
 
 export function SettingsScreen() {
   const { preferences, conversationRef } = useWorkspaceOutlet();
+  const shortcuts = useShortcutPreferences();
   const [searchParams] = useSearchParams();
-  const personalization = searchParams.get('section') === 'personalization';
-  const section = personalization ? 'personalization' : 'appearance';
+  const requested = searchParams.get('section');
+  const section: SectionKey =
+    requested === 'personalization' || requested === 'shortcuts' ? requested : 'appearance';
   useEffect(() => {
     conversationRef.current?.focus({ preventScroll: true });
     if (conversationRef.current) conversationRef.current.scrollTop = 0;
@@ -71,16 +100,16 @@ export function SettingsScreen() {
         <div className="mx-auto w-full max-w-5xl space-y-8">
           <header className="space-y-3">
             <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-              {personalization ? 'Personnaliser Alfred' : 'Apparence'}
+              {copy[section].title}
             </h1>
             <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-              {personalization
-                ? 'Vos instructions et préférences pour un accompagnement adapté à votre façon de travailler.'
-                : 'Un espace à votre image. Ajustez les couleurs et le confort de votre interface.'}
+              {copy[section].description}
             </p>
           </header>
-          {personalization ? (
+          {section === 'personalization' ? (
             <ContextDocuments scope={{ type: 'personal' }} />
+          ) : section === 'shortcuts' ? (
+            <ShortcutSettings preferences={shortcuts} />
           ) : (
             <AppearanceSettings preferences={preferences} />
           )}

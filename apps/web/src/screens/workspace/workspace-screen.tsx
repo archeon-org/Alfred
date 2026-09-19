@@ -28,6 +28,7 @@ import { useWorkspacePreferences } from '@/hooks/workspace/use-workspace-prefere
 import type { WorkspaceOutletContext } from '@/hooks/workspace/use-workspace-outlet';
 import { useTabletWorkspace } from '@/hooks/workspace/use-tablet-workspace';
 import { useWorkspaceShell } from '@/hooks/workspace/use-workspace-shell';
+import { useWorkspaceShortcuts } from '@/hooks/workspace/use-workspace-shortcuts';
 import { useWorkspaceTools } from '@/hooks/workspace/use-workspace-tools';
 import { describeApiError } from '@/lib/workspace/api-error-message';
 import type { Project, WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
@@ -180,6 +181,15 @@ export function WorkspaceScreen() {
     else sidebarRef.current?.expand();
     shell.setIsSidebarOpen(!shell.isSidebarOpen);
   }
+
+  // The same actions as the panel controls and the sidebar button, reachable from the keyboard.
+  useWorkspaceShortcuts({
+    newConversation: () => create(selectedProjectId === undefined ? 'sandbox' : 'conversation'),
+    toggleNavigation: isTablet ? toggleSidebar : shell.toggleNavigation,
+    ...(isSkillEditor || isSettings ? {} : { toggleContext: shell.toggleContext }),
+    // From the settings the shortcut moves to its section without stacking history entries.
+    showShortcuts: () => void navigate('/app/settings?section=shortcuts', { replace: isSettings }),
+  });
 
   const outlet: WorkspaceOutletContext = {
     preferences,
