@@ -179,6 +179,65 @@ colonne de lecture. Sous chaque réponse posée, une barre d'actions discrète (
 actifs (voir plus bas) et « Voir la trace de cette réponse » quand l'API sert des liens de trace.
 Aucun avatar : l'alignement suffit, et les libellés « Vous » / « Alfred » restent en `sr-only`.
 
+Au-dessus de chaque réponse, le journal du travail (`ExecutionWorkLog`, un `<details>` natif avec
+`data-slot="execution-work-log"`) rend compte de ce qu'Alfred a fait, **à même le transcript** :
+ni cadre, ni fond, comme le « Worked for 6m 34s » d'un agent de terminal. Son en-tête est une
+ligne repliable : « Travail en cours · 12 s » avec un chronomètre pendant le streaming (ouvert par
+défaut ; la ligne d'attente « Alfred réfléchit… » disparaît dès qu'une étape existe), puis
+« Travail effectué / arrêté / interrompu par une erreur · 6 min 34 s · 12 outils · 3 spécialistes »
+une fois la réponse posée (replié de lui-même, réouvrable, la réponse reste seule visible). Les
+étapes (`WorkStepRow`) suivent l'ordre d'apparition : une narration (message intermédiaire, rendu
+par `MarkdownView` en texte atténué), une réflexion (en-tête « Réflexion » avec état et durée,
+puis son texte en prose atténuée quand l'API l'expose, diffusé au fil des deltas), une
+« Génération sans réponse » (aller-retour modèle vide, chronométré), un outil (libellé
+`font-mono`, état, durée), une délégation « Spécialiste `<nom>` » avec, imbriqués sous elle dans
+la liste « Travail de Spécialiste `<nom>` », les messages, la réflexion et les outils du
+spécialiste. Des appels consécutifs du même outil par le même propriétaire se replient en une
+seule ligne (`ToolGroupRow`, « execute_raw ×7 », état le plus grave, durée du premier au dernier)
+qui se déplie sur la liste « Appels de execute_raw ». Une réflexion avec texte (`ReasoningRow`) et
+un spécialiste qui a travaillé (`SpecialistRow`) sont eux aussi des `<details>` : repliés, ils
+tiennent sur une ligne avec un aperçu (début de la réflexion, ou sa dernière ligne tant qu'elle
+s'écrit ; « 3 outils » pour un spécialiste). Un spécialiste reste ouvert tant qu'il travaille ;
+une réflexion ne s'ouvre pendant qu'elle s'écrit qu'en mode Détaillé. Tous deux se replient
+d'eux-mêmes à la fin sauf si la personne les a basculés pendant le run (`useRunDisclosure`, état
+ajusté pendant le rendu, jamais dans un effet ; les toggles venus des lignes imbriquées et
+l'écho du navigateur sont ignorés). Les durées viennent des instants serveur
+portés par les événements (`timestamp`) ; seul le chronomètre du journal en cours utilise
+l'horloge du navigateur. Une réponse enregistrée porte son bilan (`Message.work`) et charge ses
+étapes à l'ouverture (`useExecutionWork`, `GET /executions/:id`). Le journal ne montre jamais
+d'argument, de résultat d'outil ni de prompt de spécialiste ; le texte de réflexion et les
+messages des spécialistes n'y figurent que si l'API les enregistre
+(`EXECUTION_WORK_LOG_CONTENT_ENABLED`).
+
+Paramètres › Chat (`ChatSettings`, `useChatPreferences`, clé `alfred.chat.v1` dans ce navigateur,
+enregistrement version 2 décodé et borné par `decodeChatPreferences`, version 1 migrée) règle
+l'affichage seulement ; l'API enregistre et diffuse toujours tout le journal. Dix interrupteurs
+en trois groupes : **Pendant le travail** (déplier le journal pendant le travail, sinon l'en-tête
+montre l'activité en cours via `currentActivity` ; ouvrir les réflexions pendant qu'elles
+s'écrivent ; replier à la fin), **Alfred** (réflexions, messages intermédiaires, outils,
+générations sans réponse) et **Spécialistes** (réflexions, messages, outils ; les spécialistes
+eux-mêmes restent toujours listés). Un niveau (`CHAT_PRESETS`) règle les dix : **Simple**
+(journal replié, seuls les spécialistes), **Standard** par défaut (tout Alfred, messages et
+outils des spécialistes, sans leurs réflexions ni les générations vides), **Détaillé** (tout,
+réflexions ouvertes pendant l'écriture). Changer un interrupteur passe en **Personnalisé**, sauf
+si la combinaison retombe exactement sur un niveau (`withSwitch`, `presetOf`). Le filtrage
+(`visibleWork`) distingue Alfred d'un spécialiste par la présence d'un parent ; les compteurs de
+l'en-tête décrivent toujours tout le travail. Un test navigateur qui dépend d'un niveau le fixe
+avec `preferChat(page, 'detailed', { … })` (`test/e2e/support/chat-preferences.ts`).
+
+Le transcript défile dans sa propre zone (`data-slot="conversation-scroll"`) à toutes les largeurs,
+jamais le document : le code ne fait défiler que cette zone (aucun `scrollIntoView`).
+`useStickToBottom` la garde collée en bas pendant le streaming avec une animation par
+`requestAnimationFrame` (saut immédiat à l'ouverture, au redimensionnement de la zone et en
+mouvement réduit), cesse de suivre dès que la personne remonte (molette, touches, pointeur,
+toucher, focus clavier) et reprend quand elle revient en bas ; envoyer un message recolle en bas.
+Le composeur ne masque rien au-dessus de lui (pas de bande : ombre portée seulement vers le bas,
+`--composer-shadow` par thème). Sous 1200 px (`--breakpoint-workspace`), le contexte « À vos
+côtés » s'ouvre en panneau superposé à droite (`ContextSheet` sur `components/ui/sheet.tsx`,
+fermé par défaut, Échap, bouton, clic sur le voile, focus rendu à l'ouvreur) au lieu de passer
+sous la conversation ; la coquille garde la hauteur de la fenêtre et le document ne défile pas. Le
+voile des dialogues est `bg-foreground/50` en clair et `bg-black/60` en sombre.
+
 `MarkdownView` (`components/ui/markdown-view.tsx`) est l'unique rendu Markdown : chat, aperçu de
 l'éditeur de skills, documents de contexte. Il s'appuie sur `react-markdown` + `remark-gfm`
 (tables, listes imbriquées, cases à cocher en lecture seule, barré, liens automatiques), avec une
@@ -261,13 +320,22 @@ sending another message never discards the events of earlier answers, and a relo
 against the stored rows. The observation stream carries AG-UI protocol events (ADR 0023, revision of
 2026-09-15 evening). Capture and reload accept only the AG-UI events of the Alfred contract
 (`RUN_STARTED`, `RUN_FINISHED`, `RUN_ERROR`, `STATE_SNAPSHOT`, `TEXT_MESSAGE_START/CONTENT/END`,
-`TOOL_CALL_START/END/RESULT`), canonicalized by `canonicalAgUiEvent` in
+`REASONING_START/END`, `REASONING_MESSAGE_START/CONTENT/END`, `STEP_STARTED/FINISHED`,
+`TOOL_CALL_START/END/RESULT`, `SUBAGENT_STARTED/FINISHED/ERROR`, and the one `CUSTOM` event
+`alfred.work.omitted` carrying a non-negative integer `omittedSteps`),
+canonicalized by `canonicalAgUiEvent` in
 `lib/workspace/ag-ui-events.ts` with the conversation **and** the execution as scope: only known
-fields survive, a run event whose `runId` is not the execution it is filed under is dropped, a
+fields survive (plus a positive integer `timestamp` and a bounded `subagentRunId` owner), a run
+event whose `runId` is not the execution it is filed under is dropped, a
 `STATE_SNAPSHOT` must carry an `AlfredRunState` whose execution and conversation match, a
 `RUN_FINISHED` may only carry a `success` outcome, a `TEXT_MESSAGE_START` must be an `assistant`
-message, a `TOOL_CALL_RESULT` may only carry `completed` or `failed`, and one text delta is bounded
-by the answer limit. Raw native event names, other AG-UI events (`TOOL_CALL_ARGS`, `RAW`, `CUSTOM`, …),
+message (of the root agent, or of a specialist when owned through `subagentRunId`), a `TOOL_CALL_RESULT` may only carry `completed`, `failed` or
+`interrupted`, a `SUBAGENT_STARTED` carries a name but no `description` nor
+`parentSubagentRunId`, a `SUBAGENT_FINISHED` carries no `result` and only a `success` outcome,
+a text message, a reasoning marker or message and a tool call may be owned by a specialist
+through `subagentRunId` while `STEP_*` events belong to the root agent only, one text delta is
+bounded by the answer limit and one reasoning delta by the reasoning limit (32 768). Raw native
+event names, other AG-UI events (`TOOL_CALL_ARGS`, `RAW`, any other `CUSTOM` name, …),
 invalid payloads and mismatched scope produce an explicit diagnostic error. Downloads contain the validated
 public payloads, which can still include visible conversation content; they are not raw
 provider/tool exports or an authorization boundary.

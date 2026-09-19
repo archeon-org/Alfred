@@ -41,6 +41,8 @@ function activityFingerprint(state: ProjectionState): string {
  */
 export class ProjectionCommitter {
   private pending: Pending | null = null;
+  /** Latest accepted projection not yet durably committed; survives an in-flight commit. */
+  private uncommitted: ProjectionState | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private inflight: Promise<void> | undefined;
   private failure: { readonly error: unknown } | null = null;
@@ -58,7 +60,7 @@ export class ProjectionCommitter {
 
   /** Projection to reduce the next event against: pending head, or null once everything is committed. */
   get head(): ProjectionState | null {
-    return this.pending?.projection ?? null;
+    return this.uncommitted;
   }
 
   /** Surfaces a background commit failure before more source events are consumed. */
@@ -73,6 +75,7 @@ export class ProjectionCommitter {
     const text = projectionText(projection);
     const activities = activityFingerprint(projection);
     this.pending = { projection, watermark, text, activities };
+    this.uncommitted = projection;
     if (
       activities !== this.committedActivities ||
       Math.abs(text.length - this.committedText.length) >= this.window.chars
@@ -110,6 +113,8 @@ export class ProjectionCommitter {
       .then(() => {
         this.committedText = pending.text;
         this.committedActivities = pending.activities;
+        if (this.pending === null && this.uncommitted === pending.projection)
+          this.uncommitted = null;
       })
       .finally(() => {
         this.inflight = undefined;

@@ -1,4 +1,10 @@
-import type { Execution, ExecutionActivity, ExecutionSnapshot, Message } from '@alfred/contracts';
+import type {
+  Execution,
+  ExecutionActivity,
+  ExecutionSnapshot,
+  ExecutionWork,
+  Message,
+} from '@alfred/contracts';
 import { createContext } from 'react';
 
 /** One validated public event kept for diagnostics, attached to the execution that produced it. */
@@ -18,6 +24,8 @@ export interface LiveTurn {
   readonly assistantText: string;
   /** Tool calls of this turn as AG-UI reported them: safe label and status only. */
   readonly activities: readonly ExecutionActivity[];
+  /** The work behind the answer: narration, reasoning markers, tools and specialists, in order. */
+  readonly work: ExecutionWork;
   readonly execution: Execution | null;
   readonly status: 'streaming' | 'done' | 'error';
   readonly error: string | null;

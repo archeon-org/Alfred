@@ -110,7 +110,7 @@ export function WorkspaceSidebar({
         id="conversation-history"
         data-conversation-scroll-root
         className={cn(
-          'mt-5 min-h-0 flex-1 overflow-y-auto [scrollbar-color:var(--sidebar-border)_transparent] [scrollbar-width:thin]',
+          'mt-5 min-h-0 flex-1 overflow-y-auto [scrollbar-color:var(--sidebar-border)_transparent] [scrollbar-width:thin] max-workspace:min-h-40 max-workspace:basis-0',
           !isNavigationOpen && 'max-md:hidden',
         )}
       >

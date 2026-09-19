@@ -7,12 +7,15 @@ import { ApiException } from '../../../common/errors/api.exception';
 import { ConversationsService } from '../../conversations/application/conversations.service';
 import { createResumeCursor, readResumeCursor } from '../../stream/api/resume-cursor';
 import { toExecutionDto } from '../domain/execution';
+import { isExecutionSettled } from '../domain/execution-lifecycle';
 import {
   emptyProjection,
+  normalizeProjection,
   projectionActivities,
   projectionText,
   type ProjectionState,
 } from '../infrastructure/langgraph/runtime-projection';
+import { presentWork, projectionWork } from '../infrastructure/langgraph/runtime-projection-work';
 import { ExecutionEntity } from '../infrastructure/persistence/execution.entity';
 import { MessageEntity } from '../infrastructure/persistence/message.entity';
 import { ExecutionsService } from './executions.service';
@@ -55,6 +58,7 @@ export class ExecutionObservationService {
     loaded: Awaited<ReturnType<ExecutionObservationService['load']>>,
     state = loaded.state,
   ): ExecutionSnapshot {
+    const settled = isExecutionSettled(loaded.row);
     return {
       execution: toExecutionDto(loaded.row),
       conversation: loaded.conversation,
@@ -63,6 +67,12 @@ export class ExecutionObservationService {
       activities: [...projectionActivities(state)],
       cursor: this.cursor(loaded, state),
       revision: state.sequence,
+      work: presentWork(
+        projectionWork(state, {
+          settled,
+          endedAt: settled ? (loaded.row.finishedAt?.getTime() ?? Date.now()) : null,
+        }),
+      ),
     };
   }
 
@@ -107,9 +117,9 @@ export class ExecutionObservationService {
   private state(row: ExecutionEntity): ProjectionState {
     // The row and its reducer/watermark are read together from one atomic projection commit.
     if (row.sourceWatermark === null) return emptyProjection();
-    const state = row.reducerState as unknown as ProjectionState;
+    const state = normalizeProjection(row.reducerState);
     if (
-      state.version !== 1 ||
+      state === null ||
       state.sourceId !== row.sourceWatermark ||
       state.sequence !== row.projectionRevision
     ) {

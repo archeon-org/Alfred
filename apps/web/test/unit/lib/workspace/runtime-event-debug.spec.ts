@@ -135,7 +135,12 @@ describe('public runtime event debugging', () => {
     expect(saved.events[0]?.data).toEqual(event('x'.repeat(1000)).data);
     expect(debug.getRuntimeEventDebugSnapshot('another-user', CONVERSATION_ID).events).toEqual([]);
     expect(debug.getRuntimeEventDebugSnapshot('user', 'another-conversation').events).toEqual([]);
-    expect(listener).toHaveBeenCalled();
+    // Readers re-render synchronously on a store change: they follow at a bounded pace.
+    expect(listener).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(999);
+    expect(listener).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(listener).toHaveBeenCalledOnce();
     unsubscribe();
     vi.runAllTimers();
     expect(
@@ -263,6 +268,44 @@ describe('public runtime event debugging', () => {
     expect(count).toBeLessThan(40);
     expect(read(debug).events).toHaveLength(count);
     expect(read(debug).error).toMatch(/capture arrêtée/);
+  });
+
+  it('reports a browser fault once, by error type only, without marking the capture incomplete', async () => {
+    const debug = await load();
+    capture(debug);
+    const listener = vi.fn();
+    debug.subscribeRuntimeEventDebug(listener);
+    const fault = new TypeError(
+      'Cannot read properties of undefined (reading "synthetic-private")',
+    );
+    debug.reportRuntimeEventFault('user', CONVERSATION_ID, fault);
+    debug.reportRuntimeEventFault('user', CONVERSATION_ID, fault);
+    expect(listener).toHaveBeenCalledOnce();
+    expect(read(debug).error).toMatch(/\(TypeError\)/);
+    expect(read(debug).error).not.toContain('synthetic-private');
+    vi.runAllTimers();
+    expect(JSON.parse(localStorage.getItem(key) ?? '{}')).toMatchObject({
+      incomplete: false,
+      events: [event()],
+    });
+    const renamed = Object.assign(new Error('boom'), { name: 'not a <name>' });
+    debug.reportRuntimeEventFault('user', 'another-conversation', renamed);
+    expect(debug.getRuntimeEventDebugSnapshot('user', 'another-conversation').error).toMatch(
+      /\(Error\)/,
+    );
+  });
+
+  it('keeps an earlier capture error shown and ignores faults while disabled', async () => {
+    localStorage.setItem(key, '{invalid');
+    const debug = await load();
+    debug.reportRuntimeEventFault('user', CONVERSATION_ID, new TypeError('x'));
+    expect(read(debug).error).toMatch(/illisible/);
+    vi.stubEnv('VITE_DEBUG_EVENTS', 'false');
+    vi.resetModules();
+    const disabled = await load();
+    const get = vi.spyOn(Storage.prototype, 'getItem');
+    disabled.reportRuntimeEventFault('user', CONVERSATION_ID, new TypeError('x'));
+    expect(get).not.toHaveBeenCalled();
   });
 
   it('handles unavailable storage and non-public values without throwing', async () => {

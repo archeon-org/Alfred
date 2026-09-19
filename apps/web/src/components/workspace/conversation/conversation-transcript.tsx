@@ -1,11 +1,12 @@
-import type { ExecutionActivity } from '@alfred/contracts';
-import { Check, LoaderCircle, X } from 'lucide-react';
-import { Fragment, useDeferredValue, useEffect, useRef } from 'react';
+import type { ExecutionWork, ExecutionWorkSummary, Execution } from '@alfred/contracts';
+import { LoaderCircle } from 'lucide-react';
+import { Fragment, useDeferredValue } from 'react';
 
 import { MarkdownView } from '@/components/ui/markdown-view';
+import { ExecutionWorkLog } from '@/components/workspace/conversation/execution-work-log';
+import { StoredWorkLog } from '@/components/workspace/conversation/stored-work-log';
 import { TurnActions } from '@/components/workspace/conversation/turn-actions';
 import type { TurnFailure } from '@/hooks/conversations/use-conversation-chat';
-import { cn } from '@/lib/cn';
 import type {
   LiveSession,
   LiveTurn,
@@ -35,12 +36,8 @@ export function ConversationTranscript({
   debugEvents = NO_EVENTS,
   traceLinksEnabled = false,
 }: ConversationTranscriptProps) {
-  const endRef = useRef<HTMLDivElement>(null);
-  const live = sessions.at(-1)?.turn;
-  const liveLength = live?.assistantText.length ?? 0;
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length, liveLength, live?.status]);
+  // Following the end of the transcript belongs to its scroll container (useStickToBottom in
+  // ConversationPanel): scrolling an element into view would also move every ancestor.
   const failedRow =
     failure === null
       ? undefined
@@ -61,6 +58,7 @@ export function ConversationTranscript({
             executionId={entry.message.executionId}
             events={eventsOf(entry.message.executionId)}
             traceLinksEnabled={traceLinksEnabled}
+            {...(entry.message.work === undefined ? {} : { workSummary: entry.message.work })}
           />
         ) : (
           <Fragment key={`session-${entry.session.id}`}>
@@ -71,7 +69,8 @@ export function ConversationTranscript({
               pending={entry.session.turn.status === 'streaming'}
               error={entry.session.turn.error}
               statusText={observationStatus(entry.session.turn)}
-              activities={entry.session.turn.activities}
+              work={entry.session.turn.work}
+              execution={entry.session.turn.execution}
               executionId={entry.session.turn.execution?.id ?? null}
               events={eventsOf(entry.session.turn.execution?.id ?? null)}
               traceLinksEnabled={traceLinksEnabled}
@@ -79,7 +78,6 @@ export function ConversationTranscript({
           </Fragment>
         ),
       )}
-      <div ref={endRef} aria-hidden="true" />
     </ol>
   );
 }
@@ -90,8 +88,11 @@ interface TurnProps {
   readonly pending?: boolean;
   readonly error?: string | null;
   readonly statusText?: string | null;
-  /** Tool calls reported for a live turn; stored rows carry none. */
-  readonly activities?: readonly ExecutionActivity[];
+  /** The work log of a live turn as AG-UI reports it. */
+  readonly work?: ExecutionWork;
+  readonly execution?: Execution | null;
+  /** The account of a stored answer's work; its steps load when the log is opened. */
+  readonly workSummary?: ExecutionWorkSummary;
   readonly executionId?: string | null;
   readonly events?: readonly RuntimeEventView[];
   readonly traceLinksEnabled?: boolean;
@@ -99,7 +100,7 @@ interface TurnProps {
 
 /**
  * One turn of the transcript. The person's message sits in a bubble on the right; Alfred's answer
- * reads as page text, with its controls underneath once the answer has settled.
+ * reads as page text under the log of its work, with its controls underneath once settled.
  */
 function Turn({
   author,
@@ -107,7 +108,9 @@ function Turn({
   pending = false,
   error = null,
   statusText = null,
-  activities = [],
+  work,
+  execution = null,
+  workSummary,
   executionId = null,
   events = NO_EVENTS,
   traceLinksEnabled = false,
@@ -128,10 +131,14 @@ function Turn({
   return (
     <li className="group/turn flex min-w-0 flex-col text-sm leading-relaxed">
       <p className="sr-only">Alfred</p>
-      {activities.length > 0 ? <Activities activities={activities} /> : null}
+      {work !== undefined ? (
+        <ExecutionWorkLog execution={execution} live={pending} work={work} />
+      ) : workSummary !== undefined && executionId !== null ? (
+        <StoredWorkLog executionId={executionId} summary={workSummary} />
+      ) : null}
       {shown.length > 0 ? (
         <MarkdownView source={shown} />
-      ) : pending ? (
+      ) : pending && (work?.steps.length ?? 0) > 0 ? null : pending ? (
         <span className="inline-flex items-center gap-2 text-muted-foreground">
           <LoaderCircle aria-hidden="true" className="animate-spin" size={14} />
           Alfred réfléchit…
@@ -164,34 +171,6 @@ function Turn({
         />
       ) : null}
     </li>
-  );
-}
-
-const ACTIVITY_STATUS = {
-  running: { icon: LoaderCircle, label: 'en cours', className: 'animate-spin' },
-  completed: { icon: Check, label: 'terminé', className: '' },
-  failed: { icon: X, label: 'échoué', className: 'text-destructive' },
-} as const;
-
-/** Compact list of the tools Alfred used for this answer: safe label and status only. */
-function Activities({ activities }: { readonly activities: readonly ExecutionActivity[] }) {
-  return (
-    <ul
-      aria-label="Outils utilisés"
-      className="mb-2 flex flex-col gap-1 text-xs text-muted-foreground"
-    >
-      {activities.map((activity) => {
-        const status = ACTIVITY_STATUS[activity.status];
-        const Icon = status.icon;
-        return (
-          <li key={activity.id} className="flex items-center gap-1.5">
-            <Icon aria-hidden="true" className={cn('shrink-0', status.className)} size={12} />
-            <span className="truncate font-mono">{activity.label}</span>
-            <span className="sr-only">{status.label}</span>
-          </li>
-        );
-      })}
-    </ul>
   );
 }
 

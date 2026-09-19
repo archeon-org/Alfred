@@ -25,6 +25,8 @@ export interface SseWriterOptions {
 interface PendingFrame {
   readonly chunk: string;
   readonly bytes: number;
+  /** A `data:` frame (an event), as opposed to a comment heartbeat. */
+  readonly data: boolean;
   readonly resolve: (written: boolean) => void;
 }
 
@@ -76,6 +78,7 @@ export class SseWriter {
   private queuedBytes = 0;
   private pending: PendingFrame | undefined;
   private opened = false;
+  private written = { frames: 0, bytes: 0 };
   private readonly onDisconnect = () => this.finish('disconnected');
   private readonly onError = () => this.finish('transport_error');
   private readonly onAbort = () => this.finish('aborted');
@@ -103,6 +106,16 @@ export class SseWriter {
     return this.signal.aborted;
   }
 
+  /** Why the observer detached, once it did. */
+  get closeReason(): SseCloseReason | null {
+    return this.closed ? (this.signal.reason as SseCloseReason) : null;
+  }
+
+  /** Events and bytes handed to the response so far (heartbeats and named frames: bytes only). */
+  get sent(): { readonly frames: number; readonly bytes: number } {
+    return { ...this.written };
+  }
+
   open(): void {
     if (this.opened || this.closed) return;
     if (this.options.signal?.aborted) return this.finish('aborted');
@@ -120,7 +133,10 @@ export class SseWriter {
       this.response.setHeader('X-Accel-Buffering', 'no');
       this.response.flushHeaders();
       if (this.closed) return;
-      this.heartbeat = setInterval(() => void this.enqueue(': ping\n\n'), this.options.heartbeatMs);
+      this.heartbeat = setInterval(
+        () => void this.enqueue(': ping\n\n', false),
+        this.options.heartbeatMs,
+      );
       this.heartbeat.unref();
     } catch {
       this.finish('transport_error');
@@ -148,7 +164,11 @@ export class SseWriter {
     }
     try {
       const cursor = id === undefined ? '' : `id: ${id}\n`;
-      return this.enqueue(`${cursor}${header}data: ${JSON.stringify(data) ?? 'null'}\n\n`);
+      // Only unnamed frames are AG-UI events; a named transport frame counts as bytes.
+      return this.enqueue(
+        `${cursor}${header}data: ${JSON.stringify(data) ?? 'null'}\n\n`,
+        header === '',
+      );
     } catch {
       this.finish('invalid_frame');
       return Promise.resolve(false);
@@ -159,7 +179,7 @@ export class SseWriter {
     this.finish('closed');
   }
 
-  private enqueue(chunk: string): Promise<boolean> {
+  private enqueue(chunk: string, data: boolean): Promise<boolean> {
     if (this.closed) return Promise.resolve(false);
     if (this.response.writableEnded || this.response.destroyed) {
       this.finish('disconnected');
@@ -178,7 +198,7 @@ export class SseWriter {
       return Promise.resolve(false);
     }
     return new Promise((resolve) => {
-      this.frames = [...this.frames, { bytes, chunk, resolve }];
+      this.frames = [...this.frames, { bytes, chunk, data, resolve }];
       this.queuedBytes += bytes;
       this.flush();
     });
@@ -193,6 +213,10 @@ export class SseWriter {
       this.pending = frame;
       try {
         const accepted = this.response.write(frame.chunk);
+        this.written = {
+          frames: this.written.frames + (frame.data ? 1 : 0),
+          bytes: this.written.bytes + frame.bytes,
+        };
         if (this.closed) return;
         if (accepted === false) {
           this.drainTimeout = setTimeout(

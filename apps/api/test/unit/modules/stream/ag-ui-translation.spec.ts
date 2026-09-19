@@ -1,57 +1,22 @@
-import type { AlfredRunState, Execution } from '@alfred/contracts';
-import { verifyEvents } from '@ag-ui/client';
 import { EventType } from '@ag-ui/core';
-import { from, lastValueFrom, toArray } from 'rxjs';
 import { describe, expect, it } from 'vitest';
 
 import {
-  AgUiTranslationGap,
   translateObservedView,
-  type ObservedToolCall,
-  type ObservedView,
+  type ObservedStep,
 } from '@api/modules/stream/application/ag-ui-translation';
-import { toConversationDto } from '@api/modules/conversations/domain/conversation';
-import { conversationRow } from '../../../support/project-fixtures';
-
-const executionId = 'f9dfb431-2928-42c1-980d-97383a4016bd';
-const conversation = toConversationDto(conversationRow(), 'named');
-
-function execution(
-  status: Execution['status'] = 'running',
-  error: string | null = null,
-): Execution {
-  return {
-    id: executionId,
-    conversationId: conversation.id,
-    status,
-    error,
-    errorCode: error,
-    createdAt: '2026-09-15T10:00:00.000Z',
-    startedAt: null,
-    finishedAt: null,
-  };
-}
-
-function view(overrides: Partial<ObservedView> & { readonly status?: Execution['status'] } = {}) {
-  const { status, ...rest } = overrides;
-  const state: AlfredRunState = {
-    execution: execution(status),
-    conversation,
-    userMessage: 'Hello?',
-  };
-  return { state, message: null, toolCalls: [], settled: false, ...rest } satisfies ObservedView;
-}
-
-const tool = (id: string, status: ObservedToolCall['status'] = 'running'): ObservedToolCall => ({
-  id,
-  label: 'read_file',
-  status,
-  messageId: 'message-a',
-});
-
-const names = (events: readonly { type: string }[]) => events.map((event) => event.type);
-const verified = (events: readonly { type: string }[]) =>
-  lastValueFrom(from(events as never[]).pipe(verifyEvents(), toArray()));
+import {
+  executionId,
+  conversation,
+  view,
+  answer,
+  tool,
+  nested,
+  delegation,
+  narration,
+  names,
+  verified,
+} from '../../../support/ag-ui-translation-views';
 
 describe('AG-UI translation of the observed projection', () => {
   it('opens the run with product identities and the state, nothing else, while dispatch is pending', async () => {
@@ -65,8 +30,8 @@ describe('AG-UI translation of the observed projection', () => {
 
   it('replays visible tool calls and the open answer on attach and closes everything on completion', async () => {
     const attached = view({
-      message: { id: 'message-a', text: 'Hello world' },
-      toolCalls: [tool('tool-1', 'completed'), tool('tool-2')],
+      answer: answer('message-a', 'Hello world'),
+      steps: [tool('tool-1', 'completed'), tool('tool-2')],
     });
     const attach = translateObservedView(null, attached);
     expect(names(attach)).toEqual([
@@ -85,6 +50,7 @@ describe('AG-UI translation of the observed projection', () => {
       toolCallId: 'tool-1',
       toolCallName: 'read_file',
       parentMessageId: 'message-a',
+      timestamp: 1_000,
     });
     expect(attach[4]).toEqual({
       type: EventType.TOOL_CALL_RESULT,
@@ -92,16 +58,18 @@ describe('AG-UI translation of the observed projection', () => {
       toolCallId: 'tool-1',
       content: 'completed',
       role: 'tool',
+      timestamp: 1_500,
     });
     expect(attach.at(-1)).toEqual({
       type: EventType.TEXT_MESSAGE_CONTENT,
       messageId: 'message-a',
       delta: 'Hello world',
+      timestamp: 2_000,
     });
     const done = view({
       status: 'completed',
-      message: { id: 'message-a', text: 'Hello world!' },
-      toolCalls: [tool('tool-1', 'completed'), tool('tool-2', 'failed')],
+      answer: answer('message-a', 'Hello world!', 2_500),
+      steps: [tool('tool-1', 'completed'), tool('tool-2', 'failed')],
       settled: true,
     });
     const finish = translateObservedView(attached, done);
@@ -113,54 +81,71 @@ describe('AG-UI translation of the observed projection', () => {
       'RUN_FINISHED',
     ]);
     expect(finish[1]).toMatchObject({ toolCallId: 'tool-2', content: 'failed' });
-    expect(finish[2]).toMatchObject({ delta: '!' });
+    expect(finish[2]).toMatchObject({ delta: '!', timestamp: 2_500 });
     expect(finish.at(-1)).toEqual({
       type: EventType.RUN_FINISHED,
       threadId: conversation.id,
       runId: executionId,
       outcome: { type: 'success' },
+      timestamp: 2_500,
     });
     await expect(verified([...attach, ...finish])).resolves.toHaveLength(14);
   });
 
   it('sends nothing for an identical view and only the state when the product state changes', () => {
-    const before = view({ message: { id: 'message-a', text: 'Hi' } });
-    expect(
-      translateObservedView(before, view({ message: { id: 'message-a', text: 'Hi' } })),
-    ).toEqual([]);
+    const before = view({ answer: answer('message-a', 'Hi') });
+    expect(translateObservedView(before, view({ answer: answer('message-a', 'Hi') }))).toEqual([]);
     const retitled = view({
-      message: { id: 'message-a', text: 'Hi' },
+      answer: answer('message-a', 'Hi'),
       state: { ...before.state, conversation: { ...conversation, title: 'Renamed' } },
     });
     expect(names(translateObservedView(before, retitled))).toEqual(['STATE_SNAPSHOT']);
   });
 
-  it('opens the answer late, appends only new text and switches messages by closing the previous one', async () => {
+  it('opens the answer late, appends only new text and turns a replaced answer into narration', async () => {
     const empty = view();
-    const opened = view({ message: { id: 'message-a', text: '' } });
+    const opened = view({ answer: answer('message-a', '') });
     const late = translateObservedView(empty, opened);
     expect(late).toEqual([
-      { type: EventType.TEXT_MESSAGE_START, messageId: 'message-a', role: 'assistant' },
+      {
+        type: EventType.TEXT_MESSAGE_START,
+        messageId: 'message-a',
+        role: 'assistant',
+        timestamp: 1_000,
+      },
     ]);
-    const grown = view({ message: { id: 'message-a', text: 'Bonjour' } });
+    const grown = view({ answer: answer('message-a', 'Bonjour') });
     expect(translateObservedView(opened, grown)).toEqual([
-      { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'message-a', delta: 'Bonjour' },
+      {
+        type: EventType.TEXT_MESSAGE_CONTENT,
+        messageId: 'message-a',
+        delta: 'Bonjour',
+        timestamp: 2_000,
+      },
     ]);
+    // The former answer keeps growing in the same commit that replaces it: its tail then closes.
     const switched = view({
-      message: { id: 'message-b', text: 'Final' },
+      steps: [narration('message-a', 'Bonjour !')],
+      answer: answer('message-b', 'Final'),
       status: 'completed',
       settled: true,
     });
     const events = translateObservedView(grown, switched);
     expect(names(events)).toEqual([
       'STATE_SNAPSHOT',
+      'TEXT_MESSAGE_CONTENT',
       'TEXT_MESSAGE_END',
       'TEXT_MESSAGE_START',
       'TEXT_MESSAGE_CONTENT',
       'TEXT_MESSAGE_END',
       'RUN_FINISHED',
     ]);
-    expect(events[1]).toEqual({ type: EventType.TEXT_MESSAGE_END, messageId: 'message-a' });
+    expect(events[1]).toMatchObject({ messageId: 'message-a', delta: ' !' });
+    expect(events[2]).toEqual({
+      type: EventType.TEXT_MESSAGE_END,
+      messageId: 'message-a',
+      timestamp: 800,
+    });
     await expect(
       verified([
         ...translateObservedView(null, empty),
@@ -168,25 +153,101 @@ describe('AG-UI translation of the observed projection', () => {
         ...translateObservedView(opened, grown),
         ...events,
       ]),
-    ).resolves.toHaveLength(10);
+    ).resolves.toHaveLength(11);
   });
 
   it.each([
     [
       'replaced text',
-      view({ message: { id: 'message-a', text: 'Hello' } }),
-      view({ message: { id: 'message-a', text: 'Hola' } }),
+      view({ answer: answer('message-a', 'Hello') }),
+      view({ answer: answer('message-a', 'Hola') }),
+      'answer_not_prefix',
+      'answer',
     ],
-    ['a vanished answer', view({ message: { id: 'message-a', text: 'Hello' } }), view()],
-    ['a withdrawn tool call', view({ toolCalls: [tool('tool-1')] }), view()],
+    [
+      'a vanished answer',
+      view({ answer: answer('message-a', 'Hello') }),
+      view(),
+      'answer_withdrawn',
+      'answer',
+    ],
+    ['a withdrawn tool call', view({ steps: [tool('tool-1')] }), view(), 'withdrawn', 'tool'],
     [
       'a reopened tool call',
-      view({ toolCalls: [tool('tool-1', 'completed')] }),
-      view({ toolCalls: [tool('tool-1')] }),
+      view({ steps: [tool('tool-1', 'completed')] }),
+      view({ steps: [tool('tool-1')] }),
+      'regressed',
+      'tool',
     ],
-  ])('refuses to continue after %s so the browser re-attaches', (_name, previous, next) => {
-    expect(() => translateObservedView(previous, next)).toThrow(AgUiTranslationGap);
-  });
+    [
+      'a changed outcome',
+      view({ steps: [tool('tool-1', 'completed')] }),
+      view({ steps: [tool('tool-1', 'failed')] }),
+      'regressed',
+      'tool',
+    ],
+    [
+      'a re-parented nested tool',
+      view({
+        steps: [
+          delegation('task-1', 'running', 'running'),
+          delegation('task-2', 'running', 'running'),
+          nested('call-1', 'task-1'),
+        ],
+      }),
+      view({
+        steps: [
+          delegation('task-1', 'running', 'running'),
+          delegation('task-2', 'running', 'running'),
+          nested('call-1', 'task-2'),
+        ],
+      }),
+      'reshaped',
+      'tool',
+    ],
+    [
+      'a replaced answer that left no narration behind',
+      view({ answer: answer('message-a', 'Hello') }),
+      view({ answer: answer('message-b', 'Other') }),
+      'answer_replaced',
+      'answer',
+    ],
+    [
+      'a narration that became the answer again',
+      view({ steps: [narration('message-a', 'Hello')], answer: answer('message-b', 'Other') }),
+      view({ steps: [narration('message-b', 'Other')], answer: answer('message-a', 'Hello!') }),
+      'answer_reopened',
+      'message',
+    ],
+    [
+      'a specialist that vanished from its delegation',
+      view({ steps: [delegation('task-1', 'running', 'running')] }),
+      view({ steps: [delegation('task-1', 'running')] }),
+      'subagent_withdrawn',
+      'delegation',
+    ],
+    [
+      'a specialist that reopened',
+      view({ steps: [delegation('task-1', 'running', 'completed')] }),
+      view({ steps: [delegation('task-1', 'running', 'running')] }),
+      'subagent_regressed',
+      'delegation',
+    ],
+    [
+      'a narration rewritten',
+      view({ steps: [narration('message-a', 'Hello')] }),
+      view({ steps: [narration('message-a', 'Hola')] }),
+      'text_not_prefix',
+      'message',
+    ],
+  ] as const)(
+    'refuses to continue after %s so the browser re-attaches',
+    (_name, previous, next, rule, stepKind) => {
+      expect(() => translateObservedView(previous, next)).toThrow(
+        expect.objectContaining({ name: 'AgUiTranslationGap', rule, stepKind }),
+      );
+    },
+  );
 
   it.each([
     ['failed', 'runtime_failed', 'RUN_ERROR'],
@@ -196,7 +257,7 @@ describe('AG-UI translation of the observed projection', () => {
   ] as const)('ends a settled %s execution with %s', async (status, code, expected) => {
     const settled = view({
       status,
-      message: { id: 'message-a', text: 'Partial' },
+      answer: answer('message-a', 'Partial'),
       settled: true,
     });
     const withError = {
@@ -221,19 +282,65 @@ describe('AG-UI translation of the observed projection', () => {
     ]);
     expect(events.at(-1)).toEqual(
       expected === 'RUN_ERROR'
-        ? { type: EventType.RUN_ERROR, message: 'Public text.', code }
-        : { type: EventType.RUN_FINISHED, threadId: conversation.id, runId: executionId },
+        ? { type: EventType.RUN_ERROR, message: 'Public text.', code, timestamp: 2_000 }
+        : {
+            type: EventType.RUN_FINISHED,
+            threadId: conversation.id,
+            runId: executionId,
+            timestamp: 2_000,
+          },
     );
     await expect(verified(events)).resolves.toHaveLength(6);
   });
 
   it('keeps a parked interrupted execution open without a lifecycle end', () => {
-    const parked = view({ status: 'interrupted', message: { id: 'message-a', text: 'Partial' } });
+    const parked = view({ status: 'interrupted', answer: answer('message-a', 'Partial') });
     expect(names(translateObservedView(null, parked))).toEqual([
       'RUN_STARTED',
       'STATE_SNAPSHOT',
       'TEXT_MESSAGE_START',
       'TEXT_MESSAGE_CONTENT',
     ]);
+  });
+
+  it('reports an empty model round trip as a finished step and ignores activity timestamps', async () => {
+    const generation: ObservedStep = {
+      id: 'g1',
+      kind: 'generation',
+      label: '',
+      status: 'completed',
+      startedAt: 1_000,
+      finishedAt: 3_500,
+    };
+    const events = translateObservedView(null, view({ steps: [generation] }));
+    expect(names(events)).toEqual([
+      'RUN_STARTED',
+      'STATE_SNAPSHOT',
+      'STEP_STARTED',
+      'STEP_FINISHED',
+    ]);
+    expect(events[2]).toEqual({ type: EventType.STEP_STARTED, stepName: 'g1', timestamp: 1_000 });
+    await expect(verified(events)).resolves.toHaveLength(4);
+    const before = view({ answer: answer('message-a', 'Hi') });
+    const touched = view({
+      answer: answer('message-a', 'Hi'),
+      state: {
+        ...before.state,
+        conversation: {
+          ...conversation,
+          lastActivityAt: '2026-09-16T12:53:45.546Z',
+          updatedAt: '2026-09-16T12:53:45.547Z',
+        },
+      },
+    });
+    expect(translateObservedView(before, touched)).toEqual([]);
+  });
+
+  it('omits timestamps for legacy rows whose moments are unknown', () => {
+    const legacy = view({
+      answer: { id: 'legacy:answer', text: 'Saved', startedAt: 0, finishedAt: 0 },
+    });
+    const events = translateObservedView(null, legacy);
+    expect(events.every((event) => !('timestamp' in event))).toBe(true);
   });
 });

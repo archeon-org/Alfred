@@ -10,6 +10,8 @@ interface DebugEntry {
   readonly snapshot: DebugSnapshot;
   readonly bytes: number;
   readonly stopped?: boolean;
+  /** The error reports a browser fault, not a gap in the capture. */
+  readonly fault?: string;
 }
 
 const EMPTY: DebugSnapshot = { events: [], error: null };
@@ -20,6 +22,7 @@ const listeners = new Set<() => void>();
 const pending = new Set<string>();
 let timer: ReturnType<typeof setTimeout> | undefined;
 let memoryBytes = 0;
+let cancelNotify: (() => void) | null = null;
 
 export function isRuntimeEventDebugEnabled(): boolean {
   return import.meta.env.VITE_DEBUG_EVENTS === 'true';
@@ -55,7 +58,23 @@ function sweepLegacyCaptures(): void {
 }
 
 function notify(): void {
+  cancelNotify?.();
+  cancelNotify = null;
   for (const listener of listeners) listener();
+}
+
+/** Longest delay before the views that list captured events see a new one. */
+const NOTIFY_INTERVAL_MS = 1_000;
+
+/**
+ * Captures arrive once per event, and a store change re-renders its readers synchronously, the
+ * whole transcript included: the views that list captured events follow once per second, and
+ * immediately for an error.
+ */
+function scheduleNotify(): void {
+  if (cancelNotify !== null) return;
+  const handle = setTimeout(notify, NOTIFY_INTERVAL_MS);
+  cancelNotify = () => clearTimeout(handle);
 }
 
 function reportError(key: string, error: string): void {
@@ -204,7 +223,7 @@ function flush(): void {
       const raw = JSON.stringify({
         version: STORAGE_VERSION,
         events: entry.snapshot.events,
-        incomplete: entry.snapshot.error !== null,
+        incomplete: entry.snapshot.error !== null && entry.snapshot.error !== entry.fault,
       });
       if (raw.length * 2 > STORAGE_LIMIT) {
         invalidateStoredCapture(key);
@@ -262,10 +281,32 @@ export function captureRuntimeEvent(
     });
     memoryBytes += bytes;
     scheduleSave(key);
-    notify();
+    scheduleNotify();
   } catch {
     reportError(key, 'Événement public invalide : cet événement de débogage n’a pas été capturé.');
   }
+}
+
+const FAULT_NAME = /^[A-Za-z][A-Za-z0-9]{0,39}$/u;
+
+/**
+ * Records once, in the capture of the conversation, that the browser failed while applying one
+ * of its public events. Only the error's type is kept: its message may quote content. An earlier
+ * capture error stays shown.
+ */
+export function reportRuntimeEventFault(
+  userId: string,
+  conversationId: string,
+  error: Error,
+): void {
+  if (!isRuntimeEventDebugEnabled()) return;
+  const key = storageKey(userId, conversationId);
+  const entry = getEntry(key, conversationId);
+  if (entry.snapshot.error !== null) return;
+  const name = FAULT_NAME.test(error.name) ? error.name : 'Error';
+  const fault = `Erreur du navigateur en appliquant un événement (${name}) : l’observation reprend depuis l’état enregistré.`;
+  entries.set(key, { ...entry, fault, snapshot: { ...entry.snapshot, error: fault } });
+  notify();
 }
 
 export function subscribeRuntimeEventDebug(listener: () => void): () => void {

@@ -20,6 +20,7 @@ import {
 import { ExecutionEntity } from '../infrastructure/persistence/execution.entity';
 import { MessageEntity } from '../infrastructure/persistence/message.entity';
 import { RuntimeThreadEntity } from '../infrastructure/persistence/runtime-thread.entity';
+import { loadWorkSummaries } from './execution-work-summary';
 
 export interface StartedExecution {
   readonly execution: ExecutionEntity;
@@ -48,7 +49,23 @@ export class ExecutionsService {
       take: 500,
       where: { conversationId },
     });
-    return rows.reverse().map(toMessageDto);
+    // Assistant rows carry the account of the work behind them (ALF-DEC-037 durable history).
+    const summaries = await loadWorkSummaries(
+      this.dataSource,
+      rows.flatMap((row) =>
+        row.role === 'assistant' && row.executionId !== null ? [row.executionId] : [],
+      ),
+    );
+    return rows
+      .reverse()
+      .map((row) =>
+        toMessageDto(
+          row,
+          row.role === 'assistant' && row.executionId !== null
+            ? summaries.get(row.executionId)
+            : undefined,
+        ),
+      );
   }
 
   /** Intent, submission identity, user turn and binding commit before external dispatch. */

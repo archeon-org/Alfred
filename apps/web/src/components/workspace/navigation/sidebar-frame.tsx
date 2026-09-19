@@ -23,11 +23,13 @@ export function SidebarFrame({
   onTogglePreviewLoading,
 }: SidebarFrameProps) {
   const { membership, isError } = useCurrentWorkspaces();
+  // Below the workspace breakpoint the cell around the column scrolls: on a short screen the
+  // column grows past it rather than squeezing the conversations list or clipping the account.
   return (
     <aside
       aria-label="Espace personnel"
       id="workspace-navigation"
-      className="theme-sidebar flex h-full min-h-0 flex-col bg-sidebar p-4 text-sidebar-foreground md:px-4.5 md:pt-7 md:pb-3"
+      className="theme-sidebar flex h-full min-h-0 flex-col bg-sidebar p-4 text-sidebar-foreground max-workspace:h-auto max-workspace:min-h-full md:px-4.5 md:pt-7 md:pb-3"
     >
       <Link
         className="flex w-fit items-center gap-2.5 text-2xl font-semibold tracking-tight text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-sidebar-ring md:px-2.5 md:text-3xl"

@@ -11,23 +11,6 @@ const isoDateTime = z.iso.datetime();
 export const messageRoleSchema = z.enum(['user', 'assistant']);
 export type MessageRole = z.infer<typeof messageRoleSchema>;
 
-/** One visible transcript turn owned by the product store (ALF-DEC-007). */
-export const messageSchema = z.readonly(
-  z.object({
-    id: z.uuid(),
-    conversationId: z.uuid(),
-    executionId: z.nullable(z.uuid()),
-    role: messageRoleSchema,
-    content: z.string(),
-    createdAt: isoDateTime,
-  }),
-);
-export type Message = z.infer<typeof messageSchema>;
-
-export const messageListEnvelopeSchema = successEnvelopeSchema(
-  z.object({ items: z.array(messageSchema) }),
-);
-
 export const executionStatusSchema = z.enum([
   'pending',
   'running',
@@ -79,11 +62,21 @@ export const EXECUTION_STREAM_UNAVAILABLE_CODE = 'execution_stream_unavailable';
 
 export const EXECUTION_JSON_PROFILE = 'application/vnd.alfred.execution+json;version=1';
 export const EXECUTION_OUTPUT_MAX_LENGTH = 262_144;
+
+/**
+ * Outcome of one step of the work: `interrupted` is a step still running when its execution
+ * settled (Stop, deadline, failure); the runtime never reports it as such.
+ */
+export const workStepStatusSchema = z.enum(['running', 'completed', 'failed', 'interrupted']);
+export type WorkStepStatus = z.infer<typeof workStepStatusSchema>;
+
+export const EXECUTION_WORK_LABEL_MAX_LENGTH = 160;
+
 export const executionActivitySchema = z.readonly(
   z.object({
     id: z.string().check(z.minLength(1), z.maxLength(128)),
-    label: z.string().check(z.maxLength(160)),
-    status: z.enum(['running', 'completed', 'failed']),
+    label: z.string().check(z.maxLength(EXECUTION_WORK_LABEL_MAX_LENGTH)),
+    status: workStepStatusSchema,
   }),
 );
 export type ExecutionActivity = z.infer<typeof executionActivitySchema>;
@@ -92,7 +85,106 @@ export type ExecutionActivity = z.infer<typeof executionActivitySchema>;
  * Sanitized tool outcome carried as the `content` of an AG-UI `TOOL_CALL_RESULT` event. Raw tool
  * bodies never cross the product boundary (ALF-DEC-037); only the bounded status word does.
  */
-export const EXECUTION_TOOL_RESULT_CONTENTS = Object.freeze(['completed', 'failed'] as const);
+export const EXECUTION_TOOL_RESULT_CONTENTS = Object.freeze([
+  'completed',
+  'failed',
+  'interrupted',
+] as const);
+
+/** Steps of one execution's work log; the answer itself is not a step. */
+export const EXECUTION_WORK_MAX_STEPS = 1024;
+/**
+ * AG-UI `CUSTOM` event of the observation profile carrying `{ omittedSteps }`: how many steps the
+ * work log counted without recording them, emitted on attach when non-zero and whenever it grows,
+ * so a live log never reads as exhaustive when the JSON read reports omissions.
+ */
+export const EXECUTION_WORK_OMITTED_EVENT = 'alfred.work.omitted';
+/** Narration text (an intermediate assistant message) is bounded in the JSON profile only. */
+export const EXECUTION_WORK_TEXT_MAX_LENGTH = 4_000;
+
+/**
+ * One step of the work Alfred did for an answer (ALF-DEC-006 §6, ALF-DEC-037): an intermediate
+ * assistant `message` (the orchestrator's, or a specialist's when nested), a `reasoning` marker
+ * (with its text only when the deployment exposes reasoning content), a `tool` call, a
+ * `delegation` to a specialist through the runtime's delegation tool, a `subagent` seen at work
+ * before its delegation could be identified, or an empty `generation`. Nested steps name their
+ * parent; timestamps are server milliseconds. Labels are sanitized runtime names; tool arguments,
+ * results and specialist prompts never appear.
+ */
+export const workStepKindSchema = z.enum([
+  'message',
+  'reasoning',
+  'tool',
+  'delegation',
+  'subagent',
+  /** A model round trip that produced neither text, tool call nor reasoning. */
+  'generation',
+]);
+export type WorkStepKind = z.infer<typeof workStepKindSchema>;
+
+/** Reasoning text kept per marker when the deployment exposes reasoning content. */
+export const EXECUTION_REASONING_MAX_LENGTH = 32_768;
+
+const workStepIdSchema = z.string().check(z.minLength(1), z.maxLength(128));
+const epochMs = z.number().check(z.int(), z.minimum(0));
+
+export const workStepSchema = z.readonly(
+  z.object({
+    id: workStepIdSchema,
+    kind: workStepKindSchema,
+    label: z.string().check(z.maxLength(EXECUTION_WORK_LABEL_MAX_LENGTH)),
+    status: workStepStatusSchema,
+    startedAt: epochMs,
+    finishedAt: z.nullable(epochMs),
+    parentId: z.optional(workStepIdSchema),
+    specialist: z.optional(z.string().check(z.maxLength(EXECUTION_WORK_LABEL_MAX_LENGTH))),
+    /** Lifecycle of the specialist invoked by a delegation, once its work was observed. */
+    subagentStatus: z.optional(workStepStatusSchema),
+    text: z.optional(z.string().check(z.maxLength(EXECUTION_WORK_TEXT_MAX_LENGTH))),
+  }),
+);
+export type WorkStep = z.infer<typeof workStepSchema>;
+
+export const executionWorkSchema = z.readonly(
+  z.object({
+    steps: z.array(workStepSchema).check(z.maxLength(EXECUTION_WORK_MAX_STEPS)),
+    /** Steps the projection stopped recording once its bound was reached. */
+    omittedSteps: z.number().check(z.int(), z.minimum(0)),
+  }),
+);
+export type ExecutionWork = z.infer<typeof executionWorkSchema>;
+
+/** Compact account of an answer's work, served with its stored transcript row. */
+export const executionWorkSummarySchema = z.readonly(
+  z.object({
+    status: executionStatusSchema,
+    durationMs: z.nullable(epochMs),
+    steps: z.number().check(z.int(), z.minimum(0)),
+    tools: z.number().check(z.int(), z.minimum(0)),
+    delegations: z.number().check(z.int(), z.minimum(0)),
+    failedSteps: z.number().check(z.int(), z.minimum(0)),
+  }),
+);
+export type ExecutionWorkSummary = z.infer<typeof executionWorkSummarySchema>;
+
+/** One visible transcript turn owned by the product store (ALF-DEC-007). */
+export const messageSchema = z.readonly(
+  z.object({
+    id: z.uuid(),
+    conversationId: z.uuid(),
+    executionId: z.nullable(z.uuid()),
+    role: messageRoleSchema,
+    content: z.string(),
+    createdAt: isoDateTime,
+    // Added 2026-09-16 for assistant rows; absent from older APIs and from user rows.
+    work: z.optional(executionWorkSummarySchema),
+  }),
+);
+export type Message = z.infer<typeof messageSchema>;
+
+export const messageListEnvelopeSchema = successEnvelopeSchema(
+  z.object({ items: z.array(messageSchema) }),
+);
 
 /**
  * Alfred-owned state carried by AG-UI `STATE_SNAPSHOT` events on `GET /executions/:id/events`.
@@ -115,9 +207,11 @@ export const executionSnapshotSchema = z.readonly(
     conversation: conversationSchema,
     userMessage: z.string().check(z.maxLength(EXECUTION_MESSAGE_MAX_LENGTH)),
     assistantText: z.string().check(z.maxLength(EXECUTION_OUTPUT_MAX_LENGTH)),
-    activities: z.array(executionActivitySchema).check(z.maxLength(256)),
+    activities: z.array(executionActivitySchema).check(z.maxLength(EXECUTION_WORK_MAX_STEPS)),
     cursor: z.nullable(z.string().check(z.maxLength(4096))),
     revision: z.number().check(z.int(), z.minimum(0)),
+    // Added 2026-09-16: the work log behind the answer; absent from older APIs.
+    work: z.optional(executionWorkSchema),
   }),
 );
 export type ExecutionSnapshot = z.infer<typeof executionSnapshotSchema>;

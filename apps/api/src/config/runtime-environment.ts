@@ -12,6 +12,12 @@ const optionalSecret = z.preprocess(
 );
 const integer = (minimum: number, maximum: number, fallback: number) =>
   z.coerce.number().int().min(minimum).max(maximum).default(fallback);
+const booleanSetting = (fallback: boolean) =>
+  z.preprocess((value) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  }, z.boolean().default(fallback));
 
 const runtimeSchema = z.object({
   AGENT_RUNTIME_ASSISTANT_ID: z.string().min(1).default('orchestrator'),
@@ -51,6 +57,12 @@ const runtimeSchema = z.object({
   EXECUTION_MAX_OBSERVERS_PER_USER: integer(1, 32, 4),
   EXECUTION_MAX_OBSERVERS_PER_INSTANCE: integer(1, 2_048, 128),
   EXECUTION_OBSERVER_REAUTH_MS: integer(1_000, 25_000, 25_000),
+  /**
+   * Records the reasoning text and the specialists' intermediate messages in the work log. The
+   * product owner chose this on 2026-09-16; ALF-DEC-037 keeps it excluded by default in the
+   * register, so a deployment can turn it off and keep markers only.
+   */
+  EXECUTION_WORK_LOG_CONTENT_ENABLED: booleanSetting(true),
 });
 
 export const runtimeEnvironmentFields = runtimeSchema.shape;

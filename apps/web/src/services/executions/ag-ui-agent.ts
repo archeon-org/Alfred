@@ -26,6 +26,13 @@ export class AlfredExecutionAgent extends AbstractAgent {
    * logs nor rethrows it; the observer decides whether it is retryable.
    */
   failure: unknown = null;
+  /** Events handed to the AG-UI client during the current run. */
+  emitted = 0;
+  /**
+   * Number of events that re-synthesize the run on attach: the API writes the cursor on the last
+   * frame of each batch, so the first frame carrying one closes the re-synthesis. Null until then.
+   */
+  resynthesis: number | null = null;
   private readonly detach = new AbortController();
 
   constructor(private readonly options: AlfredExecutionAgentOptions) {
@@ -41,6 +48,8 @@ export class AlfredExecutionAgent extends AbstractAgent {
   /** The run input is ignored: observation reattaches to work the API already owns. */
   run(): Observable<BaseEvent> {
     this.failure = null;
+    this.emitted = 0;
+    this.resynthesis = null;
     return new Observable<BaseEvent>((subscriber) => {
       const unsubscribed = new AbortController();
       const signal = AbortSignal.any([
@@ -57,7 +66,11 @@ export class AlfredExecutionAgent extends AbstractAgent {
             this.cursor,
             this.options.conversationId,
           )) {
-            if (frame.id !== undefined) this.cursor = frame.id;
+            this.emitted += 1;
+            if (frame.id !== undefined) {
+              this.cursor = frame.id;
+              this.resynthesis ??= this.emitted;
+            }
             subscriber.next(frame.event);
           }
         } catch (error) {

@@ -83,7 +83,10 @@ function build(status: RuntimeRun['status'] = 'running', overrides: Partial<Exec
   });
   const generateTitle = vi.fn<RuntimeClient['generateTitle']>(() => Promise.resolve(null));
   const runtime = { dispatch, inspect, cancel, join, generateTitle } as RuntimeClient;
-  const config = { get: vi.fn() } as unknown as ConfigService;
+  // The register default: hidden content is marked, never recorded.
+  const config = {
+    get: vi.fn((key: string) => (key === 'EXECUTION_WORK_LOG_CONTENT_ENABLED' ? false : undefined)),
+  } as unknown as ConfigService;
   return {
     processor: new ExecutionProcessor(
       state,

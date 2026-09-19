@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   emptyProjection,
+  normalizeProjection,
   projectRuntimeEvent,
   type ProjectionState,
 } from '../infrastructure/langgraph/runtime-projection';
@@ -28,9 +29,7 @@ export interface ProcessingContext {
 }
 
 export function restoreProjection(row: ExecutionEntity): ProjectionState {
-  return row.reducerState['version'] === 1
-    ? (row.reducerState as unknown as ProjectionState)
-    : emptyProjection();
+  return normalizeProjection(row.reducerState) ?? emptyProjection();
 }
 
 /** Consumes native replay into bounded durable progress commits; never per token. */
@@ -64,7 +63,9 @@ export class ExecutionStreamConsumer {
       })) {
         committer.check();
         const prior = committer.head ?? restoreProjection(context.row);
-        const projection = projectRuntimeEvent(prior, event, row.invocationId);
+        const projection = projectRuntimeEvent(prior, event, row.invocationId, {
+          content: this.config.get<boolean>('EXECUTION_WORK_LOG_CONTENT_ENABLED') ?? true,
+        });
         if (projection === prior) continue;
         await committer.accept(projection, event.id);
         projected += 1;

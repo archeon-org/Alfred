@@ -2,6 +2,7 @@ import { Menu, PanelRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { IconButton } from '@/components/ui/icon-button';
+import { useShortcutHint } from '@/hooks/workspace/use-shortcut-preferences';
 
 export interface WorkspaceScopeLink {
   readonly name: string;
@@ -20,7 +21,9 @@ interface WorkspaceHeaderProps {
 
 /**
  * The one-line bar of narrow screens: conversations drawer, current scope, context panel. Wider
- * layouts have no bar; their controls live in the panels themselves.
+ * layouts have no bar; their controls live in the panels themselves. Below md the context panel
+ * is always a modal sheet, so its opener is a dialog trigger: one label, like the gutter opener,
+ * and the sheet's own button closes it.
  */
 export function WorkspaceHeader({
   scope,
@@ -30,6 +33,7 @@ export function WorkspaceHeader({
   onToggleContext,
   onToggleNavigation,
 }: WorkspaceHeaderProps) {
+  const contextHint = useShortcutHint('toggleContext', 'Afficher le contexte');
   return (
     <header className="flex min-h-12 shrink-0 items-center gap-1 px-2 md:hidden">
       <IconButton
@@ -58,9 +62,12 @@ export function WorkspaceHeader({
         <IconButton
           aria-controls="context-panel"
           aria-expanded={isContextOpen}
-          label={isContextOpen ? 'Masquer le contexte' : 'Afficher le contexte'}
+          aria-haspopup="dialog"
+          data-context-opener=""
+          label="Afficher le contexte"
           onClick={onToggleContext}
           size="icon-sm"
+          {...contextHint}
         >
           <PanelRight aria-hidden="true" size={18} />
         </IconButton>

@@ -10,6 +10,10 @@ export const messageKeys = {
   list: (userId: string, conversationId: string) => ['messages', userId, conversationId] as const,
 };
 
+export const executionKeys = {
+  work: (userId: string, executionId: string) => ['execution-work', userId, executionId] as const,
+};
+
 export const conversationKeys = {
   lists: (userId: string) => ['conversations', userId, 'list'] as const,
   all: (userId: string) => ['conversations', userId] as const,

@@ -1,12 +1,15 @@
 import { createHash } from 'node:crypto';
-import { EXECUTION_OUTPUT_MAX_LENGTH } from '@alfred/contracts';
+import { EXECUTION_OUTPUT_MAX_LENGTH, EXECUTION_WORK_MAX_STEPS } from '@alfred/contracts';
 
 export const PROJECTION_LIMITS = {
-  activities: 128,
   eventBytes: 512 * 1024,
   messages: 512,
   sourceIdBytes: 256,
   stateBytes: 1024 * 1024,
+  /** Recorded steps of the work log (tools, delegations, narration, markers); more are counted. */
+  steps: EXECUTION_WORK_MAX_STEPS,
+  /** Reasoning and specialist text kept per execution; further content is dropped, not fatal. */
+  contentBytes: 256 * 1024,
   // A UTF-8 byte bound is conservative for the public contract's string-length bound.
   textBytes: EXECUTION_OUTPUT_MAX_LENGTH,
 } as const;
@@ -153,10 +156,70 @@ export function textContent(content: unknown): string {
     .join('');
 }
 
+const SAFE_LABEL = /^[A-Za-z][A-Za-z0-9_. -]{0,63}$/u;
+
 export function safeToolLabel(value: unknown): string {
-  return typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_. -]{0,63}$/u.test(value)
-    ? value
-    : 'Tool';
+  return typeof value === 'string' && SAFE_LABEL.test(value) ? value : 'Tool';
+}
+
+/** A specialist name as the runtime declares it, or null when it is not a safe label. */
+export function safeSpecialist(value: unknown): string | null {
+  return typeof value === 'string' && SAFE_LABEL.test(value) ? value : null;
+}
+
+/** The runtime's delegation tool; its invocations become delegation steps. */
+export const DELEGATION_TOOL = 'task';
+
+/**
+ * Native stream positions are `<milliseconds since epoch>-<sequence>`; the millisecond part is the
+ * server clock at emission. Any other shape yields null and the caller falls back to its clock.
+ */
+export function nativeEventTimestamp(id: unknown): number | null {
+  if (typeof id !== 'string') return null;
+  const match = /^(\d{13})-\d+$/u.exec(id);
+  if (match === null) return null;
+  const value = Number(match[1]);
+  return Number.isSafeInteger(value) ? value : null;
+}
+
+/** First private namespace component of a nested event name, or null at the root. */
+export function eventNamespace(event: string): string | null {
+  const parts = event.split('|');
+  return parts.length > 1 && parts[1] !== undefined && parts[1] !== '' ? parts[1] : null;
+}
+
+/** Same as {@link eventNamespace} for a `langgraph_checkpoint_ns` metadata value. */
+export function checkpointNamespace(value: unknown): string | null {
+  if (typeof value !== 'string' || value === '') return null;
+  const first = value.split('|')[0];
+  return first === undefined || first === '' ? null : first;
+}
+
+/**
+ * The hidden reasoning a model chunk carries (provider `reasoning_content` or reasoning content
+ * blocks), stripped of control characters; empty when the chunk carries none. Whether the text
+ * is kept or only its presence is a projection option.
+ */
+export function reasoningText(message: Record<string, unknown>): string {
+  const parts: string[] = [];
+  const extra = record(message.additional_kwargs);
+  if (extra !== null) {
+    for (const key of ['reasoning_content', 'reasoning']) {
+      const value = extra[key];
+      if (typeof value === 'string' && value !== '') parts.push(value);
+    }
+  }
+  if (Array.isArray(message.content)) {
+    for (const block of message.content) {
+      const item = record(block);
+      if (item === null) continue;
+      const type = String(item.type);
+      if (type !== 'reasoning' && type !== 'thinking' && type !== 'reasoning_content') continue;
+      const text = item.text ?? item.thinking ?? item.reasoning;
+      if (typeof text === 'string' && text !== '') parts.push(text);
+    }
+  }
+  return textContent(parts.join(''));
 }
 
 export function containsInterrupt(value: unknown): boolean {

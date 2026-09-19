@@ -1,4 +1,4 @@
-import type { ExecutionSnapshot } from '@alfred/contracts';
+import type { ExecutionSnapshot, ExecutionWork } from '@alfred/contracts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -17,7 +17,7 @@ import {
   stopExecution,
 } from '@/services/executions/executions.service';
 import type * as RecoveryModule from '@/services/executions/recovery';
-import { recoveryDelay } from '@/services/executions/recovery';
+import { reattachDelay, recoveryDelay } from '@/services/executions/recovery';
 import { ApiRequestError } from '@/services/http/api-json';
 import { synthesizeRun, type AgUiFrame } from '../../../support/ag-ui-synth';
 import { execution, EXECUTION_ID, snapshot } from '../../../support/executions-api';
@@ -28,6 +28,7 @@ vi.mock('@/services/executions/executions.service');
 vi.mock('@/services/executions/recovery', async (original) => ({
   ...(await original<typeof RecoveryModule>()),
   recoveryDelay: vi.fn().mockResolvedValue(undefined),
+  reattachDelay: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockedList = vi.mocked(listMessages);
@@ -138,6 +139,76 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe('recoverable chat observation', () => {
+  it('builds the work log of a live answer from the stream and keeps it on the settled turn', async () => {
+    // Diagnostics capture is shared across tests of this file; keep this run out of it.
+    vi.stubEnv('VITE_DEBUG_EVENTS', 'false');
+    const marker = {
+      id: 'r1',
+      kind: 'reasoning',
+      label: '',
+      status: 'completed',
+      startedAt: 1_000,
+      finishedAt: 1_500,
+    } as const;
+    const delegation = {
+      id: 'task-1',
+      kind: 'delegation',
+      label: 'task',
+      status: 'running',
+      startedAt: 2_000,
+      finishedAt: null,
+      specialist: 'topology_agent',
+      subagentStatus: 'running',
+    } as const;
+    const nested = {
+      id: 'call-1',
+      kind: 'tool',
+      label: 'execute_raw',
+      status: 'completed',
+      startedAt: 2_100,
+      finishedAt: 2_400,
+      parentId: 'task-1',
+    } as const;
+    const working: ExecutionWork = { steps: [marker, delegation, nested], omittedSteps: 0 };
+    const finished: ExecutionWork = {
+      steps: [
+        marker,
+        { ...delegation, status: 'completed', finishedAt: 3_000, subagentStatus: 'completed' },
+        nested,
+      ],
+      omittedSteps: 0,
+    };
+    const run = [
+      snapshot({ revision: 1, cursor: 'cursor:1', work: working }),
+      snapshot({
+        revision: 2,
+        cursor: 'cursor:2',
+        assistantText: 'Voici',
+        work: finished,
+        execution: execution('completed'),
+      }),
+    ];
+    const stream = controlledStream(run);
+    mockedStream.mockImplementation(stream.implementation);
+    const view = await ready(renderChat());
+    act(() => {
+      expect(view.result.current.send('Topologie ?')).toBe(true);
+    });
+    await waitFor(() => expect(mockedStream).toHaveBeenCalled());
+    act(() => stream.release(0));
+    await waitFor(() => expect(view.result.current.live?.work.steps).toHaveLength(3));
+    expect(view.result.current.live?.work.steps).toEqual([marker, delegation, nested]);
+    act(() => stream.release(1));
+    await waitFor(() => expect(view.result.current.live?.status).toBe('done'));
+    expect(view.result.current.live?.assistantText).toBe('Voici');
+    expect(view.result.current.live?.work.steps[1]).toEqual({
+      ...delegation,
+      status: 'completed',
+      finishedAt: 3_000,
+      subagentStatus: 'completed',
+    });
+  });
+
   it.each(['false', 'true'])(
     'uses cumulative public snapshots and hands over with debug=%s',
     async (flag) => {
@@ -266,14 +337,17 @@ describe('recoverable chat observation', () => {
     expect(mockedCreate.mock.calls[0]?.[3]).toBe(mockedCreate.mock.calls[1]?.[3]);
   });
 
-  it('bounds reconnect attempts, preserves partial text and never claims a disconnected run completed', async () => {
+  it('bounds fruitless reconnect attempts, preserves partial text and never claims a disconnected run completed', async () => {
     mockedStream.mockImplementation(streamOf([event(1, 'Partiel')], new TypeError('offline')));
     const view = await ready(renderChat());
     act(() => {
       view.result.current.send('Salut');
     });
     await waitFor(() => expect(view.result.current.live?.connection).toBe('disconnected'));
-    expect(mockedStream).toHaveBeenCalledTimes(6);
+    // The first attach delivered the partial answer and re-attached promptly; the six replays
+    // that followed brought nothing new and exhausted the budget with backoff in between.
+    expect(mockedStream).toHaveBeenCalledTimes(7);
+    expect(reattachDelay).toHaveBeenCalledOnce();
     expect(recoveryDelay).toHaveBeenCalledTimes(5);
     expect(view.result.current.live).toMatchObject({
       assistantText: 'Partiel',
@@ -341,7 +415,7 @@ describe('recoverable chat observation', () => {
     expect(view.result.current.isStreaming).toBe(false);
     expect(view.result.current.send('Suite')).toBe(true);
     await waitFor(() => expect(mockedCreate).toHaveBeenCalledTimes(2));
-    expect(view.result.current.sessions).toHaveLength(2);
+    await waitFor(() => expect(view.result.current.sessions).toHaveLength(2));
   });
 
   it('does not attach reload discovery to a parked execution whose end is confirmed', async () => {

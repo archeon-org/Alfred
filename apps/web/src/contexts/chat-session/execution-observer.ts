@@ -1,27 +1,39 @@
-import type {
-  AlfredRunState,
-  Conversation,
-  Execution,
-  ExecutionSnapshot,
-  ExecutionStatus,
-} from '@alfred/contracts';
+import type { AlfredRunState, Conversation, Execution, ExecutionSnapshot } from '@alfred/contracts';
 
 import { createAgUiSubscriber } from '@/contexts/chat-session/ag-ui-subscriber';
+import { AttachProgress } from '@/contexts/chat-session/attach-progress';
 import type { LiveTurn } from '@/contexts/chat-session/chat-session-context';
+import { createConversationCache } from '@/contexts/chat-session/conversation-cache';
+import {
+  advances,
+  failedExecution,
+  isBusyExecution,
+  isSettledExecution,
+} from '@/contexts/chat-session/execution-status';
 import { LiveAnswer } from '@/contexts/chat-session/live-answer';
+import { EMPTY_WORK, LiveWork } from '@/contexts/chat-session/live-work';
+import { createLiveHandlers } from '@/contexts/chat-session/observer-handlers';
 import { handOver, type HandoverContext } from '@/contexts/chat-session/transcript-handover';
-import { conversationKeys } from '@/hooks/workspace/workspace-keys';
+import { createTurnPublisher } from '@/contexts/chat-session/turn-publisher';
 import { describeApiError } from '@/lib/workspace/api-error-message';
-import { captureRuntimeEvent } from '@/lib/workspace/runtime-event-debug';
+import { reportRuntimeEventFault } from '@/lib/workspace/runtime-event-debug';
 import type { AlfredExecutionAgent } from '@/services/executions/ag-ui-agent';
 import {
   createExecution,
   getExecution,
   stopExecution,
 } from '@/services/executions/executions.service';
-import { isRetryable, RECOVERY_ATTEMPTS, recoveryDelay } from '@/services/executions/recovery';
+import {
+  isRetryable,
+  reattachDelay,
+  RECOVERY_ATTEMPTS,
+  RecoveryBudget,
+  recoveryDelay,
+} from '@/services/executions/recovery';
 import { ApiRequestError } from '@/services/http/api-json';
 import { InvalidStreamError } from '@/services/executions/sse';
+
+export { isBusyExecution, isSettledExecution } from '@/contexts/chat-session/execution-status';
 
 interface ObserverOptions extends HandoverContext {
   readonly id: number;
@@ -30,45 +42,17 @@ interface ObserverOptions extends HandoverContext {
   readonly onClose: () => void;
 }
 
-const TERMINAL = new Set(['completed', 'failed', 'cancelled', 'timed_out']);
-/** Only advancing work blocks the composer; a parked answer is superseded by the next message. */
-const BUSY = new Set(['pending', 'running', 'stopping']);
-/**
- * Product statuses only move forward. A frame carrying an earlier stage (a queued `running`
- * after the Stop acknowledgement said `stopping`) is a stale delivery, never a regression.
- */
-const STATUS_RANK: Readonly<Record<ExecutionStatus, number>> = {
-  pending: 0,
-  running: 1,
-  recovering: 1,
-  interrupted: 2,
-  recovery_required: 2,
-  stopping: 3,
-  completed: 4,
-  failed: 4,
-  cancelled: 4,
-  timed_out: 4,
-};
-/** Let React render and process input between bounded batches of AG-UI events. */
-const EVENT_BATCH = 24;
-
-export function isBusyExecution(execution: Execution | null): boolean {
-  return execution === null || BUSY.has(execution.status);
-}
-
-/**
- * Terminal, or parked with a confirmed native end (`finishedAt` set on `recovery_required`). The
- * API sends such a run once and closes; there is nothing left to observe or reconnect to.
- */
-export function isSettledExecution(execution: Execution): boolean {
-  return TERMINAL.has(execution.status) || execution.finishedAt !== null;
+/** How one attach ended when the turn is still streaming. */
+interface AttachOutcome {
+  /** The attach brought a step, delta or transition never shown, or a later stage. */
+  readonly progressed: boolean;
+  /** Transport failure, or the exception a handler raised; null for a clean close. */
+  readonly error: unknown;
 }
 
 const DISCONNECTED =
   'Connexion interrompue. L’exécution peut continuer. Reconnectez-vous pour vérifier son état.';
-
-const toError = (value: unknown): Error =>
-  value instanceof Error ? value : new Error('Observation transport failed');
+const STOP_UNCONFIRMED = 'L’arrêt n’est pas encore confirmé. Vous pouvez réessayer.';
 
 /** Owns observation only; server execution lifetime never depends on this browser controller. */
 export function createExecutionObserver(options: ObserverOptions) {
@@ -78,86 +62,73 @@ export function createExecutionObserver(options: ObserverOptions) {
   /** Revision of the last accepted JSON snapshot; AG-UI frames carry no revision. */
   let jsonRevision = -1;
   const answer = new LiveAnswer();
+  const work = new LiveWork();
   /** Settled state announced by the stream; the turn settles on the AG-UI lifecycle end. */
   let settledState: Execution | null = null;
   let isObserving = false;
   let isStopping = false;
-  let diagnosticSequence = 0;
-  let previousConversation: Conversation | null = null;
+  let faultReported = false;
+  /** Every element any attach or read has shown: an attach progresses only beyond it. */
+  const shown = new AttachProgress();
   let handover: Promise<void> | undefined;
-  let turn: LiveTurn = {
-    assistantText: '',
-    activities: [],
-    error: null,
-    execution: null,
-    status: 'streaming',
-    userMessage: text,
-    connection: 'connecting',
-    stopPending: false,
-  };
-  const publish = (next: LiveTurn) => {
-    if (controller.signal.aborted) return;
-    turn = next;
-    dispatch({ type: 'update', id, turn });
-  };
+  const content = () => ({
+    assistantText: answer.text,
+    activities: answer.activities,
+    work: work.view,
+  });
+  const publisher = createTurnPublisher({
+    initial: {
+      assistantText: '',
+      activities: [],
+      work: EMPTY_WORK,
+      error: null,
+      execution: null,
+      status: 'streaming',
+      userMessage: text,
+      connection: 'connecting',
+      stopPending: false,
+    },
+    signal: controller.signal,
+    dispatch: (turn) => dispatch({ type: 'update', id, turn }),
+    content,
+  });
+  const turn = () => publisher.turn;
+  const update = (patch: Partial<LiveTurn>) => publisher.update(patch);
+  const disconnect = () => update({ connection: 'disconnected', error: DISCONNECTED });
+  const cache = createConversationCache(options.queryClient, userId);
   const title = (conversation: Conversation) => {
     if (controller.signal.aborted) return;
     if (conversation.id !== conversationId) throw new InvalidStreamError();
-    if (JSON.stringify(previousConversation) === JSON.stringify(conversation)) return;
-    const previous = previousConversation;
-    previousConversation = conversation;
-    const cached = options.queryClient.getQueryData<Conversation>(
-      conversationKeys.detail(userId, conversation.id),
-    );
-    if (cached && cached.updatedAt > conversation.updatedAt) return;
-    options.queryClient.setQueryData(
-      conversationKeys.detail(userId, conversation.id),
-      conversation,
-    );
-    // Activity timestamps advance with token projection. Refresh list ordering on attachment and
-    // completion, but do not turn every streamed frame into another navigation HTTP request.
-    if (
-      previous === null ||
-      previous.title !== conversation.title ||
-      previous.titleSource !== conversation.titleSource ||
-      previous.projectId !== conversation.projectId ||
-      previous.projectKind !== conversation.projectKind ||
-      previous.pinnedAt !== conversation.pinnedAt ||
-      previous.archivedAt !== conversation.archivedAt
-    )
-      void options.queryClient.invalidateQueries({ queryKey: conversationKeys.lists(userId) });
+    cache(conversation);
   };
   const assertIdentity = (execution: Execution) => {
+    const known = turn().execution;
     if (
       execution.conversationId !== conversationId ||
-      (turn.execution !== null && execution.id !== turn.execution.id)
+      (known !== null && execution.id !== known.id)
     )
       throw new InvalidStreamError();
   };
   /** False when the product state must not move the turn: settled turn, stale stage delivery. */
   const admits = (execution: Execution) => {
-    if (turn.status !== 'streaming' && !isSettledExecution(execution)) return false;
-    return (
-      turn.execution === null || STATUS_RANK[execution.status] >= STATUS_RANK[turn.execution.status]
-    );
+    if (turn().status !== 'streaming' && !isSettledExecution(execution)) return false;
+    return advances(turn().execution, execution);
   };
   const commit = (execution: Execution, patch: Partial<LiveTurn>) => {
     const settled = isSettledExecution(execution);
+    // Settling publishes the rebuilt content: a replay that reaches the lifecycle end is complete.
+    if (settled) publisher.release();
     // A parked execution whose end is confirmed keeps its saved text and reads as a failed turn.
-    const failed =
-      execution.status === 'failed' ||
-      execution.status === 'timed_out' ||
-      (settled && execution.status !== 'completed' && execution.status !== 'cancelled');
-    publish({
-      ...turn,
+    const failed = failedExecution(execution);
+    update({
       ...patch,
       execution,
       error: failed ? (execution.error ?? 'L’agent a échoué.') : null,
       status: failed ? 'error' : settled ? 'done' : 'streaming',
       connection: 'connected',
-      stopPending: !settled && (turn.stopPending === true || execution.status === 'stopping'),
+      stopPending: !settled && (turn().stopPending === true || execution.status === 'stopping'),
     });
-    if (settled) handover ??= handOver(options, turn);
+    if (settled) handover ??= handOver(options, turn());
   };
   /** JSON commands (create, read, Stop, discovery) carry the cumulative public projection. */
   const acceptSnapshot = (snapshot: ExecutionSnapshot) => {
@@ -174,17 +145,11 @@ export function createExecutionObserver(options: ObserverOptions) {
     const taken = answer.read(snapshot, isSettledExecution(snapshot.execution));
     jsonRevision = snapshot.revision;
     title(snapshot.conversation);
-    if (taken) cursor = snapshot.cursor;
-    commit(
-      snapshot.execution,
-      taken
-        ? {
-            assistantText: answer.text,
-            activities: answer.activities,
-            userMessage: snapshot.userMessage,
-          }
-        : {},
-    );
+    if (taken) {
+      cursor = snapshot.cursor;
+      work.read(snapshot);
+    }
+    commit(snapshot.execution, taken ? { ...content(), userMessage: snapshot.userMessage } : {});
   };
   /**
    * AG-UI state carries the product DTOs; the answer and tools follow as message/tool events, so
@@ -196,71 +161,46 @@ export function createExecutionObserver(options: ObserverOptions) {
     if (!admits(state.execution)) return;
     if (isSettledExecution(state.execution)) {
       settledState = state.execution;
-      if (turn.status === 'streaming')
-        publish({ ...turn, execution: state.execution, userMessage: state.userMessage });
+      if (turn().status === 'streaming')
+        update({ execution: state.execution, userMessage: state.userMessage });
       return;
     }
     commit(state.execution, { userMessage: state.userMessage });
   };
   const finishRun = (fallback: () => void) => {
-    if (turn.status !== 'streaming') return;
-    if (settledState !== null)
-      commit(settledState, { assistantText: answer.text, activities: answer.activities });
+    if (turn().status !== 'streaming') return;
+    if (settledState !== null) commit(settledState, content());
     else fallback();
   };
-  const live = (patch: Partial<LiveTurn>) => {
-    if (turn.status === 'streaming') publish({ ...turn, ...patch, connection: 'connected' });
-  };
-  const handlers = (agent: AlfredExecutionAgent) => ({
-    runStarted: (threadId: string) => {
-      if (threadId !== conversationId) throw new InvalidStreamError();
-      answer.reset();
-      settledState = null;
-    },
-    state: acceptState,
-    messageStart: (messageId: string) => {
-      // A later message replaces the visible answer; the first one keeps the last known text
-      // on screen until its content arrives.
-      if (answer.start(messageId)) live({ assistantText: '' });
-    },
-    messageDelta: (messageId: string, delta: string) => {
-      if (!answer.append(messageId, delta)) throw new InvalidStreamError();
-      live({ assistantText: answer.text });
-    },
-    toolStart: (toolCallId: string, toolCallName: string) => {
-      if (answer.toolStart(toolCallId, toolCallName)) live({ activities: answer.activities });
-    },
-    toolResult: (toolCallId: string, content: string) => {
-      answer.toolResult(toolCallId, content);
-      live({ activities: answer.activities });
-    },
-    runFinished: () => finishRun(() => undefined),
-    // The settled state normally precedes this; without it the run still ends as an error.
-    runError: (message: string) =>
-      finishRun(() =>
-        publish({ ...turn, status: 'error', error: message, connection: 'connected' }),
-      ),
-    event: async (event: { readonly type: string }) => {
-      cursor = agent.cursor;
-      // Validated public events only, each filed under the execution being observed.
-      if (turn.execution !== null) {
-        captureRuntimeEvent(userId, conversationId, {
-          id: ++diagnosticSequence,
-          executionId: turn.execution.id,
-          event: event.type,
-          data: event,
-        });
-      }
-      if (diagnosticSequence % EVENT_BATCH === 0)
-        await new Promise((resolve) => setTimeout(resolve, 0));
-    },
-  });
+  const handlers = (agent: AlfredExecutionAgent) =>
+    createLiveHandlers(agent, {
+      conversationId,
+      userId,
+      answer,
+      work,
+      state: acceptState,
+      live: () => publisher.progress(),
+      settle: finishRun,
+      fail: (message) => {
+        publisher.release();
+        update({ status: 'error', error: message, connection: 'connected' });
+      },
+      restart: () => {
+        settledState = null;
+        publisher.hold();
+      },
+      applied: (resynthesized) => (resynthesized ? publisher.replayed() : publisher.touch()),
+      executionId: () => turn().execution?.id,
+      cursor: (value) => {
+        cursor = value;
+      },
+    });
   dispatch({
     type: 'start',
     session: {
       conversationId,
       id,
-      turn,
+      turn: turn(),
       createdAt: options.snapshot?.execution.createdAt ?? new Date().toISOString(),
     },
   });
@@ -272,61 +212,103 @@ export function createExecutionObserver(options: ObserverOptions) {
         acceptSnapshot(
           await createExecution(client, conversationId, text, submissionId, controller.signal),
         );
-        if (turn.stopPending) stop();
+        if (turn().stopPending) stop();
         return true;
       } catch (error) {
         if (controller.signal.aborted) return false;
         if (error instanceof ApiRequestError && !isRetryable(error)) {
-          publish({
-            ...turn,
+          update({
             status: 'error',
             connection: 'disconnected',
             error: describeApiError(error, 'L’envoi du message a échoué.'),
           });
           return false;
         }
-        publish({ ...turn, connection: 'recovering' });
+        update({ connection: 'recovering' });
         if (attempt < RECOVERY_ATTEMPTS - 1) await recoveryDelay(attempt, controller.signal);
       }
     }
     // Creation might have committed. Retain the same submission id for an explicit retry.
-    publish({ ...turn, connection: 'disconnected', error: DISCONNECTED });
+    disconnect();
     return false;
   };
 
+  /** One attach: the replay of the run, then its continuation until the stream ends. */
+  const attach = async (executionId: string): Promise<AttachOutcome | null> => {
+    // The AG-UI client and its dependencies load on demand, outside the initial bundle.
+    const { AlfredExecutionAgent } = await import('@/services/executions/ag-ui-agent');
+    // Detachment or a settled turn while the module loaded must not open an observation.
+    if (controller.signal.aborted || turn().status !== 'streaming') return null;
+    const agent = new AlfredExecutionAgent({
+      client,
+      conversationId,
+      cursor,
+      executionId,
+      signal: controller.signal,
+    });
+    shown.record(turn());
+    const stage = turn().execution?.status;
+    const subscriber = createAgUiSubscriber(agent, handlers(agent), controller.signal);
+    try {
+      await agent.runAgent({ runId: executionId }, subscriber);
+    } finally {
+      publisher.end();
+    }
+    cursor = agent.cursor;
+    const invalid = subscriber.invalid();
+    if (invalid !== null) throw invalid;
+    const fault = subscriber.fault();
+    if (fault !== null) {
+      // A browser bug is not a transport fault: it never counts as progress, and shows once.
+      if (!faultReported) reportRuntimeEventFault(userId, conversationId, fault);
+      faultReported = true;
+      return { progressed: false, error: fault };
+    }
+    // Replaying known content is not progress, whatever the server sends: the attach progressed
+    // only if it brought a step, a text delta or a transition never shown, or the stage moved on.
+    // A shown step reading shorter afterwards (bounded narration) never hides that progress.
+    const grew = shown.record(content());
+    const progressed = grew || turn().execution?.status !== stage;
+    return { progressed, error: agent.failure };
+  };
+
+  /**
+   * Observes until the run settles. An attach that brought progress re-attaches promptly; only
+   * consecutive fruitless attempts back off and count toward the budget. The recovery read before
+   * each re-attach decides whether the execution settled while no stream was open.
+   */
   const observe = async () => {
-    const executionId = turn.execution?.id;
+    const executionId = turn().execution?.id;
     if (executionId === undefined) return;
-    for (let attempt = 0; attempt < RECOVERY_ATTEMPTS; attempt += 1) {
+    const budget = new RecoveryBudget();
+    for (let attempt = 0; ; attempt += 1) {
+      let prompt = false;
       try {
         if (attempt > 0) acceptSnapshot(await getExecution(client, executionId, controller.signal));
-        if (turn.status !== 'streaming') return;
-        // The AG-UI client and its dependencies load on demand, outside the initial bundle.
-        const { AlfredExecutionAgent } = await import('@/services/executions/ag-ui-agent');
-        // Detachment or a settled turn while the module loaded must not open an observation.
-        if (controller.signal.aborted || turn.status !== 'streaming') return;
-        const agent = new AlfredExecutionAgent({
-          client,
-          conversationId,
-          cursor,
-          executionId,
-          signal: controller.signal,
-        });
-        const subscriber = createAgUiSubscriber(agent, handlers(agent), controller.signal);
-        await agent.runAgent({ runId: executionId }, subscriber);
-        cursor = agent.cursor;
-        const failure = subscriber.invalid() ?? agent.failure;
-        if (failure !== null) throw toError(failure);
-        if (controller.signal.aborted || turn.status !== 'streaming') return;
-        throw new Error('Observer closed before a terminal run');
-      } catch (error) {
-        if (controller.signal.aborted || turn.status !== 'streaming') return;
-        if (!isRetryable(error) || attempt === RECOVERY_ATTEMPTS - 1) {
-          publish({ ...turn, connection: 'disconnected', error: DISCONNECTED });
+        if (turn().status !== 'streaming') return;
+        const outcome = await attach(executionId);
+        if (outcome === null || controller.signal.aborted || turn().status !== 'streaming') return;
+        if (outcome.error !== null && !isRetryable(outcome.error)) {
+          disconnect();
           return;
         }
-        publish({ ...turn, connection: 'recovering', error: null });
-        await recoveryDelay(attempt, controller.signal);
+        if (outcome.progressed) budget.progressed();
+        prompt = outcome.progressed;
+        if (!prompt && !budget.failed()) {
+          disconnect();
+          return;
+        }
+      } catch (error) {
+        if (controller.signal.aborted || turn().status !== 'streaming') return;
+        if (!isRetryable(error) || !budget.failed()) {
+          disconnect();
+          return;
+        }
+      }
+      if (prompt) await reattachDelay(controller.signal);
+      else {
+        update({ connection: 'recovering', error: null });
+        await recoveryDelay(budget.attempt - 1, controller.signal);
       }
     }
   };
@@ -334,20 +316,19 @@ export function createExecutionObserver(options: ObserverOptions) {
   const start = () => {
     if (isObserving || controller.signal.aborted) return;
     isObserving = true;
-    publish({ ...turn, connection: 'connecting', error: null });
+    update({ connection: 'connecting', error: null });
     void (async () => {
-      if (turn.execution === null && !(await create())) return;
+      if (turn().execution === null && !(await create())) return;
       await observe();
     })()
       .catch(() => {
-        if (!controller.signal.aborted && turn.status === 'streaming') {
-          publish({ ...turn, connection: 'disconnected', error: DISCONNECTED });
-        }
+        if (!controller.signal.aborted && turn().status === 'streaming') disconnect();
       })
       .finally(async () => {
         isObserving = false;
         // Keep this controller available to logout while the stored transcript is reconciling.
-        if (turn.status !== 'streaming') {
+        if (turn().status !== 'streaming') {
+          publisher.dispose();
           await handover;
           options.onClose();
         }
@@ -355,15 +336,15 @@ export function createExecutionObserver(options: ObserverOptions) {
   };
 
   const stop = () => {
-    if (isStopping || controller.signal.aborted || turn.status !== 'streaming') return;
-    const executionId = turn.execution?.id;
+    if (isStopping || controller.signal.aborted || turn().status !== 'streaming') return;
+    const executionId = turn().execution?.id;
     if (executionId === undefined) {
-      publish({ ...turn, stopPending: true });
+      update({ stopPending: true });
       start();
       return;
     }
     isStopping = true;
-    publish({ ...turn, stopPending: true, error: null });
+    update({ stopPending: true, error: null });
     void (async () => {
       for (let attempt = 0; attempt < RECOVERY_ATTEMPTS; attempt += 1) {
         try {
@@ -376,11 +357,10 @@ export function createExecutionObserver(options: ObserverOptions) {
           await recoveryDelay(attempt, controller.signal);
         }
       }
-      publish({ ...turn, error: 'L’arrêt n’est pas encore confirmé. Vous pouvez réessayer.' });
+      update({ error: STOP_UNCONFIRMED });
     })()
       .catch(() => {
-        if (!controller.signal.aborted)
-          publish({ ...turn, error: 'L’arrêt n’est pas encore confirmé. Vous pouvez réessayer.' });
+        if (!controller.signal.aborted) update({ error: STOP_UNCONFIRMED });
       })
       .finally(() => {
         isStopping = false;
@@ -390,10 +370,10 @@ export function createExecutionObserver(options: ObserverOptions) {
   return {
     conversationId,
     controller,
-    executionId: () => turn.execution?.id,
-    isActive: () => turn.status === 'streaming',
+    executionId: () => turn().execution?.id,
+    isActive: () => turn().status === 'streaming',
     /** True while the answer is genuinely advancing; parked work lets the user write again. */
-    blocksComposer: () => turn.status === 'streaming' && isBusyExecution(turn.execution),
+    blocksComposer: () => turn().status === 'streaming' && isBusyExecution(turn().execution),
     start,
     stop,
   };

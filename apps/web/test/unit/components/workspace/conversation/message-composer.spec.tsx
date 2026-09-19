@@ -111,6 +111,7 @@ describe('ConversationTranscript', () => {
             createdAt: '2026-09-11T09:00:01.000Z',
             turn: {
               activities: [],
+              work: { steps: [], omittedSteps: 0 },
               assistantText: '**Bonjour** !',
               error: null,
               execution: null,
@@ -138,6 +139,7 @@ describe('ConversationTranscript', () => {
             createdAt: '2026-09-11T09:00:01.000Z',
             turn: {
               activities: [],
+              work: { steps: [], omittedSteps: 0 },
               assistantText: '',
               error: null,
               execution: null,
@@ -159,6 +161,7 @@ describe('ConversationTranscript', () => {
             createdAt: '2026-09-11T09:00:01.000Z',
             turn: {
               activities: [],
+              work: { steps: [], omittedSteps: 0 },
               assistantText: '',
               error: 'boom',
               execution: null,

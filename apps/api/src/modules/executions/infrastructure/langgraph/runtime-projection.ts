@@ -1,7 +1,9 @@
 import {
   assertBounded,
   containsInterrupt,
-  metadataExcludes,
+  DELEGATION_TOOL,
+  eventNamespace,
+  nativeEventTimestamp,
   nativeEventType,
   PROJECTION_LIMITS,
   ProjectionError,
@@ -9,21 +11,39 @@ import {
   record,
   requireRecord,
   runtimeEventDigest,
-  safeToolLabel,
-  textContent,
   validId,
 } from './runtime-projection-data';
+import {
+  applyMessage,
+  applyMessages,
+  classify,
+  noteRootUpdate,
+  type EventContext,
+} from './runtime-projection-messages';
+import { ensureSubagent } from './runtime-projection-links';
+import {
+  assertStepLimits,
+  type ProjectionActivity,
+  type ProjectionChildMessage,
+  type ProjectionReasoning,
+  type ProjectionSubagent,
+  type ProjectionTiming,
+  type StoredActivity,
+} from './runtime-projection-steps';
 
 export { PROJECTION_LIMITS, ProjectionError } from './runtime-projection-data';
-
-export interface ProjectionActivity {
-  readonly id: string;
-  readonly label: string;
-  readonly status: 'running' | 'completed' | 'failed';
-}
+export type {
+  ActivityStatus,
+  ProjectionActivity,
+  ProjectionChildMessage,
+  ProjectionReasoning,
+  ProjectionSubagent,
+  ProjectionTiming,
+  StoredActivity,
+} from './runtime-projection-steps';
 
 export interface ProjectionState {
-  readonly version: 1;
+  readonly version: 2;
   readonly sequence: number;
   readonly sourceId: string | null;
   readonly invocationId: string | null;
@@ -33,20 +53,43 @@ export interface ProjectionState {
   readonly lastId: string | null;
   /** Fingerprint of the last source event; a reused cursor must identify identical content. */
   readonly lastEventDigest: string | null;
-  readonly activities: Readonly<
-    Record<string, ProjectionActivity & { readonly messageId: string }>
-  >;
+  readonly activities: Readonly<Record<string, StoredActivity>>;
   readonly visibility: Readonly<Record<string, 'allowed' | 'pending'>>;
   readonly modes: Readonly<Record<string, 'tuple' | 'cumulative'>>;
   readonly messageOrder: readonly string[];
-  /** Text from a namespaced sub-graph was seen and withheld (ALF-DEC-037). Optional for v1 rows. */
+  /** Text from a namespaced sub-graph was seen; it never becomes the answer (ALF-DEC-037). */
   readonly hiddenText?: boolean;
+  /** Specialist invocations by the opaque id of their private namespace. */
+  readonly subagents: Readonly<Record<string, ProjectionSubagent>>;
+  /** When each root model round trip was asked and last answered. */
+  readonly timings: Readonly<Record<string, ProjectionTiming>>;
+  /** Hidden-reasoning markers by their opaque id. */
+  readonly reasoning: Readonly<Record<string, ProjectionReasoning>>;
+  /** Specialists' intermediate messages, when the deployment exposes work content. */
+  readonly childMessages: Readonly<Record<string, ProjectionChildMessage>>;
+  /** Steps of the work log in first-seen order: messages, markers, tools, invocations. */
+  readonly order: readonly string[];
+  /** Steps that were counted but not recorded once the step bound was reached. */
+  readonly omittedSteps: number;
+  /** Short digests of the omitted steps already counted (bounded by `OMITTED_MEMO_LIMIT`). */
+  readonly omittedIds?: readonly string[];
+  /** Bytes of reasoning and specialist text recorded, against a shared budget. */
+  readonly contentBytes: number;
+  /** Moment of the last projected event: when the next model round trip was asked. */
+  readonly lastEventAt?: number;
 }
 
 export interface ProjectionRuntimeEvent {
   readonly id: string;
   readonly event: string;
   readonly data: unknown;
+}
+
+export interface ProjectionOptions {
+  /** Clock for events whose native position carries no timestamp; defaults to `Date.now()`. */
+  readonly now?: number;
+  /** Record reasoning text and specialists' messages (default), or their presence only. */
+  readonly content?: boolean;
 }
 
 const MESSAGE_EVENTS = new Set([
@@ -68,17 +111,70 @@ const SEMANTIC_EVENTS = new Set([
 export function emptyProjection(): ProjectionState {
   return {
     activities: {},
+    childMessages: {},
+    contentBytes: 0,
     excluded: [],
     invocationId: null,
     lastId: null,
     lastEventDigest: null,
     messageOrder: [],
     modes: {},
+    omittedSteps: 0,
+    order: [],
+    reasoning: {},
     sequence: 0,
     sourceId: null,
+    subagents: {},
     texts: {},
-    version: 1,
+    timings: {},
+    version: 2,
     visibility: {},
+  };
+}
+
+/**
+ * Accepts a stored reducer of the current or the previous shape. Rows written before the work log
+ * existed keep their tool calls without timings, in message order, and gain empty step records;
+ * rows of the current shape gain the fields added since they were written.
+ */
+export function normalizeProjection(value: unknown): ProjectionState | null {
+  const stored = record(value);
+  if (stored === null) return null;
+  if (stored.version === 2) {
+    const reasoning = Object.fromEntries(
+      Object.entries(record(stored.reasoning) ?? {}).map(([id, marker]) => [
+        id,
+        { text: '', ...requireRecord(marker) },
+      ]),
+    );
+    return {
+      ...(stored as unknown as ProjectionState),
+      childMessages: (record(stored.childMessages) ??
+        {}) as unknown as ProjectionState['childMessages'],
+      contentBytes: typeof stored.contentBytes === 'number' ? stored.contentBytes : 0,
+      reasoning: reasoning as unknown as ProjectionState['reasoning'],
+    };
+  }
+  if (stored.version !== 1) return null;
+  const activities = Object.fromEntries(
+    Object.entries(record(stored.activities) ?? {}).map(([id, value]) => {
+      const activity = requireRecord(value);
+      const kind = activity.label === DELEGATION_TOOL ? ('delegation' as const) : ('tool' as const);
+      return [id, { ...activity, kind, startedAt: 0 } as StoredActivity];
+    }),
+  );
+  const messageOrder = Array.isArray(stored.messageOrder) ? (stored.messageOrder as string[]) : [];
+  return {
+    ...(stored as unknown as ProjectionState),
+    activities,
+    version: 2,
+    subagents: {},
+    timings: {},
+    reasoning: {},
+    childMessages: {},
+    contentBytes: 0,
+    order: [...messageOrder, ...Object.keys(activities)].slice(0, PROJECTION_LIMITS.steps),
+    omittedSteps: 0,
   };
 }
 
@@ -87,6 +183,7 @@ export function projectRuntimeEvent(
   state: ProjectionState,
   event: ProjectionRuntimeEvent,
   invocationId: string,
+  options: ProjectionOptions = {},
 ): ProjectionState {
   assertBounded(event, PROJECTION_LIMITS.eventBytes);
   // The state was bounded when it was produced; re-checking its text budget is linear in the
@@ -96,7 +193,7 @@ export function projectRuntimeEvent(
   if (!validId(event.event) || !validId(invocationId))
     throw new ProjectionError('runtime_event_invalid');
   const eventType = nativeEventType(event.event);
-  const nested = event.event.length > eventType.length;
+  const namespace = eventNamespace(event.event);
   if (!validId(event.id)) {
     if (SEMANTIC_EVENTS.has(eventType)) throw new ProjectionError('runtime_source_id_missing');
     return state;
@@ -107,13 +204,20 @@ export function projectRuntimeEvent(
       throw new ProjectionError('runtime_event_invalid');
     return state;
   }
+  const context: EventContext = {
+    at: nativeEventTimestamp(event.id) ?? options.now ?? Date.now(),
+    nested: namespace !== null,
+    namespace,
+    content: options.content ?? true,
+  };
   // Keep the digest above bound to the raw event name, including its private namespace.
-  const projected = reduce(state, { ...event, event: eventType }, invocationId, nested);
+  const projected = reduce(state, { ...event, event: eventType }, invocationId, context);
   const next = {
     ...projected,
     invocationId,
     lastId: event.id,
     lastEventDigest,
+    lastEventAt: context.at,
     sequence: state.sequence + 1,
     sourceId: event.id,
   };
@@ -155,16 +259,11 @@ export function projectionActivities(state: ProjectionState): readonly Projectio
   return projectionToolCalls(state).map(({ id, label, status }) => ({ id, label, status }));
 }
 
-/**
- * `nested` marks an event emitted by a namespaced sub-graph (specialist). Its tool activity is
- * kept, its message text never becomes the assistant answer (ALF-DEC-037 excludes internal child
- * messages from the product record); the root graph's answer is the only visible text.
- */
 function reduce(
   state: ProjectionState,
   event: ProjectionRuntimeEvent,
   invocationId: string,
-  nested: boolean,
+  context: EventContext,
 ): ProjectionState {
   if (event.event === 'error') throw new ProjectionError('runtime_failed');
   if (event.event === 'interrupt') throw new ProjectionError('runtime_interrupted');
@@ -174,145 +273,39 @@ function reduce(
   if (event.event === 'messages/metadata') {
     return Object.entries(requireRecord(event.data)).reduce((next, [id, metadata]) => {
       if (!validId(id)) throw new ProjectionError('runtime_event_invalid');
-      return classify(next, projectionId(invocationId, 'message', id), metadata);
+      return classify(next, invocationId, projectionId(invocationId, 'message', id), metadata);
     }, state);
   }
   if (event.event === 'messages' || event.event === 'messages-tuple') {
     if (!Array.isArray(event.data) || event.data.length !== 2)
       throw new ProjectionError('runtime_event_invalid');
     const [message, metadata] = event.data as unknown[];
-    requireRecord(metadata);
-    return applyMessage(state, requireRecord(message), invocationId, 'tuple', nested, metadata);
+    const meta = requireRecord(metadata);
+    return applyMessage(state, requireRecord(message), invocationId, 'tuple', {
+      ...context,
+      metadata: meta,
+    });
   }
   if (event.event === 'values') {
     const data = requireRecord(event.data);
     if (data.messages === undefined) return state;
-    return applyMessages(state, data.messages, invocationId, nested);
+    return applyMessages(state, data.messages, invocationId, context);
   }
   if (MESSAGE_EVENTS.has(event.event))
-    return applyMessages(state, event.data, invocationId, nested);
+    return applyMessages(state, event.data, invocationId, context);
+  if (event.event === 'updates') {
+    // A specialist's sub-graph announces itself through its first update, before any message.
+    if (context.nested && context.namespace !== null)
+      return ensureSubagent(state, invocationId, context.namespace, null, context.at);
+    return noteRootUpdate(state, requireRecord(event.data), invocationId);
+  }
   // Metadata/debug/custom/checkpoint/graph updates are never public escape hatches.
   return state;
 }
 
-function applyMessages(
-  state: ProjectionState,
-  data: unknown,
-  invocationId: string,
-  nested: boolean,
-): ProjectionState {
-  if (!Array.isArray(data)) throw new ProjectionError('runtime_event_invalid');
-  if (data.length > PROJECTION_LIMITS.messages)
-    throw new ProjectionError('runtime_projection_limit');
-  return data.reduce(
-    (next: ProjectionState, value: unknown) =>
-      applyMessage(next, requireRecord(value), invocationId, 'cumulative', nested),
-    state,
-  );
-}
-
-function applyMessage(
-  state: ProjectionState,
-  message: Record<string, unknown>,
-  invocationId: string,
-  mode: 'tuple' | 'cumulative',
-  nested: boolean,
-  metadata?: unknown,
-): ProjectionState {
-  if (message.type === 'tool') return finishTool(state, message, invocationId);
-  if (!['ai', 'AIMessage', 'AIMessageChunk'].includes(String(message.type))) return state;
-  if (!validId(message.id)) throw new ProjectionError('runtime_event_invalid');
-  const id = projectionId(invocationId, 'message', message.id);
-  const classification = metadata ?? message.metadata;
-  const classified = classification === undefined ? state : classify(state, id, classification);
-  if (classified.excluded.includes(id)) return classified;
-  const withTools = rememberTools(classified, message, invocationId, id);
-  const text = textContent(message.content);
-  if (nested) {
-    return text === '' || withTools.hiddenText === true
-      ? withTools
-      : { ...withTools, hiddenText: true };
-  }
-  if (text === '' && !Object.hasOwn(withTools.texts, id)) return withTools;
-  const cumulativeWins = mode === 'tuple' && withTools.modes[id] === 'cumulative';
-  if (cumulativeWins) return withTools;
-  const content = mode === 'tuple' ? (withTools.texts[id] ?? '') + text : text;
-  if (Buffer.byteLength(content, 'utf8') > PROJECTION_LIMITS.textBytes)
-    throw new ProjectionError('runtime_projection_limit');
-  return {
-    ...withTools,
-    messageOrder: [...withTools.messageOrder.filter((previous) => previous !== id), id],
-    modes: { ...withTools.modes, [id]: mode },
-    texts: { ...withTools.texts, [id]: content },
-    visibility: { ...withTools.visibility, [id]: withTools.visibility[id] ?? 'pending' },
-  };
-}
-
-function classify(state: ProjectionState, id: string, metadata: unknown): ProjectionState {
-  if (!metadataExcludes(metadata)) {
-    return state.excluded.includes(id)
-      ? state
-      : { ...state, visibility: { ...state.visibility, [id]: 'allowed' } };
-  }
-  if (
-    state.visibility[id] === 'allowed' &&
-    (Object.hasOwn(state.texts, id) ||
-      Object.values(state.activities).some((activity) => activity.messageId === id))
-  ) {
-    throw new ProjectionError('runtime_event_invalid');
-  }
-  return {
-    ...state,
-    activities: Object.fromEntries(
-      Object.entries(state.activities).filter(([, value]) => value.messageId !== id),
-    ),
-    excluded: state.excluded.includes(id) ? state.excluded : [...state.excluded, id],
-    messageOrder: state.messageOrder.filter((value) => value !== id),
-    modes: Object.fromEntries(Object.entries(state.modes).filter(([key]) => key !== id)),
-    texts: Object.fromEntries(Object.entries(state.texts).filter(([key]) => key !== id)),
-    visibility: Object.fromEntries(Object.entries(state.visibility).filter(([key]) => key !== id)),
-  };
-}
-
-function rememberTools(
-  state: ProjectionState,
-  message: Record<string, unknown>,
-  invocationId: string,
-  messageId: string,
-): ProjectionState {
-  if (message.tool_calls === undefined) return state;
-  if (!Array.isArray(message.tool_calls)) throw new ProjectionError('runtime_event_invalid');
-  return message.tool_calls.reduce((next: ProjectionState, value: unknown) => {
-    const tool = requireRecord(value);
-    if (!validId(tool.id)) {
-      if (message.type === 'AIMessageChunk' && (tool.id === null || tool.id === undefined))
-        return next;
-      throw new ProjectionError('runtime_event_invalid');
-    }
-    const id = projectionId(invocationId, 'tool', tool.id);
-    const previous = next.activities[id];
-    if (previous !== undefined) return next;
-    const activity = { id, label: safeToolLabel(tool.name), messageId, status: 'running' as const };
-    return { ...next, activities: { ...next.activities, [id]: activity } };
-  }, state);
-}
-
-function finishTool(
-  state: ProjectionState,
-  message: Record<string, unknown>,
-  invocationId: string,
-): ProjectionState {
-  if (!validId(message.tool_call_id)) throw new ProjectionError('runtime_event_invalid');
-  const id = projectionId(invocationId, 'tool', message.tool_call_id);
-  const activity = state.activities[id];
-  if (activity === undefined) return state;
-  const status = message.status === 'error' ? 'failed' : 'completed';
-  return { ...state, activities: { ...state.activities, [id]: { ...activity, status } } };
-}
-
 function validateState(state: ProjectionState, invocationId: string): void {
   if (
-    state.version !== 1 ||
+    state.version !== 2 ||
     !Number.isSafeInteger(state.sequence) ||
     state.sequence < 0 ||
     state.sourceId !== state.lastId ||
@@ -325,8 +318,18 @@ function validateState(state: ProjectionState, invocationId: string): void {
     record(state.visibility) === null ||
     record(state.modes) === null ||
     record(state.activities) === null ||
+    record(state.subagents) === null ||
+    record(state.timings) === null ||
+    record(state.reasoning) === null ||
+    record(state.childMessages) === null ||
     !Array.isArray(state.excluded) ||
-    !Array.isArray(state.messageOrder)
+    !Array.isArray(state.messageOrder) ||
+    !Array.isArray(state.order) ||
+    !Number.isSafeInteger(state.omittedSteps) ||
+    state.omittedSteps < 0 ||
+    !Number.isSafeInteger(state.contentBytes) ||
+    state.contentBytes < 0 ||
+    (state.lastEventAt !== undefined && !Number.isSafeInteger(state.lastEventAt))
   ) {
     throw new ProjectionError('runtime_event_invalid');
   }
@@ -347,10 +350,10 @@ function validateLimits(state: ProjectionState): void {
     Object.keys(state.texts).length > PROJECTION_LIMITS.messages ||
     state.excluded.length > PROJECTION_LIMITS.messages ||
     Object.keys(state.visibility).length > PROJECTION_LIMITS.messages ||
-    Object.keys(state.activities).length > PROJECTION_LIMITS.activities ||
     !Number.isSafeInteger(state.sequence) ||
     (state.hiddenText !== undefined && typeof state.hiddenText !== 'boolean')
   )
     throw new ProjectionError('runtime_projection_limit');
+  assertStepLimits(state);
   assertTextBudget(state);
 }

@@ -124,7 +124,13 @@ export class AgUiReplicaBuilder {
           ...current,
           activities: current.activities.map((activity) =>
             activity.id === event.toolCallId
-              ? { ...activity, status: event.content === 'failed' ? 'failed' : 'completed' }
+              ? {
+                  ...activity,
+                  status:
+                    event.content === 'failed' || event.content === 'interrupted'
+                      ? event.content
+                      : 'completed',
+                }
               : activity,
           ),
           cursor,

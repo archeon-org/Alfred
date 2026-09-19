@@ -12,8 +12,10 @@ import {
 const invocation = 'invocation-one';
 const message = (content: unknown, id = 'message-one') => ({ content, id, type: 'ai' });
 const event = (id: string, event: string, data: unknown) => ({ data, event, id });
+// These cases describe the register default (ALF-DEC-037): presence of hidden content, never
+// its text. The exposed-content option has its own cases in the work-log spec.
 const project = (state: ProjectionState, id: string, name: string, data: unknown) =>
-  projectRuntimeEvent(state, event(id, name, data), invocation);
+  projectRuntimeEvent(state, event(id, name, data), invocation, { content: false });
 const metadata = (id = 'message-one') => ({ [id]: { metadata: { langgraph_node: 'model' } } });
 
 describe('private runtime projection', () => {
@@ -172,10 +174,12 @@ describe('private runtime projection', () => {
         },
       }),
     ];
-    const initial = projectRuntimeEvent(emptyProjection(), frames[0]!, invocation);
+    const initial = projectRuntimeEvent(emptyProjection(), frames[0]!, invocation, {
+      content: false,
+    });
     const restored = JSON.parse(JSON.stringify(initial)) as ProjectionState;
     const recovered = frames.reduce(
-      (state, frame) => projectRuntimeEvent(state, frame, invocation),
+      (state, frame) => projectRuntimeEvent(state, frame, invocation, { content: false }),
       restored,
     );
     expect(projectionText(recovered)).toBe('');
@@ -377,13 +381,19 @@ describe('private runtime projection', () => {
     expect(() => project(emptyProjection(), '1', 'messages/metadata', tooMany)).toThrow(
       'runtime_projection_limit',
     );
-    const tools = Array.from({ length: 129 }, (_, index) => ({
+    const tools = Array.from({ length: 1_025 }, (_, index) => ({
       id: String(index),
       name: 'search',
     }));
-    expect(() =>
-      project(emptyProjection(), '1', 'messages', [{ ...message(''), tool_calls: tools }, {}]),
-    ).toThrow('runtime_projection_limit');
+    // Tool calls beyond the step bound are counted, never a reason to park the execution; the
+    // message that issued them holds the first of the recorded steps.
+    const bounded = project(emptyProjection(), '1', 'messages', [
+      { ...message(''), tool_calls: tools },
+      {},
+    ]);
+    expect(projectionActivities(bounded)).toHaveLength(1_023);
+    expect(bounded.order).toHaveLength(1_024);
+    expect(bounded.omittedSteps).toBe(2);
   });
 
   it.each([

@@ -1,7 +1,13 @@
 import { AGUIError } from '@ag-ui/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { isRetryable, recoveryDelay } from '@/services/executions/recovery';
+import {
+  isRetryable,
+  reattachDelay,
+  RECOVERY_ATTEMPTS,
+  RecoveryBudget,
+  recoveryDelay,
+} from '@/services/executions/recovery';
 import { InvalidStreamError } from '@/services/executions/sse';
 import { ApiRequestError } from '@/services/http/api-json';
 
@@ -43,6 +49,36 @@ describe('bounded observer recovery', () => {
       expect(vi.getTimerCount()).toBe(0);
     },
   );
+
+  it('re-attaches after progress within a short jittered pause', async () => {
+    vi.useFakeTimers();
+    for (const [random, delay] of [
+      [0, 100],
+      [1, 300],
+    ] as const) {
+      vi.spyOn(Math, 'random').mockReturnValue(random);
+      const resolve = vi.fn();
+      const pending = reattachDelay(new AbortController().signal).then(resolve);
+      await vi.advanceTimersByTimeAsync(delay - 1);
+      expect(resolve).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await pending;
+      expect(resolve).toHaveBeenCalledOnce();
+    }
+  });
+
+  it('counts only consecutive fruitless attempts toward the budget', () => {
+    const budget = new RecoveryBudget();
+    for (let attempt = 1; attempt < RECOVERY_ATTEMPTS; attempt += 1) {
+      expect(budget.failed()).toBe(true);
+      expect(budget.attempt).toBe(attempt);
+    }
+    budget.progressed();
+    expect(budget.attempt).toBe(0);
+    for (let attempt = 1; attempt < RECOVERY_ATTEMPTS; attempt += 1)
+      expect(budget.failed()).toBe(true);
+    expect(budget.failed()).toBe(false);
+  });
 
   it('retries transient availability failures but fails closed on authorization and malformed data', () => {
     expect(isRetryable(new TypeError('offline'))).toBe(true);

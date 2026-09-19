@@ -116,17 +116,17 @@ describe('Workspace organization', () => {
     await user.click(checked);
     expect(screen.getByRole('textbox', { name: 'Message' })).toBeVisible();
 
-    expect(
-      screen.getByRole('complementary', { name: 'Contexte de la conversation' }),
-    ).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Masquer le contexte' }));
+    // A narrow screen (jsdom) lays the context over the chat as a sheet, closed until asked for.
     expect(
       screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Afficher le contexte' }));
+    expect(screen.getByRole('dialog', { name: 'Contexte de la conversation' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Masquer le contexte' }));
     expect(
-      screen.getByRole('complementary', { name: 'Contexte de la conversation' }),
-    ).toBeVisible();
+      screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Afficher le contexte' })).toHaveFocus();
   });
 
   it('answers the keyboard shortcuts for the panels, a new conversation and the shortcut settings', async () => {
@@ -144,6 +144,10 @@ describe('Workspace organization', () => {
     await user.keyboard('{Control>}{Shift>},{/Shift}{/Control}');
     expect(drawer()).toHaveAttribute('aria-expanded', 'false');
 
+    expect(
+      screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).not.toBeInTheDocument();
+    await user.keyboard('{Control>}{Shift>}.{/Shift}{/Control}');
     expect(
       screen.getByRole('complementary', { name: 'Contexte de la conversation' }),
     ).toBeVisible();

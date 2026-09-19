@@ -186,7 +186,13 @@ test('keeps every workspace panel reachable on a narrow viewport', async ({ page
 
   await page.goto('/app');
 
+  // One bar tops the chat: the navigation opens under it, the context as a sheet over the chat.
+  await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
+  await page.getByRole('button', { name: 'Afficher les conversations' }).click();
   await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible();
+  await page.getByRole('button', { name: 'Masquer les conversations' }).click();
+  await page.getByRole('button', { name: 'Afficher le contexte' }).click();
+  await expect(page.getByRole('dialog', { name: 'Contexte de la conversation' })).toBeVisible();
   await expect(
     page.getByRole('complementary', { name: 'Contexte de la conversation' }),
   ).toBeVisible();
@@ -195,7 +201,7 @@ test('keeps every workspace panel reachable on a narrow viewport', async ({ page
     .toBeLessThanOrEqual(390);
 });
 
-test('lets the context panel use the full tablet width', async ({ page }) => {
+test('lays the context panel over the tablet conversation', async ({ page }) => {
   await page.setViewportSize({ height: 900, width: 1024 });
   await page.route('**/api/auth/refresh', async (route) =>
     route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
@@ -204,10 +210,16 @@ test('lets the context panel use the full tablet width', async ({ page }) => {
   await page.goto('/app');
 
   const contextPanel = page.getByRole('complementary', { name: 'Contexte de la conversation' });
+  await expect(contextPanel).toHaveCount(0);
+  await page.getByRole('button', { name: 'Afficher le contexte' }).click();
   await expect(contextPanel).toBeVisible();
   await expect
-    .poll(async () => (await contextPanel.boundingBox())?.width ?? 0)
-    .toBeGreaterThan(1000);
+    .poll(async () => {
+      const box = await contextPanel.boundingBox();
+      return box === null ? 0 : box.x + box.width;
+    })
+    .toBeCloseTo(1024, 0);
+  expect((await contextPanel.boundingBox())!.width).toBeLessThanOrEqual(352);
 });
 
 test('browses conversations by keyboard while keeping drafts local', async ({ page }) => {
@@ -287,7 +299,6 @@ test('opens mobile history and restores a hidden context without horizontal over
   await expect(page.getByRole('main')).toBeFocused();
   await expect(sample).toBeHidden();
 
-  await page.getByRole('button', { name: 'Masquer le contexte' }).click();
   await expect(
     page.getByRole('complementary', { name: 'Contexte de la conversation' }),
   ).toHaveCount(0);
@@ -296,6 +307,14 @@ test('opens mobile history and restores a hidden context without horizontal over
     page.getByRole('complementary', { name: 'Contexte de la conversation' }),
   ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page
+    .getByRole('dialog', { name: 'Contexte de la conversation' })
+    .getByRole('button', { name: 'Masquer le contexte' })
+    .click();
+  await expect(
+    page.getByRole('complementary', { name: 'Contexte de la conversation' }),
+  ).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Afficher le contexte' })).toBeFocused();
 });
 
 test('respects reduced motion while previewing loading placeholders', async ({ page }) => {

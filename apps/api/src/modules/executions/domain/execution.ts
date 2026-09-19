@@ -2,6 +2,7 @@ import {
   CONVERSATION_TITLE_MAX_LENGTH,
   type Execution,
   type ExecutionStatus,
+  type ExecutionWorkSummary,
   type Message,
   type MessageRole,
 } from '@alfred/contracts';
@@ -41,7 +42,7 @@ export function toExecutionDto(record: ExecutionRecord): Execution {
   });
 }
 
-export function toMessageDto(record: MessageRecord): Message {
+export function toMessageDto(record: MessageRecord, work?: ExecutionWorkSummary): Message {
   return Object.freeze({
     content: record.content,
     conversationId: record.conversationId,
@@ -49,6 +50,7 @@ export function toMessageDto(record: MessageRecord): Message {
     executionId: record.executionId,
     id: record.id,
     role: record.role,
+    ...(work === undefined ? {} : { work }),
   });
 }
 

@@ -1,16 +1,19 @@
 import { SidebarFrame } from '@/components/workspace/navigation/sidebar-frame';
 import { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Keyboard, Palette, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Keyboard, MessagesSquare, Palette, SlidersHorizontal } from 'lucide-react';
 import { AppearanceSettings } from '@/components/workspace/personalization/appearance-settings';
+import { ChatSettings } from '@/components/workspace/personalization/chat-settings';
 import { ContextDocuments } from '@/components/workspace/personalization/context-documents';
 import { ShortcutSettings } from '@/components/workspace/personalization/shortcut-settings';
+import { useChatPreferences } from '@/hooks/workspace/use-chat-preferences';
 import { useShortcutPreferences } from '@/hooks/workspace/use-shortcut-preferences';
 import { useWorkspaceOutlet } from '@/hooks/workspace/use-workspace-outlet';
 import { cn } from '@/lib/cn';
 
 const sections = [
   { key: 'appearance', label: 'Apparence', icon: Palette, to: '/app/settings' },
+  { key: 'chat', label: 'Chat', icon: MessagesSquare, to: '/app/settings?section=chat' },
   {
     key: 'personalization',
     label: 'Personnaliser Alfred',
@@ -32,6 +35,11 @@ const copy: Record<SectionKey, { readonly title: string; readonly description: s
     title: 'Apparence',
     description: 'Un espace à votre image. Ajustez les couleurs et le confort de votre interface.',
   },
+  chat: {
+    title: 'Chat',
+    description:
+      'Ce que la conversation montre du travail d’Alfred : un aperçu simple ou tout le détail, et les éléments à masquer.',
+  },
   personalization: {
     title: 'Personnaliser Alfred',
     description:
@@ -47,10 +55,13 @@ const copy: Record<SectionKey, { readonly title: string; readonly description: s
 export function SettingsScreen() {
   const { preferences, conversationRef } = useWorkspaceOutlet();
   const shortcuts = useShortcutPreferences();
+  const chat = useChatPreferences();
   const [searchParams] = useSearchParams();
   const requested = searchParams.get('section');
   const section: SectionKey =
-    requested === 'personalization' || requested === 'shortcuts' ? requested : 'appearance';
+    requested === 'chat' || requested === 'personalization' || requested === 'shortcuts'
+      ? requested
+      : 'appearance';
   useEffect(() => {
     conversationRef.current?.focus({ preventScroll: true });
     if (conversationRef.current) conversationRef.current.scrollTop = 0;
@@ -106,7 +117,9 @@ export function SettingsScreen() {
               {copy[section].description}
             </p>
           </header>
-          {section === 'personalization' ? (
+          {section === 'chat' ? (
+            <ChatSettings preferences={chat} />
+          ) : section === 'personalization' ? (
             <ContextDocuments scope={{ type: 'personal' }} />
           ) : section === 'shortcuts' ? (
             <ShortcutSettings preferences={shortcuts} />

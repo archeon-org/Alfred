@@ -304,9 +304,171 @@ above: while the `traceLinks` capability is enabled (development only, refused i
 `GET /api/executions/:id/trace-link` returns the LangSmith console address of the execution's
 runtime run. Execution DTOs, `AlfredRunState` and the AG-UI identities are unchanged.
 
+## Revision 2026-09-16 (later): the work log of an execution
+
+Decided with the product owner on 2026-09-16 (plan in
+`tmp/plan-journal-activite-execution-2026-09-16.md`, validated with its recommended options).
+Implements ALF-DEC-006 §6 (sanitized specialist call/result pairs persisted by server-side work),
+ALF-DEC-037 (durable sanitized delegation history: specialist identity, safe timestamps and
+status, bounded labels; no prompt, child message, reasoning or tool payload) and ALF-DEC-036 (one
+level of delegation). ALF-DEC-008 stays in discussion: only that accepted slice is exposed.
+
+- **The projection records the work, not only the answer.** Reducer version 2 keeps, in
+  first-seen order, every visible root message with the moments it started and last grew, a
+  hidden-reasoning marker per message (presence, timing and chunk count, never content), every
+  tool call with its start and end moments, and every specialist invocation identified by the
+  opaque id of its private namespace. The runtime's delegation tool (`task`) reads as a
+  delegation carrying the specialist it requested; the invocation seen through that namespace is
+  linked to the earliest waiting delegation of the same specialist, then confirmed by the
+  namespace the delegation's own result names; a confirmed link displaces an inferred one. When a
+  delegation ends, its invocation ends and its unfinished tools read as interrupted. Moments come
+  from the native stream position (`<milliseconds>-<sequence>`, the server clock) and otherwise
+  from the worker clock. Version 1 rows are read through a normalizer: their tool calls keep
+  their order without moments. The step bound (1 024) is no longer a projection error: further
+  steps are counted as omitted and the execution goes on.
+- **The observation stays standard AG-UI.** Every event carries `timestamp` when the moment is
+  known. Narration (a root message replaced by a later one) is replayed as a closed
+  `TEXT_MESSAGE`; the latest visible message remains the open answer. Reasoning markers are
+  `REASONING_START`/`REASONING_END` without any reasoning message. A delegation is its
+  `TOOL_CALL_START`/`END` plus `SUBAGENT_STARTED` (`subagentRunId` = the delegation's tool call
+  id, `name` = the specialist, `parentToolCallId`) once the specialist is named or finished; the
+  specialist's tools are `TOOL_CALL_*` events owned through `subagentRunId`;
+  `SUBAGENT_FINISHED { outcome: success }` or `SUBAGENT_ERROR { code: failed | interrupted }`
+  follows the specialist's own tool results, then the delegation's `TOOL_CALL_RESULT`. A
+  specialist seen at work before its delegation could be identified is a `SUBAGENT_STARTED`
+  without parent. `TOOL_CALL_RESULT` content adds `interrupted`. A settled execution closes every
+  running step (`interrupted`) and every open specialist before its lifecycle end; a re-parented
+  step, a withdrawn one or a reopened outcome closes the observation so the browser re-attaches.
+  The official verifier remains the oracle.
+- **The JSON profile carries the same log.** `ExecutionSnapshot.work` lists the steps
+  (`message`, `reasoning`, `tool`, `delegation`, `subagent`; narration text bounded to 4 000
+  characters) and the count of omitted steps; `GET /conversations/:id/messages` gives each
+  assistant row a `work` account (status, duration, counts) computed inside PostgreSQL from the
+  reducer JSON, which never leaves the database for a listing. Both fields are optional so an
+  older API stays readable.
+- **The browser renders a collapsible account of the work** above the answer: open and clocked
+  while the answer streams, folded once it settles, reopened at will; narration as page text,
+  markers, tools and specialists with their nested tools, outcomes and durations. The browser
+  refuses specialist prompts (`description`), reports (`result`), nested specialists
+  (`parentSubagentRunId`), child reasoning and reasoning messages, and keeps only a `success`
+  outcome. A stored answer shows its account and loads its steps on demand.
+
+Verification for this revision is recorded in
+[the session record](../memory-bank/sessions/2026-09-16-execution-work-log.md).
+
+## Revision 2026-09-16 (evening): reasoning text, specialist messages and empty generations
+
+Decided with the product owner on 2026-09-16 after the first delivery: the work log must show
+what the orchestrator and its specialists think and say, not only that they thought. This departs
+from the content exclusion of ALF-DEC-037 (reasoning and child messages) on the owner's explicit
+instruction; the register owner is asked to amend the record (see `docs/memory-bank/decisions.md`).
+ALF-DEC-006 §6 and ALF-DEC-036 are unchanged; prompts, reports, tool arguments and tool results
+stay out of the projection and off the wire.
+
+- **Content is a deployment setting.** `EXECUTION_WORK_LOG_CONTENT_ENABLED` (validated boolean,
+  default `true`) lets the worker record the reasoning text of every visible message and the
+  text of a specialist's own messages next to the markers. `false` restores the marker-only
+  record of the previous revision without any other change. Content is bounded per item
+  (32 768 characters of reasoning, 8 000 of a specialist's message, cut with a mark) and by a
+  shared budget of 256 KiB per execution, after which further text is dropped and the steps
+  keep their markers; the `reducer_state` row therefore stays within its byte bound.
+- **The events stay ratified AG-UI.** Reasoning text travels as
+  `REASONING_MESSAGE_START/CONTENT/END` inside its `REASONING_START/END` marker, owned through
+  `subagentRunId` when a specialist reasons. A specialist's message is a `TEXT_MESSAGE_*`
+  sequence owned through `subagentRunId`; the orchestrator's open message remains the only
+  unowned text. A model round trip that produced neither text, nor tool call, nor reasoning is
+  `STEP_STARTED`/`STEP_FINISHED` (`stepName` = the message id): the captured "hello" run spent
+  14 seconds on three empty attempts of the planner model before the fallback answered, and the
+  log now says so instead of showing nothing. Both profiles carry the same steps, not the same
+  bounds: the AG-UI profile streams the text the reducer kept (up to 32 768 characters of
+  reasoning, 8 000 of a specialist's message), while the JSON profile's `WorkStep.text` bounds
+  every step text, reasoning included, to 4 000 characters (`EXECUTION_WORK_TEXT_MAX_LENGTH`). The
+  bounds are JavaScript string lengths (UTF-16 code units, what the contract and the browser
+  check), never splitting a code point; the shared budget counts UTF-8 bytes; the two are enforced
+  separately. `WorkStep` gains `text` and the `generation` kind.
+- **State frames only when the product state changes.** The translator compares states without
+  their activity timestamps, so a run no longer re-sends `STATE_SNAPSHOT` at every commit; the
+  dozens of identical snapshots seen in the exported diagnostics were that comparison, not a
+  change of state.
+- **The browser reads like a terminal agent.** The log sits inline in the transcript (no frame,
+  no background): a folding header "Travail en cours · 12 s" that becomes "Travail effectué ·
+  6 min 34 s · 12 outils · 3 spécialistes" and folds itself once the answer is settled; the
+  waiting line disappears as soon as a step exists. Reasoning streams as muted prose under a
+  "Réflexion" heading, a specialist's messages under its delegation, consecutive calls of the same
+  tool by the same owner fold into one row ("execute_raw ×7") that unfolds into its calls, and an
+  empty generation is a clocked "Génération sans réponse" row. The browser still refuses
+  specialist prompts (`description`), reports (`result`), nested specialists
+  (`parentSubagentRunId`) and any owner on a `STEP_*` event.
+
+### Review corrections (2026-09-16, same revision)
+
+An independent review of the uncommitted revision found defects fixed before delivery; they
+refine, not change, the decisions above (ALF-DEC-006 §5/§6, ALF-DEC-036, ALF-DEC-037 as amended
+by the owner; ALF-DEC-008 stays in discussion).
+
+- **Delegation links are inferred only when they cannot be wrong.** This supersedes "linked to
+  the earliest waiting delegation" of the previous revision: an invocation is linked by inference
+  only when exactly one unresolved delegation of its specialist could own it and that delegation
+  could own no other invocation. Parallel delegations to the same specialist stay unlinked, and
+  their invocations and steps are withheld from the log, until a result names its namespace
+  (`link: exact`); each confirmed pair may make the remaining ones unambiguous. This restraint is
+  what keeps the observation a continuation instead of a re-attach. Lookups scan the unresolved
+  delegations only and stop at the second candidate; observers of one instance share the work log
+  of a committed revision (`ObservedWorkCache`).
+- **Omitted steps are counted once within a bounded memory, and observed live.** The reducer
+  remembers a digest of each omitted step, so its later chunks, deltas or complete message never
+  count it again. The memory holds 2 048 digests (`OMITTED_MEMO_LIMIT`): past that many distinct
+  omissions, a step's later events may count it again (2 049 distinct omissions followed by a
+  repeat read as 2 050), so the count is exact up to that point and an upper bound beyond it. The step count travels on the AG-UI stream as the profile's only `CUSTOM` event,
+  `alfred.work.omitted` with `{ omittedSteps }`, on attach when non-zero and whenever it changes;
+  the browser refuses any other custom event. Its name is `EXECUTION_WORK_OMITTED_EVENT` in the
+  contracts. This is an application contract addition proposed under ALF-DEC-008, which stays
+  in discussion: recording it here does not accept it, and the register owner may replace or
+  remove it.
+- **Commits never lose the head.** The committer keeps the latest accepted projection as the
+  reduction base until its commit completes, so an event consumed during an in-flight write is
+  reduced against it rather than against the older durable row.
+- **The browser's live log matches the stored one.** An orchestrator message keeps its place
+  from its start, so narration reads before the steps that followed it, and ends with its last
+  content (the `TEXT_MESSAGE_END` moment) rather than when the next message began. A re-attach
+  progresses when it brings any step, text growth or transition never shown, element by element;
+  a total size could shrink when a long intermediate answer became bounded narration.
+
+## Revision 2026-09-16 (night): observations that explain their end and never give up on a live run
+
+With the runtime switched to GLM-5.3-Flash, a six-minute topology run was observed six times in
+fifty seconds (attaches of 2.6 to 14.5 s) before the browser showed "Connexion interrompue"
+while the execution kept running. The captured native stream replayed through the real reducer,
+commit rule and translator with 20 ms database writes reproduced it: 192 attaches, each ended by
+a `text_not_prefix` gap on reasoning, because events consumed during an in-flight window commit
+were reduced against the older durable row (fixed by the review correction above: the committer
+keeps its head until the write completes). With that fix the same replay needs a single attach.
+ALF-DEC-006 §5 and ALF-DEC-033 are unchanged; ALF-DEC-008 stays in discussion.
+
+- **Every observation logs why it ended.** One structured line per attach, event
+  `execution_observation_ended`, with the execution id, reason, gap rule and step kind when a
+  translation gap ended it, error class name, duration, events and bytes written, whether it
+  resumed from a cursor and whether headers were sent. Reasons: `terminal`, `legacy_snapshot`,
+  `client_disconnected`, `token_expired` (info); `translation_gap`, `slow_consumer`,
+  `frame_too_large`, `invalid_frame`, `transport_error`, `reauthorization_failed`,
+  `load_timeout`, `revision_regressed`, `error` (warn). No text, prompt or payload is logged.
+- **Unavailability is not an authentication refusal.** A projection or authority read that
+  exceeds its 5 s bound before headers now answers 503 `execution_stream_unavailable`
+  (retryable) instead of 401. A settled row read below the revision already sent ends the attach
+  (`revision_regressed`) instead of waiting for token expiry.
+- **The browser never abandons a progressing run.** An attach that brought any step, text growth
+  or transition never shown resets the recovery budget and re-attaches after 100 to 300 ms; only
+  six consecutive attempts that bring nothing back off and exhaust it (`RecoveryBudget`). A
+  handler exception is a browser bug, never progress. While a re-attach replays the run, the
+  content already on screen stays untouched until the rebuilt content catches up (at most 3 s),
+  and stream deltas publish at most once per animation frame (`createTurnPublisher`), so rows
+  keep their DOM nodes and a folded or unfolded row keeps its state.
+
 ## Remaining decisions
 
 DEC-008/009/016/019/038/051 retain their open event/HITL, continuation, operations, capability and
-privacy details. DEC-050 service-authentication work remains outside this delivery. Full specialist
-history, queue/Push, fork reconstruction, multi-invocation HITL, retention/erasure, production SLOs,
-native restart durability and arbitrary-runtime portability require separate work and evidence.
+privacy details: reasoning content, a bounded excerpt of a specialist's report, tool arguments and
+an exact live delegation link through the native `tasks` stream mode remain decisions for the
+register owner. DEC-050 service-authentication work remains outside this delivery. Queue/Push, fork
+reconstruction, multi-invocation HITL, retention/erasure, production SLOs, native restart durability
+and arbitrary-runtime portability require separate work and evidence.

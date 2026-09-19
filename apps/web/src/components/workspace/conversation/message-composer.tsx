@@ -59,7 +59,9 @@ export function MessageComposer({
   };
 
   return (
-    <div className="mx-auto w-full max-w-conversation shrink-0 px-4 py-4 md:px-6 md:pt-4 md:pb-5 wide:px-8">
+    // No padding, background or spread ring above the box: the transcript scrolls right up to its
+    // border instead of disappearing behind a band.
+    <div className="mx-auto w-full max-w-conversation shrink-0 px-4 pb-4 md:px-6 md:pb-5 wide:px-8">
       <form
         className="rounded-2xl border border-border bg-background px-3 pt-3 pb-2 shadow-composer transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 motion-reduce:transition-none"
         onSubmit={submit}

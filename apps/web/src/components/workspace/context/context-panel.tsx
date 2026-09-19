@@ -13,7 +13,7 @@ import type { WorkspaceToolTab } from '@/lib/workspace/workspace-tools.types';
 interface ContextPanelProps {
   readonly isLoading: boolean;
   readonly tools: WorkspaceToolsState;
-  /** Folds the panel away; the chat gutter then offers the control to bring it back. */
+  /** Folds the docked panel away or closes its sheet; the gutter or the bar brings it back. */
   readonly onClose?: () => void;
 }
 
@@ -28,7 +28,7 @@ export function ContextPanel({ isLoading, tools, onClose }: ContextPanelProps) {
   return (
     <aside
       aria-label="Contexte de la conversation"
-      className="flex min-h-0 min-w-0 workspace:h-full flex-col overflow-y-auto px-5 pt-4 pb-6 text-foreground [scrollbar-width:thin]"
+      className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto overscroll-contain px-5 pt-4 pb-6 text-foreground [scrollbar-width:thin]"
       id="context-panel"
     >
       <div className="border-b border-border pt-0.5 pb-4">

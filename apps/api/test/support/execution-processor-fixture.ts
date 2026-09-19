@@ -94,7 +94,12 @@ export function processorFixture(overrides: Partial<ExecutionEntity> = {}) {
     abandon,
     applyTitle,
   } as unknown as ExecutionStateStore;
-  const config = new ConfigService({ EXECUTION_LEASE_MS: 30_000, EXECUTION_COMMIT_WINDOW_MS: 500 });
+  const config = new ConfigService({
+    EXECUTION_LEASE_MS: 30_000,
+    EXECUTION_COMMIT_WINDOW_MS: 500,
+    // The register default: hidden content is marked, never recorded.
+    EXECUTION_WORK_LOG_CONTENT_ENABLED: false,
+  });
   const processor = new ExecutionProcessor(
     states,
     { renew } as unknown as ExecutionLeaseStore,

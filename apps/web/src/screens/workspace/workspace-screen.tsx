@@ -24,6 +24,7 @@ import {
   useProjectQuery,
   useProjectsQuery,
 } from '@/hooks/projects/use-projects-query';
+import { useContextPanel } from '@/hooks/workspace/use-context-panel';
 import { useWorkspacePreferences } from '@/hooks/workspace/use-workspace-preferences';
 import type { WorkspaceOutletContext } from '@/hooks/workspace/use-workspace-outlet';
 import { useTabletWorkspace } from '@/hooks/workspace/use-tablet-workspace';
@@ -58,7 +59,9 @@ export function WorkspaceScreen() {
   const preferences = useWorkspacePreferences();
   const shell = useWorkspaceShell(preferences.contextOpenByDefault);
   const tools = useWorkspaceTools();
-  // Below md the narrow bar owns the context toggle; from md the panel folds itself.
+  // Docked from the workspace breakpoint, an overlay sheet (closed until asked for) below it.
+  const context = useContextPanel({ isOpen: shell.isContextOpen, toggle: shell.toggleContext });
+  // Below md the narrow bar owns the conversations list; from md the navigation column folds itself.
   const isTablet = useTabletWorkspace();
   const isSettings = useMatch('/app/settings') !== null;
   const navigate = useNavigate();
@@ -67,6 +70,8 @@ export function WorkspaceScreen() {
   const skillEditorMatch = useMatch('/app/skills/:skillId/edit');
   const newSkillMatch = useMatch('/app/skills/new');
   const isSkillEditor = skillEditorMatch !== null || newSkillMatch !== null;
+  // Below the workspace breakpoint these screens grow with their content; the stage scrolls them.
+  const conversationGrows = isSkillEditor || projectMatch !== null;
   const newConversationMatch = useMatch('/app/conversations/new');
   const conversationMatch = useMatch('/app/conversations/:conversationId');
   const pinnedQuery = usePinnedProjectsQuery();
@@ -186,7 +191,7 @@ export function WorkspaceScreen() {
   useWorkspaceShortcuts({
     newConversation: () => create(selectedProjectId === undefined ? 'sandbox' : 'conversation'),
     toggleNavigation: isTablet ? toggleSidebar : shell.toggleNavigation,
-    ...(isSkillEditor || isSettings ? {} : { toggleContext: shell.toggleContext }),
+    ...(isSkillEditor || isSettings ? {} : { toggleContext: context.toggle }),
     // From the settings the shortcut moves to its section without stacking history entries.
     showShortcuts: () => void navigate('/app/settings?section=shortcuts', { replace: isSettings }),
   });
@@ -216,12 +221,15 @@ export function WorkspaceScreen() {
       </a>
       <WorkspaceLayout
         contextAvailable={!isSkillEditor}
+        conversationGrows={conversationGrows}
         isSidebarOpen={shell.isSidebarOpen}
-        isContextOpen={shell.isContextOpen && !isSkillEditor}
+        isNavigationOpen={shell.isNavigationOpen}
+        isContextOpen={context.isOpen && !isSkillEditor}
         sidebarRef={sidebarRef}
         onSidebarOpenChange={shell.setIsSidebarOpen}
         onOpenSidebar={toggleSidebar}
-        onOpenContext={shell.toggleContext}
+        onOpenContext={context.toggle}
+        onCloseContext={context.close}
         sidebar={
           <WorkspaceSidebar
             conversationActions={{
@@ -280,20 +288,14 @@ export function WorkspaceScreen() {
                 selectedProjectId === undefined ? undefined : projectHomePath(selectedProjectId),
               name: scopeName,
             }}
-            isContextOpen={shell.isContextOpen && !isSkillEditor}
+            isContextOpen={context.isOpen && !isSkillEditor}
             isNavigationOpen={shell.isNavigationOpen}
-            onToggleContext={shell.toggleContext}
+            onToggleContext={context.toggle}
             onToggleNavigation={shell.toggleNavigation}
           />
         }
         conversation={<Outlet context={outlet} />}
-        context={
-          <ContextPanel
-            isLoading={isLoading}
-            tools={tools}
-            onClose={isTablet ? shell.toggleContext : undefined}
-          />
-        }
+        context={<ContextPanel isLoading={isLoading} tools={tools} onClose={context.close} />}
       />
       <TextFieldDialog
         description="Regroupez les conversations autour d’un même objectif."
