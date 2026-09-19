@@ -1,10 +1,13 @@
+import { AGUIError } from '@ag-ui/core';
+
 import { ApiRequestError } from '@/services/http/api-json';
 import { InvalidStreamError } from '@/services/executions/sse';
 
 export const RECOVERY_ATTEMPTS = 6;
 
+/** Invalid frames and AG-UI protocol violations fail closed; only transport faults reconnect. */
 export function isRetryable(error: unknown): boolean {
-  if (error instanceof InvalidStreamError) return false;
+  if (error instanceof InvalidStreamError || error instanceof AGUIError) return false;
   if (error instanceof ApiRequestError) return error.status === 429 || error.status >= 500;
   return true;
 }

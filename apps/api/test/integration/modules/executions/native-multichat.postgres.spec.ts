@@ -315,11 +315,13 @@ withDatabase('real worker concurrent conversation recovery', () => {
     }
     for (const reader of [readerA, replayA, readerB, readerC, readerD]) {
       expect(reader.errors).toEqual([]);
-      expect(new Set(reader.snapshots.map((item) => item.execution.id)).size).toBe(1);
-      for (let index = 1; index < reader.snapshots.length; index += 1)
-        expect(reader.snapshots[index]!.revision).toBeGreaterThanOrEqual(
-          reader.snapshots[index - 1]!.revision,
-        );
+      // The RUN_STARTED replica carries no state yet; every later one names the same execution.
+      expect(
+        new Set(reader.snapshots.flatMap((item) => (item.execution ? [item.execution.id] : [])))
+          .size,
+      ).toBe(1);
+      // One attach per reader: every replica belongs to the single synthesized AG-UI run.
+      expect(reader.snapshots.every((item) => item.runs === 1)).toBe(true);
     }
     process.stdout.write(
       'ALFRED_MULTICHAT_RESULT ' +

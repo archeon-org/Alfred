@@ -110,6 +110,7 @@ describe('ConversationTranscript', () => {
             conversationId: CONVERSATION_ID,
             createdAt: '2026-09-11T09:00:01.000Z',
             turn: {
+              activities: [],
               assistantText: '**Bonjour** !',
               error: null,
               events: [
@@ -140,6 +141,7 @@ describe('ConversationTranscript', () => {
             conversationId: CONVERSATION_ID,
             createdAt: '2026-09-11T09:00:01.000Z',
             turn: {
+              activities: [],
               assistantText: '',
               error: null,
               events: [],
@@ -161,6 +163,7 @@ describe('ConversationTranscript', () => {
             conversationId: CONVERSATION_ID,
             createdAt: '2026-09-11T09:00:01.000Z',
             turn: {
+              activities: [],
               assistantText: '',
               error: 'boom',
               events: [],

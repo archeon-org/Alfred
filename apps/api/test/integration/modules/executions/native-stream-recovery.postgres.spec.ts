@@ -9,14 +9,7 @@ import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  applyExecutionDelta,
-  EXECUTION_JSON_PROFILE,
-  executionDeltaSchema,
-  type ExecutionSnapshot,
-  executionSnapshotEnvelopeSchema,
-  executionSnapshotSchema,
-} from '@alfred/contracts';
+import { EXECUTION_JSON_PROFILE, executionSnapshotEnvelopeSchema } from '@alfred/contracts';
 import { ApiExceptionFilter } from '@api/common/filters/api-exception.filter';
 import { AccessTokenGuard } from '@api/common/guards/access-token.guard';
 import { RequestValidationPipe } from '@api/common/validation/request-validation.pipe';
@@ -28,6 +21,11 @@ import { ExecutionProcessor } from '@api/modules/executions/application/executio
 import { ExecutionStreamConsumer } from '@api/modules/executions/application/execution-stream.consumer';
 import { ExecutionsService } from '@api/modules/executions/application/executions.service';
 import { LangGraphRuntimeClient } from '@api/modules/executions/infrastructure/langgraph/langgraph-runtime.client';
+import {
+  AgUiReplicaBuilder,
+  parseAgUiFrame,
+  type ObservedReplica,
+} from '../../../support/ag-ui-frames';
 import { ExecutionLeaseStore } from '@api/modules/executions/infrastructure/persistence/execution-lease.store';
 import { ExecutionStateStore } from '@api/modules/executions/infrastructure/persistence/execution-state.store';
 import { ExecutionEntity } from '@api/modules/executions/infrastructure/persistence/execution.entity';
@@ -307,10 +305,8 @@ soak('native HTTP streaming recovery over wall-clock time', () => {
         expect(
           reader.snapshots.every((s) => 'A durable streaming answer.'.startsWith(s.assistantText)),
         ).toBe(true);
-        for (let index = 1; index < reader.snapshots.length; index += 1)
-          expect(reader.snapshots[index]!.revision).toBeGreaterThanOrEqual(
-            reader.snapshots[index - 1]!.revision,
-          );
+        // One attach per reader: every replica belongs to the single synthesized AG-UI run.
+        expect(reader.snapshots.every((s) => s.runs === 1)).toBe(true);
       }
       const elapsedMs = Date.now() - native.startedAt;
       expect(elapsedMs).toBeGreaterThanOrEqual(durationMs);
@@ -348,10 +344,11 @@ async function atFraction(native: NativeStreamFixture, fraction: number): Promis
   await delay(Math.max(0, native.startedAt + native.durationMs * fraction - Date.now()));
 }
 
-/** A real fetch reader: parses only the known complete JSON snapshot frames emitted by Alfred. */
+/** A real fetch reader: validates every AG-UI frame and reconstructs the browser's view. */
 class SnapshotReader {
-  readonly snapshots: ExecutionSnapshot[] = [];
+  readonly snapshots: ObservedReplica[] = [];
   readonly errors: unknown[] = [];
+  private readonly replica = new AgUiReplicaBuilder();
   maxByteGapMs = 0;
   done: Promise<void> = Promise.resolve();
   private readonly controller = new AbortController();
@@ -391,26 +388,10 @@ class SnapshotReader {
         text += decoder.decode(chunk.value, { stream: true });
         let boundary: number;
         while ((boundary = text.indexOf('\n\n')) !== -1) {
-          const frame = text.slice(0, boundary);
+          const frame = parseAgUiFrame(text.slice(0, boundary));
           text = text.slice(boundary + 2);
-          const lines = frame.split('\n');
-          const data = lines
-            .filter((line) => line.startsWith('data: '))
-            .map((line) => line.slice(6))
-            .join('\n');
-          if (lines.includes('event: snapshot'))
-            this.snapshots.push(executionSnapshotSchema.parse(JSON.parse(data)));
-          if (lines.includes('event: delta')) {
-            // Deltas continue the frame this reader already holds, exactly as the browser does.
-            const base = this.snapshots.at(-1);
-            const merged =
-              base === undefined
-                ? null
-                : applyExecutionDelta(base, executionDeltaSchema.parse(JSON.parse(data)));
-            if (merged === null) throw new Error('Delta frame does not continue the last snapshot');
-            this.snapshots.push(merged);
-          }
-          if (lines.includes('event: error')) this.errors.push(JSON.parse(data) as unknown);
+          if (frame?.kind === 'error') this.errors.push(frame.data);
+          else if (frame?.kind === 'agui') this.snapshots.push(this.replica.push(frame)!);
         }
       }
     } finally {

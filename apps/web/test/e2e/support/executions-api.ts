@@ -2,6 +2,7 @@ import type { ExecutionSnapshot } from '@alfred/contracts';
 import type { Page } from '@playwright/test';
 
 import { DISABLED_FEATURE_FLAGS } from '../../../src/services/feature-flags/feature-flags';
+import { encodeAgUiFrames, synthesizeRun } from '../../support/ag-ui-synth';
 import {
   CONVERSATION_ID,
   defaultSeed,
@@ -36,8 +37,12 @@ export function executionSnapshot(
   };
 }
 
-export function sse(snapshot: ExecutionSnapshot): string {
-  return `id: ${snapshot.cursor}\nevent: snapshot\ndata: ${JSON.stringify(snapshot)}\n\n`;
+/**
+ * One observation response: the AG-UI attach for the first snapshot, then the frames of each
+ * later change, exactly as the API translates its committed projection.
+ */
+export function sse(...snapshots: readonly ExecutionSnapshot[]): string {
+  return encodeAgUiFrames(synthesizeRun(snapshots).flat());
 }
 
 export async function installExecutionApi(page: Page, seed?: WorkspaceSeed) {

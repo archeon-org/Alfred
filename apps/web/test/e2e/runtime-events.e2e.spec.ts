@@ -1,25 +1,23 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
-import {
-  EXECUTION_ID,
-  executionSnapshot,
-  installExecutionApi,
-  sse,
-} from './support/executions-api';
+import { diagnosticEvents, encodeAgUiFrames, synthesizeRun } from '../support/ag-ui-synth';
+import { EXECUTION_ID, executionSnapshot, installExecutionApi } from './support/executions-api';
 import { CONVERSATION_ID } from './support/workspace-api';
 
 const userId = '21dd1aaa-d564-4a45-9a07-dbc5777d25d5';
-const key = `alfred:runtime-event-debug:v2:${userId}:${CONVERSATION_ID}`;
+const key = `alfred:runtime-event-debug:v3:${userId}:${CONVERSATION_ID}`;
 const enabled = process.env.VITE_DEBUG_EVENTS === 'true';
-const events = Array.from({ length: 205 }, (_, id) => ({
-  event: 'snapshot',
-  data: executionSnapshot(
+// Cumulative answers: every snapshot extends the previous one, as the API projection does.
+const snapshots = Array.from({ length: 205 }, (_, id) =>
+  executionSnapshot(
     id + 1,
-    `event-${id}-${'x'.repeat(700)}`,
+    Array.from({ length: id + 1 }, (_, index) => `event-${index}-${'x'.repeat(700)}`).join('\n'),
     id === 204 ? 'completed' : 'running',
   ),
-}));
+);
+const frames = synthesizeRun(snapshots).flat();
+const events = diagnosticEvents(frames);
 
 for (const width of [390, 1440]) {
   test(`debug events capture, download and reload at ${width}px (enabled=${enabled})`, async ({
@@ -28,10 +26,10 @@ for (const width of [390, 1440]) {
     await page.setViewportSize({ width, height: 950 });
     const api = await installExecutionApi(page);
     await page.route(`**/api/executions/${EXECUTION_ID}/events`, (route) => {
-      api.set(events.at(-1)!.data);
+      api.set(snapshots.at(-1)!);
       return route.fulfill({
         contentType: 'text/event-stream',
-        body: events.map((event) => sse(event.data)).join(''),
+        body: encodeAgUiFrames(frames),
       });
     });
     await page.goto(`/app/conversations/${CONVERSATION_ID}`);
@@ -43,8 +41,8 @@ for (const width of [390, 1440]) {
       expect(await page.evaluate((storageKey) => localStorage.getItem(storageKey), key)).toBeNull();
       return;
     }
-    await expect(page.getByText('Événements du runtime (205)')).toBeVisible();
-    await page.getByText('Événements du runtime (205)').click();
+    await expect(page.getByText(`Événements du runtime (${events.length})`)).toBeVisible();
+    await page.getByText(`Événements du runtime (${events.length})`).click();
     const region = page.getByRole('region', { name: 'Événements capturés' });
     await expect(region).toBeVisible();
     expect(
@@ -68,7 +66,7 @@ for (const width of [390, 1440]) {
     const download = await downloaded;
     const path = await download.path();
     const exported = JSON.parse(await readFile(path, 'utf8')) as unknown[];
-    expect(exported).toEqual(events.map((event, index) => ({ ...event, id: index + 1 })));
+    expect(exported).toEqual(events);
     await expect
       .poll(() =>
         page.evaluate((storageKey) => {
@@ -76,10 +74,10 @@ for (const width of [390, 1440]) {
           return raw ? (JSON.parse(raw) as { events: unknown[] }).events.length : 0;
         }, key),
       )
-      .toBe(205);
+      .toBe(events.length);
     await page.reload();
-    await expect(page.getByText('Événements du runtime (205)')).toBeVisible();
-    await page.getByText('Événements du runtime (205)').click();
+    await expect(page.getByText(`Événements du runtime (${events.length})`)).toBeVisible();
+    await page.getByText(`Événements du runtime (${events.length})`).click();
     await expect(page.getByRole('region', { name: 'Événements capturés' })).toContainText(
       'event-204-',
     );

@@ -154,18 +154,23 @@ restart Vite. For Compose, set the root `.env` value and recreate the developmen
 rebuild the production web image. This is public build configuration, not an authorization control.
 
 Debug copies are keyed by user and conversation under
-`alfred:runtime-event-debug:v2:<encoded-user-id>:<encoded-conversation-id>` and store `version: 2`.
-The stream also carries `delta` frames; the observer applies each one to the snapshot it holds
-(reconnecting on a revision gap) and captures the reconstructed snapshot, never the wire delta.
-Capture and reload accept only the public `snapshot` and `conversation` events, canonicalized
-through `executionSnapshotSchema` or `conversationSchema`. Both Conversation IDs in a snapshot
-must match the selected conversation; a conversation event must match it too. Unknown extra fields
-are stripped, while raw native event names, invalid payloads and mismatched scope produce an
-explicit diagnostic error. Downloads contain the validated public payloads, which can still include
-visible conversation content; they are not raw provider/tool exports or an authorization boundary.
+`alfred:runtime-event-debug:v3:<encoded-user-id>:<encoded-conversation-id>` and store `version: 3`.
+The observation stream carries AG-UI protocol events (ADR 0023, revision of 2026-09-15 evening);
+the observer records each validated event as `{ id, event: <AG-UI type>, data: <event> }`.
+Capture and reload accept only the AG-UI events of the Alfred contract (`RUN_STARTED`,
+`RUN_FINISHED`, `RUN_ERROR`, `STATE_SNAPSHOT`, `TEXT_MESSAGE_START/CONTENT/END`,
+`TOOL_CALL_START/END/RESULT`), canonicalized by `canonicalAgUiEvent` in
+`lib/workspace/ag-ui-events.ts`: only known fields survive, a `STATE_SNAPSHOT` must carry an
+`AlfredRunState` whose execution and conversation belong to the selected conversation, a
+`RUN_FINISHED` may only carry a `success` outcome, a `TEXT_MESSAGE_START` must be an `assistant`
+message, a `TOOL_CALL_RESULT` may only carry `completed` or `failed`, and one text delta is bounded
+by the answer limit. Raw native event names, other AG-UI events (`TOOL_CALL_ARGS`, `RAW`, `CUSTOM`, …),
+invalid payloads and mismatched scope produce an explicit diagnostic error. Downloads contain the validated
+public payloads, which can still include visible conversation content; they are not raw
+provider/tool exports or an authorization boundary.
 
-Legacy `alfred:runtime-event-debug:v1:` records are not read, migrated or automatically deleted,
-even with diagnostics enabled. Disabling the flag returns before validation or any storage access,
+Legacy `alfred:runtime-event-debug:v1:` and `v2:` records are not read, migrated or automatically
+deleted, even with diagnostics enabled. Disabling the flag returns before validation or any storage access,
 leaving both namespaces untouched. Remove existing keys through browser storage tools when erasure
 is required. Within the stated budgets, downloads include every captured public event across runs;
 there is no 200-event/240-character truncation. This remains the explicit opt-in exception to the

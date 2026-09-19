@@ -1,3 +1,4 @@
+import { encodeAgUiFrames, synthesizeRun, type AgUiFrame } from './ag-ui-synth';
 import type {
   Conversation,
   ExecutionSnapshot,
@@ -74,29 +75,28 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-type SseFrames = readonly (readonly [string, unknown])[];
+/** AG-UI batches: the attach batch, then the frames of each committed change. */
+type SseFrames = readonly (readonly AgUiFrame[])[];
 
 const SSE_HEADERS = { 'content-type': 'text/event-stream' };
 
-function encodeFrames(frames: SseFrames): string {
-  return frames
-    .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-    .join('');
+function encodeFrames(batches: SseFrames): string {
+  return batches.map((frames) => encodeAgUiFrames(frames)).join('');
 }
 
 /**
- * Streams `frames`; with `hold`, the first two (conversation view, running execution) go out at
+ * Streams `batches`; with `hold`, the attach batch (state and running execution) goes out at
  * once and the rest waits for the promise, so tests can observe an answer in progress.
  */
-function sseResponse(frames: SseFrames, hold: Promise<void> | null): Response {
+function sseResponse(batches: SseFrames, hold: Promise<void> | null): Response {
   if (hold === null)
-    return new Response(encodeFrames(frames), { headers: SSE_HEADERS, status: 200 });
+    return new Response(encodeFrames(batches), { headers: SSE_HEADERS, status: 200 });
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
-      controller.enqueue(encoder.encode(encodeFrames(frames.slice(0, 2))));
+      controller.enqueue(encoder.encode(encodeFrames(batches.slice(0, 1))));
       await hold;
-      controller.enqueue(encoder.encode(encodeFrames(frames.slice(2))));
+      controller.enqueue(encoder.encode(encodeFrames(batches.slice(1))));
       controller.close();
     },
   });
@@ -185,21 +185,12 @@ function runExecution(
     cursor: 'cursor:2',
     revision: 2,
   };
+  const partial = { ...initial, assistantText: reply.slice(0, 8), revision: 1, cursor: 'cursor:1' };
+  const full = { ...initial, assistantText: reply, revision: 2, cursor: 'cursor:2' };
   return {
     initial,
     final,
-    frames: [
-      ['conversation', provisional],
-      ['snapshot', initial],
-      [
-        'snapshot',
-        { ...initial, assistantText: reply.slice(0, 8), revision: 1, cursor: 'cursor:1' },
-      ],
-      ['snapshot', { ...initial, assistantText: reply, revision: 2, cursor: 'cursor:2' }],
-      ...(interrupted
-        ? []
-        : [...(untitled ? [['conversation', titled] as const] : []), ['snapshot', final] as const]),
-    ],
+    frames: synthesizeRun([initial, partial, full, ...(interrupted ? [] : [final])]),
   };
 }
 

@@ -1,4 +1,5 @@
 import type { ExecutionSnapshot } from '@alfred/contracts';
+import { EventType } from '@ag-ui/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -14,10 +15,10 @@ import {
   listMessages,
   observeExecution,
   stopExecution,
-  type PublicExecutionEvent,
 } from '@/services/executions/executions.service';
 import type * as RecoveryModule from '@/services/executions/recovery';
 import { ApiRequestError } from '@/services/http/api-json';
+import { synthesizeFrames, synthesizeRun, type AgUiFrame } from '../../../support/ag-ui-synth';
 import { snapshot } from '../../../support/executions-api';
 import { CONVERSATION_ID, STANDALONE_CONVERSATION_ID } from '../../../support/workspace-api';
 
@@ -53,15 +54,15 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-function frame(base: ExecutionSnapshot, revision: number, text: string): PublicExecutionEvent {
-  return {
-    event: 'snapshot',
-    data: { ...base, revision, cursor: `${base.execution.id}:${revision}`, assistantText: text },
-  };
+function frame(base: ExecutionSnapshot, revision: number, text: string): ExecutionSnapshot {
+  return { ...base, revision, cursor: `${base.execution.id}:${revision}`, assistantText: text };
 }
 
-/** Each gate represents a network delivery; ignoring abort models an already queued callback. */
-function stream(events: readonly PublicExecutionEvent[], ignoreAbort = false) {
+/** AG-UI batches for consecutive committed projections, as the API translates them. */
+const batches = (...snapshots: readonly ExecutionSnapshot[]) => synthesizeRun(snapshots);
+
+/** Each gate represents a network delivery of one batch; ignoring abort models a queued callback. */
+function stream(events: readonly (readonly AgUiFrame[])[], ignoreAbort = false) {
   const gates = events.map(() => deferred<void>());
   const ended = deferred<void>();
   let signal: AbortSignal | undefined;
@@ -72,12 +73,12 @@ function stream(events: readonly PublicExecutionEvent[], ignoreAbort = false) {
       else current.addEventListener('abort', () => resolve(), { once: true });
     });
     try {
-      for (const [index, item] of events.entries()) {
+      for (const [index, batch] of events.entries()) {
         await (ignoreAbort
           ? gates[index]!.promise
           : Promise.race([gates[index]!.promise, aborted]));
         if (current.aborted && !ignoreAbort) return;
-        yield item;
+        for (const item of batch) yield item;
       }
       if (!current.aborted) await aborted;
     } finally {
@@ -151,7 +152,7 @@ describe('chat recovery race regressions', () => {
 
   it('deduplicates Stop while its response is pending and does not roll it back on a queued running snapshot', async () => {
     const response = deferred<ExecutionSnapshot>();
-    const events = stream([frame(FIRST, 0, '')]);
+    const events = stream(batches(frame(FIRST, 0, '')));
     stop.mockReturnValue(response.promise);
     observe.mockImplementation(events.implementation);
     const view = renderChat();
@@ -175,7 +176,7 @@ describe('chat recovery race regressions', () => {
   });
 
   it('does not reopen a cancelled execution when an already queued newer running snapshot arrives', async () => {
-    const events = stream([frame(FIRST, 5, 'Incorrect reopening')]);
+    const events = stream(batches(frame(FIRST, 5, 'Incorrect reopening')));
     observe.mockImplementation(events.implementation);
     stop.mockResolvedValue({ ...FIRST, execution: { ...FIRST.execution, status: 'cancelled' } });
     const view = renderChat();
@@ -196,7 +197,7 @@ describe('chat recovery race regressions', () => {
   });
 
   it('keeps one observer when reload is clicked repeatedly while the stream is already open', async () => {
-    const events = stream([frame(FIRST, 1, 'Still connected')]);
+    const events = stream(batches(frame(FIRST, 1, 'Still connected')));
     observe.mockImplementation(events.implementation);
     const view = renderChat();
     await ready(view);
@@ -233,10 +234,11 @@ describe('chat recovery race regressions', () => {
   });
 
   it('keeps the accepted replay cursor when reconciliation returns an older snapshot', async () => {
-    const next = stream([frame(FIRST, 5, 'Recovered')]);
+    const next = stream(batches(frame(FIRST, 5, 'Recovered')));
     observe
       .mockImplementationOnce(async function* () {
-        yield await Promise.resolve(frame(FIRST, 4, 'Partial'));
+        for (const item of synthesizeFrames(null, frame(FIRST, 4, 'Partial')))
+          yield await Promise.resolve(item);
       })
       .mockImplementationOnce(next.implementation);
     get.mockResolvedValue({ ...FIRST, revision: 2, cursor: 'outdated', assistantText: 'Old' });
@@ -253,8 +255,18 @@ describe('chat recovery race regressions', () => {
     expect(create).toHaveBeenCalledOnce();
   });
 
-  it('fails closed on contradictory text at the same revision without retrying or erasing the last good text', async () => {
-    const events = stream([frame(FIRST, 1, 'Trusted'), frame(FIRST, 1, 'Conflicting')]);
+  it('fails closed on the state of another execution without retrying or erasing the last good text', async () => {
+    const foreign: AgUiFrame = {
+      event: {
+        type: EventType.STATE_SNAPSHOT,
+        snapshot: {
+          execution: { ...SECOND.execution, conversationId: FIRST.execution.conversationId },
+          conversation: FIRST.conversation,
+          userMessage: FIRST.userMessage,
+        },
+      },
+    };
+    const events = stream([synthesizeFrames(null, frame(FIRST, 1, 'Trusted')), [foreign]]);
     observe.mockImplementation(events.implementation);
     const view = renderChat();
     await ready(view);
@@ -271,11 +283,31 @@ describe('chat recovery race regressions', () => {
     expect(view.result.current.send('Duplicate')).toBe(false);
   });
 
+  it('fails closed on an AG-UI protocol violation reported by the official verifier, without a retry', async () => {
+    const outOfOrder: AgUiFrame = {
+      event: { type: EventType.TEXT_MESSAGE_CONTENT, messageId: 'never-opened', delta: 'x' },
+    };
+    const events = stream([synthesizeFrames(null, frame(FIRST, 1, 'Trusted')), [outOfOrder]]);
+    observe.mockImplementation(events.implementation);
+    const view = renderChat();
+    await ready(view);
+    act(() => {
+      view.result.current.send('First');
+      events.release(0);
+    });
+    await waitFor(() => expect(view.result.current.live?.assistantText).toBe('Trusted'));
+    act(() => events.release(1));
+    await waitFor(() => expect(view.result.current.live?.connection).toBe('disconnected'));
+    expect(view.result.current.live?.assistantText).toBe('Trusted');
+    expect(observe).toHaveBeenCalledOnce();
+    expect(get).not.toHaveBeenCalled();
+  });
+
   it('keeps reversed creation acknowledgements and subsequent output in their own conversations', async () => {
     const first = deferred<ExecutionSnapshot>();
     const second = deferred<ExecutionSnapshot>();
-    const firstEvents = stream([frame(FIRST, 1, 'First answer')]);
-    const secondEvents = stream([frame(SECOND, 1, 'Second answer')]);
+    const firstEvents = stream(batches(frame(FIRST, 1, 'First answer')));
+    const secondEvents = stream(batches(frame(SECOND, 1, 'Second answer')));
     create.mockImplementation((_client, id) => (id === CONVERSATION_ID ? first : second).promise);
     observe.mockImplementation((client, id, signal) =>
       (id === FIRST.execution.id ? firstEvents : secondEvents).implementation(client, id, signal),
@@ -311,14 +343,15 @@ describe('chat recovery race regressions', () => {
   it.each([401, 403, 404])(
     'isolates a non-retryable %s stream failure from another chat',
     async (status) => {
-      const secondEvents = stream([frame(SECOND, 1, 'Second stays usable')]);
+      const secondEvents = stream(batches(frame(SECOND, 1, 'Second stays usable')));
       create.mockImplementation((_client, id) =>
         Promise.resolve(id === CONVERSATION_ID ? FIRST : SECOND),
       );
       observe.mockImplementation((client, id, signal) => {
         if (id === SECOND.execution.id) return secondEvents.implementation(client, id, signal);
         return (async function* () {
-          yield await Promise.resolve(frame(FIRST, 1, 'Saved partial'));
+          for (const item of synthesizeFrames(null, frame(FIRST, 1, 'Saved partial')))
+            yield await Promise.resolve(item);
           throw new ApiRequestError(status, 'execution_unavailable', 'Unavailable');
         })();
       });
@@ -347,7 +380,7 @@ describe('chat recovery race regressions', () => {
   );
 
   it('ignores an old account event even when its transport delivers after cancellation', async () => {
-    const late = stream([frame(FIRST, 1, 'Private prior account answer')], true);
+    const late = stream(batches(frame(FIRST, 1, 'Private prior account answer')), true);
     observe.mockImplementation(late.implementation);
     const view = renderChat();
     await ready(view);

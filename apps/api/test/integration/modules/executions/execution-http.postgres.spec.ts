@@ -199,7 +199,10 @@ postgres('durable execution authenticated HTTP contract', () => {
     const observer = await request(`/executions/${created.execution.id}/events`, f.token);
     expect(observer.headers.get('content-type')).toContain('text/event-stream');
     const text = await observer.text();
-    expect(text).toContain('event: snapshot');
+    // AG-UI frames: an unnamed `data:` run that opens, carries the answer and finishes.
+    expect(text).toContain('"type":"RUN_STARTED"');
+    expect(text).toContain('"type":"RUN_FINISHED"');
+    expect(text).not.toContain('event: ');
     expect(text).toContain('Safe answer');
     expect(text).not.toContain(claimed.invocationId);
   });

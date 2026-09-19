@@ -1,3 +1,4 @@
+import { AGUIError } from '@ag-ui/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { isRetryable, recoveryDelay } from '@/services/executions/recovery';
@@ -51,5 +52,7 @@ describe('bounded observer recovery', () => {
       expect(isRetryable(new ApiRequestError(status, 'rejected', 'Rejected'))).toBe(false);
     }
     expect(isRetryable(new InvalidStreamError())).toBe(false);
+    // Protocol violations reported by the official AG-UI verifier never reconnect.
+    expect(isRetryable(new AGUIError('Cannot send TEXT_MESSAGE_CONTENT'))).toBe(false);
   });
 });

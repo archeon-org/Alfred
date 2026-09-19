@@ -20,9 +20,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// The chat panel is re-created when the route changes: query the current main element each time.
+// The chat panel is re-created when the route changes, and a settled live turn is swapped for its
+// stored rows: query the current main element each time and assert visibility inside the wait.
 const findInMain = (text: string | RegExp) =>
-  waitFor(() => within(screen.getByRole('main')).getByText(text));
+  waitFor(() => {
+    const element = within(screen.getByRole('main')).getByText(text);
+    expect(element).toBeVisible();
+    return element;
+  });
 const sidebar = () => within(screen.getByRole('complementary', { name: 'Espace personnel' }));
 
 describe('Workspace chat with the agent bridge', () => {
@@ -37,8 +42,10 @@ describe('Workspace chat with the agent bridge', () => {
       expect(router.state.location.pathname).toMatch(/^\/app\/conversations\/[0-9a-f-]{36}$/u),
     );
     expect(router.state.location.state).toBeNull();
-    expect(await findInMain('hello')).toBeVisible();
-    expect(await findInMain(fakeReply('hello'))).toBeVisible();
+    // The live turn hands over to the stored rows as soon as the answer settles; a reference taken
+    // before that swap would be stale, so visibility is asserted inside the wait itself.
+    await findInMain('hello');
+    await findInMain(fakeReply('hello'));
     expect(await sidebar().findByRole('button', { name: fakeTitle('hello') })).toBeVisible();
     expect(
       await screen.findByRole('heading', { level: 1, name: fakeTitle('hello') }),

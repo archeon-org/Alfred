@@ -55,20 +55,27 @@ export class ExecutionObservationService {
     loaded: Awaited<ReturnType<ExecutionObservationService['load']>>,
     state = loaded.state,
   ): ExecutionSnapshot {
-    const cursor = createResumeCursor(
-      { ...this.scope(loaded.row), nativePosition: state.sourceId, outputSubposition: 0 },
-      this.config.getOrThrow<string>('EXECUTION_CURSOR_KEY'),
-      { ttlMs: this.config.get<number>('EXECUTION_CURSOR_TTL_MS') ?? 3_600_000 },
-    );
     return {
       execution: toExecutionDto(loaded.row),
       conversation: loaded.conversation,
       userMessage: loaded.userMessage,
       assistantText: state.sourceId === null ? loaded.row.publicText : projectionText(state),
       activities: [...projectionActivities(state)],
-      cursor,
+      cursor: this.cursor(loaded, state),
       revision: state.sequence,
     };
+  }
+
+  /** Opaque, authenticated resume position of the committed projection (ALF-DEC-006 §4). */
+  cursor(
+    loaded: Awaited<ReturnType<ExecutionObservationService['load']>>,
+    state = loaded.state,
+  ): string {
+    return createResumeCursor(
+      { ...this.scope(loaded.row), nativePosition: state.sourceId, outputSubposition: 0 },
+      this.config.getOrThrow<string>('EXECUTION_CURSOR_KEY'),
+      { ttlMs: this.config.get<number>('EXECUTION_CURSOR_TTL_MS') ?? 3_600_000 },
+    );
   }
 
   private readCursor(cursor: string, row: ExecutionEntity): void {

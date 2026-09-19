@@ -1,5 +1,5 @@
-import { conversationSchema, executionSnapshotSchema } from '@alfred/contracts';
 import type { RuntimeEventView } from '@/contexts/chat-session/chat-session-context';
+import { canonicalAgUiEvent } from '@/lib/workspace/ag-ui-events';
 
 interface DebugSnapshot {
   readonly events: readonly RuntimeEventView[];
@@ -26,7 +26,7 @@ export function isRuntimeEventDebugEnabled(): boolean {
 }
 
 function storageKey(userId: string, conversationId: string): string {
-  return `alfred:runtime-event-debug:v2:${encodeURIComponent(userId)}:${encodeURIComponent(conversationId)}`;
+  return `alfred:runtime-event-debug:v3:${encodeURIComponent(userId)}:${encodeURIComponent(conversationId)}`;
 }
 
 function notify(): void {
@@ -53,25 +53,15 @@ function isStoredEvent(value: unknown): value is RuntimeEventView {
   );
 }
 
-/** Canonical copies prevent persisted native payloads or extra private fields re-entering exports. */
+/**
+ * Canonical copies prevent persisted native payloads or extra private fields re-entering exports:
+ * only AG-UI events of the Alfred contract, scoped to this conversation, are kept.
+ */
 function parsePublicEvent(value: unknown, conversationId: string): RuntimeEventView | null {
   if (!isStoredEvent(value)) return null;
-  if (value.event === 'snapshot') {
-    const parsed = executionSnapshotSchema.safeParse(value.data);
-    if (
-      !parsed.success ||
-      parsed.data.conversation.id !== conversationId ||
-      parsed.data.execution.conversationId !== conversationId
-    )
-      return null;
-    return { id: value.id, event: value.event, data: parsed.data };
-  }
-  if (value.event === 'conversation') {
-    const parsed = conversationSchema.safeParse(value.data);
-    if (!parsed.success || parsed.data.id !== conversationId) return null;
-    return { id: value.id, event: value.event, data: parsed.data };
-  }
-  return null;
+  const event = canonicalAgUiEvent(value.data, { conversationId });
+  if (event === null || (event.type as string) !== value.event) return null;
+  return { id: value.id, event: value.event, data: event };
 }
 
 function parseSnapshot(raw: string, conversationId: string): DebugSnapshot {
@@ -80,7 +70,7 @@ function parseSnapshot(raw: string, conversationId: string): DebugSnapshot {
     typeof value !== 'object' ||
     value === null ||
     !('version' in value) ||
-    value.version !== 2 ||
+    value.version !== 3 ||
     !('events' in value) ||
     !Array.isArray(value.events) ||
     !value.events.every(isStoredEvent)
@@ -149,7 +139,7 @@ export function getRuntimeEventDebugSnapshot(
 function invalidateStoredCapture(key: string): void {
   try {
     window.localStorage.removeItem(key);
-    window.localStorage.setItem(key, JSON.stringify({ version: 2, events: [], incomplete: true }));
+    window.localStorage.setItem(key, JSON.stringify({ version: 3, events: [], incomplete: true }));
   } catch {
     // The caller already reports the storage failure. A denied browser store may prevent cleanup.
   }
@@ -166,7 +156,7 @@ function flush(): void {
     if (!entry) continue;
     try {
       const raw = JSON.stringify({
-        version: 2,
+        version: 3,
         events: entry.snapshot.events,
         incomplete: entry.snapshot.error !== null,
       });

@@ -1,4 +1,5 @@
-import { Bot, LoaderCircle, User } from 'lucide-react';
+import type { ExecutionActivity } from '@alfred/contracts';
+import { Bot, Check, LoaderCircle, User, X } from 'lucide-react';
 import { Fragment, useEffect, useRef } from 'react';
 
 import { MarkdownView } from '@/components/ui/markdown-view';
@@ -51,6 +52,7 @@ export function ConversationTranscript({
               pending={entry.session.turn.status === 'streaming'}
               error={entry.session.turn.error}
               statusText={observationStatus(entry.session.turn)}
+              activities={entry.session.turn.activities}
             />
           </Fragment>
         ),
@@ -66,9 +68,18 @@ interface TurnProps {
   readonly pending?: boolean;
   readonly error?: string | null;
   readonly statusText?: string | null;
+  /** Tool calls reported for a live turn; stored rows carry none. */
+  readonly activities?: readonly ExecutionActivity[];
 }
 
-function Turn({ author, content, pending = false, error = null, statusText = null }: TurnProps) {
+function Turn({
+  author,
+  content,
+  pending = false,
+  error = null,
+  statusText = null,
+  activities = [],
+}: TurnProps) {
   const isUser = author === 'user';
   return (
     <li className={cn('flex gap-3', isUser && 'flex-row-reverse')}>
@@ -88,6 +99,7 @@ function Turn({ author, content, pending = false, error = null, statusText = nul
         )}
       >
         <p className="sr-only">{isUser ? 'Vous' : 'Alfred'}</p>
+        {activities.length > 0 ? <Activities activities={activities} /> : null}
         {isUser ? (
           <p className="whitespace-pre-wrap">{content}</p>
         ) : content.length > 0 ? (
@@ -117,6 +129,34 @@ function Turn({ author, content, pending = false, error = null, statusText = nul
         ) : null}
       </div>
     </li>
+  );
+}
+
+const ACTIVITY_STATUS = {
+  running: { icon: LoaderCircle, label: 'en cours', className: 'animate-spin' },
+  completed: { icon: Check, label: 'terminé', className: '' },
+  failed: { icon: X, label: 'échoué', className: 'text-destructive' },
+} as const;
+
+/** Compact list of the tools Alfred used for this answer: safe label and status only. */
+function Activities({ activities }: { readonly activities: readonly ExecutionActivity[] }) {
+  return (
+    <ul
+      aria-label="Outils utilisés"
+      className="mb-2 flex flex-col gap-1 text-xs text-muted-foreground"
+    >
+      {activities.map((activity) => {
+        const status = ACTIVITY_STATUS[activity.status];
+        const Icon = status.icon;
+        return (
+          <li key={activity.id} className="flex items-center gap-1.5">
+            <Icon aria-hidden="true" className={cn('shrink-0', status.className)} size={12} />
+            <span className="truncate font-mono">{activity.label}</span>
+            <span className="sr-only">{status.label}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

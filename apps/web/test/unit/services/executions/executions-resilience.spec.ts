@@ -181,15 +181,11 @@ describe('execution transport boundary regressions', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(request.signal()?.aborted).toBe(false);
     }
-    const recovered = snapshot({
-      revision: 2,
-      cursor: 'after-silence',
-      assistantText: 'Answer after four minutes',
-    });
-    request.write(`id: after-silence\nevent: snapshot\ndata: ${JSON.stringify(recovered)}\n\n`);
+    const runStarted = { type: 'RUN_STARTED', threadId: CONVERSATION_ID, runId: EXECUTION_ID };
+    request.write(`id: after-silence\ndata: ${JSON.stringify(runStarted)}\n\n`);
     await expect(pending).resolves.toEqual({
       done: false,
-      value: { event: 'snapshot', data: recovered, id: 'after-silence' },
+      value: { event: runStarted, id: 'after-silence' },
     });
     expect(request.client.request).toHaveBeenCalledOnce();
     await observer.return(undefined);

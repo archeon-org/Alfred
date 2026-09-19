@@ -15,11 +15,11 @@ import {
   listMessages,
   observeExecution,
   stopExecution,
-  type PublicExecutionEvent,
 } from '@/services/executions/executions.service';
 import type * as RecoveryModule from '@/services/executions/recovery';
 import { recoveryDelay } from '@/services/executions/recovery';
 import { ApiRequestError } from '@/services/http/api-json';
+import { synthesizeRun, type AgUiFrame } from '../../../support/ag-ui-synth';
 import { execution, EXECUTION_ID, snapshot } from '../../../support/executions-api';
 import { CONVERSATION_ID, STANDALONE_CONVERSATION_ID } from '../../../support/workspace-api';
 
@@ -37,18 +37,18 @@ const mockedGet = vi.mocked(getExecution);
 const mockedStream = vi.mocked(observeExecution);
 const mockedStop = vi.mocked(stopExecution);
 
+/** One committed public projection; the stream helpers translate them into AG-UI batches. */
 function event(
   revision: number,
   assistantText = '',
   status: ExecutionSnapshot['execution']['status'] = 'running',
-): PublicExecutionEvent {
-  const data = snapshot({
+): ExecutionSnapshot {
+  return snapshot({
     revision,
     cursor: `cursor:${revision}`,
     assistantText,
     execution: execution(status, status === 'failed' ? 'L’agent a échoué.' : null),
   });
-  return { event: 'snapshot', data, id: data.cursor! };
 }
 
 function stored(content: string, role: 'user' | 'assistant', executionId = EXECUTION_ID) {
@@ -78,9 +78,10 @@ function renderChat(conversationId = CONVERSATION_ID) {
   };
 }
 
-function streamOf(events: readonly PublicExecutionEvent[], failure?: Error) {
+function streamOf(snapshots: readonly ExecutionSnapshot[], failure?: Error) {
+  const frames: AgUiFrame[] = synthesizeRun(snapshots).flat();
   return async function* (_client: unknown, _id: string, signal: AbortSignal) {
-    for (const item of events) {
+    for (const item of frames) {
       if (signal.aborted) throw new Error('aborted');
       await Promise.resolve();
       yield item;
@@ -89,8 +90,10 @@ function streamOf(events: readonly PublicExecutionEvent[], failure?: Error) {
   };
 }
 
-function controlledStream(events: readonly PublicExecutionEvent[]) {
-  const gates = events.map(() => {
+/** One gate per snapshot: releasing it delivers the whole AG-UI batch of that change. */
+function controlledStream(snapshots: readonly ExecutionSnapshot[]) {
+  const batches = synthesizeRun(snapshots);
+  const gates = batches.map(() => {
     let open = () => undefined as void;
     const promise = new Promise<void>((resolve) => {
       open = resolve;
@@ -100,13 +103,13 @@ function controlledStream(events: readonly PublicExecutionEvent[]) {
   let seenSignal: AbortSignal | undefined;
   const implementation = async function* (_client: unknown, _id: string, signal: AbortSignal) {
     seenSignal = signal;
-    for (const [index, item] of events.entries()) {
+    for (const [index, batch] of batches.entries()) {
       const abort = new Promise<never>((_resolve, reject) => {
         if (signal.aborted) reject(new Error('aborted'));
         else signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
       });
       await Promise.race([gates[index]?.promise, abort]);
-      yield item;
+      for (const item of batch) yield item;
     }
   };
   return {
@@ -139,11 +142,8 @@ describe('recoverable chat observation', () => {
     'uses cumulative public snapshots and hands over with debug=%s',
     async (flag) => {
       vi.stubEnv('VITE_DEBUG_EVENTS', flag);
-      const stream = controlledStream([
-        event(1, 'Bon'),
-        event(2, 'Bonjour !'),
-        event(3, 'Bonjour !', 'completed'),
-      ]);
+      const run = [event(1, 'Bon'), event(2, 'Bonjour !'), event(3, 'Bonjour !', 'completed')];
+      const stream = controlledStream(run);
       mockedStream.mockImplementation(stream.implementation);
       const view = await ready(renderChat());
       mockedList.mockResolvedValue([stored('Salut', 'user'), stored('Bonjour !', 'assistant')]);
@@ -159,7 +159,9 @@ describe('recoverable chat observation', () => {
       });
       await waitFor(() => expect(view.result.current.live).toBeNull());
       expect(view.result.current.messages).toHaveLength(2);
-      expect(view.result.current.debug.events).toHaveLength(flag === 'true' ? 3 : 0);
+      expect(view.result.current.debug.events).toHaveLength(
+        flag === 'true' ? synthesizeRun(run).flat().length : 0,
+      );
       expect(mockedCreate).toHaveBeenCalledWith(
         expect.anything(),
         CONVERSATION_ID,
@@ -172,6 +174,7 @@ describe('recoverable chat observation', () => {
         EXECUTION_ID,
         expect.any(AbortSignal),
         'cursor:0',
+        CONVERSATION_ID,
       );
     },
   );
@@ -206,6 +209,7 @@ describe('recoverable chat observation', () => {
       EXECUTION_ID,
       expect.any(AbortSignal),
       'cursor:4',
+      CONVERSATION_ID,
     );
     expect(view.result.current.send('another')).toBe(false);
     mockedActive.mockResolvedValue(null);
@@ -217,10 +221,10 @@ describe('recoverable chat observation', () => {
     await waitFor(() => expect(view.result.current.live).toBeNull());
   });
 
-  it('rejoins the same execution after EOF and ignores duplicate and older snapshots', async () => {
+  it('rejoins the same execution after EOF from its cursor and ignores an unchanged batch', async () => {
     const next = controlledStream([
       event(1, 'Bon'),
-      event(0, 'stale'),
+      event(1, 'Bon'),
       event(2, 'Bonjour', 'completed'),
     ]);
     mockedStream
@@ -294,9 +298,7 @@ describe('recoverable chat observation', () => {
         finishedAt: '2026-09-11T09:01:00.000Z',
       },
     });
-    mockedStream.mockImplementation(
-      streamOf([{ event: 'snapshot', data: parked, id: 'cursor:1' }]),
-    );
+    mockedStream.mockImplementation(streamOf([parked]));
     mockedList.mockResolvedValue([stored('Salut', 'user'), stored('Partiel', 'assistant')]);
     const view = await ready(renderChat());
     act(() => {
@@ -354,24 +356,14 @@ describe('recoverable chat observation', () => {
     expect(view.result.current.send('Suite')).toBe(true);
   });
 
-  it('applies delta frames on top of the last snapshot and reconnects on a revision gap', async () => {
-    const delta = (
-      baseRevision: number,
-      revision: number,
-      append: string,
-    ): PublicExecutionEvent => ({
-      event: 'delta',
-      id: `cursor:${revision}`,
-      data: {
-        executionId: EXECUTION_ID,
-        baseRevision,
-        revision,
-        cursor: `cursor:${revision}`,
-        assistantAppend: append,
-      },
-    });
+  it('re-attaches from the last cursor when the API asks the observer to reconnect', async () => {
     mockedStream
-      .mockImplementationOnce(streamOf([event(1, 'Par'), delta(1, 2, 'tiel'), delta(7, 8, 'LOST')]))
+      .mockImplementationOnce(
+        streamOf(
+          [event(1, 'Par'), event(2, 'Partiel')],
+          new ApiRequestError(503, 'execution_stream_unavailable', 'Indisponible'),
+        ),
+      )
       .mockImplementationOnce(streamOf([event(3, 'Partiel !', 'completed')]));
     mockedList.mockResolvedValue([stored('Salut', 'user'), stored('Partiel !', 'assistant')]);
     const view = await ready(renderChat());
@@ -380,9 +372,9 @@ describe('recoverable chat observation', () => {
     });
     await waitFor(() => expect(view.result.current.live).toBeNull());
     expect(mockedStream).toHaveBeenCalledTimes(2);
+    expect(mockedStream.mock.calls[1]?.[3]).toBe('cursor:2');
     expect(mockedGet).toHaveBeenCalledOnce();
     expect(view.result.current.messages.at(-1)?.content).toBe('Partiel !');
-    expect(view.result.current.debug.events.map((item) => item.event)).not.toContain('delta');
   });
 
   it('reconciles a terminal GET after losing the final stream event', async () => {
@@ -542,11 +534,11 @@ describe('recoverable chat observation', () => {
     },
   );
 
-  it('refreshes titles and releases the slot when the execution settles while the title stream remains open', async () => {
+  it('applies a title carried by the settled state and releases the slot for the next message', async () => {
     const title = { ...snapshot().conversation, title: 'Salutations' };
     const stream = controlledStream([
-      event(1, 'FIRST ANSWER', 'completed'),
-      { event: 'conversation', data: title },
+      event(1, 'FIRST ANSWER'),
+      { ...event(1, 'FIRST ANSWER', 'completed'), conversation: title },
     ]);
     mockedStream
       .mockImplementationOnce(stream.implementation)
@@ -556,7 +548,14 @@ describe('recoverable chat observation', () => {
       view.result.current.send('first');
       stream.release(0);
     });
+    await waitFor(() => expect(view.result.current.live?.assistantText).toBe('FIRST ANSWER'));
+    act(() => stream.release(1));
     await waitFor(() => expect(view.result.current.live?.status).toBe('done'));
+    await waitFor(() =>
+      expect(
+        view.queryClient.getQueryData(['conversations', 'user-1', 'detail', CONVERSATION_ID]),
+      ).toMatchObject({ title: 'Salutations' }),
+    );
     mockedCreate.mockResolvedValue(
       snapshot({
         execution: { ...execution(), id: '55555555-5555-4555-8555-555555555555' },
@@ -567,12 +566,6 @@ describe('recoverable chat observation', () => {
       expect(view.result.current.send('second')).toBe(true);
     });
     await waitFor(() => expect(view.result.current.live?.userMessage).toBe('second'));
-    act(() => stream.release(1));
-    await waitFor(() =>
-      expect(
-        view.queryClient.getQueryData(['conversations', 'user-1', 'detail', CONVERSATION_ID]),
-      ).toMatchObject({ title: 'Salutations' }),
-    );
     render(<ConversationTranscript messages={[]} sessions={view.result.current.sessions} />);
     expect(screen.getByText('FIRST ANSWER')).toBeVisible();
     expect(view.result.current.sessions).toHaveLength(2);
@@ -642,7 +635,7 @@ describe('recoverable chat observation', () => {
       });
       const firstStream = controlledStream([event(1, 'First answer')]);
       const secondStream = controlledStream([
-        { event: 'snapshot', data: { ...second, revision: 1, assistantText: 'Second answer' } },
+        { ...second, revision: 1, assistantText: 'Second answer' },
       ]);
       mockedCreate.mockImplementation((_client, id) =>
         Promise.resolve(id === CONVERSATION_ID ? first : second),
@@ -725,12 +718,12 @@ describe('recoverable chat observation', () => {
     const stream = controlledStream(
       Array.from({ length: 40 }, (_, index) => {
         const updatedAt = new Date(Date.parse(base.updatedAt) + index * 500).toISOString();
-        const data = snapshot({
+        return snapshot({
           revision: index + 1,
-          assistantText: `Progress ${index}`,
+          cursor: `cursor:${index + 1}`,
+          assistantText: `Progress ${'.'.repeat(index + 1)}`,
           conversation: { ...base, lastActivityAt: updatedAt, updatedAt },
         });
-        return { event: 'snapshot' as const, data };
       }),
     );
     mockedStream.mockImplementation(stream.implementation);
@@ -742,7 +735,9 @@ describe('recoverable chat observation', () => {
       view.result.current.send('Salut');
       for (let index = 0; index < 40; index += 1) stream.release(index);
     });
-    await waitFor(() => expect(view.result.current.live?.assistantText).toBe('Progress 39'));
+    await waitFor(() =>
+      expect(view.result.current.live?.assistantText).toBe(`Progress ${'.'.repeat(40)}`),
+    );
     const navigationInvalidations = invalidate.mock.calls.filter(
       ([filters]) => JSON.stringify(filters?.queryKey) === '["conversations","user-1","list"]',
     );

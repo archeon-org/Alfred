@@ -1,6 +1,8 @@
-import type { Execution, ExecutionSnapshot, ExecutionStreamEvent } from '@alfred/contracts';
+import type { Execution, ExecutionSnapshot } from '@alfred/contracts';
 
 import { CONVERSATION_ID } from './workspace-api';
+
+export { synthesizeFrames, synthesizeRun, encodeAgUiFrames, type AgUiFrame } from './ag-ui-synth';
 
 export const EXECUTION_ID = '22222222-2222-4222-8222-222222222222';
 export const SUBMISSION_ID = '99999999-9999-4999-8999-999999999999';
@@ -42,9 +44,4 @@ export function snapshot(overrides: Partial<ExecutionSnapshot> = {}): ExecutionS
     revision: 0,
     ...overrides,
   };
-}
-
-export function snapshotEvent(overrides: Partial<ExecutionSnapshot> = {}): ExecutionStreamEvent {
-  const data = snapshot(overrides);
-  return { event: 'snapshot', data, ...(data.cursor === null ? {} : { id: data.cursor }) };
 }

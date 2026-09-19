@@ -63,25 +63,20 @@ export const startExecutionInputSchema = z.object({
 });
 export type StartExecutionInput = z.infer<typeof startExecutionInputSchema>;
 
-/**
- * Product execution lifecycle event. Native provider payloads are never a public event contract.
- */
-export const EXECUTION_SSE_EVENT = 'execution';
-
-/**
- * SSE event name carrying the public Conversation DTO whenever the API changes it during an
- * execution: the provisional title and activity when the first message is sent, then the title
- * produced by the runtime title agent. A user-chosen title is never replaced.
- */
-export const CONVERSATION_SSE_EVENT = 'conversation';
-
+/** One parsed SSE frame: the event name, its decoded payload and the opaque cursor if any. */
 export interface ExecutionStreamEvent {
   readonly event: string;
   readonly data: unknown;
   readonly id?: string;
 }
 
-export const EXECUTION_SNAPSHOT_SSE_EVENT = 'snapshot';
+/**
+ * Transport-only SSE frame written beside the AG-UI `data:` frames when observation must be
+ * re-established. Its payload is `{ code }` only; it is not an AG-UI event and carries no content.
+ */
+export const EXECUTION_STREAM_ERROR_EVENT = 'error';
+export const EXECUTION_STREAM_UNAVAILABLE_CODE = 'execution_stream_unavailable';
+
 export const EXECUTION_JSON_PROFILE = 'application/vnd.alfred.execution+json;version=1';
 export const EXECUTION_OUTPUT_MAX_LENGTH = 262_144;
 export const executionActivitySchema = z.readonly(
@@ -93,7 +88,27 @@ export const executionActivitySchema = z.readonly(
 );
 export type ExecutionActivity = z.infer<typeof executionActivitySchema>;
 
-/** Public cumulative projection. Private source/reducer coordinates stay inside the API. */
+/**
+ * Sanitized tool outcome carried as the `content` of an AG-UI `TOOL_CALL_RESULT` event. Raw tool
+ * bodies never cross the product boundary (ALF-DEC-037); only the bounded status word does.
+ */
+export const EXECUTION_TOOL_RESULT_CONTENTS = Object.freeze(['completed', 'failed'] as const);
+
+/**
+ * Alfred-owned state carried by AG-UI `STATE_SNAPSHOT` events on `GET /executions/:id/events`.
+ * The AG-UI `threadId` is the Conversation id and the `runId` is the Execution id
+ * (ALF-DEC-032/033); native runtime identifiers never appear on the wire.
+ */
+export const alfredRunStateSchema = z.readonly(
+  z.object({
+    execution: executionSchema,
+    conversation: conversationSchema,
+    userMessage: z.string().check(z.maxLength(EXECUTION_MESSAGE_MAX_LENGTH)),
+  }),
+);
+export type AlfredRunState = z.infer<typeof alfredRunStateSchema>;
+
+/** Public cumulative projection returned by the JSON commands. Private coordinates stay inside. */
 export const executionSnapshotSchema = z.readonly(
   z.object({
     execution: executionSchema,
@@ -116,52 +131,3 @@ export const activeExecutionEnvelopeSchema = successEnvelopeSchema(
     snapshot: z.nullable(executionSnapshotSchema),
   }),
 );
-
-export const EXECUTION_DELTA_SSE_EVENT = 'delta';
-/**
- * Incremental public projection. It applies only on top of the last accepted snapshot of the same
- * execution at `baseRevision`; omitted fields are unchanged, `assistantAppend` extends the text and
- * `assistantText` replaces it. Terminal states always arrive as a full snapshot.
- */
-export const executionDeltaSchema = z.readonly(
-  z.object({
-    executionId: z.uuid(),
-    baseRevision: z.number().check(z.int(), z.minimum(0)),
-    revision: z.number().check(z.int(), z.minimum(0)),
-    cursor: z.nullable(z.string().check(z.maxLength(4096))),
-    assistantAppend: z.optional(z.string().check(z.maxLength(EXECUTION_OUTPUT_MAX_LENGTH))),
-    assistantText: z.optional(z.string().check(z.maxLength(EXECUTION_OUTPUT_MAX_LENGTH))),
-    activities: z.optional(z.array(executionActivitySchema).check(z.maxLength(256))),
-    execution: z.optional(executionSchema),
-    conversation: z.optional(conversationSchema),
-  }),
-);
-export type ExecutionDelta = z.infer<typeof executionDeltaSchema>;
-
-/** Returns the reconstructed snapshot, or null when the delta does not continue `base`. */
-export function applyExecutionDelta(
-  base: ExecutionSnapshot,
-  delta: ExecutionDelta,
-): ExecutionSnapshot | null {
-  if (
-    delta.executionId !== base.execution.id ||
-    delta.baseRevision !== base.revision ||
-    delta.revision < base.revision
-  )
-    return null;
-  const assistantText =
-    delta.assistantText ??
-    (delta.assistantAppend === undefined
-      ? base.assistantText
-      : base.assistantText + delta.assistantAppend);
-  if (assistantText.length > EXECUTION_OUTPUT_MAX_LENGTH) return null;
-  return {
-    execution: delta.execution ?? base.execution,
-    conversation: delta.conversation ?? base.conversation,
-    userMessage: base.userMessage,
-    assistantText,
-    activities: delta.activities ?? base.activities,
-    cursor: delta.cursor,
-    revision: delta.revision,
-  };
-}

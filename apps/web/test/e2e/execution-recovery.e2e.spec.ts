@@ -75,7 +75,7 @@ test('an early disconnect resumes from the last cursor and renders the final ans
       api.set(executionSnapshot(2, 'Bonjour, réponse terminée.', 'completed'));
       await route.fulfill({
         contentType: 'text/event-stream',
-        body: sse(executionSnapshot(1, 'Bon')) + sse(api.current!),
+        body: sse(executionSnapshot(1, 'Bon'), api.current!),
       });
     }
   });

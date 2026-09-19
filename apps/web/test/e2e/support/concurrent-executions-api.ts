@@ -1,6 +1,7 @@
 import type { ExecutionSnapshot, Message } from '@alfred/contracts';
 import type { Page, Route } from '@playwright/test';
 
+import { encodeAgUiFrames, synthesizeRun } from '../../support/ag-ui-synth';
 import { executionSnapshot, installExecutionApi, sse } from './executions-api';
 import { CONVERSATION_ID, defaultSeed } from './workspace-api';
 
@@ -93,7 +94,7 @@ export async function installConcurrentExecutionApi(page: Page) {
     observed.add(id);
     // A realistic projection burst changes activity timestamps on every event. It must not
     // refetch all sidebar lists forty times or unmount the active chat while React processes it.
-    const frames = Array.from({ length: 40 }, (_, index) => {
+    const progress = Array.from({ length: 40 }, (_, index) => {
       const updatedAt = new Date(
         Date.parse(snapshot.conversation.updatedAt) + (index + 1) * 500,
       ).toISOString();
@@ -101,13 +102,20 @@ export async function installConcurrentExecutionApi(page: Page) {
         ...snapshot,
         revision: index + 1,
         cursor: `${id}:${index + 1}`,
-        assistantText: `Progress ${snapshot.conversation.title} ${index + 1}`,
+        // Cumulative text, as the projection is: the final frame appends the burst size.
+        assistantText:
+          index === 39
+            ? `Progress ${snapshot.conversation.title} 40`
+            : `Progress ${snapshot.conversation.title}`,
         conversation: { ...snapshot.conversation, updatedAt, lastActivityAt: updatedAt },
       };
       snapshots.set(id, next);
-      return sse(next);
+      return next;
     });
-    return route.fulfill({ contentType: 'text/event-stream', body: frames.join('') });
+    return route.fulfill({
+      contentType: 'text/event-stream',
+      body: encodeAgUiFrames(synthesizeRun(progress).flat()),
+    });
   });
   return {
     submissions,

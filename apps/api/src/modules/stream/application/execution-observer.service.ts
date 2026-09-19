@@ -1,9 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import {
-  EXECUTION_DELTA_SSE_EVENT,
-  EXECUTION_SNAPSHOT_SSE_EVENT,
-  type ExecutionSnapshot,
-} from '@alfred/contracts';
+import { EXECUTION_STREAM_ERROR_EVENT, EXECUTION_STREAM_UNAVAILABLE_CODE } from '@alfred/contracts';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
@@ -12,18 +8,22 @@ import { ApiException } from '../../../common/errors/api.exception';
 import { ExecutionObservationService } from '../../executions/application/execution-observation.service';
 import { isExecutionSettled } from '../../executions/domain/execution-lifecycle';
 import { SseWriter } from '../api/sse-writer';
-import { executionDelta } from './execution-delta';
+import { translateObservedView, type ObservedView } from './ag-ui-translation';
+import { observedView } from './observed-view';
 import { StreamAuthorityService } from './stream-authority.service';
 
 type Loaded = Awaited<ReturnType<ExecutionObservationService['load']>>;
 interface Observed {
   revision: number;
-  fingerprint: string;
-  /** Last frame the client holds; the next change travels as a delta on top of it. */
-  snapshot: ExecutionSnapshot | null;
+  /** What this client has been told so far; the next change is translated on top of it. */
+  view: ObservedView | null;
 }
 
-/** Streams committed Product snapshots; native stream lifetime belongs only to the worker. */
+/**
+ * Streams the committed Product projection as AG-UI events (ALF-DEC-006 §5): every attach
+ * re-synthesizes the run from durable state, then each committed change becomes the smallest
+ * continuing sequence. Native stream lifetime belongs only to the worker.
+ */
 @Injectable()
 export class ExecutionObserverService {
   private readonly counts = new Map<string, number>();
@@ -68,13 +68,16 @@ export class ExecutionObserverService {
     );
     try {
       writer.open();
-      const observed: Observed = { revision: -1, fingerprint: '', snapshot: null };
+      const observed: Observed = { revision: -1, view: null };
       await this.send(writer, loaded, observed);
       if (writer.closed || this.terminal(loaded) || loaded.row.responseProfile === 'legacy') return;
       await this.followProgress(principal, loaded.row.id, writer, observed);
     } catch {
       // No provider payload or exception text crosses this boundary. Reconnect retrieves authority.
-      if (!writer.closed) await writer.write('error', { code: 'execution_stream_unavailable' });
+      if (!writer.closed)
+        await writer.write(EXECUTION_STREAM_ERROR_EVENT, {
+          code: EXECUTION_STREAM_UNAVAILABLE_CODE,
+        });
     } finally {
       clearTimeout(expiry);
       clearInterval(reauth);
@@ -137,27 +140,25 @@ export class ExecutionObserverService {
   }
 
   /**
-   * First frame and settled states are full snapshots; every change in between is a delta on top
-   * of the frame this client already holds, so a long answer is not resent on every revision.
+   * Attach opens the run and replays the visible answer and tool calls from the committed
+   * projection; later reads send only what changed. A change AG-UI cannot continue closes the
+   * observation so the browser re-attaches. The cursor rides on the last frame of each batch.
    */
   private async send(writer: SseWriter, loaded: Loaded, observed: Observed): Promise<void> {
-    const snapshot = this.observations.present(loaded);
-    const fingerprint = JSON.stringify({ ...snapshot, cursor: undefined });
-    if (snapshot.revision < observed.revision || fingerprint === observed.fingerprint) return;
-    const cursor = snapshot.cursor ?? undefined;
-    const accepted =
-      observed.snapshot === null || this.terminal(loaded)
-        ? await writer.write(EXECUTION_SNAPSHOT_SSE_EVENT, snapshot, cursor)
-        : await writer.write(
-            EXECUTION_DELTA_SSE_EVENT,
-            executionDelta(observed.snapshot, snapshot),
-            cursor,
-          );
-    if (accepted) {
-      observed.revision = snapshot.revision;
-      observed.fingerprint = fingerprint;
-      observed.snapshot = snapshot;
+    if (loaded.state.sequence < observed.revision) return;
+    const view = observedView(loaded);
+    const events = translateObservedView(observed.view, view);
+    if (events.length === 0) return;
+    const cursor = this.observations.cursor(loaded);
+    for (const [index, event] of events.entries()) {
+      const accepted = await writer.writeData(
+        event,
+        index === events.length - 1 ? cursor : undefined,
+      );
+      if (!accepted) return;
     }
+    observed.revision = loaded.state.sequence;
+    observed.view = view;
   }
 
   /** Terminal rows and parked rows with a confirmed native end need no further observation. */

@@ -1,4 +1,4 @@
-import type { Execution, ExecutionSnapshot, Message } from '@alfred/contracts';
+import type { Execution, ExecutionActivity, ExecutionSnapshot, Message } from '@alfred/contracts';
 import { createContext } from 'react';
 
 /** One validated public event kept for the visibility panel. */
@@ -15,6 +15,8 @@ export interface RuntimeEventView {
 export interface LiveTurn {
   readonly userMessage: string;
   readonly assistantText: string;
+  /** Tool calls of this turn as AG-UI reported them: safe label and status only. */
+  readonly activities: readonly ExecutionActivity[];
   readonly events: readonly RuntimeEventView[];
   readonly execution: Execution | null;
   readonly status: 'streaming' | 'done' | 'error';

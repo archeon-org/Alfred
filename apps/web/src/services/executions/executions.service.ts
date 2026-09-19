@@ -1,16 +1,16 @@
 import {
   activeExecutionEnvelopeSchema,
-  conversationSchema,
-  executionDeltaSchema,
+  EXECUTION_STREAM_ERROR_EVENT,
+  EXECUTION_STREAM_UNAVAILABLE_CODE,
   executionSnapshotEnvelopeSchema,
-  executionSnapshotSchema,
   messageListEnvelopeSchema,
-  type Conversation,
-  type ExecutionDelta,
   type ExecutionSnapshot,
   type Message,
 } from '@alfred/contracts';
 
+import { EventType } from '@ag-ui/core';
+
+import { canonicalAgUiEvent, type AlfredAgUiEvent } from '@/lib/workspace/ag-ui-events';
 import { InvalidStreamError, parseSseStream } from '@/services/executions/sse';
 import {
   ApiRequestError,
@@ -22,11 +22,13 @@ import {
 import type { HttpClient, HttpRequestInit } from '@/services/http/http-client';
 
 export type { Execution, ExecutionStreamEvent, Message } from '@alfred/contracts';
+export type { AlfredAgUiEvent } from '@/lib/workspace/ag-ui-events';
 
-export type PublicExecutionEvent =
-  | { readonly event: 'snapshot'; readonly data: ExecutionSnapshot; readonly id?: string }
-  | { readonly event: 'delta'; readonly data: ExecutionDelta; readonly id?: string }
-  | { readonly event: 'conversation'; readonly data: Conversation; readonly id?: string };
+/** One validated AG-UI event of the observed execution with the opaque cursor of its frame. */
+export interface ObservedAgUiFrame {
+  readonly event: AlfredAgUiEvent;
+  readonly id?: string;
+}
 
 const REQUEST_TIMEOUT_MS = 20_000;
 const OBSERVER_SILENCE_MS = 60_000;
@@ -139,13 +141,19 @@ export async function stopExecution(client: HttpClient, executionId: string, sig
   return snapshot;
 }
 
-/** Observation never submits or cancels work. Authorization refresh is handled by HttpClient. */
+/**
+ * Observation never submits or cancels work. Authorization refresh is handled by HttpClient. Only
+ * well-formed AG-UI events of this execution pass; any other frame ends the observation as invalid.
+ * When the conversation is known, run identity and state are bound to it as well, and the terminal
+ * event must name the same thread as the run it closes.
+ */
 export async function* observeExecution(
   client: HttpClient,
   executionId: string,
   signal: AbortSignal,
   cursor?: string | null,
-): AsyncGenerator<PublicExecutionEvent> {
+  conversationId?: string,
+): AsyncGenerator<ObservedAgUiFrame> {
   const observer = new AbortController();
   let timeout = setTimeout(() => observer.abort(), REQUEST_TIMEOUT_MS);
   const touch = () => {
@@ -169,34 +177,26 @@ export async function* observeExecution(
       throw new InvalidStreamError();
     }
     touch();
-    for await (const event of parseSseStream(response.body, { onChunk: touch })) {
-      const id = event.id === undefined ? {} : { id: event.id };
-      if (event.event === 'error' && isTransientError(event.data)) {
+    let threadId: string | null = null;
+    for await (const frame of parseSseStream(response.body, { onChunk: touch })) {
+      if (frame.event === EXECUTION_STREAM_ERROR_EVENT && isTransientError(frame.data)) {
         throw new ApiRequestError(
           503,
-          'execution_stream_unavailable',
+          EXECUTION_STREAM_UNAVAILABLE_CODE,
           'Le flux est temporairement indisponible.',
         );
       }
-      if (event.event === 'snapshot') {
-        const parsed = executionSnapshotSchema.safeParse(event.data);
-        if (!parsed.success) throw new InvalidStreamError();
-        assertSnapshot(parsed.data, executionId);
-        if (event.id !== undefined && event.id !== parsed.data.cursor)
-          throw new InvalidStreamError();
-        yield { event: 'snapshot', data: parsed.data, ...id };
-      } else if (event.event === 'delta') {
-        const parsed = executionDeltaSchema.safeParse(event.data);
-        if (!parsed.success || parsed.data.executionId !== executionId)
-          throw new InvalidStreamError();
-        if (event.id !== undefined && event.id !== parsed.data.cursor)
-          throw new InvalidStreamError();
-        yield { event: 'delta', data: parsed.data, ...id };
-      } else if (event.event === 'conversation') {
-        const parsed = conversationSchema.safeParse(event.data);
-        if (!parsed.success) throw new InvalidStreamError();
-        yield { event: 'conversation', data: parsed.data, ...id };
-      } else throw new InvalidStreamError();
+      // AG-UI frames are unnamed `data:` frames; every named frame is foreign to this contract.
+      if (frame.event !== 'message') throw new InvalidStreamError();
+      const event = canonicalAgUiEvent(frame.data, {
+        executionId,
+        ...(conversationId === undefined ? {} : { conversationId }),
+      });
+      if (event === null) throw new InvalidStreamError();
+      if (event.type === EventType.RUN_STARTED) threadId = event.threadId;
+      else if (event.type === EventType.RUN_FINISHED && event.threadId !== threadId)
+        throw new InvalidStreamError();
+      yield { event, ...(frame.id === undefined ? {} : { id: frame.id }) };
     }
   } finally {
     clearTimeout(timeout);
@@ -224,6 +224,6 @@ function isTransientError(data: unknown): boolean {
     !Array.isArray(data) &&
     Object.keys(data).length === 1 &&
     'code' in data &&
-    data.code === 'execution_stream_unavailable'
+    data.code === EXECUTION_STREAM_UNAVAILABLE_CODE
   );
 }

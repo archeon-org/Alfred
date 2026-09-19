@@ -128,15 +128,27 @@ export class SseWriter {
   }
 
   write(event: string, data: unknown, id?: string): Promise<boolean> {
+    if (event.includes('\0')) {
+      this.finish('invalid_frame');
+      return Promise.resolve(false);
+    }
+    return this.frame(`event: ${event.replaceAll(/[\r\n]+/gu, ' ')}\n`, data, id);
+  }
+
+  /** An unnamed `data:` frame, the shape AG-UI clients read; the cursor travels as `id:`. */
+  writeData(data: unknown, id?: string): Promise<boolean> {
+    return this.frame('', data, id);
+  }
+
+  private frame(header: string, data: unknown, id?: string): Promise<boolean> {
     if (this.closed || !this.opened) return Promise.resolve(false);
-    if (/[\r\n\0]/u.test(id ?? '') || event.includes('\0')) {
+    if (/[\r\n\0]/u.test(id ?? '')) {
       this.finish('invalid_frame');
       return Promise.resolve(false);
     }
     try {
-      const name = event.replaceAll(/[\r\n]+/gu, ' ');
       const cursor = id === undefined ? '' : `id: ${id}\n`;
-      return this.enqueue(`${cursor}event: ${name}\ndata: ${JSON.stringify(data) ?? 'null'}\n\n`);
+      return this.enqueue(`${cursor}${header}data: ${JSON.stringify(data) ?? 'null'}\n\n`);
     } catch {
       this.finish('invalid_frame');
       return Promise.resolve(false);

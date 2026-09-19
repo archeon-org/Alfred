@@ -2,11 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import {
-  applyExecutionDelta,
-  executionDeltaSchema,
-  type ExecutionSnapshot,
-  executionSnapshotSchema,
-} from '@alfred/contracts';
+  AgUiReplicaBuilder,
+  parseAgUiFrame,
+  type ObservedReplica,
+} from '../../../support/ag-ui-frames';
 
 type Frame = { id: string; data: unknown };
 type FixtureRun = {
@@ -215,8 +214,9 @@ export class NativeMultichatFixture {
 
 /** Real browser-like HTTP reader, including heartbeats, independent abort and resume cursor. */
 export class MultichatSnapshotReader {
-  readonly snapshots: ExecutionSnapshot[] = [];
+  readonly snapshots: ObservedReplica[] = [];
   readonly errors: unknown[] = [];
+  private readonly replica = new AgUiReplicaBuilder();
   maxByteGapMs = 0;
   done: Promise<void> = Promise.resolve();
   private readonly controller = new AbortController();
@@ -255,25 +255,10 @@ export class MultichatSnapshotReader {
         text += decoder.decode(chunk.value, { stream: true });
         let boundary: number;
         while ((boundary = text.indexOf('\n\n')) !== -1) {
-          const lines = text.slice(0, boundary).split('\n');
+          const frame = parseAgUiFrame(text.slice(0, boundary));
           text = text.slice(boundary + 2);
-          const data = lines
-            .filter((line) => line.startsWith('data: '))
-            .map((line) => line.slice(6))
-            .join('\n');
-          if (lines.includes('event: snapshot'))
-            this.snapshots.push(executionSnapshotSchema.parse(JSON.parse(data)));
-          if (lines.includes('event: delta')) {
-            // Deltas continue the frame this reader already holds, exactly as the browser does.
-            const base = this.snapshots.at(-1);
-            const merged =
-              base === undefined
-                ? null
-                : applyExecutionDelta(base, executionDeltaSchema.parse(JSON.parse(data)));
-            if (merged === null) throw new Error('Delta frame does not continue the last snapshot');
-            this.snapshots.push(merged);
-          }
-          if (lines.includes('event: error')) this.errors.push(JSON.parse(data) as unknown);
+          if (frame?.kind === 'error') this.errors.push(frame.data);
+          else if (frame?.kind === 'agui') this.snapshots.push(this.replica.push(frame)!);
         }
       }
     } finally {

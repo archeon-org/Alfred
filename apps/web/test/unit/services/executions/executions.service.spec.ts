@@ -17,6 +17,18 @@ afterEach(() => vi.unstubAllGlobals());
 const MESSAGE_ID = '11111111-1111-4111-8111-111111111111';
 import { EXECUTION_ID, SUBMISSION_ID, snapshot } from '../../../support/executions-api';
 
+const runStarted = { type: 'RUN_STARTED', threadId: CONVERSATION_ID, runId: EXECUTION_ID };
+const state = (base = snapshot()) => ({
+  type: 'STATE_SNAPSHOT',
+  snapshot: {
+    execution: base.execution,
+    conversation: base.conversation,
+    userMessage: base.userMessage,
+  },
+});
+const frame = (event: unknown, id?: string) =>
+  `${id === undefined ? '' : `id: ${id}\n`}data: ${JSON.stringify(event)}\n\n`;
+
 function sseResponse(text: string): Response {
   return new Response(new TextEncoder().encode(text), {
     headers: { 'content-type': 'text/event-stream' },
@@ -107,11 +119,7 @@ describe('execution commands and observation', () => {
   });
 
   it('observes by execution id and cursor without posting the original prompt', async () => {
-    const fetch = vi
-      .fn()
-      .mockResolvedValue(
-        sseResponse(`id: cursor:0\nevent: snapshot\ndata: ${JSON.stringify(snapshot())}\n\n`),
-      );
+    const fetch = vi.fn().mockResolvedValue(sseResponse(frame(runStarted, 'cursor:0')));
     vi.stubGlobal('fetch', fetch);
     const events = await collect(
       observeExecution(
@@ -121,7 +129,7 @@ describe('execution commands and observation', () => {
         'old-cursor',
       ),
     );
-    expect(events).toEqual([{ event: 'snapshot', data: snapshot(), id: 'cursor:0' }]);
+    expect(events).toEqual([{ event: runStarted, id: 'cursor:0' }]);
     const [url, init] = fetch.mock.calls[0] as [string, RequestInit];
     expect(url).toContain(`/executions/${EXECUTION_ID}/events`);
     expect(init.method).toBe('GET');
@@ -130,44 +138,27 @@ describe('execution commands and observation', () => {
     expect(new Headers(init.headers).get('authorization')).toBe('Bearer token');
   });
 
-  it('parses delta frames for the observed execution and rejects a foreign or mismatched one', async () => {
-    const delta = {
-      executionId: EXECUTION_ID,
-      baseRevision: 0,
-      revision: 1,
-      cursor: 'cursor:1',
-      assistantAppend: 'Salut',
-    };
+  it('yields validated AG-UI frames of this execution and rejects a foreign run or state', async () => {
     vi.stubGlobal(
       'fetch',
       vi
         .fn()
-        .mockResolvedValue(
-          sseResponse(
-            `id: cursor:0\nevent: snapshot\ndata: ${JSON.stringify(snapshot())}\n\n` +
-              `id: cursor:1\nevent: delta\ndata: ${JSON.stringify(delta)}\n\n`,
-          ),
-        ),
+        .mockResolvedValue(sseResponse(frame(runStarted, 'cursor:0') + frame(state(), 'cursor:1'))),
     );
     const events = await collect(
       observeExecution(createHttpClient(), EXECUTION_ID, new AbortController().signal),
     );
     expect(events).toEqual([
-      { event: 'snapshot', data: snapshot(), id: 'cursor:0' },
-      { event: 'delta', data: delta, id: 'cursor:1' },
+      { event: runStarted, id: 'cursor:0' },
+      { event: state(), id: 'cursor:1' },
     ]);
+    const foreign = '11111111-1111-4111-8111-111111111111';
     for (const bad of [
-      { ...delta, executionId: '11111111-1111-4111-8111-111111111111' },
-      { ...delta, cursor: 'other' },
+      { ...runStarted, runId: foreign },
+      { type: 'RUN_FINISHED', threadId: CONVERSATION_ID, runId: foreign },
+      state(snapshot({ execution: { ...snapshot().execution, id: foreign } })),
     ]) {
-      vi.stubGlobal(
-        'fetch',
-        vi
-          .fn()
-          .mockResolvedValue(
-            sseResponse(`id: cursor:1\nevent: delta\ndata: ${JSON.stringify(bad)}\n\n`),
-          ),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(frame(bad, 'cursor:1'))));
       await expect(
         collect(observeExecution(createHttpClient(), EXECUTION_ID, new AbortController().signal)),
       ).rejects.toBeInstanceOf(InvalidStreamError);
@@ -211,20 +202,68 @@ describe('execution commands and observation', () => {
     },
   );
 
-  it('rejects a mismatched execution, forged cursor and malformed snapshot', async () => {
-    for (const data of [
-      snapshot({ execution: { ...snapshot().execution, id: CONVERSATION_ID } }),
-      { nope: true },
-      snapshot({ cursor: 'different' }),
-    ]) {
-      vi.stubGlobal(
-        'fetch',
-        vi
-          .fn()
-          .mockResolvedValue(
-            sseResponse(`id: cursor:0\nevent: snapshot\ndata: ${JSON.stringify(data)}\n\n`),
+  it('binds the terminal event to the observed conversation and to the run it closes', async () => {
+    const foreign = '11111111-1111-4111-8111-111111111111';
+    const finished = (threadId: string) => ({
+      type: 'RUN_FINISHED',
+      threadId,
+      runId: EXECUTION_ID,
+      outcome: { type: 'success' },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          sseResponse(frame(runStarted, 'cursor:0') + frame(finished(CONVERSATION_ID), 'cursor:1')),
+        ),
+    );
+    await expect(
+      collect(
+        observeExecution(
+          createHttpClient(),
+          EXECUTION_ID,
+          new AbortController().signal,
+          null,
+          CONVERSATION_ID,
+        ),
+      ),
+    ).resolves.toHaveLength(2);
+    for (const [body, conversation] of [
+      // Another conversation, with the conversation scope known.
+      [frame(runStarted, 'cursor:0') + frame(finished(foreign), 'cursor:1'), CONVERSATION_ID],
+      // Another thread than the run that was started, without a conversation scope.
+      [frame(runStarted, 'cursor:0') + frame(finished(foreign), 'cursor:1'), undefined],
+      // A terminal event before any run was started.
+      [frame(finished(CONVERSATION_ID), 'cursor:0'), undefined],
+    ] as const) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(body)));
+      await expect(
+        collect(
+          observeExecution(
+            createHttpClient(),
+            EXECUTION_ID,
+            new AbortController().signal,
+            null,
+            conversation,
           ),
-      );
+        ),
+      ).rejects.toBeInstanceOf(InvalidStreamError);
+    }
+  });
+
+  it('rejects a state of another conversation, an event outside the contract and a malformed frame', async () => {
+    for (const data of [
+      state(
+        snapshot({
+          execution: { ...snapshot().execution, conversationId: CONVERSATION_ID },
+          conversation: { ...snapshot().conversation, id: '11111111-1111-4111-8111-111111111111' },
+        }),
+      ),
+      { type: 'CUSTOM', name: 'PredictState', value: { secret: 'private' } },
+      { nope: true },
+    ]) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse(frame(data, 'cursor:0'))));
       await expect(
         collect(observeExecution(createHttpClient(), EXECUTION_ID, new AbortController().signal)),
       ).rejects.toThrow('invalide');

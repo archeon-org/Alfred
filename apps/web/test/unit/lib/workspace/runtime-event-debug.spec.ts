@@ -4,13 +4,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { snapshot } from '../../../support/executions-api';
 import { CONVERSATION_ID } from '../../../support/workspace-api';
 
-const key = `alfred:runtime-event-debug:v2:user:${CONVERSATION_ID}`;
+const key = `alfred:runtime-event-debug:v3:user:${CONVERSATION_ID}`;
 const legacyKey = `alfred:runtime-event-debug:v1:user:${CONVERSATION_ID}`;
 const load = () => import('@/lib/workspace/runtime-event-debug');
+/** One AG-UI text delta as the observer records it. */
 const event = (text = 'public answer') => ({
   id: 1,
-  event: 'snapshot',
-  data: snapshot({ assistantText: text }),
+  event: 'TEXT_MESSAGE_CONTENT',
+  data: { type: 'TEXT_MESSAGE_CONTENT', messageId: 'answer', delta: text },
+});
+/** One AG-UI state snapshot bound to a conversation. */
+const stateEvent = (base = snapshot()) => ({
+  id: 1,
+  event: 'STATE_SNAPSHOT',
+  data: {
+    type: 'STATE_SNAPSHOT',
+    snapshot: {
+      execution: base.execution,
+      conversation: base.conversation,
+      userMessage: base.userMessage,
+    },
+  },
 });
 
 const capture = (debug: Awaited<ReturnType<typeof load>>, text?: string) =>
@@ -73,7 +87,7 @@ describe('public runtime event debugging', () => {
     expect(initial.events).toHaveLength(0);
     expect(saved.events).toHaveLength(205);
     expect(new Set(saved.events.map((item) => item.id)).size).toBe(205);
-    expect(saved.events[0]?.data).toEqual(snapshot({ assistantText: 'x'.repeat(1000) }));
+    expect(saved.events[0]?.data).toEqual(event('x'.repeat(1000)).data);
     expect(debug.getRuntimeEventDebugSnapshot('another-user', CONVERSATION_ID).events).toEqual([]);
     expect(debug.getRuntimeEventDebugSnapshot('user', 'another-conversation').events).toEqual([]);
     expect(listener).toHaveBeenCalled();
@@ -88,19 +102,18 @@ describe('public runtime event debugging', () => {
     expect(read(restored).events.at(-1)?.id).toBe(206);
   });
 
-  it('rejects raw native and cross-conversation events in persisted v2 data', async () => {
+  it('rejects raw native and cross-conversation events in persisted v3 data', async () => {
     for (const invalid of [
       { id: 1, event: 'metadata', data: { secret: 'synthetic-private' } },
-      {
-        ...event(),
-        data: snapshot({
+      stateEvent(
+        snapshot({
           conversation: { ...snapshot().conversation, id: '44444444-4444-4444-8444-444444444444' },
         }),
-      },
-      { id: 'bad', event: 'snapshot' },
+      ),
+      { id: 'bad', event: 'STATE_SNAPSHOT' },
     ]) {
       vi.resetModules();
-      localStorage.setItem(key, JSON.stringify({ version: 2, events: [invalid] }));
+      localStorage.setItem(key, JSON.stringify({ version: 3, events: [invalid] }));
       const debug = await load();
       expect(read(debug).events).toEqual([]);
       expect(read(debug).error).toMatch(/illisible/);
@@ -111,30 +124,26 @@ describe('public runtime event debugging', () => {
     localStorage.setItem(
       key,
       JSON.stringify({
-        version: 2,
-        events: [{ ...event(), data: { ...snapshot(), privateToken: 'synthetic-private' } }],
+        version: 3,
+        events: [{ ...event(), data: { ...event().data, privateToken: 'synthetic-private' } }],
       }),
     );
     const debug = await load();
-    expect(read(debug).events).toEqual([event('')]);
+    expect(read(debug).events).toEqual([event()]);
     expect(JSON.stringify(read(debug))).not.toContain('synthetic-private');
   });
 
-  it('rejects unsupported live payloads and allows only public snapshots and conversation titles', async () => {
+  it('rejects unsupported live payloads and keeps only AG-UI events of this conversation', async () => {
     const debug = await load();
     debug.captureRuntimeEvent('user', CONVERSATION_ID, {
       id: 1,
-      event: 'custom',
-      data: { secret: 'synthetic-private' },
+      event: 'CUSTOM',
+      data: { type: 'CUSTOM', name: 'PredictState', value: { secret: 'synthetic-private' } },
     });
     expect(read(debug).events).toEqual([]);
     expect(read(debug).error).toMatch(/public invalide/);
-    debug.captureRuntimeEvent('user', CONVERSATION_ID, {
-      id: 1,
-      event: 'conversation',
-      data: snapshot().conversation,
-    });
-    expect(read(debug).events).toHaveLength(1);
+    debug.captureRuntimeEvent('user', CONVERSATION_ID, stateEvent());
+    expect(read(debug).events).toEqual([stateEvent()]);
     expect(JSON.stringify(read(debug))).not.toContain('synthetic-private');
   });
 
@@ -153,7 +162,7 @@ describe('public runtime event debugging', () => {
     });
     capture(debug);
     expect(() => vi.runAllTimers()).not.toThrow();
-    expect(read(debug).events).toMatchObject([{ data: { assistantText: 'public answer' } }]);
+    expect(read(debug).events).toMatchObject([{ data: { delta: 'public answer' } }]);
     expect(read(debug).error).toMatch(/stockage/);
   });
 
@@ -163,7 +172,7 @@ describe('public runtime event debugging', () => {
     window.dispatchEvent(new Event('pagehide'));
     expect(
       JSON.parse(localStorage.getItem(key) ?? '{}') as { version: number; events: unknown[] },
-    ).toMatchObject({ version: 2, events: [event()] });
+    ).toMatchObject({ version: 3, events: [event()] });
   });
 
   it('reports the storage size limit without truncating downloadable events', async () => {

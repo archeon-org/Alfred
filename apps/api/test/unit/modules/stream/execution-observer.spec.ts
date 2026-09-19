@@ -1,12 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { randomBytes } from 'node:crypto';
-import {
-  applyExecutionDelta,
-  EXECUTION_JSON_PROFILE,
-  executionDeltaSchema,
-  executionSnapshotSchema,
-  type ExecutionSnapshot,
-} from '@alfred/contracts';
+import { EXECUTION_JSON_PROFILE } from '@alfred/contracts';
+import { EventType } from '@ag-ui/core';
 import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Response } from 'express';
@@ -27,6 +22,13 @@ import {
 import { ExecutionEntity } from '@api/modules/executions/infrastructure/persistence/execution.entity';
 import { ExecutionObserverService } from '@api/modules/stream/application/execution-observer.service';
 import type { StreamAuthorityService } from '@api/modules/stream/application/stream-authority.service';
+import {
+  agUiEventNames,
+  parseAgUiChunks,
+  reduceAgUiFrames,
+  verifyAgUiRuns,
+  type ObservedReplica,
+} from '../../../support/ag-ui-frames';
 import { conversationRow, principal } from '../../../support/project-fixtures';
 
 // Bind promise-based Node delays to the same clock used by the observer's expiry/heartbeat timers.
@@ -79,30 +81,16 @@ class ObserverResponse extends EventEmitter {
   asExpress(): Response {
     return this as unknown as Response;
   }
-  /** Public frames as the browser reconstructs them: snapshots as sent, deltas applied in order. */
-  snapshots(): ExecutionSnapshot[] {
-    const frames: ExecutionSnapshot[] = [];
-    for (const chunk of this.chunks) {
-      const data = chunk
-        .split('\n')
-        .find((line) => line.startsWith('data: '))
-        ?.slice(6);
-      if (chunk.includes('event: snapshot\n')) {
-        frames.push(executionSnapshotSchema.parse(JSON.parse(data ?? 'null') as unknown));
-      } else if (chunk.includes('event: delta\n')) {
-        const delta = executionDeltaSchema.parse(JSON.parse(data ?? 'null') as unknown);
-        const base = frames.at(-1);
-        const merged = base === undefined ? null : applyExecutionDelta(base, delta);
-        if (merged === null) throw new Error('Delta does not continue the previous frame');
-        frames.push(merged);
-      }
-    }
-    return frames;
+  /** Public frames as the browser reconstructs them from the AG-UI events, one per frame. */
+  snapshots(): ObservedReplica[] {
+    return reduceAgUiFrames(parseAgUiChunks(this.chunks));
   }
   frameNames(): string[] {
-    return this.chunks
-      .map((chunk) => /(?:^|\n)event: (\S+)\n/u.exec(chunk)?.[1])
-      .filter((name): name is string => name !== undefined);
+    return agUiEventNames(parseAgUiChunks(this.chunks));
+  }
+  /** Every attach must satisfy the official AG-UI verifier. */
+  verified(): Promise<number> {
+    return verifyAgUiRuns(parseAgUiChunks(this.chunks));
   }
 }
 
@@ -260,8 +248,8 @@ describe('execution observer authorization, recovery and capacity', () => {
     await vi.advanceTimersByTimeAsync(500);
     expect(res.snapshots().at(-1)).toMatchObject({
       assistantText: 'Hello world',
-      revision: 2,
       execution: { status: 'running' },
+      lifecycle: 'open',
     });
     f.setLoaded(loaded(finished, { status: 'completed', finishedAt: new Date() }));
     await vi.advanceTimersByTimeAsync(500);
@@ -269,16 +257,27 @@ describe('execution observer authorization, recovery and capacity', () => {
     expect(f.load).toHaveBeenCalledWith(principal, executionId, 'opaque-client-cursor');
     expect(res.snapshots().at(-1)).toMatchObject({
       assistantText: 'Hello world',
-      revision: 2,
       execution: { status: 'completed' },
+      lifecycle: 'finished',
+      runs: 1,
     });
-    expect(res.snapshots()).toHaveLength(3);
+    expect(res.frameNames()).toEqual([
+      'RUN_STARTED',
+      'STATE_SNAPSHOT',
+      'TEXT_MESSAGE_START',
+      'TEXT_MESSAGE_CONTENT',
+      'TEXT_MESSAGE_CONTENT',
+      'STATE_SNAPSHOT',
+      'TEXT_MESSAGE_END',
+      'RUN_FINISHED',
+    ]);
+    await expect(res.verified()).resolves.toBe(1);
     expect(res.chunks.join('')).not.toContain('native-message');
     expect(res.chunks.join('')).not.toContain('source-1');
     expect(res.chunks.join('')).not.toContain(invocationId);
   });
 
-  it('sends one full snapshot, then appends as deltas, then a full snapshot at the terminal state', async () => {
+  it('opens the run once, appends only new text and carries the cursor on the last frame of each batch', async () => {
     const f = fixture();
     const res = response();
     const observed = f.service.observe(
@@ -303,17 +302,26 @@ describe('execution observer authorization, recovery and capacity', () => {
     f.setLoaded(loaded(grown, { status: 'completed', finishedAt: new Date() }));
     await vi.advanceTimersByTimeAsync(500);
     await observed;
-    expect(res.frameNames()).toEqual(['snapshot', 'delta', 'snapshot']);
-    const delta = JSON.parse(
-      res.chunks.find((chunk) => chunk.includes('event: delta\n'))?.split('data: ')[1] ?? 'null',
-    ) as {
-      assistantAppend?: string;
-      assistantText?: string;
-      baseRevision: number;
-      revision: number;
-    };
-    expect(delta).toMatchObject({ assistantAppend: ' world', baseRevision: 1, revision: 2 });
-    expect(delta.assistantText).toBeUndefined();
+    const frames = parseAgUiChunks(res.chunks);
+    const deltas = frames.flatMap((frame) =>
+      frame.kind === 'agui' && frame.event.type === EventType.TEXT_MESSAGE_CONTENT
+        ? [frame.event.delta]
+        : [],
+    );
+    expect(deltas).toEqual(['Hello', ' world']);
+    // Frames are unnamed `data:` frames; only the last frame of a batch carries the cursor.
+    expect(res.chunks.filter((chunk) => chunk.includes('event: '))).toEqual([]);
+    const batches = [4, 1, 3];
+    let offset = 0;
+    for (const size of batches) {
+      const batch = res.chunks
+        .filter((chunk) => !chunk.startsWith(':'))
+        .slice(offset, offset + size);
+      expect(batch.map((chunk) => chunk.startsWith('id: '))).toEqual(
+        batch.map((_chunk, index) => index === size - 1),
+      );
+      offset += size;
+    }
     expect(res.snapshots().at(-1)).toMatchObject({
       assistantText: 'Hello world',
       execution: { status: 'completed' },
@@ -332,7 +340,8 @@ describe('execution observer authorization, recovery and capacity', () => {
     );
     await vi.advanceTimersByTimeAsync(240_000);
     expect(res.writableEnded).toBe(false);
-    expect(res.snapshots()).toHaveLength(1);
+    expect(res.snapshots().at(-1)?.runs).toBe(1);
+    expect(res.frameNames()).toHaveLength(4);
     expect(res.chunks.filter((chunk) => chunk === ': ping\n\n').length).toBeGreaterThanOrEqual(9);
     res.destroy();
     await observed;
@@ -450,7 +459,8 @@ describe('execution observer authorization, recovery and capacity', () => {
     );
     await vi.advanceTimersByTimeAsync(25_000);
     expect(res.chunks).toContain(': ping\n\n');
-    expect(res.snapshots()[0]?.execution.status).toBe('pending');
+    expect(res.frameNames()).toEqual(['RUN_STARTED', 'STATE_SNAPSHOT']);
+    expect(res.snapshots().at(-1)?.execution?.status).toBe('pending');
     res.destroy();
     await observed;
   });
@@ -467,7 +477,11 @@ describe('execution observer authorization, recovery and capacity', () => {
       );
       const res = response();
       await f.service.observe(principal, executionId, 'Bearer valid', undefined, res.asExpress());
-      expect(res.snapshots()).toHaveLength(1);
+      expect(res.snapshots().at(-1)).toMatchObject({
+        runs: 1,
+        assistantText: 'Hello',
+        lifecycle: kind === 'terminal' ? 'finished' : 'open',
+      });
       expect(res.writableEnded).toBe(true);
     },
   );
@@ -483,11 +497,13 @@ describe('execution observer authorization, recovery and capacity', () => {
     );
     const res = response();
     await f.service.observe(principal, executionId, 'Bearer valid', undefined, res.asExpress());
-    expect(res.snapshots()).toHaveLength(1);
-    expect(res.snapshots()[0]?.execution).toMatchObject({
-      status: 'recovery_required',
-      errorCode: 'runtime_recovery_gap',
+    expect(res.snapshots().at(-1)).toMatchObject({
+      runs: 1,
+      lifecycle: 'error',
+      lastError: { code: 'runtime_recovery_gap' },
+      execution: { status: 'recovery_required', errorCode: 'runtime_recovery_gap' },
     });
+    await expect(res.verified()).resolves.toBe(1);
     expect(res.writableEnded).toBe(true);
     expect(f.load).toHaveBeenCalledOnce();
   });
@@ -506,11 +522,18 @@ describe('execution observer authorization, recovery and capacity', () => {
     await vi.advanceTimersByTimeAsync(25_000);
     expect(res.writableEnded).toBe(false);
     expect(res.chunks).toContain(': ping\n\n');
-    expect(res.snapshots()).toHaveLength(1);
+    expect(res.snapshots().at(-1)).toMatchObject({
+      lifecycle: 'open',
+      execution: { status: 'interrupted' },
+    });
     f.setLoaded(loaded(undefined, { status: 'cancelled', finishedAt: new Date(), error: null }));
     await vi.advanceTimersByTimeAsync(500);
     await observed;
-    expect(res.snapshots().at(-1)?.execution.status).toBe('cancelled');
+    expect(res.snapshots().at(-1)).toMatchObject({
+      lifecycle: 'finished',
+      execution: { status: 'cancelled' },
+    });
+    await expect(res.verified()).resolves.toBe(1);
     expect(res.writableEnded).toBe(true);
   });
 
@@ -531,7 +554,7 @@ describe('execution observer authorization, recovery and capacity', () => {
     expect(res.chunks.at(-1)).toBe(
       'event: error\ndata: {"code":"execution_stream_unavailable"}\n\n',
     );
-    expect(res.snapshots().every((snapshot) => snapshot.execution.status === 'running')).toBe(true);
+    expect(res.snapshots().every((snapshot) => snapshot.lifecycle === 'open')).toBe(true);
     expect(res.chunks.join('')).not.toContain('SYNTHETIC_PRIVATE_VALUE');
   });
 
@@ -557,10 +580,9 @@ describe('execution observer authorization, recovery and capacity', () => {
     await vi.advanceTimersByTimeAsync(500);
     expect(res.snapshots().at(-1)).toMatchObject({
       assistantText: 'Hello world',
-      revision: 2,
       execution: { status: 'running' },
     });
-    expect(res.snapshots()).toHaveLength(2);
+    expect(res.frameNames()).toHaveLength(5);
     res.destroy();
     await observed;
   });
@@ -595,11 +617,14 @@ describe('execution observer authorization, recovery and capacity', () => {
       res.asExpress(),
     );
     await vi.advanceTimersByTimeAsync(0);
-    const revision = res.snapshots().at(-1)?.revision;
     f.setLoaded(loaded(undefined, { status: 'completed', finishedAt: new Date() }));
     await vi.advanceTimersByTimeAsync(25_000);
     await observed;
-    expect(res.snapshots().at(-1)).toMatchObject({ revision, execution: { status: 'completed' } });
+    expect(res.snapshots().at(-1)).toMatchObject({
+      assistantText: 'Hello',
+      lifecycle: 'finished',
+      execution: { status: 'completed' },
+    });
   });
 
   it('keeps the remaining observer counted when another one disconnects', async () => {

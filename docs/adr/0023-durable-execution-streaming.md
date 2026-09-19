@@ -239,6 +239,64 @@ The opt-in probe `projection-cost.postgres.spec.ts` (`ALFRED_PROJECTION_BENCH=1`
 milliseconds per token, durable commits and WAL amplification and fails if commits approach one
 per token again.
 
+## Revision 2026-09-15 (evening): AG-UI observation profile
+
+Decided with the product owner on 2026-09-15 (plan in the session record). Implements
+ALF-DEC-001 (AG-UI as the live interaction seam, product persistence separate), ALF-DEC-006 §5
+("stable identifiers deduplicate translated AG-UI output, including one-to-many adapter
+transformations") and §6 (projection independent of subscribers), ALF-DEC-032 §5 (private
+runtime identifiers), ALF-DEC-033 (one Execution per submitted request) and ALF-DEC-037 (safe
+tool labels, no internal child messages). It changes only the wire shape of the public
+observation; commands, projection, cursor, heartbeat, authorization and limits above are kept.
+
+- **The observation route speaks AG-UI.** `GET /api/executions/:id/events` writes unnamed SSE
+  `data:` frames whose payloads are AG-UI protocol events (`@ag-ui/core` 0.0.59 schemas); the
+  opaque cursor rides as `id:` on the last frame of each batch, comment heartbeats are unchanged
+  and the transport-only `error {code}` frame keeps its name. The AG-UI `threadId` is the
+  Conversation id and the `runId` the Execution id. The `snapshot`/`delta` frames of the previous
+  revision and their contracts are removed.
+- **Events are synthesized from the committed projection, never journaled.** Every attach
+  (first or reconnect) re-synthesizes the run from durable state: `RUN_STARTED`,
+  `STATE_SNAPSHOT { execution, conversation, userMessage }`, the visible tool calls
+  (`TOOL_CALL_START`/`END`, `TOOL_CALL_RESULT` with the bounded status word `completed` or
+  `failed` as content, never a tool body) and the open answer (`TEXT_MESSAGE_START` plus one
+  `TEXT_MESSAGE_CONTENT` with the text so far). Each later committed change becomes the smallest
+  continuing sequence: text appends, new tool calls or results, a `STATE_SNAPSHOT` when a product
+  DTO changed. A change AG-UI cannot express as a continuation (replaced text, withdrawn tool
+  call, reopened result) closes the observation with the transport error so the browser
+  re-attaches; DEC-006 Option B (a Product event journal) stays deferred. Message and tool
+  identifiers are the existing opaque projection hashes.
+- **Lifecycle follows product status.** A settled `completed` run closes its open message and ends
+  with `RUN_FINISHED { outcome: success }`; `cancelled` ends with `RUN_FINISHED` without outcome;
+  `failed`, `timed_out` and a parked row with a confirmed end (`recovery_required`) end with
+  `RUN_ERROR { message: public error, code: errorCode }`. A parked `interrupted` row stays an open
+  stream with heartbeats and no lifecycle end (DEC-009 remains open). The official
+  `verifyEvents` of `@ag-ui/client` is the test oracle for every emitted sequence.
+- **The browser consumes it with the official client.** An `AbstractAgent` subclass whose
+  transport is the existing authenticated, resumable fetch-SSE reader runs one AG-UI run per
+  attach; its input is ignored because observation never submits work. The browser validates each
+  frame with the AG-UI schemas, keeps only the events of this contract with their known fields,
+  binds run identity, the terminal event and state to the observed execution and conversation
+  (the terminal event must also name the thread of the run it closes), keeps only a `success`
+  outcome on `RUN_FINISHED`, accepts `assistant` messages only, refuses tool
+  arguments and any tool result outside `completed`/`failed`, bounds one delta and the accumulated
+  answer by the 262,144-character limit of the JSON profile, accumulates the answer from message
+  deltas, renders tool calls as label plus status, and settles the turn on
+  `RUN_FINISHED`/`RUN_ERROR` after the settled state. Invalid frames and AG-UI protocol
+  violations reported by the official verifier fail closed without a reconnect; only transport
+  faults retry. The AG-UI client module loads on demand so it stays out of the initial bundle. Product statuses only move forward, so a
+  frame carrying an earlier stage than the Stop acknowledgement is a stale delivery. JSON commands
+  keep the `ExecutionSnapshot` profile; a non-settled read only replaces streamed text when it
+  extends it. Diagnostics record the validated AG-UI events under a new storage version.
+- **Not decided here.** Tool arguments and result bodies, specialist attribution
+  (`SUBAGENT_*`/`STEP_*`/`ACTIVITY_*`), HITL interrupt outcomes and resume, `@ag-ui/langgraph`
+  (which creates runs itself and cannot join from a cursor) and CopilotKit remain outside this
+  revision; the reserved `agUiStreaming` capability flag is untouched because the AG-UI frames are
+  the only observation profile and ride on `agentRuntime`.
+
+Verification for this revision is recorded in
+[the session record](../memory-bank/sessions/2026-09-15-ag-ui-observation-profile.md).
+
 ## Remaining decisions
 
 DEC-008/009/016/019/038/051 retain their open event/HITL, continuation, operations, capability and

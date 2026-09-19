@@ -121,21 +121,38 @@ export function projectRuntimeEvent(
   return next;
 }
 
-export function projectionText(state: ProjectionState): string {
+export interface ProjectionMessage {
+  readonly id: string;
+  readonly text: string;
+}
+
+/** The visible answer: the latest allowed root message, with its opaque stable identifier. */
+export function projectionMessage(state: ProjectionState): ProjectionMessage | null {
   const id = state.messageOrder.findLast(
     (id) => state.visibility[id] === 'allowed' && !state.excluded.includes(id),
   );
-  return id === undefined ? '' : (state.texts[id] ?? '');
+  return id === undefined ? null : { id, text: state.texts[id] ?? '' };
 }
 
-export function projectionActivities(state: ProjectionState): readonly ProjectionActivity[] {
+export function projectionText(state: ProjectionState): string {
+  return projectionMessage(state)?.text ?? '';
+}
+
+/** Visible tool calls with the opaque identifier of the message that issued them. */
+export function projectionToolCalls(
+  state: ProjectionState,
+): readonly (ProjectionActivity & { readonly messageId: string })[] {
   return Object.values(state.activities)
     .filter(
       (activity) =>
         state.visibility[activity.messageId] === 'allowed' &&
         !state.excluded.includes(activity.messageId),
     )
-    .map(({ id, label, status }) => ({ id, label, status }));
+    .map(({ id, label, status, messageId }) => ({ id, label, status, messageId }));
+}
+
+export function projectionActivities(state: ProjectionState): readonly ProjectionActivity[] {
+  return projectionToolCalls(state).map(({ id, label, status }) => ({ id, label, status }));
 }
 
 /**
