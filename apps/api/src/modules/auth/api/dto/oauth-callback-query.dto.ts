@@ -11,6 +11,7 @@ import {
   ValidatorConstraint,
   type ValidatorConstraintInterface,
 } from 'class-validator';
+import { STATE_PLACEHOLDER } from '../auth-shared.openapi';
 
 /** Documentation only: parameters a provider appends are accepted so its redirect is not refused. */
 const NOT_USED = 'Validated, then ignored by Alfred.';
@@ -121,8 +122,8 @@ export class OauthCallbackQueryDto {
 
   @ApiProperty({
     description:
-      'The login state created by the start route, which the provider sends back unchanged. It must equal the state cookie, be less than 10 minutes old, never have been used and have been issued for this provider. The example is a placeholder, not a real state.',
-    example: 'FAKE-LOGIN-STATE-0000000000000000000000000000',
+      'The login state created by the start route, which the provider sends back unchanged. It must equal the state cookie, be less than 10 minutes old, never have been used and have been issued for this provider. The example is a placeholder, not a real state; it is the same value as in the `Cookie` header example and in the `Location` and `Set-Cookie` examples of the start route.',
+    example: STATE_PLACEHOLDER,
     minLength: 32,
     maxLength: 256,
   })

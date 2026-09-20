@@ -8,6 +8,7 @@ import {
   ApiRoute,
   type ApiProblem,
 } from '../../common/api-docs/api-docs.decorators';
+import { PROBLEM } from '../../common/api-docs/api-problems';
 
 /** The probes have no web contract: these schemas mirror `HealthService` exactly. */
 const healthSummaryEnvelopeSchema = successEnvelopeSchema(
@@ -33,16 +34,18 @@ const healthReadinessSchema = z.strictObject({
   status: z.literal('ok'),
 });
 
-const PROBE_RULES = `Served at the root of the host, **outside the \`/api\` prefix**. Public: no token is read. Never rate limited, so an orchestrator can poll it freely. Like every answer it carries \`Cache-Control: no-store\`.`;
+/** The request middleware runs on the routes kept outside the prefix too, hence the two headers. */
+const PROBE_RULES = `Served at the root of the host, **outside the \`/api\` prefix**. Public: no token is read. Never rate limited, so an orchestrator can poll it freely. Like every answer of this API it carries \`Cache-Control: no-store\`, an \`x-request-id\` and a W3C \`traceparent\`: send your own \`x-request-id\` (1 to 128 characters among letters, digits, \`.\`, \`_\`, \`:\` and \`-\`) to get it back instead of a generated UUID, and quote it when reporting a failed probe, because every log line of the request carries it.`;
 
+/**
+ * Masked like every answer of status 500 or above, with one difference the exception filter makes
+ * for this probe alone (`safeOperationalDetails`): it keeps `details` made of `up` / `down` only.
+ */
 const notReady = (
   when: string,
   details?: Readonly<Record<string, { readonly status: 'down' | 'up' }>>,
 ): ApiProblem => ({
-  status: 503,
-  code: 'HTTP_503',
-  message: 'Internal server error',
-  when,
+  ...PROBLEM.masked(503, 'HTTP_503', when),
   ...(details === undefined ? {} : { details }),
 });
 
@@ -96,7 +99,7 @@ export const DocCheckReadiness = () =>
 - **redis**: a \`PING\`, only when rate limiting is switched on for the deployment. When it is off, Redis is not contacted and is reported as \`disabled\`, which does not fail the probe.
 - **storage**: a probe of the file storage, only when the \`fileUploads\` capability is on; the entry is absent otherwise. Its result is cached for 30 seconds and a probe gives up after 10 seconds.
 
-${PROBE_RULES} The \`200\` body is **not enveloped**; the \`503\` uses the usual error envelope. No error detail of a dependency (host, user, driver message) is ever returned. The route takes no parameter.`,
+${PROBE_RULES} The \`200\` body is **not enveloped**; the \`503\` uses the usual error envelope and, like every answer of status 500 or above, the message "Internal server error". It is the only such answer that keeps \`details\`, and they hold \`up\` / \`down\` statuses and nothing else. No error detail of a dependency (host, user, driver message) is ever returned. The route takes no parameter.`,
     ),
     ApiJsonResponse({
       name: 'HealthReadiness',

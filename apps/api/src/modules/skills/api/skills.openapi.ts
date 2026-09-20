@@ -6,24 +6,28 @@ import {
   skillWriteInputSchema,
 } from '@alfred/contracts';
 import { applyDecorators } from '@nestjs/common';
-import { ApiResponse } from '@nestjs/swagger';
 import {
   ApiEnvelopeResponse,
   ApiErrors,
   ApiIdParam,
   ApiJsonBody,
+  ApiNoContent,
   ApiRoute,
 } from '../../../common/api-docs/api-docs.decorators';
 import { PROBLEM } from '../../../common/api-docs/api-problems';
 import {
   EXPECTED_VERSION_TEXT,
+  FRONT_MATTER_QUOTING,
+  SKILL_ACCOUNT_LOCK_NOTE,
   SKILL_BODY_TOO_LARGE,
   SKILL_DETAIL_DESCRIBE,
   SKILL_EXAMPLE,
   SKILL_EXPECTED_VERSION_INVALID,
+  SKILL_FILE_COUNT_INVALID,
   SKILL_ID,
   SKILL_ID_TEXT,
   SKILL_LIST_DESCRIBE,
+  SKILL_MD_DECODED,
   SKILL_NAME_CONFLICT,
   SKILL_PACKAGE,
   SKILL_PACKAGE_PROBLEMS,
@@ -31,16 +35,26 @@ import {
   SKILL_PACKAGE_REVISED,
   SKILL_PRIVATE_PROBLEMS,
   SKILL_QUOTA_EXCEEDED,
+  SKILL_ROW_LOCK_NOTE,
   SKILL_VERSION_CONFLICT,
+  SKILL_WRITE_BLOCKED,
   SKILL_WRITE_DESCRIBE,
   SKILL_WRITE_FIELDS_INVALID,
 } from './skills-shared.openapi';
 
-const PACKAGE_RULES = `**Package rules** (broken: \`400 skill_package_invalid\`, first broken rule only, message in French for the author):
-- a root \`SKILL.md\` (exact case), at most 131 072 bytes, starting with a YAML front matter between two \`---\` lines whose \`name\` and \`description\` are strictly equal to the body fields; other front-matter keys are allowed;
-- 1 to 50 files, at most 1 048 576 decoded bytes in total; a deployment can lower these limits;
-- file bytes travel as canonical standard base64; \`.md\` files must be UTF-8 without NUL character; any other file can be binary;
-- scripts are stored, never executed by the API.
+/** `example`: the request example of the route whose `SKILL.md` is `SKILL_MD_DECODED`. */
+const packageRules = (
+  example: string,
+) => `**Two layers of rules.** Field bounds are checked first and answer \`400 HTTP_400\`, one message per broken field: the \`name\` pattern, string lengths, and the number of files (none, or more than 50). The package rules below are checked next and answer \`400 skill_package_invalid\`: first broken rule only, message in French for the author.
+- A root \`SKILL.md\` (exact case), at most 131 072 bytes, starting with a YAML front matter between two \`---\` lines whose \`name\` and \`description\`, **once parsed as YAML**, are strings strictly equal to the body fields; other front-matter keys are allowed. ${FRONT_MATTER_QUOTING}
+- 1 to 50 files (the field rule above) and at most 1 048 576 decoded bytes in total. A deployment can lower the file count, the package size and the \`SKILL.md\` size; a package above a lowered limit answers \`skill_package_invalid\`. The values given here are the defaults and the most a deployment can allow. No route exposes the effective limits and the error carries no \`details\`: ask the operator when a package within these bounds is refused for its size or its file count.
+- File bytes travel as canonical standard base64; \`.md\` files must be UTF-8 without NUL character; any other file can be binary, and an empty file is accepted.
+- Scripts are stored, never executed by the API.
+
+Decoded, the \`SKILL.md\` of the \`${example}\` request example reads:
+\`\`\`
+${SKILL_MD_DECODED}
+\`\`\`
 
 The JSON body itself is limited to 1 600 000 bytes (\`413\`).`;
 
@@ -93,14 +107,16 @@ export const DocCreateSkill = () =>
       'Create a skill from a package',
       `Stores a new skill as snapshot \`1\`. The answer is the stored skill: \`version: 1\`, \`currentVersion: 1\`, \`publishedVersion: null\`, \`status: "draft"\`, \`enabled: true\`. Consumers do not see it until \`POST /api/skills/{id}/publish\`.
 
-${PACKAGE_RULES}
+${packageRules('minimal')}
 
-**Not idempotent.** After a network failure, look the name up with \`GET /api/skills?search=\` before retrying: a retry of a creation that succeeded answers \`409 skill_name_conflict\`. The account is never read from the body: the owner is the token's subject.`,
+**Not idempotent.** After a network failure, look the name up with \`GET /api/skills?search=\` before retrying: a retry of a creation that succeeded answers \`409 skill_name_conflict\`. The account is never read from the body: the owner is the token's subject.
+
+**Concurrency.** ${SKILL_ACCOUNT_LOCK_NOTE}: retry, after the same name look-up.`,
     ),
     ApiJsonBody({
       name: 'SkillsCreateBody',
       description:
-        'The whole package. The front matter of `SKILL.md` repeats `name` and `description`.',
+        'The whole package. The front matter of `SKILL.md` repeats `name` and `description`, written as double-quoted YAML strings in every example.',
       contract: skillWriteInputSchema,
       describe: SKILL_WRITE_DESCRIBE,
       examples: {
@@ -121,6 +137,7 @@ ${PACKAGE_RULES}
     }),
     ApiErrors(
       SKILL_WRITE_FIELDS_INVALID,
+      SKILL_FILE_COUNT_INVALID,
       PROBLEM.unknownField,
       PROBLEM.invalidJson,
       ...SKILL_PACKAGE_PROBLEMS,
@@ -128,6 +145,10 @@ ${PACKAGE_RULES}
       SKILL_NAME_CONFLICT,
       SKILL_QUOTA_EXCEEDED,
       SKILL_BODY_TOO_LARGE,
+      {
+        ...SKILL_WRITE_BLOCKED,
+        when: 'The creation waited more than 5 seconds behind another write of the same account and gave up: the transaction was rolled back and nothing was written. Any other unexpected failure answers the same body. Look the name up, then retry.',
+      },
     ),
   );
 
@@ -174,8 +195,9 @@ export const DocUpdateSkill = () =>
 - Sending exactly the stored name, description and files writes nothing and returns the skill unchanged, same \`version\`. \`expectedVersion\` is checked first all the same.
 - After a network failure, re-read the skill before retrying: if the first attempt went through, the \`version\` moved and the same request answers \`409 skill_version_conflict\`.
 - Older snapshots are kept (\`GET /api/skills/{id}/versions\`) and count toward the storage quota.
+- ${SKILL_ACCOUNT_LOCK_NOTE}: re-read the skill, then retry.
 
-${PACKAGE_RULES}`,
+${packageRules('unchanged')}`,
     ),
     ApiIdParam('id', SKILL_ID_TEXT, SKILL_ID),
     ApiJsonBody({
@@ -192,6 +214,10 @@ ${PACKAGE_RULES}`,
           summary: 'Rename: `name` changes in the body and in the front matter',
           value: { ...SKILL_PACKAGE_RENAMED, expectedVersion: 2 },
         },
+        unchanged: {
+          summary: 'Exactly what is stored: nothing is written, the answer keeps `version` 2',
+          value: { ...SKILL_PACKAGE, expectedVersion: 2 },
+        },
       },
     }),
     ApiEnvelopeResponse({
@@ -201,14 +227,20 @@ ${PACKAGE_RULES}`,
       describe: SKILL_DETAIL_DESCRIBE,
       data: SKILL_EXAMPLE.edited,
       more: {
+        renamed: {
+          summary:
+            'After the `rename` request: the new name shows here, consumers keep `incident-runbook` until the next publication',
+          data: SKILL_EXAMPLE.renamed,
+        },
         unchanged: {
-          summary: 'The body equals what is stored: nothing written, same `version`',
+          summary: 'After the `unchanged` request: nothing written, same `version`',
           data: SKILL_EXAMPLE.published,
         },
       },
     }),
     ApiErrors(
       SKILL_WRITE_FIELDS_INVALID,
+      SKILL_FILE_COUNT_INVALID,
       SKILL_EXPECTED_VERSION_INVALID,
       PROBLEM.unknownField,
       PROBLEM.invalidJson,
@@ -219,6 +251,7 @@ ${PACKAGE_RULES}`,
       SKILL_NAME_CONFLICT,
       SKILL_QUOTA_EXCEEDED,
       SKILL_BODY_TOO_LARGE,
+      SKILL_WRITE_BLOCKED,
     ),
   );
 
@@ -228,7 +261,9 @@ export const DocDeleteSkill = () =>
       'Delete a skill with all its snapshots',
       `Removes the skill, **every retained snapshot and every file**, the published one included: consumers lose it immediately and its bytes stop counting toward the storage quota. It cannot be undone and there is no archive.
 
-This \`DELETE\` takes a **JSON body** with the \`version\` last read, so a skill somebody just changed is not deleted by mistake. Send \`Content-Type: application/json\`; some HTTP clients drop the body of a \`DELETE\` unless asked not to. A second call answers \`404 skill_not_found\`.`,
+This \`DELETE\` takes a **JSON body** with the \`version\` last read, so a skill somebody just changed is not deleted by mistake. Send \`Content-Type: application/json\`; some HTTP clients drop the body of a \`DELETE\` unless asked not to. A second call answers \`404 skill_not_found\`.
+
+${SKILL_ROW_LOCK_NOTE} If the re-read answers \`404 skill_not_found\`, the other write was a deletion.`,
     ),
     ApiIdParam('id', SKILL_ID_TEXT, SKILL_ID),
     ApiJsonBody({
@@ -244,7 +279,7 @@ This \`DELETE\` takes a **JSON body** with the \`version\` last read, so a skill
         },
       },
     }),
-    ApiResponse({ status: 204, description: 'The skill is deleted. The answer has no body.' }),
+    ApiNoContent('The skill is deleted. The answer has no body.'),
     ApiErrors(
       SKILL_EXPECTED_VERSION_INVALID,
       PROBLEM.unknownField,
@@ -253,5 +288,6 @@ This \`DELETE\` takes a **JSON body** with the \`version\` last read, so a skill
       PROBLEM.notFound('skill'),
       SKILL_VERSION_CONFLICT,
       SKILL_BODY_TOO_LARGE,
+      SKILL_WRITE_BLOCKED,
     ),
   );

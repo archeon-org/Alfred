@@ -9,11 +9,11 @@ import {
   updateFileInputSchema,
 } from '@alfred/contracts';
 import { applyDecorators } from '@nestjs/common';
-import { ApiResponse } from '@nestjs/swagger';
 import {
   ApiEnvelopeResponse,
   ApiErrors,
   ApiJsonBody,
+  ApiNoContent,
   ApiRoute,
 } from '../../../common/api-docs/api-docs.decorators';
 import { PROBLEM } from '../../../common/api-docs/api-problems';
@@ -24,6 +24,7 @@ import {
   FILES_FOLDER_NOT_FOUND,
   FILES_NAME_CLEANING,
   FILES_NOT_FOUND,
+  FILES_POLL_RULE,
   FilesIdParam,
   filesFailedScan,
   filesJustUploadedPdf,
@@ -41,7 +42,7 @@ export const DocListFiles = () =>
 - **Order**: newest upload first (\`createdAt\`, then \`id\`), stable across pages.
 - **Filters** combine with AND. Without \`folderId\` the whole library is listed, whatever the folder; with a folder identifier, only the files placed directly in it (not those of its sub-folders); with \`folderId=root\`, the files of the top level. A folder or a conversation that does not exist, or belongs to someone else, answers an empty list, not a \`404\`.
 - **Paging**: \`limit\` 1 to 100 (default 20). Send \`data.nextCursor\` back unchanged as \`cursor\` with the same filters; \`nextCursor: null\` is the last page.
-- **Following an upload**: processing happens after the upload answered and nothing is pushed. Re-read \`GET /api/files/{id}\`, or list with \`readiness=processing\`, until the file is \`ready\` or \`failed\`. ${FILES_ATTACH_RULE}`,
+- **Following an upload**: processing happens after the upload answered and nothing is pushed. Re-read \`GET /api/files/{id}\`, or list with \`readiness=processing\`, until the file is \`ready\` or \`failed\`. ${FILES_POLL_RULE} ${FILES_ATTACH_RULE}`,
     ),
     ApiEnvelopeResponse({
       name: 'FilesPage',
@@ -135,7 +136,7 @@ export const DocGetFile = () =>
       'Read a file of the library',
       `The library entry of one file: its name, type, size, place, labels, processing state and usage. The bytes are served by \`GET /api/files/{id}/content\`.
 
-This is the route to poll after an upload: \`readiness\` goes from \`processing\` to \`ready\` or \`failed\`. ${FILES_ATTACH_RULE}`,
+This is the route to poll after an upload: \`readiness\` goes from \`processing\` to \`ready\` or \`failed\`, and both are final. ${FILES_POLL_RULE} ${FILES_ATTACH_RULE}`,
     ),
     FilesIdParam(),
     ApiEnvelopeResponse({
@@ -176,13 +177,13 @@ export const DocUpdateFile = () =>
     ApiJsonBody({
       name: 'FilesUpdateInput',
       description:
-        'The fields to change. Any subset; an absent field is left as it is. Unknown fields are refused.',
+        'The fields to change. Any subset; an absent field is left as it is. Unknown fields are refused. Only `folderId` and `description` have a `null` value; `name` and `tags` do not: leave them out to keep them.',
       contract: updateFileInputSchema,
       describe: {
-        name: `New display name, 1 to ${FILE_NAME_MAX_LENGTH} characters once trimmed. Cleaned, and its extension replaced by the current one (see above).`,
+        name: `New display name, 1 to ${FILE_NAME_MAX_LENGTH} characters once trimmed. Cleaned, and its extension replaced by the current one (see above). Omit it to keep the current name: unlike \`folderId\`, \`name\` has no \`null\` value.`,
         folderId:
           'Identifier of the folder to move the file to; `null` moves it to the top level. Omit it to leave the file where it is.',
-        tags: `The complete new list of labels: it replaces the current one, \`[]\` removes them all. At most ${FILE_MAX_TAGS} labels of 1 to ${FILE_TAG_MAX_LENGTH} characters. Each is trimmed; blank labels and duplicates are dropped, the order is kept.`,
+        tags: `The complete new list of labels: it replaces the current one, \`[]\` removes them all. At most ${FILE_MAX_TAGS} labels of 1 to ${FILE_TAG_MAX_LENGTH} characters. Each is trimmed; blank labels and duplicates are dropped, the order is kept. Omit it to keep the current labels: \`tags\` has no \`null\` value, \`[]\` is how they are removed.`,
         description: `Free text of at most ${FILE_DESCRIPTION_MAX_LENGTH} characters, trimmed. \`null\`, an empty or a blank string removes the description.`,
       },
       examples: {
@@ -260,7 +261,7 @@ export const DocDeleteFile = () =>
 - A file an answer is being written from cannot be deleted: \`409 file_in_use\`.`,
     ),
     FilesIdParam(),
-    ApiResponse({ status: 204, description: 'Deleted. No body.' }),
+    ApiNoContent('Deleted. No body.'),
     ApiErrors(FILES_NOT_FOUND, ...FILES_ACCESS_PROBLEMS, {
       status: 409,
       code: 'file_in_use',

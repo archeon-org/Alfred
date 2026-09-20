@@ -17,10 +17,11 @@ import {
   EXECUTION_CONVERSATION_GONE,
   EXECUTION_ID,
   EXECUTION_NOT_FOUND,
+  EXECUTION_PRIVATE_PROBLEMS,
   failedSnapshot,
+  projectNotWritable,
   RECOVERY_REQUIRED,
   runningSnapshot,
-  SESSION_REVOKED,
   snapshotFields,
   stoppingSnapshot,
 } from './execution-snapshot.openapi';
@@ -58,9 +59,7 @@ The snapshot comes from one committed revision, so it is always coherent; \`revi
       },
     }),
     ApiErrors(
-      PROBLEM.unauthenticated,
-      PROBLEM.invalidToken,
-      SESSION_REVOKED,
+      ...EXECUTION_PRIVATE_PROBLEMS,
       EXECUTION_NOT_FOUND,
       EXECUTION_CONVERSATION_GONE,
       PROBLEM.featureDisabled('agentRuntime'),
@@ -76,7 +75,8 @@ export const DocStopExecution = () =>
       `Records the intent to stop and answers the snapshot as it is right after. It takes no body.
 
 - An active execution becomes \`stopping\`. A background worker then cancels the run in the runtime and settles the execution, normally as \`cancelled\` (\`timed_out\` if its deadline passed meanwhile). This answer therefore does not prove that a tool call already stopped: keep observing, or poll, until the status is terminal. An execution created before durable streaming existed (a legacy row) cannot be cancelled safely and becomes \`recovery_required\` instead.
-- **Idempotent**: stopping an execution that is already \`stopping\` or already settled changes nothing and answers \`200\` with its current snapshot.
+- **Idempotent**: stopping an execution that already has a Stop recorded (\`stopping\`, or parked after a Stop) or that is in a terminal status (\`completed\`, \`failed\`, \`cancelled\`, \`timed_out\`) changes nothing and answers \`200\` with its current snapshot.
+- A parked execution (\`interrupted\`, \`recovery_required\`) with no Stop recorded counts as active and becomes \`stopping\` as well. This includes a \`recovery_required\` execution whose \`finishedAt\` is already set (\`errorCode: runtime_output_incomplete\`): the answer then shows \`stopping\` with a non-null \`finishedAt\`, and a worker takes the execution up again.
 - The text and the work committed before the stop are kept; steps still running are reported \`interrupted\` once the execution settles.
 - While the execution is \`stopping\` the conversation still refuses a new message with \`thread_busy\`.`,
     ),
@@ -100,20 +100,19 @@ export const DocStopExecution = () =>
       },
     }),
     ApiErrors(
-      PROBLEM.unauthenticated,
-      PROBLEM.invalidToken,
-      SESSION_REVOKED,
+      ...EXECUTION_PRIVATE_PROBLEMS,
       EXECUTION_NOT_FOUND,
       EXECUTION_CONVERSATION_GONE,
       PROBLEM.featureDisabled('agentRuntime'),
+      {
+        ...PROBLEM.notFound('project'),
+        when: "The conversation's project row disappeared while this request waited for its lock: a concurrent move of the chat, a concurrent delete of the chat or of its project won. No Stop was recorded. Read the execution again: it answers `404` once its conversation is gone.",
+      },
       BINDING_CHANGED,
       RECOVERY_REQUIRED,
-      {
-        status: 409,
-        code: 'project_archived',
-        message: 'Project is archived.',
-        when: 'The project was archived while this request was waiting for its lock. `project_deleting` ("Project is being deleted.") is the same race with a deletion.',
-      },
+      ...projectNotWritable(
+        "The conversation's project was archived or started being deleted while this request waited for its lock. No Stop was recorded; later calls answer `404`. The worker abandons the execution on its own once its project is no longer active: it settles as `cancelled` with `errorCode: execution_authority_lost`.",
+      ),
     ),
   );
 
@@ -139,9 +138,7 @@ Needs **two** capabilities: \`agentRuntime\` and \`traceLinks\`. \`traceLinks\` 
       },
     }),
     ApiErrors(
-      PROBLEM.unauthenticated,
-      PROBLEM.invalidToken,
-      SESSION_REVOKED,
+      ...EXECUTION_PRIVATE_PROBLEMS,
       EXECUTION_NOT_FOUND,
       EXECUTION_CONVERSATION_GONE,
       {
@@ -150,16 +147,12 @@ Needs **two** capabilities: \`agentRuntime\` and \`traceLinks\`. \`traceLinks\` 
         message: 'This execution has no runtime trace.',
         when: 'The runtime has not accepted the run yet (the execution is still `pending`) or never did. Retry once the execution is `running`.',
       },
-      {
-        ...PROBLEM.featureDisabled('traceLinks'),
-        when: 'The `traceLinks` or the `agentRuntime` capability is switched off on this deployment. Do not retry; read `GET /api/platform` to know which capabilities are on.',
-      },
+      PROBLEM.featureDisabled('traceLinks', 'agentRuntime'),
       BINDING_CHANGED,
-      {
-        status: 500,
-        code: 'trace_link_invalid',
-        message: 'Internal server error',
-        when: 'The configured console address yields a link the contract refuses. Startup validation is meant to prevent it; report it to the operator.',
-      },
+      PROBLEM.masked(
+        500,
+        'trace_link_invalid',
+        'The configured console address yields a link the contract refuses. Startup validation is meant to prevent it; report it to the operator.',
+      ),
     ),
   );

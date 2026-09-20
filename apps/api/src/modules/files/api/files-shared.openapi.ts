@@ -9,7 +9,11 @@ import {
 import { ApiIdParam, type ApiProblem } from '../../../common/api-docs/api-docs.decorators';
 import { PROBLEM } from '../../../common/api-docs/api-problems';
 
-/** What the three `files*.openapi.ts` files share: identifiers, field texts, examples, errors. */
+/**
+ * What the documentation of the library shares, so that the two halves of the `files` tag cannot
+ * drift: the three `files-*.openapi.ts` files of the file routes and `file-folders.openapi.ts`.
+ * Identifiers, field texts, examples, errors.
+ */
 export const FILES_PDF_ID = 'c1f6a2d4-7b3e-4a58-9d10-5e8f2b6c4a97';
 export const FILES_IMAGE_ID = '4e9b7d21-0c5a-4f83-b6e2-a1d3c8f05b79';
 export const FILES_SCAN_ID = '8a2d5f60-3e1b-4c97-a4d8-6f0b9e7c2d15';
@@ -18,6 +22,10 @@ export const FILES_FOLDER_ID = '6d1f0a52-3b7e-4c19-8a44-9e2b5c7d1f03';
 
 export const FILES_NAME_CLEANING =
   'normalised to Unicode NFC, control characters (line breaks included) and invisible direction or zero-width marks removed, `/`, `\\` and `:` replaced by `-`, runs of white space replaced by one space, then trimmed';
+
+/** Where a text tells the caller to poll. The figures are the worker's and the web application's. */
+export const FILES_POLL_RULE =
+  'Processing usually ends within a few seconds. A document can take up to the extraction time limit of the deployment (60 seconds by default), and a processing that could not run is tried again, 3 attempts in all, 15 then 30 seconds apart. Poll every 2 seconds and stop after about a minute, as the web application does: every read counts against the general rate limit of the account (120 requests a minute by default). A file still `processing` by then is not lost: read it again later.';
 
 export const FILES_ATTACH_RULE = `Only a \`ready\` file can be attached to a message: send its \`id\` in \`attachmentIds\` of \`POST /api/conversations/{id}/executions\` (at most ${FILE_MAX_ATTACHMENTS_PER_MESSAGE} files per message, of which at most ${FILE_MAX_IMAGES_PER_MESSAGE} images).`;
 
@@ -35,7 +43,7 @@ export const filesStoredFileFields = (prefix: string): Record<string, string> =>
   [`${prefix}readiness`]:
     '`processing` right after the upload, while the text of a document is extracted or the reduced copy of an image is prepared (off the request path: re-read the file to follow it); then `ready`, or `failed` with a `failureCode`. Only a `ready` file can be attached to a message. A `processing` or `failed` file stays in the library and can be downloaded, renamed and deleted.',
   [`${prefix}failureCode`]:
-    'Why processing failed; `null` unless `readiness` is `failed`. `no_readable_text`: the document holds no text (a scanned PDF has pages but no text layer, and there is no OCR); `parser_error`: the file could not be read; `timeout`: reading it took longer than this deployment allows; `too_large`: reading it needed more memory than allowed. `unsupported` belongs to the contract but is not reported on a library file today.',
+    'Why processing failed; `null` unless `readiness` is `failed`. `no_readable_text`: the document holds no text (a scanned PDF has pages but no text layer, and there is no OCR); `parser_error`: the file could not be read; `timeout`: reading it took longer than this deployment allows; `too_large`: reading it needed more memory than allowed. `unsupported` belongs to the contract but is not reported on a library file today. A `failed` file is final: it is never processed again, no route starts its processing over, and uploading the same bytes again answers this same entry (`deduplicated: true`), still `failed`. To try again, which only makes sense for `timeout` and `parser_error`, delete the file, then upload it with a new `uploadId`. For `no_readable_text`, provide a document that has a text layer.',
   [`${prefix}folderId`]:
     'Folder the file is placed in (see `GET /api/files/folders`); `null` at the top level.',
   [`${prefix}tags`]: `Free labels in the order they were saved, at most ${FILE_MAX_TAGS} of 1 to ${FILE_TAG_MAX_LENGTH} characters, without duplicates. The \`tag\` filter of the list matches one exactly.`,
@@ -116,11 +124,12 @@ export const filesFailedScan = {
   updatedAt: '2026-09-17T08:03:55.264Z',
 };
 
-export const FilesIdParam = () =>
+/** `example` pre-fills "Try it out": it must name a file the route can answer. */
+export const FilesIdParam = (example = FILES_PDF_ID) =>
   ApiIdParam(
     'id',
     'Identifier of a file of the signed-in account, as answered by the upload or the list.',
-    FILES_PDF_ID,
+    example,
   );
 
 export const FILES_NOT_FOUND: ApiProblem = {
@@ -133,9 +142,13 @@ export const FILES_FOLDER_NOT_FOUND: ApiProblem = {
   when: '`folderId` names a folder that does not exist or belongs to another account; the two cases are indistinguishable by design. Re-read `GET /api/files/folders`.',
 };
 
-/** Every route of the library is private and belongs to the `fileUploads` capability. */
+/**
+ * Every route of the library, folders included, is private, belongs to the `fileUploads`
+ * capability and calls `TenantsService.scopeFor`: the access-token guard verifies the token only,
+ * so a token that outlived its account gets as far as `PROBLEM.accountUnavailable`.
+ */
 export const FILES_ACCESS_PROBLEMS: readonly ApiProblem[] = [
-  PROBLEM.unauthenticated,
-  PROBLEM.invalidToken,
+  ...PROBLEM.session,
+  PROBLEM.accountUnavailable,
   PROBLEM.featureDisabled('fileUploads'),
 ];

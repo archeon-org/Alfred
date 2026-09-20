@@ -8,7 +8,14 @@ import {
   type ApiProblem,
 } from '../../../common/api-docs/api-docs.decorators';
 import { PROBLEM } from '../../../common/api-docs/api-problems';
-import { AUTH_PROBLEM, ProviderParam, SET_COOKIE, STATE_COOKIE } from './auth-shared.openapi';
+import {
+  AUTH_PROBLEM,
+  ProviderParam,
+  SET_COOKIE,
+  STATE_COOKIE,
+  STATE_PLACEHOLDER,
+  responseHeader,
+} from './auth-shared.openapi';
 
 /** The web application composes the same envelope; the contracts export its two parts only. */
 const authProviderListEnvelopeSchema = successEnvelopeSchema(authProvidersSchema);
@@ -45,9 +52,9 @@ const START_BEHAVIOUR = `Public, and meant for the browser: navigate to this URL
 What the API does before it redirects:
 - it creates a one-time login state, valid 10 minutes and stored as a hash, that remembers the provider and \`returnTo\`;
 - it puts that state in the state cookie (see the \`Set-Cookie\` header of the \`302\`), so that the callback can check that the same browser comes back;
-- for Google it adds a PKCE challenge (\`S256\`) and a nonce, asks for the scopes \`openid email profile\` and always shows the account chooser.
+- for Google it adds a PKCE challenge (\`S256\`) and a nonce, asks for the scopes \`openid email profile\` (\`include_granted_scopes=true\`), asks for no Google refresh token (\`access_type=online\`) and always shows the account chooser (\`prompt=select_account\`).
 
-There is nothing else to call: the provider sends the browser to the callback route, which signs the user in and redirects to \`returnTo\` inside the web application. Every call creates a new state; one that is never used expires by itself.
+Nothing else to call during the sign-in: the provider sends the browser to the callback route, which sets the refresh cookie and redirects to the \`/auth/callback\` page of the web application (\`WEB_APP_URL\`) with \`returnTo\` as a query parameter. That page calls \`POST /api/auth/refresh\` to get its first access token, then navigates to \`returnTo\`. Every call creates a new state; one that is never used expires by itself.
 
 Rate limit: on top of the general per-address limit this route has its own bucket, \`oauth-start-ip\` (300 calls per minute and per client address by default).`;
 
@@ -64,7 +71,7 @@ const START_PROBLEMS: readonly ApiProblem[] = [
     '`returnTo` exceeds 2048 characters.',
     'returnTo must be shorter than or equal to 2048 characters',
   ),
-  AUTH_PROBLEM.unknownParameter('redirect'),
+  PROBLEM.unknownParameter('redirect'),
   AUTH_PROBLEM.rateLimited('oauth-start-ip', 300, 'AUTH_OAUTH_START_IP_RATE_LIMIT_PER_MINUTE'),
 ];
 
@@ -74,18 +81,27 @@ const StartRedirect = () =>
     description:
       "The login state is created and the browser is sent to the provider's sign-in page.",
     headers: {
-      Location: {
+      Location: responseHeader({
         description:
-          "The provider's authorization URL, built for this attempt. For Google it carries the client identifier, the registered callback URL, the `state`, the PKCE `code_challenge`, the `nonce`, the scopes and `prompt=select_account`. Follow it as it is.",
-        schema: { type: 'string', format: 'uri' },
-        example:
-          'https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=<client-id>&redirect_uri=<callback-url>&scope=openid%20email%20profile&state=<login-state>&code_challenge=<pkce-challenge>&code_challenge_method=S256&nonce=<nonce>&prompt=select_account',
-      },
-      'Set-Cookie': {
+          "The provider's authorization URL, built for this attempt. For Google it carries `access_type=online` (no Google refresh token is requested), the PKCE `code_challenge` with `code_challenge_method=S256`, `include_granted_scopes=true`, the `nonce`, `prompt=select_account`, the scopes, the `state`, `response_type=code`, the client identifier and the registered callback URL (`GOOGLE_OAUTH_CALLBACK_URL`), in that order. Follow it as it is.",
+        format: 'uri',
+        examples: {
+          google: {
+            summary:
+              'Google (`<…>` stands for a value of this attempt or of the deployment, percent-encoded in the real URL)',
+            value: `https://accounts.google.com/o/oauth2/v2/auth?access_type=online&code_challenge=<pkce-challenge>&code_challenge_method=S256&include_granted_scopes=true&nonce=<nonce>&prompt=select_account&scope=openid%20email%20profile&state=${STATE_PLACEHOLDER}&response_type=code&client_id=<client-id>&redirect_uri=<callback-url>`,
+          },
+        },
+      }),
+      'Set-Cookie': responseHeader({
         description: `${STATE_COOKIE} Its value is the same state as in \`Location\`; the callback compares the two.`,
-        schema: { type: 'string' },
-        example: SET_COOKIE.setState,
-      },
+        examples: {
+          setState: {
+            summary: 'With `AUTH_COOKIE_SECURE=false`',
+            value: SET_COOKIE.setState,
+          },
+        },
+      }),
     },
   });
 

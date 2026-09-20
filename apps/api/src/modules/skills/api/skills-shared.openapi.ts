@@ -47,19 +47,26 @@ export const SKILL_DETAIL_DESCRIBE = prefixed('data.', { ...SUMMARY_FIELDS, ...F
 export const EXPECTED_VERSION_TEXT =
   'The `version` last read for this skill, 1 to 2 147 483 646. Any other current value answers `409 skill_version_conflict` and nothing is written.';
 
+/**
+ * The front matter is compared after a YAML parse (`validateMetadata`), so what must match is the
+ * value YAML reads, not the text typed after the colon.
+ */
+export const FRONT_MATTER_QUOTING =
+  'Write both values as double-quoted YAML strings: the JSON encoding of a string (`JSON.stringify`) is one. Unquoted, YAML reads a name such as `2024`, `007`, `true` or `null` as a number, a boolean or null, stops a description at ` #`, refuses one holding `: `, and drops leading and trailing spaces: the value no longer equals the body field and the package is refused.';
+
 /** `describe` of the package fields of `skillWriteInputSchema` and `skillUpdateInputSchema`. */
 export const SKILL_WRITE_DESCRIBE = {
-  name: 'Lower-case kebab-case (`a-z`, `0-9`, single hyphens between groups), 1 to 64 characters, unique among the skills of the account. Must equal the `name` of the `SKILL.md` front matter.',
+  name: 'Lower-case kebab-case (`a-z`, `0-9`, single hyphens between groups), 1 to 64 characters, unique among the skills of the account. The `name` of the `SKILL.md` front matter, once parsed as YAML, must be a string strictly equal to it: quote it there (`name: "2024"`), because YAML reads an unquoted `2024`, `true` or `null` as something other than a string.',
   description:
-    '1 to 1 024 characters, not only white space, no NUL character, no unpaired surrogate. Must equal the `description` of the `SKILL.md` front matter. Write it for whoever decides when to use the skill.',
+    '1 to 1 024 UTF-16 code units (a character outside the BMP, an emoji for example, counts for two), not only white space, no NUL character, no unpaired surrogate. The `description` of the `SKILL.md` front matter, once parsed as YAML, must be a string strictly equal to it: write it double-quoted there, because an unquoted description holding `: ` or ` #`, or with leading or trailing spaces, is read differently. Write it for whoever decides when to use the skill.',
   files:
     'The whole package: 1 to 50 files (a deployment can lower the maximum) and at most 1 048 576 decoded bytes in total. It must hold a root `SKILL.md`. Paths are unique ignoring case and Unicode normalisation, and a path cannot be both a file and the folder of another file.',
   'files[].path':
-    'Relative `/`-separated path, 1 to 240 characters, NFC-normalised. No empty, `.` or `..` segment (so no leading or trailing `/`), no segment with leading or trailing white space, no backslash, colon or control character. The case is kept as sent.',
+    'Relative `/`-separated path, 1 to 240 UTF-16 code units (a character outside the BMP counts for two), NFC-normalised. No empty, `.` or `..` segment (so no leading or trailing `/`), no segment with leading or trailing white space, no backslash, colon or control character. The case is kept as sent.',
   'files[].mediaType':
     'Media type as `type/subtype`, without parameters, 1 to 127 characters. Example: `text/markdown`. Stored as sent.',
   'files[].contentBase64':
-    'The exact bytes of the file in canonical standard base64: `+` and `/` alphabet, `=` padding, no line break. At most 1 398 104 characters. A file whose path ends in `.md` must decode to UTF-8 text without NUL character.',
+    'The exact bytes of the file in canonical standard base64: `+` and `/` alphabet, `=` padding, no line break. At most 1 398 104 characters. An empty string is an empty file (0 bytes) and is accepted, except for `SKILL.md`, which needs its front matter. A file whose path ends in `.md` must decode to UTF-8 text without NUL character.',
 } as const;
 
 const file = (path: string, mediaType: string, text: string) => ({
@@ -67,12 +74,11 @@ const file = (path: string, mediaType: string, text: string) => ({
   mediaType,
   contentBase64: Buffer.from(text, 'utf8').toString('base64'),
 });
+/** Both values double-quoted, the form `FRONT_MATTER_QUOTING` recommends: safe whatever they hold. */
+const skillMdText = (name: string, description: string, body: string) =>
+  `---\nname: ${JSON.stringify(name)}\ndescription: ${JSON.stringify(description)}\n---\n${body}`;
 const skillMd = (name: string, description: string, body: string) =>
-  file(
-    'SKILL.md',
-    'text/markdown',
-    `---\nname: ${name}\ndescription: ${description}\n---\n${body}`,
-  );
+  file('SKILL.md', 'text/markdown', skillMdText(name, description, body));
 type ExampleFile = ReturnType<typeof file>;
 const decodedBytes = (files: readonly ExampleFile[]) =>
   files.reduce((total, item) => total + Buffer.from(item.contentBase64, 'base64').byteLength, 0);
@@ -87,6 +93,8 @@ export const SKILL_PACKAGE = {
   description: DESCRIPTION,
   files: [skillMd(NAME, DESCRIPTION, 'Check the runbook first.')],
 };
+/** The `SKILL.md` of `SKILL_PACKAGE` before base64, shown as text so a reader sees a front matter. */
+export const SKILL_MD_DECODED = skillMdText(NAME, DESCRIPTION, 'Check the runbook first.');
 export const SKILL_PACKAGE_RENAMED = {
   name: 'incident-triage',
   description: DESCRIPTION,
@@ -151,6 +159,8 @@ export const SKILL_EXAMPLE = {
   created: detailOf(SKILL_PACKAGE, [1, 1, null, CREATED_AT]),
   published: detailOf(SKILL_PACKAGE, [2, 1, 1, '2026-09-18T09:20:05.117Z']),
   edited: detailOf(SKILL_PACKAGE_REVISED, EDITED),
+  /** The other way out of `published`: a rename instead of an edit, same counters as `edited`. */
+  renamed: detailOf(SKILL_PACKAGE_RENAMED, EDITED),
   republished: detailOf(SKILL_PACKAGE_REVISED, [4, 2, 2, '2026-09-19T14:05:10.961Z']),
   restored: detailOf(SKILL_PACKAGE, [5, 1, 2, '2026-09-20T08:31:22.340Z']),
   restoredToPublished: detailOf(SKILL_PACKAGE, [4, 1, 1, '2026-09-19T14:30:41.208Z']),
@@ -164,20 +174,31 @@ export const SKILL_EXAMPLE = {
   },
 } as const;
 
-export const SKILL_ACCOUNT_UNAVAILABLE: ApiProblem = {
-  status: 401,
-  code: 'HTTP_401',
-  message: 'Account is unavailable',
-  when: 'The access token is valid but its account no longer exists or is no longer active.',
-};
-
-/** Every skills route: private, and behind the `skills` capability (checked before the token). */
+/**
+ * Every skills route: behind the `skills` capability (checked before the token), behind the global
+ * `AccessTokenGuard`, and every operation of both services starts with `TenantsService.scopeFor`.
+ */
 export const SKILL_PRIVATE_PROBLEMS: readonly ApiProblem[] = [
-  PROBLEM.unauthenticated,
-  PROBLEM.invalidToken,
-  SKILL_ACCOUNT_UNAVAILABLE,
+  ...PROBLEM.session,
+  PROBLEM.accountUnavailable,
   PROBLEM.featureDisabled('skills'),
 ];
+
+/**
+ * `lock_timeout` of the API connections (5 000 ms, `database-options.ts`): a write blocked that
+ * long fails with PostgreSQL `55P03`, which is not an HTTP exception, so the filter answers 500.
+ */
+export const SKILL_WRITE_BLOCKED: ApiProblem = PROBLEM.masked(
+  500,
+  'HTTP_500',
+  'The write waited more than 5 seconds behind another write of the same account or skill and gave up: the transaction was rolled back and nothing was written. Any other unexpected failure answers the same body. Re-read the skill, then retry.',
+);
+/** Create, update and restore lock the account row first; every write locks its skill row. */
+export const SKILL_ACCOUNT_LOCK_NOTE =
+  'Creations, updates and restores of one account run one after another, and a write also waits for any other write on the same skill. One that waits more than 5 seconds answers `500 HTTP_500` ("Internal server error") and wrote nothing';
+/** Publish, availability and delete lock the skill row only. */
+export const SKILL_ROW_LOCK_NOTE =
+  '- Writes on one skill run one after another. One that waits more than 5 seconds behind another answers `500 HTTP_500` ("Internal server error") and wrote nothing: re-read the skill, then retry.';
 
 export const SKILL_VERSION_CONFLICT: ApiProblem = {
   status: 409,
@@ -200,9 +221,11 @@ export const SKILL_QUOTA_EXCEEDED: ApiProblem = {
   when: 'The decoded bytes of this package, added to every retained snapshot of every skill of the account, exceed the account quota (26 214 400 bytes unless the deployment changes it). Nothing was written. Deleting a skill frees all its snapshots.',
 };
 
+const SKILL_BODY_LIMIT = PROBLEM.bodyTooLargeAt(1_600_000);
+/** `bootstrap.ts` gives every path under `/api/skills` its own JSON limit. */
 export const SKILL_BODY_TOO_LARGE: ApiProblem = {
-  ...PROBLEM.bodyTooLarge,
-  when: 'The JSON body exceeds 1 600 000 bytes, the limit of the skills routes.',
+  ...SKILL_BODY_LIMIT,
+  when: `${SKILL_BODY_LIMIT.when} This is the limit of the skills routes.`,
 };
 
 export const SKILL_EXPECTED_VERSION_INVALID = PROBLEM.validation(
@@ -232,7 +255,7 @@ export const SKILL_PACKAGE_PROBLEMS: readonly ApiProblem[] = [
   ),
   packageProblem(
     'En-tête YAML invalide ou métadonnées incohérentes.',
-    'The front matter is not valid YAML (core schema, no duplicate key, no alias), is not a mapping, or its `name` or `description` is not strictly equal to the body field. Other keys are allowed.',
+    'The front matter is not valid YAML (core schema, no duplicate key, no alias), is not a mapping, or its `name` or `description`, once parsed as YAML, is not a string strictly equal to the body field. The usual cause is an unquoted value YAML reads differently (a name such as `2024` or `true`, a description holding `: ` or ` #`, leading or trailing spaces): write both values double-quoted. Other keys are allowed.',
   ),
   packageProblem(
     'SKILL.md dépasse la taille autorisée.',
@@ -248,7 +271,7 @@ export const SKILL_PACKAGE_PROBLEMS: readonly ApiProblem[] = [
   ),
   packageProblem(
     'Nom ou description invalide.',
-    '`description` holds only white space, a NUL character or an unpaired surrogate.',
+    '`description` holds only white space, a NUL character or an unpaired surrogate, or is longer than 1 024 UTF-16 code units although it passed the field rule, which counts a character outside the BMP (an emoji) once where this rule counts it twice. Shorten it.',
   ),
   packageProblem(
     'Le package contient des chemins dupliqués.',
@@ -260,7 +283,7 @@ export const SKILL_PACKAGE_PROBLEMS: readonly ApiProblem[] = [
   ),
   packageProblem(
     'Le chemin du fichier est invalide.',
-    'A `path` is absolute, holds an empty, `.` or `..` segment, a segment with leading or trailing white space, a backslash, a colon, a control character or an unpaired surrogate, or is not NFC-normalised.',
+    'A `path` is absolute, holds an empty, `.` or `..` segment, a segment with leading or trailing white space, a backslash, a colon, a control character or an unpaired surrogate, is not NFC-normalised, or is longer than 240 UTF-16 code units (a character outside the BMP counts for two here, for one in the field rule).',
   ),
   packageProblem(
     'Le contenu du fichier doit être encodé en base64 canonique.',
@@ -278,7 +301,13 @@ export const SKILL_PACKAGE_PROBLEMS: readonly ApiProblem[] = [
 
 /** Field rules of the package, checked first; one message per broken field. */
 export const SKILL_WRITE_FIELDS_INVALID = PROBLEM.validation(
-  'A field breaks its rule: `name` not lower-case kebab-case or over 64 characters, `description` empty or over 1 024 characters, `files` not a list of 1 to 50 entries, a file field missing, not a string or out of bounds. One message per broken field; file fields are prefixed with `files.<index>.`.',
+  'A field breaks its rule: `name` not lower-case kebab-case or over 64 characters, `description` empty or over 1 024 characters, a file field missing, not a string or out of bounds. One message per broken field; file fields are prefixed with `files.<index>.`.',
   'name must match /^[a-z0-9]+(?:-[a-z0-9]+)*$/u regular expression',
   'files.0.path must be longer than or equal to 1 characters',
+);
+
+/** `@ArrayMinSize(1) @ArrayMaxSize(50)` on the DTO: a field rule, so never `skill_package_invalid`. */
+export const SKILL_FILE_COUNT_INVALID = PROBLEM.validation(
+  '`files` is empty (`files must contain at least 1 elements`) or holds more than 50 entries; the entries are then not checked one by one. This is a field rule, not `skill_package_invalid`: only a deployment whose maximum is below 50 answers `skill_package_invalid`, between its maximum and 50 files.',
+  'files must contain no more than 50 elements',
 );

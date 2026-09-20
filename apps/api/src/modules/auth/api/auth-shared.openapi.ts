@@ -2,9 +2,41 @@ import { ApiHeader, ApiParam } from '@nestjs/swagger';
 import type { ApiProblem } from '../../../common/api-docs/api-docs.decorators';
 import { PROBLEM } from '../../../common/api-docs/api-problems';
 
-/** Placeholders on purpose: no real state, token or cookie value is ever documented. */
-const STATE_PLACEHOLDER = '<login-state>';
+/**
+ * Placeholders on purpose: no real state, token or cookie value is ever documented. The state is
+ * one value everywhere (start `Location`, state cookie, callback `state`), because the callback's
+ * whole rule is that they are equal; it also fits the 32 to 256 characters the callback accepts.
+ */
+export const STATE_PLACEHOLDER = 'FAKE-LOGIN-STATE-0000000000000000000000000000';
 const REFRESH_PLACEHOLDER = '<opaque-refresh-token>';
+
+export interface ResponseHeaderExample {
+  /** The situation, not the value. */
+  readonly summary: string;
+  readonly value: string;
+}
+
+/**
+ * A response header of an `ApiResponse`. Swagger UI shows a response header as name, description
+ * and type only and ignores `example` / `examples` of a Header Object, so every example is written
+ * in the description too; the machine examples stay for readers of `/api/docs-json`.
+ */
+export function responseHeader(options: {
+  readonly description: string;
+  readonly format?: 'uri';
+  readonly examples: Readonly<Record<string, ResponseHeaderExample>>;
+}) {
+  const examples = Object.values(options.examples);
+  const shown = examples.map((example) => `- ${example.summary}: \`${example.value}\``).join('\n');
+  return {
+    description: `${options.description}\n\n${examples.length === 1 ? 'Example' : 'Examples'}:\n\n${shown}`,
+    schema: {
+      type: 'string' as const,
+      ...(options.format === undefined ? {} : { format: options.format }),
+    },
+    ...(examples.length === 1 ? { example: examples[0]?.value } : { examples: options.examples }),
+  };
+}
 
 /** How `AuthCookieService` names and scopes a cookie in its two modes. */
 const cookieModes = (name: string) =>
@@ -73,16 +105,15 @@ export const AUTH_PROBLEM = {
     message: 'Authentication provider is unavailable',
     when: 'No provider has this identifier, or it is switched off on this deployment. Use an `id` listed by `GET /api/auth/providers`.',
   },
-  googleDisabled: PROBLEM.featureDisabled('googleOAuth'),
-  unknownParameter: (name: string): ApiProblem => ({
-    ...PROBLEM.unknownField,
-    message: [`property ${name} should not exist`],
-  }),
+  /** `FeatureFlagGuard` is the first global guard: it answers before rate limits and validation. */
+  googleDisabled: {
+    ...PROBLEM.featureDisabled('googleOAuth'),
+    when: 'The `googleOAuth` capability is switched off on this deployment; the answer comes before anything else is checked. Do not retry: `google` is then absent from the public `GET /api/auth/providers`, and `data.googleOAuth` of the public `GET /api/features` is `false`.',
+  },
   /** A dedicated bucket is counted per route and per client address, apart from the general limit. */
-  rateLimited: (bucket: string, perMinute: number, variable: string): ApiProblem => ({
-    status: 429,
-    code: 'HTTP_429',
-    message: 'ThrottlerException: Too Many Requests',
-    when: `Too many calls of this route from one client address within 60 seconds: its dedicated bucket \`${bucket}\` allows ${perMinute} per minute by default (\`${variable}\`), on top of the general per-address limit. Wait for the number of seconds given by the \`Retry-After-${bucket}\` header.`,
-  }),
+  rateLimited: (bucket: string, perMinute: number, variable: string): ApiProblem =>
+    PROBLEM.rateLimited(
+      bucket,
+      `Too many calls of this route from one client address within 60 seconds: its dedicated bucket \`${bucket}\` allows ${perMinute} per minute by default (\`${variable}\`), on top of the general per-address limit.`,
+    ),
 } as const satisfies Record<string, ApiProblem | ((...parameters: never[]) => ApiProblem)>;

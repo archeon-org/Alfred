@@ -2,7 +2,12 @@ import { FILE_MEDIA_TYPES } from '@alfred/contracts';
 import { applyDecorators } from '@nestjs/common';
 import { ApiResponse } from '@nestjs/swagger';
 import { ApiErrors, ApiRoute, type ApiProblem } from '../../../common/api-docs/api-docs.decorators';
-import { FILES_ACCESS_PROBLEMS, FILES_NOT_FOUND, FilesIdParam } from './files-shared.openapi';
+import {
+  FILES_ACCESS_PROBLEMS,
+  FILES_IMAGE_ID,
+  FILES_NOT_FOUND,
+  FilesIdParam,
+} from './files-shared.openapi';
 
 const binary = (example: string) => ({ schema: { type: 'string', format: 'binary' }, example });
 
@@ -81,7 +86,8 @@ export const DocDownloadFilePreview = () =>
 - Always \`image/jpeg\`, whatever the original type: longest edge of at most 1 568 pixels by default (a deployment setting), never enlarged, rotated as its EXIF orientation says, transparency flattened on white, first frame of an animation, and no metadata left (EXIF, GPS).
 - ${BEARER_ONLY}`,
     ),
-    FilesIdParam(),
+    // The image of the examples: the PDF the other routes show has no reduced copy.
+    FilesIdParam(FILES_IMAGE_ID),
     ApiResponse({
       status: 200,
       description: 'The reduced copy, always a JPEG, with the headers listed.',

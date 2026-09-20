@@ -1,9 +1,12 @@
 import { sessionDataSchema, successEnvelopeSchema } from '@alfred/contracts';
 import { applyDecorators } from '@nestjs/common';
 import { ApiResponse } from '@nestjs/swagger';
-import { ApiErrors, ApiRoute, type ApiProblem } from '../../../common/api-docs/api-docs.decorators';
-import { checkApiDocsExample } from '../../../common/api-docs/api-docs.registry';
-import { contractSchema } from '../../../common/api-docs/contract-schema';
+import {
+  ApiEnvelopeResponse,
+  ApiErrors,
+  ApiRoute,
+  type ApiProblem,
+} from '../../../common/api-docs/api-docs.decorators';
 import {
   AUTH_PROBLEM,
   CookieHeader,
@@ -11,6 +14,7 @@ import {
   REFRESH_COOKIE,
   REFRESH_COOKIE_EXAMPLE,
   SET_COOKIE,
+  responseHeader,
 } from './auth-shared.openapi';
 
 /** The contracts export the payload (`sessionDataSchema`) and the envelope builder, not the pair. */
@@ -46,50 +50,44 @@ const refreshUnauthorized = (message: string, when: string): ApiProblem => ({
   when,
 });
 
-/** `ApiEnvelopeResponse` cannot carry response headers, and this answer's `Set-Cookie` matters. */
-function RefreshedSession(): MethodDecorator {
-  const examples = {
-    default: { summary: 'Typical answer', value: { success: true, data: member } },
-    administrator: {
-      summary: 'An administrator whose provider gave no avatar: `avatarUrl` is absent',
-      value: { success: true, data: administrator },
-    },
-  };
-  for (const [key, example] of Object.entries(examples))
-    checkApiDocsExample(`AuthSession (${key})`, authSessionEnvelopeSchema, example.value);
-  return ApiResponse({
-    status: 200,
+const RefreshedSession = () =>
+  ApiEnvelopeResponse({
+    name: 'AuthSession',
     description:
       'The session is renewed: a new access token in the body, a new refresh token in the cookie.',
-    headers: {
-      'Set-Cookie': {
-        description: `The rotated refresh token, which replaces the one that was sent. ${REFRESH_COOKIE}`,
-        schema: { type: 'string' },
-        example: SET_COOKIE.setRefresh,
-      },
+    contract: authSessionEnvelopeSchema,
+    describe: {
+      'data.accessToken':
+        'Signed JWT to send as `Authorization: Bearer <token>` on private routes. Valid 5 minutes by default. Its subject is the account; keep it in memory, never in storage or in a URL.',
+      'data.user': 'The signed-in account, as the provider described it at the last sign-in.',
+      'data.user.id': 'Identifier of the account (UUID), stable across sign-ins.',
+      'data.user.email': 'E-mail address verified by the identity provider.',
+      'data.user.displayName':
+        'Name given by the identity provider; the e-mail address when it gave none.',
+      'data.user.avatarUrl':
+        'Picture given by the identity provider. Absent, never `null`, when there is none.',
+      'data.user.role':
+        '`user` or `admin`. An account is created as `user`. The same value is the `role` claim of the access token.',
     },
-    content: {
-      'application/json': {
-        schema: contractSchema('AuthSession', authSessionEnvelopeSchema, {
-          describe: {
-            'data.accessToken':
-              'Signed JWT to send as `Authorization: Bearer <token>` on private routes. Valid 5 minutes by default. Its subject is the account; keep it in memory, never in storage or in a URL.',
-            'data.user': 'The signed-in account, as the provider described it at the last sign-in.',
-            'data.user.id': 'Identifier of the account (UUID), stable across sign-ins.',
-            'data.user.email': 'E-mail address verified by the identity provider.',
-            'data.user.displayName':
-              'Name given by the identity provider; the e-mail address when it gave none.',
-            'data.user.avatarUrl':
-              'Picture given by the identity provider. Absent, never `null`, when there is none.',
-            'data.user.role':
-              '`user` or `admin`. An account is created as `user`. The same value is the `role` claim of the access token.',
+    headers: {
+      'Set-Cookie': responseHeader({
+        description: `The rotated refresh token, which replaces the one that was sent. ${REFRESH_COOKIE}`,
+        examples: {
+          setRefresh: {
+            summary: 'With `AUTH_COOKIE_SECURE=false` and the default 30 days',
+            value: SET_COOKIE.setRefresh,
           },
-        }),
-        examples,
+        },
+      }),
+    },
+    data: member,
+    more: {
+      administrator: {
+        summary: 'An administrator whose provider gave no avatar: `avatarUrl` is absent',
+        data: administrator,
       },
     },
   });
-}
 
 export const DocRefreshSession = () =>
   applyDecorators(
@@ -103,6 +101,7 @@ export const DocRefreshSession = () =>
 - **One refresh at a time per cookie.** Concurrent calls are serialised, so the second one presents a token that was just rotated. That is handled as a stolen token: every session born from the same sign-in is revoked and the user must sign in again. The same happens when a call is repeated after its answer was lost.
 - **On \`401\`** the cookie is cleared: show the sign-in screen. **On \`5xx\`** or a network failure the cookie is kept: retry later.
 - **Same-origin guard**: the \`Origin\` header must be an origin of the web application, otherwise \`403\`.
+- **From this page**: "Try it out" sends the origin of this documentation page and answers \`403\` unless that origin is listed in \`API_CORS_ORIGINS\`. To try the private routes, sign in through the web application, copy \`data.accessToken\` from the answer of its \`POST /api/auth/refresh\` call (browser developer tools, network tab) and paste it in **Authorize**, without the \`Bearer\` prefix. It stays valid 5 minutes by default; reload the web application and copy a newer one when a route answers \`401\` "Invalid or expired access token".
 - **Rate limit**: its own bucket, \`refresh-ip\` (1 200 calls per minute and per client address by default), on top of the general per-address limit.`,
     ),
     OriginHeader(),
@@ -154,12 +153,16 @@ export const DocLogout = () =>
       status: 204,
       description: 'Signed out: the session is revoked and the refresh cookie cleared. No body.',
       headers: {
-        'Set-Cookie': {
+        'Set-Cookie': responseHeader({
           description:
             'Clears the refresh cookie: empty value and `Expires` in 1970, with the name, `Path` and flags it was set with.',
-          schema: { type: 'string' },
-          example: SET_COOKIE.clearRefresh,
-        },
+          examples: {
+            clearRefresh: {
+              summary: 'With `AUTH_COOKIE_SECURE=false`',
+              value: SET_COOKIE.clearRefresh,
+            },
+          },
+        }),
       },
     }),
     ApiErrors(AUTH_PROBLEM.originRefused),

@@ -22,9 +22,12 @@ import {
   SKILL_EXPECTED_VERSION_INVALID,
   SKILL_ID,
   SKILL_ID_TEXT,
+  SKILL_ACCOUNT_LOCK_NOTE,
   SKILL_NAME_CONFLICT,
   SKILL_PRIVATE_PROBLEMS,
+  SKILL_ROW_LOCK_NOTE,
   SKILL_VERSION_CONFLICT,
+  SKILL_WRITE_BLOCKED,
 } from './skills-shared.openapi';
 
 const snapshot = (
@@ -100,7 +103,7 @@ export const DocListSkillVersions = () =>
         '`before` is not an integer from 1 to 2 147 483 647 (an empty value included), or `limit` is not an integer from 1 to 100.',
         'before must not be less than 1',
       ),
-      { ...PROBLEM.unknownField, message: ['property cursor should not exist'] },
+      PROBLEM.unknownParameter('cursor'),
       ...SKILL_PRIVATE_PROBLEMS,
       PROBLEM.notFound('skill'),
     ),
@@ -116,7 +119,8 @@ export const DocRestoreSkillVersion = () =>
 - \`publishedVersion\` does not move, so the result is a \`draft\` unless \`sourceVersion\` is the published snapshot. Call \`POST /api/skills/{id}/publish\` to give the restored content to consumers.
 - The next edit is numbered after the highest retained snapshot, not after \`sourceVersion\`.
 - Restoring the snapshot that is already current writes nothing and returns the skill unchanged, same \`version\`. \`expectedVersion\` is checked first all the same.
-- The snapshot brings its name back: if another skill took that name meanwhile, the answer is \`409 skill_name_conflict\` and nothing changes.`,
+- The snapshot brings its name back: if another skill took that name meanwhile, the answer is \`409 skill_name_conflict\` and nothing changes. The body carries no name, so the way out is to rename or delete the other skill, then restore again.
+- ${SKILL_ACCOUNT_LOCK_NOTE}: re-read the skill, then retry.`,
     ),
     ApiIdParam('id', SKILL_ID_TEXT, SKILL_ID),
     ApiJsonBody({
@@ -166,8 +170,12 @@ export const DocRestoreSkillVersion = () =>
         when: 'The skill does not exist, belongs to another account, the identifier is not a UUID, **or the skill has no snapshot numbered `sourceVersion`**. The same answer for all, by design.',
       },
       SKILL_VERSION_CONFLICT,
-      SKILL_NAME_CONFLICT,
+      {
+        ...SKILL_NAME_CONFLICT,
+        when: 'Another skill of the account took the name this snapshot carries. Nothing was written. The name of a snapshot cannot be changed and this body carries none: rename or delete that other skill, then restore again.',
+      },
       SKILL_BODY_TOO_LARGE,
+      SKILL_WRITE_BLOCKED,
     ),
   );
 
@@ -180,7 +188,8 @@ export const DocSetSkillAvailability = () =>
 - \`enabled: false\` removes the skill from \`GET /api/skills/published\` and makes \`GET /api/skills/published/{id}\` answer \`404\`. Authoring routes keep working: a disabled skill can be edited, restored and published.
 - \`enabled: true\` offers it again at its published snapshot. A skill that was never published stays invisible to consumers either way.
 - A real change increases \`version\` by one. Sending the value the skill already has writes nothing and returns it unchanged, same \`version\`; \`expectedVersion\` is checked first all the same.
-- This is the way to withdraw a skill from consumers without deleting it: there is no "unpublish".`,
+- This is the way to withdraw a skill from consumers without deleting it: there is no "unpublish".
+${SKILL_ROW_LOCK_NOTE}`,
     ),
     ApiIdParam('id', SKILL_ID_TEXT, SKILL_ID),
     ApiJsonBody({
@@ -225,6 +234,7 @@ export const DocSetSkillAvailability = () =>
       PROBLEM.notFound('skill'),
       SKILL_VERSION_CONFLICT,
       SKILL_BODY_TOO_LARGE,
+      SKILL_WRITE_BLOCKED,
     ),
   );
 
@@ -238,7 +248,8 @@ export const DocPublishSkill = () =>
 - Publishing a restored snapshot works the same way, so an older content can be published again.
 - When the current snapshot is already the published one, nothing is written and the skill comes back unchanged, same \`version\`; \`expectedVersion\` is checked first all the same.
 - A disabled skill can be published; it stays hidden from consumers until it is enabled.
-- There is no "unpublish": to withdraw a skill, disable it (\`PUT /api/skills/{id}/availability\`) or delete it.`,
+- There is no "unpublish": to withdraw a skill, disable it (\`PUT /api/skills/{id}/availability\`) or delete it.
+${SKILL_ROW_LOCK_NOTE}`,
     ),
     ApiIdParam('id', SKILL_ID_TEXT, SKILL_ID),
     ApiJsonBody({
@@ -279,5 +290,6 @@ export const DocPublishSkill = () =>
       PROBLEM.notFound('skill'),
       SKILL_VERSION_CONFLICT,
       SKILL_BODY_TOO_LARGE,
+      SKILL_WRITE_BLOCKED,
     ),
   );

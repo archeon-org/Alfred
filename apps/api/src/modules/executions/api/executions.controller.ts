@@ -1,6 +1,6 @@
 import { EXECUTION_JSON_PROFILE } from '@alfred/contracts';
 import { Body, Controller, Get, Headers, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ok } from '../../../common/api-response';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -49,7 +49,6 @@ export class ExecutionsController {
   /** Persist the command before any runtime side effect; observation has a separate lifetime. */
   @Post('executions')
   @HttpCode(200)
-  @ApiProduces(EXECUTION_JSON_PROFILE)
   @DocStartExecution()
   async start(
     @CurrentUser() principal: AuthPrincipal,

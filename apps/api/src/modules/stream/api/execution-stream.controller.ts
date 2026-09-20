@@ -1,5 +1,5 @@
 import { Controller, Get, Headers, Param, Res } from '@nestjs/common';
-import { ApiBearerAuth, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
@@ -15,7 +15,6 @@ import { DocObserveExecution } from './execution-stream.openapi';
 export class ExecutionStreamController {
   constructor(private readonly observers: ExecutionObserverService) {}
   @Get(':id/events')
-  @ApiProduces('text/event-stream')
   @DocObserveExecution()
   observe(
     @CurrentUser() principal: AuthPrincipal,

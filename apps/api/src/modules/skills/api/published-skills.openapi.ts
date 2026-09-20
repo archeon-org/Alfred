@@ -7,8 +7,7 @@ import {
   ApiRoute,
 } from '../../../common/api-docs/api-docs.decorators';
 import { PROBLEM } from '../../../common/api-docs/api-problems';
-
-const SKILL_ID = '1456a6c1-9e22-4497-8efc-798ff8511ac2';
+import { SKILL_ID, SKILL_PRIVATE_PROBLEMS } from './skills-shared.openapi';
 
 const SUMMARY_FIELDS = {
   id: 'Stable identity of the skill. It survives renames and new versions.',
@@ -66,9 +65,7 @@ This is the read side for whoever *uses* skills (an agent runtime); the authorin
       ),
       PROBLEM.unknownField,
       PROBLEM.invalidCursor,
-      PROBLEM.unauthenticated,
-      PROBLEM.invalidToken,
-      PROBLEM.featureDisabled('skills'),
+      ...SKILL_PRIVATE_PROBLEMS,
     ),
   );
 
@@ -113,13 +110,8 @@ export const DocGetPublishedSkill = () =>
         ],
       },
     }),
-    ApiErrors(
-      PROBLEM.unauthenticated,
-      PROBLEM.invalidToken,
-      {
-        ...PROBLEM.notFound('skill'),
-        when: 'The skill does not exist, belongs to another account, the identifier is not a UUID, **or the skill is disabled or was never published**. All indistinguishable by design.',
-      },
-      PROBLEM.featureDisabled('skills'),
-    ),
+    ApiErrors(...SKILL_PRIVATE_PROBLEMS, {
+      ...PROBLEM.notFound('skill'),
+      when: 'The skill does not exist, belongs to another account, the identifier is not a UUID, **or the skill is disabled or was never published**. All indistinguishable by design.',
+    }),
   );

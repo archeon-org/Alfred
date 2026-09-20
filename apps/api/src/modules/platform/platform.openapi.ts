@@ -29,7 +29,8 @@ export const DocGetPlatformStatus = () =>
       'Read the platform status and its enabled capabilities',
       `A summary of this deployment for a signed-in client: the product name, its layers, the capabilities that are switched on and the full flag manifest.
 
-- **Private**: it needs an access token. The flags alone are public at \`GET /api/features\`.
+- **Private**, unlike \`GET /api/features\` next to it: it needs an access token. The flags alone are public there, readable before sign-in.
+- Only the token is checked, the account is not read: the answer holds nothing personal, and unlike \`GET /api/users/me\` this route never answers \`401\` "Account is unavailable".
 - \`enabledCapabilities\` is derived from \`features\`, never stored: \`orchestration\` ⇐ \`agentRuntime\`, \`teams\` ⇐ \`teams\`, \`skills\` ⇐ \`skills\`, \`runtime-memory\` ⇐ \`runtimeMemory\`. The other flags have no capability name; read them in \`features\`.
 - The answer is computed from the configuration read when the API starts: it is the same for every account and does not change until the API restarts. It reads no database, so it says nothing about the health of dependencies (see \`GET /health/ready\`).
 - The route takes no parameter.`,
@@ -55,16 +56,18 @@ export const DocGetPlatformStatus = () =>
         features: FEATURE_FLAGS_EXAMPLE,
       },
       more: {
-        allOff: {
-          summary: 'A deployment with its default configuration: no capability is on',
+        signInOnly: {
+          summary:
+            'Only Google sign-in is switched on: a flag that is on, and no capability name for it',
           data: {
             name: 'Alfred',
             layers: ['web', 'api', 'agent'],
             enabledCapabilities: [],
-            features: FEATURE_FLAGS_ALL_OFF,
+            features: { ...FEATURE_FLAGS_ALL_OFF, googleOAuth: true },
           },
         },
       },
     }),
-    ApiErrors(PROBLEM.unauthenticated, PROBLEM.invalidToken),
+    // The route reads no account, so the guard's three refusals are its only errors.
+    ApiErrors(...PROBLEM.session),
   );

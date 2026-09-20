@@ -55,17 +55,17 @@ export const DocListAgents = () =>
       contract: agentListEnvelopeSchema,
       describe: {
         'data.items[].id':
-          'Identifier of the assistant in the agent runtime. An opaque string of 1 to 128 characters: do not assume a UUID.',
+          'The unique identifier the agent runtime gives the assistant (its `assistant_id`). The key of an agent: use it to merge pages and to recognise the same agent after a reload. An opaque string of 1 to 128 characters: do not assume a UUID. No route of this API takes it as input today.',
         'data.items[].graphId':
-          'Name of the runtime graph the assistant runs, 1 to 128 characters. Searchable.',
+          'Name of the runtime graph the assistant runs, 1 to 128 characters. Not unique: several agents can run the same graph. Informational and searchable.',
         'data.items[].name':
-          'Name of the assistant in the runtime, trimmed, at most 120 characters (a longer one is cut and ends with `…`); the `graphId` when the runtime name is blank. A technical name such as `elastic_rag`, not a display label. The list is ordered by it.',
+          'Name of the assistant in the runtime, trimmed, at most 120 characters (a longer one is cut and ends with `…`); the first 120 characters of the `graphId` when the runtime name is blank. A technical name such as `elastic_rag`, not a display label, and not guaranteed unique: two agents can share it, only `id` tells them apart. Searchable; the list is ordered by it.',
         'data.items[].shortDescription':
-          'One-line summary declared in the runtime metadata, trimmed, at most 280 characters (cut with a final `…` beyond); `null` when none is declared.',
+          'One-line summary declared in the runtime metadata, trimmed, at most 280 characters (cut with a final `…` beyond); `null` when none is declared. Searchable.',
         'data.items[].description':
-          'Full description declared in the runtime metadata, trimmed, at most 2 000 characters (cut with a final `…` beyond); `null` when none is declared.',
+          'Full description declared in the runtime metadata, trimmed, at most 2 000 characters (cut with a final `…` beyond); `null` when none is declared. Searchable.',
         'data.items[].tags':
-          'Keywords declared in the runtime metadata: trimmed, without duplicates, at most 16 tags of at most 40 characters. Empty when none is declared. Searchable.',
+          'Keywords declared in the runtime metadata: trimmed, without duplicates, at most 16 tags of at most 40 characters (a longer tag is left out, not cut). Empty when none is declared. Searchable.',
       },
       data: { items: [bare, elasticRag, topology], nextCursor: null },
       more: {
@@ -85,11 +85,11 @@ export const DocListAgents = () =>
     }),
     ApiErrors(
       PROBLEM.validation(
-        '`limit` is above 100 or is not an integer (below 1: `limit must not be less than 1`). One message per broken parameter, so several can come together.',
+        '`limit` is not a plain whole number from 1 to 100, written with digits only. `limit=0` answers `limit must not be less than 1`; every other refused value (`101`, `-1`, `+5`, `1.5`, `abc`, empty, a repeated `limit`) answers the message shown here. One message per broken parameter, so several can come together.',
         'limit must not be greater than 100',
       ),
       PROBLEM.validation(
-        '`search` is longer than 100 characters. A NUL character in `search` and a `cursor` longer than 512 characters are refused the same way, with their own message.',
+        '`search` is longer than 100 characters. A NUL character in `search`, or `search` sent more than once, answers `search should not contain a \\u0000 string` (the message holds a real NUL character); a `cursor` longer than 512 characters, or sent more than once, answers `cursor must be shorter than or equal to 512 characters`.',
         'search must be shorter than or equal to 100 characters',
       ),
       PROBLEM.unknownField,
@@ -97,20 +97,21 @@ export const DocListAgents = () =>
         ...PROBLEM.invalidCursor,
         when: 'The `cursor` does not have the format this route issues (altered, truncated, empty, taken from another route), or it is sent with another `search` than the one it was issued for. Restart from the first page without `cursor`.',
       },
-      PROBLEM.unauthenticated,
-      PROBLEM.invalidToken,
-      PROBLEM.featureDisabled('teams'),
+      ...PROBLEM.session,
+      {
+        ...PROBLEM.featureDisabled('teams'),
+        when: 'The `teams` capability is switched off on this deployment; the answer comes before the access token is looked at. Do not retry: `data.teams` of the public `GET /api/features` is `false` (the same flags are in `GET /api/platform/status`, which needs a token).',
+      },
       {
         status: 409,
         code: 'agent_catalog_changed',
         message: 'The agent catalog changed; reload the list from the first page.',
         when: 'The `cursor` belongs to an older version of the catalog: an agent was added, removed or changed since it was issued. Discard the pages already loaded and call again with the same `search` and no `cursor`.',
       },
-      {
-        status: 503,
-        code: 'agent_catalog_unavailable',
-        message: 'Internal server error',
-        when: 'The agent runtime is not configured, unreachable, too slow (10 seconds for the whole read), answered something unreadable, or holds more than 200 assistants. No stale list is served. Retry later; the message never carries runtime details.',
-      },
+      PROBLEM.masked(
+        503,
+        'agent_catalog_unavailable',
+        'The agent runtime is not configured, unreachable, too slow (10 seconds for the whole read), answered something unreadable, or holds more than 200 assistants. No stale list is served. Retry later; the message never carries runtime details.',
+      ),
     ),
   );

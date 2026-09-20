@@ -31,12 +31,28 @@ strings (validation). Every answer carries \`Cache-Control: no-store\`.
 - **Unknown fields are refused** with a \`400\`, in bodies and in query strings.
 - **Capabilities**: a route of a switched-off capability answers \`404\` "Feature is not available".
 
-## Errors every route can answer
+## Headers
+Every answer carries \`x-request-id\` and \`traceparent\`; quote the request id when reporting a
+problem. An incoming \`X-Request-Id\` is kept when it is well formed.
+
+## Safe retries
+Creation routes that accept an \`Idempotency-Key\` header say so. One key per intent: the same key
+with the same request replays the stored answer for 24 hours; with another request it answers
+\`422 idempotency_mismatch\`.
+
+## Outside the \`/api\` prefix
+\`GET /health\`, \`GET /health/live\`, \`GET /health/ready\` and \`GET /metrics\` are served at the
+root, without the prefix, and are not rate limited.
+
+## Errors every other route can answer
 | Status | \`error.code\` | Meaning |
 | --- | --- | --- |
-| 429 | \`HTTP_429\` | Rate limit (per address, and per account once authenticated). Wait for \`Retry-After\` seconds |
-| 500 | \`HTTP_500\` | Unexpected failure; the message is always "Internal server error" |
-| 503 | \`HTTP_503\` | A dependency is down |
+| 429 | \`HTTP_429\` | Rate limit: per address, and per account once authenticated. The wait, in seconds, is in a header named after the limit that was hit: \`Retry-After-ip\`, \`Retry-After-authenticated\`, or the route's own. There is no plain \`Retry-After\` |
+| 500 | \`HTTP_500\` | Unexpected failure |
+| 5xx | a domain code | A known dependency failure keeps its \`error.code\` (for example \`storage_unavailable\`) |
+
+Every answer of status 500 or above has the message "Internal server error" and no \`details\`,
+whatever its code: the cause is in the server log, under the request id.
 `.trim();
 
 export const API_DOCS_TAGS: Readonly<Record<string, string>> = {
@@ -49,7 +65,8 @@ export const API_DOCS_TAGS: Readonly<Record<string, string>> = {
   files: 'The personal file library: upload, folders, download and message attachments.',
   health: 'Liveness and readiness probes. Public.',
   observability: 'Prometheus metrics, protected by a scrape token rather than a session.',
-  platform: 'What this deployment offers: capabilities and sign-in providers. Public.',
+  platform:
+    'What this deployment offers. `GET /api/features` is public; `GET /api/platform/status` needs a session.',
   projects: 'Named projects and the private shell of a standalone chat.',
   skills:
     'Personal skills: authoring, versions and publication, plus the published read side a skills consumer uses.',

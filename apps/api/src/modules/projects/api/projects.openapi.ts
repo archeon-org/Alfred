@@ -4,18 +4,19 @@ import {
   projectListEnvelopeSchema,
 } from '@alfred/contracts';
 import { applyDecorators } from '@nestjs/common';
-import { ApiHeader } from '@nestjs/swagger';
 import {
   ApiEnvelopeResponse,
   ApiErrors,
+  ApiIdempotencyKeyHeader,
   ApiJsonBody,
   ApiRoute,
 } from '../../../common/api-docs/api-docs.decorators';
-import { PROBLEM } from '../../../common/api-docs/api-problems';
+import { PROBLEM, idempotencyProblems } from '../../../common/api-docs/api-problems';
 import {
   NAME_PATTERN_MESSAGE,
   NEXT_CURSOR,
   PROJECT_AUTH_PROBLEMS,
+  PROJECT_BODY_TOO_LARGE,
   PROJECT_NOT_FOUND,
   ProjectIdParam,
   pinnedPortalProject,
@@ -34,16 +35,11 @@ export const DocCreateProject = () =>
       `Creates a named project owned by the signed-in account and answers it with \`201\`. It starts \`active\` and not pinned. Names are not unique: calling twice creates two projects, unless the call carries an \`Idempotency-Key\`. A refused call creates nothing.
 
 - **Safe retry (optional)**: with an \`Idempotency-Key\` header, the same key and the same request answer the stored \`201\` body again for 24 hours and create nothing. "Same request" means the same URL and the same JSON body as sent (key order is ignored, a difference in whitespace inside \`name\` is not). The same key with another request answers \`422 idempotency_mismatch\`. While the first call is still running, a second one waits up to 2 seconds, then answers \`409 idempotency_in_progress\`.
-- **What reserves a key**: only a call that got past the access token check and validation. A refused token, a \`413\` and every \`HTTP_400\` leave the key free, so a corrected body can reuse it. After any other failure (\`invalid_content\`, \`context_content_too_large\`, a \`500\`, a lost connection) the key keeps answering \`409\` until it expires: list the projects to see whether the creation happened, then retry with a new key.
+- **What reserves a key**: only a call that got past the access token check and validation. A refused token, a \`413\` and every \`HTTP_400\` leave the key free, so a corrected body can reuse it. A call refused after that (\`invalid_content\`, \`context_content_too_large\`, \`401 Account is unavailable\`, a \`500\`) keeps its key: the key answers \`409 idempotency_in_progress\` until it expires, so use a new key once the cause is fixed.
+- **After a lost connection or a client timeout**: retry with the SAME key and the same body. The creation goes on when the client goes away and its \`201\` is stored, so the retry answers that \`201\` again; when the first call never arrived, the retry creates the project, once. \`409 idempotency_in_progress\` means the first call is still running, or that it failed after validation: retry a little later. If the \`409\` persists, list the projects to see whether the creation happened, then use a new key.
 - **\`context\`** is a shortcut for the first write of the project \`context\` document. When the field is sent, even empty, the document is written in the same transaction and starts at revision 1. Every later change goes through \`PUT /api/projects/{projectId}/context-documents/context\`; \`PATCH /api/projects/{id}\` refuses the field.`,
     ),
-    ApiHeader({
-      name: 'Idempotency-Key',
-      required: false,
-      description:
-        'Makes a retry of this creation safe. 1 to 128 characters among `A-Z`, `a-z`, `0-9`, `_` and `-`. One key per intended creation, reused only to retry that same call; it is scoped to the signed-in account across every route that accepts the header, and kept 24 hours. Without the header nothing is deduplicated. Example: `create-project-7f3a9c2e`.',
-      schema: { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9_-]{1,128}$' },
-    }),
+    ApiIdempotencyKeyHeader(),
     ApiJsonBody({
       name: 'ProjectsCreateBody',
       description:
@@ -54,7 +50,7 @@ export const DocCreateProject = () =>
         description:
           'Free text shown with the project, at most 2000 characters, any character except NUL. `\\r\\n` is stored as `\\n`. Omitted, empty or blank means no description (`null` in the answer).',
         context:
-          'Initial Markdown content of the project `context` document: at most 65 536 UTF-8 bytes (less when the deployment lowered its document limit), no NUL character, no unpaired surrogate. `\\r\\n` and `\\r` are stored as `\\n`. An empty string writes an empty document and answers `context: null`.',
+          'Initial Markdown content of the project `context` document: at most 65 536 UTF-8 bytes (less when the deployment lowered its document limit: read `data.maxBytes` of `GET /api/context/personal`), no NUL character, no unpaired surrogate. `\\r\\n` and `\\r` are stored as `\\n`. An empty string writes an empty document and answers `context: null`.',
       },
       examples: {
         minimal: { summary: 'A name is enough', value: { name: 'Refonte du portail' } },
@@ -113,12 +109,6 @@ export const DocCreateProject = () =>
       PROBLEM.invalidJson,
       {
         status: 400,
-        code: 'invalid_idempotency_key',
-        message: 'Invalid Idempotency-Key',
-        when: 'The `Idempotency-Key` header is empty, longer than 128 characters, holds another character than `A-Z a-z 0-9 _ -`, or was sent twice.',
-      },
-      {
-        status: 400,
         code: 'invalid_content',
         message: 'Content must be valid Unicode text without NUL.',
         when: '`context` holds an unpaired surrogate (`\\ud800` to `\\udfff` alone). With an `Idempotency-Key`, the key stays reserved: fix the text and use a new key.',
@@ -128,22 +118,13 @@ export const DocCreateProject = () =>
         code: 'context_content_too_large',
         message: 'Context document exceeds its byte limit.',
         details: { maxBytes: 32768 },
-        when: '`context` fits in 65 536 bytes but exceeds the document limit of this deployment, which was lowered (`data.maxBytes` of `GET /api/projects/{projectId}/context-documents`). `details.maxBytes` holds the limit. With an `Idempotency-Key`, the key stays reserved: shorten the text and use a new key.',
+        when: '`context` fits in 65 536 bytes but exceeds the document limit of this deployment, which was lowered (`data.maxBytes` of `GET /api/context/personal`, which needs no project). `details.maxBytes` holds the limit. With an `Idempotency-Key`, the key stays reserved: shorten the text and use a new key.',
       },
       ...PROJECT_AUTH_PROBLEMS,
-      {
-        status: 409,
-        code: 'idempotency_in_progress',
-        message: 'This request is still in progress or requires reconciliation',
-        when: 'The `Idempotency-Key` belongs to a call that has not stored a `201` yet: it is still running (the API waited 2 seconds), or it failed after validation. Retry a little later; if it persists, check whether the project exists, then use a new key.',
-      },
-      PROBLEM.bodyTooLarge,
-      {
-        status: 422,
-        code: 'idempotency_mismatch',
-        message: 'Idempotency-Key was used for a different request',
-        when: 'The `Idempotency-Key` was already used within 24 hours by this account for another URL or another body. Use a new key for a new creation.',
-      },
+      PROJECT_BODY_TOO_LARGE,
+      ...idempotencyProblems(
+        'retry a little later with the same key; if the `409` persists, list the projects (`GET /api/projects`) to see whether the creation happened, then use a new key.',
+      ),
     ),
   );
 

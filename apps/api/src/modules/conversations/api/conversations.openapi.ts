@@ -5,24 +5,24 @@ import {
   updateConversationInputSchema,
 } from '@alfred/contracts';
 import { applyDecorators } from '@nestjs/common';
-import { ApiResponse } from '@nestjs/swagger';
 import {
   ApiEnvelopeResponse,
   ApiErrors,
   ApiIdParam,
+  ApiIdempotencyKeyHeader,
   ApiJsonBody,
+  ApiNoContent,
   ApiRoute,
 } from '../../../common/api-docs/api-docs.decorators';
-import { PROBLEM } from '../../../common/api-docs/api-problems';
+import { PROBLEM, idempotencyProblems } from '../../../common/api-docs/api-problems';
 import {
-  ApiIdempotencyKeyHeader,
+  CHAT_IS_CONVERSATION,
   CONVERSATION_ID,
   CONVERSATION_ID_TEXT,
   CONVERSATION_NOT_FOUND,
-  IDEMPOTENCY_PROBLEMS,
   NAMED_PROJECT_ID,
-  PRIVATE_ROUTE_PROBLEMS,
   PROJECT_CHANGED_WHILE_WAITING,
+  PROJECT_DELETED_WHILE_WAITING,
   TARGET_PROJECT_NOT_WRITABLE,
   THREAD_BUSY,
   TITLE_TEXT,
@@ -33,15 +33,23 @@ import {
   titleProblems,
 } from './conversations-shared.openapi';
 
+/** The chat of the path examples after the `rename` request example: same id, later `updatedAt`. */
+const renamedChat = {
+  ...pinnedChat,
+  title: 'Analyse des incidents de septembre',
+  titleSource: 'user',
+  updatedAt: '2026-09-18T09:20:15.702Z',
+};
+
 export const DocCreateConversation = () =>
   applyDecorators(
     ApiRoute(
       'Create a chat',
-      `Creates an empty chat and answers \`201\` with it. Send messages afterwards with \`POST /api/conversations/{id}/executions\`.
+      `Creates an empty chat and answers \`201\` with it. Send messages afterwards with \`POST /api/conversations/{id}/executions\`. ${CHAT_IS_CONVERSATION}
 
 - **Without \`projectId\`** the chat is standalone: the API creates a private project for it in the same transaction (\`projectKind: implicit\`). That project is never chosen by the caller, and is deleted with the chat.
 - **With \`projectId\`** the chat is created inside that named project, which must be active.
-- Without \`title\` the chat is called \`Nouvelle conversation\` (\`titleSource: none\`) and its first message titles it. A given \`title\` is kept as is (\`titleSource: user\`).
+- Without \`title\` the chat is called \`Nouvelle conversation\` (\`titleSource: none\`). Its first message that has text titles it (\`titleSource: auto\`): first with the first line of that message, then, a few seconds later, with a generated title that replaces it. A given \`title\` is stored trimmed and is never replaced automatically (\`titleSource: user\`).
 - An empty JSON object is a valid body.
 - Send an \`Idempotency-Key\` to make a retry after a network failure safe: without it, a retry creates a second chat.`,
     ),
@@ -87,20 +95,21 @@ export const DocCreateConversation = () =>
       ...titleProblems(''),
       PROBLEM.unknownField,
       PROBLEM.invalidJson,
-      ...PRIVATE_ROUTE_PROBLEMS,
+      ...PROBLEM.session,
+      PROBLEM.accountUnavailable,
       {
         ...PROBLEM.notFound('project'),
         when: 'The project named by `projectId` does not exist or belongs to another account. The two cases are indistinguishable by design.',
       },
       ...TARGET_PROJECT_NOT_WRITABLE,
       {
-        status: 409,
-        code: 'project_implicit',
-        message: 'Convert the chat into a project before using it as one.',
+        ...PROBLEM.projectImplicit,
         when: '`projectId` is the private project of a standalone chat. It holds one chat only; create the chat in a named project.',
       },
       PROBLEM.bodyTooLarge,
-      ...IDEMPOTENCY_PROBLEMS,
+      ...idempotencyProblems(
+        'list with `GET /api/conversations` (add `projectId` when one was sent; a new chat comes first among the unpinned ones) to see whether the chat was created, then use a new key.',
+      ),
     ),
   );
 
@@ -108,7 +117,7 @@ export const DocListConversations = () =>
   applyDecorators(
     ApiRoute(
       'List chats',
-      `The chats of the signed-in account, standalone chats and project chats together unless a filter narrows them.
+      `The chats of the signed-in account, standalone chats and project chats together unless a filter narrows them. ${CHAT_IS_CONVERSATION}
 
 - **Order**: pinned chats first, then newest creation first; stable across pages. The time of pinning does not order pinned chats.
 - **Page size**: \`limit\` defaults to **10** on this route (1 to 100).
@@ -138,9 +147,9 @@ export const DocListConversations = () =>
       },
     }),
     ApiErrors(
-      PROBLEM.validation('`limit` is below 1.', 'limit must not be less than 1'),
+      PROBLEM.validation('`limit` is `0`.', 'limit must not be less than 1'),
       PROBLEM.validation(
-        '`limit` is above 100 or is not a whole number.',
+        '`limit` is above 100, negative, empty or not a whole number written in digits.',
         'limit must not be greater than 100',
       ),
       PROBLEM.validation(
@@ -157,7 +166,8 @@ export const DocListConversations = () =>
       ),
       PROBLEM.unknownField,
       PROBLEM.invalidCursor,
-      ...PRIVATE_ROUTE_PROBLEMS,
+      ...PROBLEM.session,
+      PROBLEM.accountUnavailable,
       {
         ...PROBLEM.notFound('project'),
         when: 'The `projectId` filter names a project that does not exist or belongs to another account. The two cases are indistinguishable by design.',
@@ -177,15 +187,15 @@ export const DocGetConversation = () =>
       description: 'The chat.',
       contract: conversationEnvelopeSchema,
       describe: conversationFields('data.'),
-      data: projectChat,
+      data: pinnedChat,
       more: {
-        standalonePinned: {
-          summary: 'Pinned standalone chat, titled from its first message',
-          data: pinnedChat,
+        inProject: {
+          summary: 'Another chat, inside a named project and titled by the user',
+          data: projectChat,
         },
       },
     }),
-    ApiErrors(...PRIVATE_ROUTE_PROBLEMS, CONVERSATION_NOT_FOUND),
+    ApiErrors(...PROBLEM.session, PROBLEM.accountUnavailable, CONVERSATION_NOT_FOUND),
   );
 
 export const DocUpdateConversation = () =>
@@ -213,17 +223,20 @@ export const DocUpdateConversation = () =>
     }),
     ApiEnvelopeResponse({
       name: 'ConversationsRenamed',
-      description: 'The chat with its new title, `titleSource: user` and a new `updatedAt`.',
+      description:
+        'The chat with its new title and `titleSource: user`. `updatedAt` moves only when something changed: renaming a chat to the title the user already gave it writes nothing and answers the chat as it is.',
       contract: conversationEnvelopeSchema,
       describe: conversationFields('data.'),
-      data: projectChat,
+      data: renamedChat,
     }),
     ApiErrors(
       ...titleProblems('missing, '),
       PROBLEM.unknownField,
       PROBLEM.invalidJson,
-      ...PRIVATE_ROUTE_PROBLEMS,
+      ...PROBLEM.session,
+      PROBLEM.accountUnavailable,
       CONVERSATION_NOT_FOUND,
+      PROJECT_DELETED_WHILE_WAITING,
       ...PROJECT_CHANGED_WHILE_WAITING,
       PROBLEM.bodyTooLarge,
     ),
@@ -233,13 +246,15 @@ export const DocDeleteConversation = () =>
   applyDecorators(
     ApiRoute(
       'Delete a chat',
-      'Deletes a chat for good, with its messages and its executions. Deleting a standalone chat also deletes the private project that existed for it, once no chat remains in it. Refused while an execution of the chat is still advancing: stop it first. There is no undo; deleting again answers `404`.',
+      'Deletes a chat for good, with its messages and its executions. Files attached to its messages stay in the personal library (`/api/files`); only their link to the deleted messages goes. Deleting a standalone chat also deletes the private project that existed for it, once no chat remains in it. Refused while an execution of the chat is still advancing: stop it first. There is no undo; deleting again answers `404` (`conversation_not_found`, or `project_not_found` when two deletes of a standalone chat overlap).',
     ),
     ApiIdParam('id', CONVERSATION_ID_TEXT, CONVERSATION_ID),
-    ApiResponse({ status: 204, description: 'The chat is deleted. No body.' }),
+    ApiNoContent('The chat is deleted. No body.'),
     ApiErrors(
-      ...PRIVATE_ROUTE_PROBLEMS,
+      ...PROBLEM.session,
+      PROBLEM.accountUnavailable,
       CONVERSATION_NOT_FOUND,
+      PROJECT_DELETED_WHILE_WAITING,
       THREAD_BUSY,
       ...PROJECT_CHANGED_WHILE_WAITING,
     ),

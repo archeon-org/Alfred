@@ -11,37 +11,32 @@ import {
   ApiIdParam,
   ApiJsonBody,
   ApiRoute,
-  type ApiProblem,
 } from '../../../common/api-docs/api-docs.decorators';
 import { PROBLEM } from '../../../common/api-docs/api-problems';
+import {
+  CONVERSATION_ID,
+  CONVERSATION_ID_TEXT,
+  CONVERSATION_NOT_FOUND,
+} from '../../conversations/api/conversations-shared.openapi';
 import {
   attachment,
   attachmentFields,
   attachmentsOnlySnapshot,
   BINDING_CHANGED,
   completedSnapshot,
-  CONVERSATION_ID,
   EXECUTION_ID,
+  EXECUTION_PRIVATE_PROBLEMS,
   FILE_ID,
   pendingSnapshot,
+  projectNotWritable,
   RECOVERY_REQUIRED,
   runningSnapshot,
-  SESSION_REVOKED,
   snapshotFields,
 } from './execution-snapshot.openapi';
 
-const CONVERSATION_PARAM = ApiIdParam(
-  'id',
-  'Identifier of a conversation the signed-in account owns, in an active project.',
-  CONVERSATION_ID,
-);
+const CONVERSATION_PARAM = ApiIdParam('id', CONVERSATION_ID_TEXT, CONVERSATION_ID);
 
-const CONVERSATION_NOT_FOUND: ApiProblem = {
-  ...PROBLEM.notFound('conversation'),
-  when: 'The conversation does not exist, belongs to another account, its project is archived or being deleted, or the identifier is not a UUID. All indistinguishable by design.',
-};
-
-const PRIVATE = [PROBLEM.unauthenticated, PROBLEM.invalidToken, SESSION_REVOKED] as const;
+const PRIVATE = EXECUTION_PRIVATE_PROBLEMS;
 
 const userMessage = {
   id: '5d3a9f10-7b2c-4e8d-a1f6-0c9b8e7d6a5f',
@@ -51,13 +46,14 @@ const userMessage = {
   content: 'Rédige un plan de reprise pour la base clients.',
   createdAt: '2026-09-20T16:48:44.120Z',
 };
+/** Written by the commit that finished the execution, hence right after its `finishedAt`. */
 const assistantMessage = {
   id: 'e4c1b7a2-6d5f-4a3e-9b8c-2f1e0d9c8b7a',
   conversationId: CONVERSATION_ID,
   executionId: EXECUTION_ID,
   role: 'assistant',
   content: completedSnapshot.assistantText,
-  createdAt: '2026-09-20T16:48:45.310Z',
+  createdAt: '2026-09-20T16:48:52.909Z',
   work: {
     status: 'completed',
     durationMs: 8509,
@@ -75,7 +71,7 @@ export const DocListMessages = () =>
       `The visible turns of one conversation, oldest first: what the user sent and what Alfred answered. This is the durable history; it stays readable whatever happened to the executions behind it.
 
 - Not paginated: the **500 most recent** messages are returned, no cursor, no query parameter.
-- One \`user\` row per submitted message, and at most one \`assistant\` row per execution. The assistant row is saved when the execution commits visible text, so while an execution is active its row can be absent or partial: read the live answer from \`GET /api/conversations/{id}/executions/active\` or the event stream, and this list once the execution has settled.
+- One \`user\` row per submitted message, and at most one \`assistant\` row per execution. The assistant row is written by the commit that finishes the execution (\`completed\`, \`failed\`, \`cancelled\`, \`timed_out\`), with the visible text it has then; an execution that finishes without visible text gets none. While an execution is active its answer is therefore **not** in this list: read it from \`GET /api/conversations/{id}/executions/active\` or the event stream, and read this list once the execution has settled. An execution that was parked, or replaced by a newer message (\`superseded\`), leaves no assistant row; its partial answer stays readable with \`GET /api/executions/{id}\`.
 - \`work\` summarises the work behind an answer without its log; \`attachments\` names the files a user message carried (only while the \`fileUploads\` capability is on).`,
     ),
     CONVERSATION_PARAM,
@@ -104,7 +100,7 @@ export const DocListMessages = () =>
         'data.items[].work.tools': 'Tool calls among them.',
         'data.items[].work.delegations': 'Tasks handed to a specialist among them.',
         'data.items[].work.failedSteps':
-          'Tool calls and delegations that failed or were interrupted.',
+          "Tool calls and delegations the runtime reported as failed, plus a specialist's calls cut short when its delegation ended. A step that was still running when the execution settled (Stop, deadline, failure) is NOT counted here, although `work.steps` of the snapshot reports it `interrupted`.",
         ...attachmentFields('data.items[].attachments'),
       },
       data: { items: [userMessage, assistantMessage] },
@@ -165,11 +161,11 @@ export const DocStartExecution = () =>
       'Send a message and start the execution that answers it',
       `Saves the user message and the intent to answer it in one transaction, then returns at once: the runtime is reached by a background worker, never by this request. The answer is normally a \`pending\` snapshot; follow the work with \`GET /api/executions/{id}/events\` (or poll \`GET /api/executions/{id}\`). Closing the connection never cancels anything; only \`POST /api/executions/{id}/stop\` does.
 
-**Accept header.** Send exactly \`Accept: application/json\` or \`Accept: application/vnd.alfred.execution+json;version=1\`. Anything else, including a missing header, \`*/*\` or a list of types, answers \`406\`. The body is JSON in both cases.
+**Accept header.** Send exactly \`Accept: application/json\` or \`Accept: application/vnd.alfred.execution+json;version=1\`. Anything else, including a missing header, \`*/*\` or a list of types, answers \`406\`. The answer is the same JSON body, sent as \`Content-Type: application/json\`, in both cases.
 
 **Idempotency.** \`submissionId\` is a UUID the client generates per send. Repeating the same request (same conversation, text and attachments in the same order) returns the execution created the first time, in its current state, and starts nothing; do this after a timeout or a network failure. The same \`submissionId\` with different content answers \`409 idempotency_conflict\`.
 
-**One answer at a time.** A conversation that is being answered refuses a new message with \`409 thread_busy\`: stop the active execution first, or wait. An execution that is parked (\`interrupted\`, \`recovery_required\`), past its deadline, or \`recovering\` for more than 30 seconds is replaced instead: it becomes \`cancelled\` with \`errorCode: superseded\`.
+**One answer at a time.** A conversation that is being answered refuses a new message with \`409 thread_busy\`: stop the active execution first, or wait. An execution that no longer advances is replaced instead, and becomes \`cancelled\` with \`errorCode: superseded\`: one that is parked (\`interrupted\`, \`recovery_required\`), one past its deadline, or one that is \`recovering\` and whose worker recorded nothing for 30 seconds. That delay runs from the last write of the worker, not from the moment the execution entered \`recovering\`: every retry and every progress commit renews it, so a \`recovering\` execution can keep answering \`thread_busy\` for minutes.
 
 **Limits and side effects.** Text up to 16 384 characters after trimming; up to 8 attachments, 4 of them images, each a \`ready\` file of the caller's library (needs the \`fileUploads\` capability). 4 active executions per account and 64 per deployment by default. An execution that has not settled after its deadline (10 minutes by default) becomes \`timed_out\`. The first message of an untitled conversation sets its title to the first line of the text (80 characters at most).`,
     ),
@@ -230,12 +226,10 @@ export const DocStartExecution = () =>
     }),
     ApiErrors(
       PROBLEM.validation(
-        'A field is missing or breaks a rule. One message per broken field.',
+        'A field is missing or breaks a rule. One message per broken field, for the first rule it breaks. A `message` that is missing or not a string answers `message must not be empty unless a file is attached`, or the 16 384-character message when files are attached; an `attachmentIds` that is not an array answers `each value in attachmentIds must be a UUID`.',
         'submissionId must be a UUID',
-        'message must be a string',
         'message must be shorter than or equal to 16384 characters',
         'message must not be empty unless a file is attached',
-        'attachmentIds must be an array',
         'attachmentIds must contain no more than 8 elements',
         "All attachmentIds's elements must be unique",
         'each value in attachmentIds must be a UUID',
@@ -244,6 +238,10 @@ export const DocStartExecution = () =>
       PROBLEM.invalidJson,
       ...PRIVATE,
       CONVERSATION_NOT_FOUND,
+      {
+        ...PROBLEM.notFound('project'),
+        when: "The conversation's project row disappeared while this request waited for its lock: a concurrent move of the chat, a concurrent delete of the chat or of its project won. Nothing was saved. Re-read the conversation; if it still exists, send again with the same `submissionId`.",
+      },
       PROBLEM.featureDisabled('agentRuntime'),
       {
         ...PROBLEM.featureDisabled('fileUploads'),
@@ -271,7 +269,7 @@ export const DocStartExecution = () =>
         status: 409,
         code: 'thread_busy',
         message: 'The conversation is already answering.',
-        when: 'An execution of the conversation is still advancing. Stop it (`POST /api/executions/{id}/stop`) or wait for it to settle, then send again with the same `submissionId`.',
+        when: 'An execution of the conversation is still advancing within its deadline: `pending`, `running`, `stopping`, or `recovering` with a worker write in the last 30 seconds. Nothing was saved. Find it with `GET /api/conversations/{id}/executions/active`; stop it with `POST /api/executions/{id}/stop`, where `{id}` is `data.snapshot.execution.id` of that answer, or wait for it to settle (`stopping` still blocks until a worker settles it). Then send again with the same `submissionId`.',
       },
       {
         status: 409,
@@ -291,14 +289,17 @@ export const DocStartExecution = () =>
         message: 'Too many images for one message.',
         when: 'More than 4 of the attached files are images.',
       },
+      ...projectNotWritable(
+        "The conversation's project was archived or started being deleted while this request waited for its lock. Nothing was saved; later calls answer `404`.",
+      ),
       {
-        status: 409,
-        code: 'project_archived',
-        message: 'Project is archived.',
-        when: 'The project was archived while this request was waiting for its lock. `project_deleting` ("Project is being deleted.") is the same race with a deletion.',
+        ...BINDING_CHANGED,
+        when: 'Only on a retry of a `submissionId` whose original execution can no longer be presented: the conversation was bound to another runtime thread since. A new message never answers this. The message was saved the first time: do not resend it, read `GET /api/conversations/{id}/messages`.',
       },
-      BINDING_CHANGED,
-      RECOVERY_REQUIRED,
+      {
+        ...RECOVERY_REQUIRED,
+        when: 'Only on a retry of a `submissionId` whose original execution has an inconsistent saved projection. A new message never answers this. The message was saved the first time: do not resend it; the transcript (`GET /api/conversations/{id}/messages`) stays readable.',
+      },
       PROBLEM.bodyTooLarge,
       {
         status: 429,

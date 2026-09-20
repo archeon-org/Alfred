@@ -1,10 +1,10 @@
 import { projectEnvelopeSchema, updateProjectInputSchema } from '@alfred/contracts';
 import { applyDecorators } from '@nestjs/common';
-import { ApiResponse } from '@nestjs/swagger';
 import {
   ApiEnvelopeResponse,
   ApiErrors,
   ApiJsonBody,
+  ApiNoContent,
   ApiRoute,
 } from '../../../common/api-docs/api-docs.decorators';
 import { PROBLEM } from '../../../common/api-docs/api-problems';
@@ -12,6 +12,7 @@ import {
   NAME_PATTERN_MESSAGE,
   PROJECT_ARCHIVED,
   PROJECT_AUTH_PROBLEMS,
+  PROJECT_BODY_TOO_LARGE,
   PROJECT_DELETING,
   PROJECT_NOT_FOUND,
   ProjectIdParam,
@@ -33,7 +34,7 @@ export const DocUpdateProject = () =>
 - An empty body answers \`400 invalid_update\`.
 - \`null\` never clears a field, it answers \`400\`. Clear the description with an empty string.
 - **\`context\` cannot be written here.** The field is still accepted by validation so that an older client gets a clear answer: any valid \`context\`, even unchanged, answers \`409 context_revision_required\`, before the project is looked up and without applying the other fields. Write the document with \`PUT /api/projects/{projectId}/context-documents/context\` and its \`expectedRevision\`; the \`context\` field of the answers follows.
-- On the \`implicit\` shell of a standalone chat the description can be changed, the name cannot (\`409 project_implicit\`).
+- On the \`implicit\` shell of a standalone chat the description can be changed, the name cannot (\`409 project_implicit\`). A shell that holds a description can no longer be moved into a named project: \`POST /api/conversations/{id}/move\` answers \`409 conversation_source_has_context\` until the description is removed with \`{ "description": "" }\`.
 - An \`archived\` or \`deleting\` project refuses every change with a \`409\`.`,
     ),
     ProjectIdParam(OWNED_PROJECT),
@@ -117,7 +118,7 @@ export const DocUpdateProject = () =>
       PROJECT_DELETING,
       PROJECT_ARCHIVED,
       projectImplicit('renamed'),
-      PROBLEM.bodyTooLarge,
+      PROJECT_BODY_TOO_LARGE,
     ),
   );
 
@@ -134,7 +135,8 @@ export const DocPinProject = () =>
     ProjectIdParam(OWNED_PROJECT),
     ApiEnvelopeResponse({
       name: 'ProjectsPinned',
-      description: 'The project, pinned: `pinnedAt` holds the time of its first pin.',
+      description:
+        'The project, pinned: `pinnedAt` is the time of the pin now in force. Repeating the call keeps it; unpinning then pinning again sets a new one.',
       contract: projectEnvelopeSchema,
       describe: projectFields('data.'),
       data: pinnedPortalProject,
@@ -186,17 +188,15 @@ export const DocDeleteProject = () =>
       'Delete a project and everything in it',
       `Deletes the project for good and answers \`204\` with no body. There is no trash and no undo.
 
-- **What goes with it**: every chat of the project with its messages and executions, and the \`context\` and \`preferences\` documents of the project.
-- **Guard**: the deletion is refused with \`409 thread_busy\` while an execution of one of its chats is still advancing: \`pending\`, \`running\` or \`stopping\` before its deadline, or \`recovering\` for less than 30 seconds. Stop it with \`POST /api/executions/{id}/stop\`, or wait for it to end, then retry. An execution that is parked (\`interrupted\`, \`recovery_required\`) or past its deadline does not block. Nothing is deleted when the guard refuses.
-- It also deletes an \`archived\` project, and the \`implicit\` shell of a standalone chat together with that chat.
+- **What goes with it**: every chat of the project with its messages and executions, and the \`context\` and \`preferences\` documents of the project. The files those messages carried stay in the personal file library (\`/api/files\`): only their link to the deleted messages goes.
+- **Guard**: the deletion is refused with \`409 thread_busy\` while an execution of one of its chats is still advancing: \`pending\`, \`running\` or \`stopping\` before its deadline, or \`recovering\` for less than 30 seconds. To find it, list the chats with \`GET /api/conversations?projectId={id}\` and read \`GET /api/conversations/{id}/executions/active\` on each: \`data.snapshot.id\` is the execution. Stop it with \`POST /api/executions/{id}/stop\`, or wait for it to end, then retry. An execution that is parked (\`interrupted\`, \`recovery_required\`) or past its deadline does not block. Nothing is deleted when the guard refuses.
+- It also deletes a project that is \`archived\` or \`deleting\`, and the \`implicit\` shell of a standalone chat together with that chat.
 - A second call answers \`404\`: the project no longer exists.`,
     ),
     ProjectIdParam(OWNED_PROJECT),
-    ApiResponse({ status: 204, description: 'Deleted. The answer has no body.' }),
+    ApiNoContent('Deleted. The answer has no body.'),
     ApiErrors(...PROJECT_AUTH_PROBLEMS, PROJECT_NOT_FOUND, {
-      status: 409,
-      code: 'thread_busy',
-      message: 'Stop the active execution before changing this resource.',
-      when: 'A chat of the project has an execution that is still advancing. Nothing was deleted. Stop the execution or wait for it to end, then retry.',
+      ...PROBLEM.threadBusy,
+      when: 'A chat of the project has an execution that is still advancing. Nothing was deleted. List the chats with `GET /api/conversations?projectId={id}`, read `GET /api/conversations/{id}/executions/active` on each to find the execution (`data.snapshot.id`), stop it with `POST /api/executions/{id}/stop` or wait for it to end, then retry.',
     }),
   );

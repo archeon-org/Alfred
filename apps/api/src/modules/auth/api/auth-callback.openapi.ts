@@ -10,15 +10,18 @@ import {
   SET_COOKIE,
   STATE_COOKIE,
   STATE_COOKIE_EXAMPLE,
+  responseHeader,
 } from './auth-shared.openapi';
 
 const CALLBACK_BEHAVIOUR = `Public. No application calls this route: the identity provider redirects the browser here at the end of a sign-in begun with the start route. The callback URL registered at the provider (\`GOOGLE_OAUTH_CALLBACK_URL\` for Google) must point to it.
+
+Three query parameters decide the outcome: \`state\`, always, and exactly one of \`code\` and \`error\`. The others (\`authuser\`, \`error_description\`, \`hd\`, \`iss\`, \`prompt\`, \`scope\`, \`session_state\`) are what providers append to their redirect: they are validated, then ignored.
 
 The state cookie is read, then cleared as soon as the request passes validation, whatever happens next: a login state serves once. Two outcomes redirect to the web application (\`WEB_APP_URL\`):
 - **Signed in** (\`code\`). The state is consumed, the code is exchanged with the provider and the identity it returns is verified (for Google: signed ID token, nonce, verified e-mail, and the Workspace domain when \`GOOGLE_WORKSPACE_DOMAIN\` is set). The identity is matched to its Alfred account, created on the first sign-in with the role \`user\` and a membership of the default workspace; name, e-mail and avatar are refreshed from the provider at every sign-in. A refresh session is created and its token set in the refresh cookie. Redirect to \`/auth/callback?returnTo=…\`. No token travels in a URL: the web application then calls \`POST /api/auth/refresh\` to get its first access token.
 - **Refused at the provider** (\`error\`). The state is consumed and no session is created. Redirect to \`/auth/callback?error=…&returnTo=…\` with the provider's error code; \`error_description\` is never forwarded.
 
-Every other failure is answered as a JSON error shown in the browser tab, not as a redirect. A failed or repeated attempt cannot be replayed (reloading this URL answers \`401\`): begin again from the start route.
+Every other failure is answered as a JSON error shown in the browser tab, not as a redirect. That includes \`500\` "Internal server error" when the code exchange with the provider fails (a \`code\` the provider refuses, a provider that cannot be reached, an ID token that fails its signature check): these failures are not mapped to a \`4xx\`. A failed or repeated attempt cannot be replayed: the state is consumed and the state cookie cleared, so reloading this URL answers \`401\` "Invalid OAuth state". Begin again from the start route.
 
 Rate limit: on top of the general per-address limit this route has its own bucket, \`oauth-callback-ip\` (600 calls per minute and per client address by default).`;
 
@@ -47,33 +50,33 @@ const CALLBACK_PROBLEMS: readonly ApiProblem[] = [
     'code must be longer than or equal to 1 characters',
   ),
   PROBLEM.validation(
-    '`error` is not an OAuth error code: lower-case letters, digits and `_`, starting with a letter, at most 64 characters.',
+    '`error` is not an OAuth error code (lower-case letters, digits and `_`, starting with a letter); beyond 64 characters the message names the upper bound instead (`error must be shorter than or equal to 64 characters`).',
     'error must match /^[a-z][a-z0-9_]{0,63}$/u regular expression',
   ),
   PROBLEM.validation(
     'A parameter the provider appends is malformed or too long (`authuser`, `error_description`, `hd`, `iss`, `prompt`, `scope`, `session_state`): one message per broken parameter.',
     'iss must be a URL address',
   ),
-  AUTH_PROBLEM.unknownParameter('unexpected'),
+  PROBLEM.unknownParameter('unexpected'),
   stateProblem(
     'Invalid OAuth state',
-    'The state cookie is absent or differs from `state`: the browser that comes back is not the one that started, the cookie expired (10 minutes), or cookies are blocked.',
+    'The state cookie is absent or differs from `state`: the browser that comes back is not the one that started, the cookie expired (10 minutes), cookies are blocked, or this URL is reloaded (the first call cleared the cookie). Begin again from the start route.',
   ),
   stateProblem(
     'Expired or reused OAuth state',
-    'The state is unknown, older than 10 minutes or was already used, for instance when this URL is reloaded.',
+    'The cookie matches `state`, but the state is unknown, older than 10 minutes or already consumed: two callbacks racing with the same cookie, or a client that replays the cookie itself. Begin again from the start route.',
   ),
   stateProblem(
     'OAuth state does not match the provider',
-    'The state was issued by the start route of another provider.',
+    'The state was issued by the start route of another provider. Begin again from the start route of this provider.',
   ),
   stateProblem(
     'Google did not return a valid identity token',
-    'Google exchanged the code without returning an ID token.',
+    'Google exchanged the code without returning an ID token. The state is consumed: begin again from the start route.',
   ),
   stateProblem(
     'Google identity validation failed',
-    'The Google identity cannot be trusted: nonce mismatch, e-mail not verified, or no e-mail or subject in the ID token.',
+    'The Google identity cannot be trusted: nonce mismatch, e-mail not verified, or no e-mail or subject in the ID token. The state is consumed: begin again from the start route, with a Google account whose e-mail address is verified.',
   ),
   stateProblem(
     'Google Workspace domain is not allowed',
@@ -81,14 +84,19 @@ const CALLBACK_PROBLEMS: readonly ApiProblem[] = [
   ),
   stateProblem(
     'Account is disabled',
-    'The identity is verified but its Alfred account is not active. No session is created.',
+    'The identity is verified but its Alfred account is not active. No session is created. Signing in again does not help: the user must contact the administrator of this deployment.',
   ),
   {
     status: 409,
     code: 'HTTP_409',
     message: 'The verified identity is already linked to another account',
-    when: 'The e-mail of this identity already belongs to another Alfred account, linked to a different identity. Accounts are never merged and no session is created.',
+    when: 'The e-mail of this identity already belongs to another Alfred account, linked to a different identity. Accounts are never merged and no session is created. Signing in again does not help: the user must contact the administrator of this deployment.',
   },
+  PROBLEM.masked(
+    500,
+    'HTTP_500',
+    'The code exchange with the provider failed: it refused `code` (forged, expired or already exchanged), could not be reached, or returned an ID token whose signature, audience or expiry check failed. These failures are not mapped to a `4xx`. The login state is already consumed and the state cookie cleared: begin again from the start route.',
+  ),
   AUTH_PROBLEM.rateLimited(
     'oauth-callback-ip',
     600,
@@ -113,10 +121,10 @@ const CallbackRedirect = () =>
 
 \`returnTo\` is the value given to the start route (\`/app\` by default).`,
     headers: {
-      Location: {
+      Location: responseHeader({
         description:
           'A URL of the web application: always the `/auth/callback` page of `WEB_APP_URL`, with `returnTo` and, after a refusal, `error`.',
-        schema: { type: 'string', format: 'uri' },
+        format: 'uri',
         examples: {
           signedIn: {
             summary: 'Signed in',
@@ -127,13 +135,12 @@ const CallbackRedirect = () =>
             value: 'http://localhost:5173/auth/callback?error=access_denied&returnTo=%2Fapp',
           },
         },
-      },
-      'Set-Cookie': {
+      }),
+      'Set-Cookie': responseHeader({
         description: `Sent twice after a sign-in, once after a refusal.
 
 1. The state cookie is cleared (empty value, \`Expires\` in 1970), with the name, \`Path\` and flags it was set with. ${STATE_COOKIE}
 2. After a sign-in only, the refresh cookie is set. ${REFRESH_COOKIE}`,
-        schema: { type: 'string' },
         examples: {
           clearState: {
             summary: 'Always: the state cookie is cleared',
@@ -144,7 +151,7 @@ const CallbackRedirect = () =>
             value: SET_COOKIE.setRefresh,
           },
         },
-      },
+      }),
     },
   });
 

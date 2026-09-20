@@ -1,4 +1,8 @@
-import { FILE_MAX_CONCURRENT_UPLOADS_PER_USER, fileUploadEnvelopeSchema } from '@alfred/contracts';
+import {
+  FILE_MAX_CONCURRENT_UPLOADS_PER_USER,
+  FILE_MEDIA_TYPES,
+  fileUploadEnvelopeSchema,
+} from '@alfred/contracts';
 import { applyDecorators } from '@nestjs/common';
 import { ApiBody, ApiConsumes } from '@nestjs/swagger';
 import { z } from 'zod/mini';
@@ -9,6 +13,7 @@ import {
   type ApiExample,
 } from '../../../common/api-docs/api-docs.decorators';
 import { checkApiDocsExample } from '../../../common/api-docs/api-docs.registry';
+import { PROBLEM } from '../../../common/api-docs/api-problems';
 import { contractSchema } from '../../../common/api-docs/contract-schema';
 import {
   FILES_ACCESS_PROBLEMS,
@@ -16,6 +21,7 @@ import {
   FILES_FOLDER_ID,
   FILES_FOLDER_NOT_FOUND,
   FILES_NAME_CLEANING,
+  FILES_POLL_RULE,
   filesJustUploadedPdf,
   filesReadyImage,
   filesReadyPdf,
@@ -24,6 +30,23 @@ import {
 
 const UPLOAD_ID = 'f3b0c1d2-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
 const MULTIPART = 'multipart/form-data';
+
+/**
+ * The answer of the `intoFolder` request: a file the other examples do not hold yet, so that the
+ * `folderId` that was sent can be read back. It is uploaded after the library of the list example
+ * was read, which is why that list and the `fileCount` of `Contrats` do not show it.
+ */
+const filesJustUploadedDocx = {
+  ...filesJustUploadedPdf,
+  id: '2f8c1b6e-9d40-4a73-b5e1-7c0a3d9e6f24',
+  name: 'Avenant 2026.docx',
+  kind: 'docx',
+  mediaType: FILE_MEDIA_TYPES.docx,
+  sizeBytes: 38_214,
+  folderId: FILES_FOLDER_ID,
+  createdAt: '2026-09-20T10:15:42.117Z',
+  updatedAt: '2026-09-20T10:15:42.117Z',
+};
 
 /**
  * The text fields of the form, as `FileUploadFieldsDto` validates them: no web contract exists
@@ -42,7 +65,7 @@ function uploadFormSchema(): Record<string, unknown> {
       uploadId:
         'Identity of this upload, a UUID the client generates: one per file the user picked, kept for every retry of that file, never reused for another file. It makes the upload safe to send again (see above). Case is ignored.',
       folderId:
-        'Identifier of the folder to place the file in. Omit the field for the top level: `root` and an empty value are refused here. Ignored when the answer is an existing file (`deduplicated`, or a replayed `uploadId`).',
+        'Identifier of the folder to place the file in. Omit the field for the top level: `root` and an empty value are refused here. Ignored when the answer is an existing file (`deduplicated`, or a replayed `uploadId`). If the folder is deleted while the upload is in flight, the upload still succeeds and the file lands at the top level: read `file.folderId` in the answer.',
     },
   });
   return {
@@ -85,18 +108,18 @@ export const DocUploadFile = () =>
 
 **The same bytes twice.** Bytes the library already holds (same SHA-256, under any name or folder) are not stored again: the answer is the existing file with \`deduplicated: true\`, still \`201\`; the quota is not charged and the \`filename\` and \`folderId\` sent are ignored.
 
-**After the answer.** The file is \`processing\`: its text is extracted, or its reduced copy prepared, off the request path. Poll \`GET /api/files/{id}\` until \`ready\` or \`failed\`. ${FILES_ATTACH_RULE}
+**After the answer.** The file is \`processing\`: its text is extracted, or its reduced copy prepared, off the request path. Poll \`GET /api/files/{id}\` until \`ready\` or \`failed\`. ${FILES_POLL_RULE} ${FILES_ATTACH_RULE}
 
 **Limits on the request itself.**
 - At most ${FILE_MAX_CONCURRENT_UPLOADS_PER_USER} uploads of one account in flight, and a fixed number per API instance (4 by default). One more answers \`503 upload_busy\` at once, before its body is read: queue on the client, ${FILE_MAX_CONCURRENT_UPLOADS_PER_USER} at a time, and retry after a short delay.
-- Its own rate limit per account (20 uploads a minute by default, against 120 requests for the general one): \`429\` with the wait in seconds in the \`Retry-After-file-upload-user\` header.
+- Its own rate limit per account (20 uploads a minute by default, against 120 requests for the general one): \`429\` with the wait in seconds in the \`Retry-After-file-upload-user\` header. The general limits answer the same \`429\` body under another header name, \`Retry-After-authenticated\` (per account) or \`Retry-After-ip\` (per address): read whichever is present.
 - The body must arrive within a deadline sized for the largest accepted file at 64 KiB/s, never under 30 seconds (80 seconds with the default limit). Past it the connection is closed without an answer.
 - Closing the connection before the answer cancels the upload: nothing is published, nothing is charged.`,
     ),
     ApiConsumes(MULTIPART),
     ApiBody({
       description:
-        'A multipart form: the `file` part and the text fields below. At most 4 text fields of at most 1 024 bytes each.',
+        'A multipart form: the `file` part and the text fields below. At most 4 text fields of at most 1 024 bytes each. Let the HTTP client write the `Content-Type` header from the form, so that it carries its `boundary` (without it: `400` "Multipart: Boundary not found"). A form that breaks these bounds is answered `499 upload_cancelled` today, not a `400`: see that answer.',
       required: true,
       schema: uploadFormSchema(),
       examples: uploadFormExamples({
@@ -105,9 +128,9 @@ export const DocUploadFile = () =>
           value: { file: '(binary content of Contrat cadre.pdf)', uploadId: UPLOAD_ID },
         },
         intoFolder: {
-          summary: 'An image into a folder',
+          summary: 'A Word document into the `Contrats` folder',
           value: {
-            file: '(binary content of Schéma réseau.png)',
+            file: `(binary content of ${filesJustUploadedDocx.name})`,
             uploadId: '0a7c4e19-5d2b-4f86-b3a1-8e6f9c0d2b57',
             folderId: FILES_FOLDER_ID,
           },
@@ -129,6 +152,10 @@ export const DocUploadFile = () =>
       },
       data: { file: filesJustUploadedPdf, deduplicated: false },
       more: {
+        intoFolder: {
+          summary: 'Sent with a `folderId`: the new file is placed in that folder',
+          data: { file: filesJustUploadedDocx, deduplicated: false },
+        },
         deduplicated: {
           summary: 'The library already held these bytes: the earlier file is answered',
           data: { file: filesReadyPdf, deduplicated: true },
@@ -153,9 +180,7 @@ export const DocUploadFile = () =>
         when: '`folderId` is present and is not a UUID, `root` and an empty value included. Omit the field for the top level.',
       },
       {
-        status: 400,
-        code: 'HTTP_400',
-        message: ['property name should not exist'],
+        ...PROBLEM.unknownParameter('name'),
         when: 'The form carries a text field other than `uploadId` and `folderId`. Nothing is ignored silently.',
       },
       {
@@ -164,8 +189,21 @@ export const DocUploadFile = () =>
         message: 'A file is required.',
         when: 'The form has no `file` part, or the body is not `multipart/form-data` (a JSON body for example). Checked after the text fields.',
       },
+      {
+        status: 400,
+        code: 'HTTP_400',
+        message: 'Multipart: Boundary not found',
+        when: 'The `Content-Type` is `multipart/form-data` without its `boundary` parameter, typically because the header was set by hand. Let the HTTP client set it from the form.',
+      },
       FILES_FOLDER_NOT_FOUND,
-      ...FILES_ACCESS_PROBLEMS,
+      ...FILES_ACCESS_PROBLEMS.map((problem) =>
+        problem === PROBLEM.accountUnavailable
+          ? {
+              ...problem,
+              when: `${problem.when} On this route the account is read after the bytes were inspected, so a \`413\`, a \`415\` or a \`422\` comes first.`,
+            }
+          : problem,
+      ),
       {
         status: 409,
         code: 'quota_exceeded',
@@ -214,31 +252,33 @@ export const DocUploadFile = () =>
         status: 422,
         code: 'file_rejected',
         message: 'The file could not be accepted.',
-        when: 'A DOCX that is unsafe to open: macro-enabled, a damaged or oversized archive (more than 2 048 entries, more than 100 MiB once inflated, an entry compressed over a hundredfold), or an unsafe entry name. Do not retry.',
+        when: 'A DOCX that is unsafe to open: macro-enabled, a damaged or oversized archive (more than 2 048 entries, more than 100 MiB once inflated, an entry of more than 1 MiB that inflates over a hundredfold, or a ZIP64 archive), or an unsafe entry name. Do not retry.',
       },
+      PROBLEM.rateLimited(
+        'file-upload-user',
+        'A rate limit is reached: the upload limit of the account (20 a minute by default), or a general one, which answers this same body with `Retry-After-authenticated` (per account) or `Retry-After-ip` (per address) in place of the header named next.',
+      ),
       {
-        status: 429,
-        code: 'HTTP_429',
-        message: 'ThrottlerException: Too Many Requests',
-        when: 'The upload rate limit of the account is reached. Wait for the number of seconds of the `Retry-After-file-upload-user` header.',
+        status: 499,
+        code: 'upload_cancelled',
+        message: 'The upload was cancelled by the client.',
+        when: 'The client closed the connection before the answer, so nobody reads this; it exists for proxy logs.',
       },
       {
         status: 499,
         code: 'upload_cancelled',
         message: 'The upload was cancelled by the client.',
-        when: 'The client closed the connection before the answer, so nobody reads this; it exists for proxy logs. It is also what a form the multipart parser refuses receives today: a file part under another name than `file`, a second file part, more than 4 text fields, or a text field over 1 024 bytes.',
+        when: 'Known defect: a form the multipart parser refuses (a file part under another name than `file`, a second file part, more than 4 text fields, a text field over 1 024 bytes, a body that ends before its closing boundary) is answered this instead of a `400`, although the connection is open. Nothing was stored. Fix the form; do not retry it unchanged.',
       },
-      {
-        status: 503,
-        code: 'upload_busy',
-        message: 'Internal server error',
-        when: `No upload slot is free: the account already has ${FILE_MAX_CONCURRENT_UPLOADS_PER_USER} uploads in flight, or the instance is full. Nothing was read. Retry after a short delay. Branch on the code: the message of a \`5xx\` is always generic.`,
-      },
-      {
-        status: 503,
-        code: 'storage_unavailable',
-        message: 'Internal server error',
-        when: 'The file storage refused the write. Nothing was published and the reservation was released. Retry later with the same `uploadId`.',
-      },
+      PROBLEM.masked(
+        503,
+        'upload_busy',
+        `No upload slot is free: the account already has ${FILE_MAX_CONCURRENT_UPLOADS_PER_USER} uploads in flight, or the instance is full. Nothing was read. Retry after a short delay. Branch on the code: the message of a \`5xx\` is always generic.`,
+      ),
+      PROBLEM.masked(
+        503,
+        'storage_unavailable',
+        'The file storage refused the write. Nothing was published and the reservation was released. Retry later with the same `uploadId`.',
+      ),
     ),
   );

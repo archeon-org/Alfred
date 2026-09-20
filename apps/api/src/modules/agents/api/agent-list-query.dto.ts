@@ -6,7 +6,7 @@ import { ListQueryDto } from '../../../common/pagination/list-query.dto';
 export class AgentListQueryDto extends ListQueryDto {
   @ApiPropertyOptional({
     description:
-      'Free-text filter. Case, accents, `_` and `-` are ignored. The text is split on whitespace and every term must appear (substring match) in the name, the graph identifier, the short description, the description or a tag of the agent; two terms may match two different fields. Omitted, empty or blank: the whole catalog. No NUL character. A cursor is only valid with the search it was issued for. Example: `infra topo`.',
+      'Free-text filter. Case and accents are ignored; `_` and `-` count as spaces, in the search and in the agent text: `elastic_rag`, `elastic-rag` and `elastic rag` are the same search (two terms, `elastic` and `rag`), while `elasticrag` does not find `elastic_rag`. The text is split on whitespace and every term must appear (substring match) in the name, the graph identifier, the short description, the description or a tag of the agent; two terms may match two different fields. Omitted, empty, blank or made only of `_` and `-`: the whole catalog. No NUL character, and the parameter is sent once. A cursor is only valid with the search it was issued for. Example: `infra topo`.',
     maxLength: AGENT_SEARCH_MAX_LENGTH,
   })
   @ValidateIf((_object: unknown, value: unknown) => value !== undefined)

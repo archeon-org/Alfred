@@ -1,5 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { ApiBody, ApiHeader, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import type { z } from 'zod/mini';
 import { checkApiDocsExample, recordApiDocsProblem } from './api-docs.registry';
 import { contractSchema, type FieldDescriptions } from './contract-schema';
@@ -9,6 +9,11 @@ const JSON_MEDIA = 'application/json';
 /** Injected into `components.schemas` by `applyApiDocsComponents`; every error answer refers to it. */
 export const API_ERROR_COMPONENT = 'ApiError';
 const EXAMPLE_ID = '0b8f6c1e-5a3d-4f7b-9c2a-1e4d7a9b3c5f';
+
+export interface ApiResponseHeader {
+  readonly description: string;
+  readonly schema: { readonly type: 'string' | 'integer'; readonly example?: string | number };
+}
 
 export interface ApiExample {
   /** One line shown in the example picker: the situation, not the payload. */
@@ -33,6 +38,8 @@ export function ApiJsonResponse(options: {
   readonly describe?: FieldDescriptions;
   readonly example: unknown;
   readonly examples?: Readonly<Record<string, ApiExample>>;
+  /** Response headers a caller relies on (`Set-Cookie`, `Location`…), by name. Never a real value. */
+  readonly headers?: Readonly<Record<string, ApiResponseHeader>>;
 }): MethodDecorator {
   const named = {
     default: { summary: 'Typical answer', value: options.example },
@@ -43,6 +50,7 @@ export function ApiJsonResponse(options: {
   return ApiResponse({
     status: options.status,
     description: options.description,
+    ...(options.headers === undefined ? {} : { headers: options.headers }),
     content: {
       [JSON_MEDIA]: {
         schema: contractSchema(options.name, options.contract, { describe: options.describe }),
@@ -62,6 +70,7 @@ export function ApiEnvelopeResponse(options: {
   readonly describe?: FieldDescriptions;
   readonly data: unknown;
   readonly more?: Readonly<Record<string, { readonly summary: string; readonly data: unknown }>>;
+  readonly headers?: Readonly<Record<string, ApiResponseHeader>>;
 }): MethodDecorator {
   const wrap = (data: unknown) => ({ success: true, data });
   return ApiJsonResponse({
@@ -70,6 +79,7 @@ export function ApiEnvelopeResponse(options: {
     description: options.description,
     contract: options.contract,
     describe: options.describe,
+    headers: options.headers,
     example: wrap(options.data),
     examples:
       options.more === undefined
@@ -103,6 +113,22 @@ export function ApiJsonBody(options: {
       describe: options.describe,
     }),
     examples: options.examples,
+  });
+}
+
+/** A `204`: the answer has no body, so the description carries everything. */
+export function ApiNoContent(description: string): MethodDecorator {
+  return ApiResponse({ status: 204, description });
+}
+
+/** The optional retry-safety header of an `@Idempotent()` route. Pair it with `idempotencyProblems`. */
+export function ApiIdempotencyKeyHeader(): MethodDecorator {
+  return ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description:
+      'Makes the call safe to retry. 1 to 128 characters among `A-Z`, `a-z`, `0-9`, `_` and `-`, chosen by the caller: one key per intent, reused only to retry that same call. A key is scoped to the signed-in account across every route that accepts the header. The first success is stored for 24 hours; the same key with the same path, query string and JSON body (key order is ignored) replays that stored status and body instead of running again. Without the header, every call runs. Example: `chat-8f2c1d7a-0001`.',
+    schema: { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9_-]{1,128}$' },
   });
 }
 

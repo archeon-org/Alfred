@@ -36,7 +36,7 @@ export const DocGetStreamCapabilities = () =>
       },
       data: { protocol: 'AG-UI', status: 'reserved', transport: 'SSE' },
     }),
-    ApiErrors(PROBLEM.unauthenticated, PROBLEM.invalidToken, {
+    ApiErrors(...PROBLEM.session, {
       ...PROBLEM.featureDisabled('agUiStreaming'),
       when: 'Always on this version: the `agUiStreaming` capability is reserved and cannot be switched on. The capability check runs before authentication, so this is the answer with or without a token.',
     }),

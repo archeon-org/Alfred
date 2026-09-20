@@ -57,20 +57,40 @@ const SET_DESCRIBE = {
   ...documentFields('data.documents[].'),
 };
 
+/** The account is read inside the transaction (`ContextScopeService.authorize`), on all four routes. */
+const SESSION_PROBLEMS: readonly ApiProblem[] = [...PROBLEM.session, PROBLEM.accountUnavailable];
+
+/** One message per broken field: the validation stops at the first broken rule of each field. */
 const SAVE_PROBLEMS: readonly ApiProblem[] = [
   PROBLEM.validation(
-    '`expectedRevision` is missing, not an integer, or out of range.',
+    '`expectedRevision` is missing, is not a JSON number (`"3"` is refused, never converted) or exceeds 2 147 483 646.',
     'expectedRevision must not be greater than 2147483646',
-    'expectedRevision must not be less than 0',
+  ),
+  PROBLEM.validation('`expectedRevision` is negative.', 'expectedRevision must not be less than 0'),
+  PROBLEM.validation(
+    '`expectedRevision` is a number with a fractional part.',
     'expectedRevision must be an integer number',
   ),
-  PROBLEM.unknownField,
+  PROBLEM.validation(
+    '`content` is missing, is not a string, or is longer than 65 536 characters: a fixed bound, checked before `maxBytes`. A request that also breaks an `expectedRevision` rule lists both messages.',
+    'content must be shorter than or equal to 65536 characters',
+  ),
+  {
+    ...PROBLEM.unknownField,
+    when: 'The body carries a field the route does not define: only `content` and `expectedRevision` exist. (The route reads no query string, so one is ignored.)',
+  },
   PROBLEM.invalidJson,
   {
     status: 400,
     code: 'invalid_content',
     message: 'Invalid document kind for this scope.',
-    when: 'The `kind` of the path does not belong to this scope, or `content` holds a NUL character or an unpaired surrogate.',
+    when: 'The `kind` of the path does not belong to this scope.',
+  },
+  {
+    status: 400,
+    code: 'invalid_content',
+    message: 'Content must be valid Unicode text without NUL.',
+    when: '`content` holds a NUL character or an unpaired surrogate.',
   },
   {
     status: 400,
@@ -79,8 +99,7 @@ const SAVE_PROBLEMS: readonly ApiProblem[] = [
     details: { maxBytes: 65536 },
     when: '`content` exceeds `maxBytes` once line endings are normalised. `details.maxBytes` holds the limit.',
   },
-  PROBLEM.unauthenticated,
-  PROBLEM.invalidToken,
+  ...SESSION_PROBLEMS,
   {
     status: 409,
     code: 'context_revision_conflict',
@@ -99,7 +118,7 @@ const saveBody = (name: string, value: { content: string; expectedRevision: numb
     contract: saveContextDocumentInputSchema,
     describe: {
       content:
-        'The complete Markdown text. `\\r\\n` and `\\r` are stored as `\\n`. At most `maxBytes` UTF-8 bytes. No NUL character, no unpaired surrogate. An empty string resets the document and still increases the revision.',
+        'The complete Markdown text. `\\r\\n` and `\\r` are stored as `\\n`. At most 65 536 characters and `maxBytes` UTF-8 bytes. No NUL character, no unpaired surrogate. An empty string resets the document and still increases the revision.',
       expectedRevision:
         'The `revision` last read for this document; `0` to create it. 0 to 2 147 483 646.',
     },
@@ -125,7 +144,7 @@ export const DocListPersonalContext = () =>
       describe: SET_DESCRIBE,
       data: { maxBytes: 65536, documents: [neverWritten('instructions'), personalPreferences] },
     }),
-    ApiErrors(PROBLEM.unauthenticated, PROBLEM.invalidToken),
+    ApiErrors(...SESSION_PROBLEMS),
   );
 
 export const DocSavePersonalContext = () =>
@@ -167,7 +186,7 @@ export const DocListProjectContext = () =>
       describe: SET_DESCRIBE,
       data: { maxBytes: 65536, documents: [projectContext, neverWritten('preferences')] },
     }),
-    ApiErrors(PROBLEM.unauthenticated, PROBLEM.invalidToken, PROBLEM.notFound('project')),
+    ApiErrors(...SESSION_PROBLEMS, PROBLEM.notFound('project')),
   );
 
 export const DocSaveProjectContext = () =>
@@ -198,17 +217,7 @@ Read first (\`GET\` on the same path without the kind) to learn the \`revision\`
     ApiErrors(
       ...SAVE_PROBLEMS,
       PROBLEM.notFound('project'),
-      {
-        status: 409,
-        code: 'project_archived',
-        message: 'Project is archived.',
-        when: 'The project is archived: it can still be read, no longer written.',
-      },
-      {
-        status: 409,
-        code: 'project_deleting',
-        message: 'Project is being deleted.',
-        when: 'The project is being deleted.',
-      },
+      PROBLEM.projectArchived,
+      PROBLEM.projectDeleting,
     ),
   );

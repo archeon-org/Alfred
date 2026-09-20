@@ -1,4 +1,3 @@
-import { ApiHeader } from '@nestjs/swagger';
 import type { ApiProblem } from '../../../common/api-docs/api-docs.decorators';
 import { PROBLEM } from '../../../common/api-docs/api-problems';
 
@@ -7,10 +6,17 @@ export const CONVERSATION_ID = '7d3e2b1a-4c5f-4a6b-8c9d-0e1f2a3b4c5d';
 export const NAMED_PROJECT_ID = '3f0c6c0e-9c7b-4f2a-9a58-2d5a1c7e8b41';
 const IMPLICIT_PROJECT_ID = 'b2a1c0d9-8e7f-4a6b-9c5d-4e3f2a1b0c9d';
 
-export const CONVERSATION_ID_TEXT =
-  'Identifier of a chat the signed-in account owns, as returned by `POST /api/conversations` or `GET /api/conversations`.';
+/** The documentation says "chat"; paths, error codes and error messages say "conversation". */
+export const CHAT_IS_CONVERSATION =
+  'A chat is the `conversation` of the paths, the error codes and the error messages: one resource, two words.';
 
-/** Descriptions of one conversation, prefixed with where it sits in the answer. */
+export const CONVERSATION_ID_TEXT =
+  'Identifier of a chat (a `conversation` in paths and error codes) the signed-in account owns, as returned by `POST /api/conversations` or `GET /api/conversations`.';
+
+/**
+ * Descriptions of one conversation, prefixed with where it sits in the answer: `data.` here,
+ * `data.snapshot.conversation.` in an execution answer.
+ */
 export const conversationFields = (prefix: string): Record<string, string> => ({
   [`${prefix}id`]:
     'Identifier of the chat. Use it in every `/api/conversations/{id}` route, messages and executions included.',
@@ -19,9 +25,9 @@ export const conversationFields = (prefix: string): Record<string, string> => ({
   [`${prefix}projectKind`]:
     '`implicit`: a standalone chat, outside any named project. `named`: a chat of a project the user created.',
   [`${prefix}title`]:
-    'Display title, one line. `Nouvelle conversation` until the chat is titled by its first message or by the user.',
+    'Display title, one line, at most 160 characters. `Nouvelle conversation` until the first message or the user titles the chat. While `titleSource` is `auto` the title is provisional and can still be replaced by a generated one.',
   [`${prefix}titleSource`]:
-    'Who chose the title. `none`: default title, the first message will title the chat. `auto`: derived from the first message. `user`: given at creation or by a rename, never replaced automatically.',
+    'Who chose the title. `none`: default title; the first message that has text will title the chat. `auto`: set by the API in two steps. When the first message is sent, the title is its first line, cut to 80 characters (the cut ends with `…`). A few seconds later, possibly after the answer finished, a generated title replaces it, when the deployment generates titles and the result is usable; otherwise the first line stays. Do not cache an `auto` title: re-read the chat or the list after an execution. `user`: given at creation or by a rename, never replaced automatically.',
   [`${prefix}pinnedAt`]:
     'When the chat was pinned (UTC); `null` when it is not pinned. Pinned chats come first in lists.',
   [`${prefix}lastActivityAt`]:
@@ -29,7 +35,7 @@ export const conversationFields = (prefix: string): Record<string, string> => ({
   [`${prefix}createdAt`]:
     'Creation time (UTC). Lists are ordered by it, newest first, among pinned chats and then among the others.',
   [`${prefix}updatedAt`]:
-    'Last change of the chat (UTC): rename, pin, unpin or new activity. Moving the chat to a project does not change it.',
+    'Last change of the chat (UTC): rename, pin, unpin, new activity or an automatic title. Moving the chat to a project does not change it.',
   [`${prefix}archivedAt`]:
     'When the chat was archived (UTC); `null` for a live chat. Archived chats are left out of lists. No route archives a chat today, so expect `null`.',
 });
@@ -72,62 +78,25 @@ export const pinnedChat = {
   updatedAt: '2026-09-18T09:05:44.021Z',
 };
 
-/** The route reads `Idempotency-Key`; only `@Idempotent()` handlers do. */
-export const ApiIdempotencyKeyHeader = () =>
-  ApiHeader({
-    name: 'Idempotency-Key',
-    required: false,
-    description:
-      'Makes the call safe to retry. 1 to 128 characters among letters, digits, `_` and `-`, chosen by the caller, unique per intent. The first success is stored for 24 hours per account; the same key with the same path, query string and body replays that stored status and body instead of running again. Without the header, every call runs. Example: `chat-8f2c1d7a-0001`.',
-    schema: { type: 'string', minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9_-]{1,128}$' },
-  });
-
-/** Answers of the idempotency layer, the same on every route that reads `Idempotency-Key`. */
-export const IDEMPOTENCY_PROBLEMS: readonly ApiProblem[] = [
-  {
-    status: 400,
-    code: 'invalid_idempotency_key',
-    message: 'Invalid Idempotency-Key',
-    when: '`Idempotency-Key` is empty, longer than 128 characters or holds a character other than letters, digits, `_` and `-`. Nothing ran; fix the key.',
-  },
-  {
-    status: 409,
-    code: 'idempotency_in_progress',
-    message: 'This request is still in progress or requires reconciliation',
-    when: 'The same `Idempotency-Key` is still running after a 2-second wait, or its earlier attempt ended without a stored success (an error other than a validation `400`, or a crash). The key stays reserved for 24 hours: read the resource to learn the outcome, then use a new key.',
-  },
-  {
-    status: 422,
-    code: 'idempotency_mismatch',
-    message: 'Idempotency-Key was used for a different request',
-    when: 'This account already used the `Idempotency-Key` within 24 hours with another path, query string or body. Nothing ran; use a new key for a new intent.',
-  },
-];
-
-/** `TenantsService.scopeFor`: the token is valid, the account behind it is not usable. */
-export const ACCOUNT_UNAVAILABLE: ApiProblem = {
-  status: 401,
-  code: 'HTTP_401',
-  message: 'Account is unavailable',
-  when: 'The access token is valid but its account no longer exists or is disabled. Retrying cannot succeed.',
-};
-
-export const PRIVATE_ROUTE_PROBLEMS: readonly ApiProblem[] = [
-  PROBLEM.unauthenticated,
-  PROBLEM.invalidToken,
-  ACCOUNT_UNAVAILABLE,
-];
-
 /** The 404 of a chat also covers a chat whose project is no longer active. */
 export const CONVERSATION_NOT_FOUND: ApiProblem = {
   ...PROBLEM.notFound('conversation'),
   when: 'The chat does not exist, belongs to another account, the identifier is not a UUID, or its project is archived or being deleted. All indistinguishable by design.',
 };
 
+/**
+ * `lockOwned` finds the chat, then waits for the lock of its project row. When the winner of that
+ * wait deleted the project, the row is gone and the write answers the project's 404, not the chat's.
+ */
+export const PROJECT_DELETED_WHILE_WAITING: ApiProblem = {
+  ...PROBLEM.notFound('project'),
+  when: "The chat's project was deleted while this request waited for it: a concurrent move of the chat, a concurrent delete of the same standalone chat, or a concurrent `DELETE /api/projects/{id}` won. Nothing changed; re-read the chat (after a delete, treat it as already deleted).",
+};
+
 /** The two refusals of a project that no longer accepts writes, worded for the route. */
 export const projectNotWritable = (when: string): readonly ApiProblem[] => [
-  { status: 409, code: 'project_archived', message: 'Project is archived.', when },
-  { status: 409, code: 'project_deleting', message: 'Project is being deleted.', when },
+  { ...PROBLEM.projectArchived, when },
+  { ...PROBLEM.projectDeleting, when },
 ];
 
 /** Writes on a chat re-check its project after waiting for the project lock. */
@@ -139,11 +108,10 @@ export const TARGET_PROJECT_NOT_WRITABLE = projectNotWritable(
   'The project named by `projectId` is archived or being deleted: it accepts no new chat. Choose another project.',
 );
 
+/** The shared `thread_busy`, with how a caller finds and stops the execution of a chat. */
 export const THREAD_BUSY: ApiProblem = {
-  status: 409,
-  code: 'thread_busy',
-  message: 'Stop the active execution before changing this resource.',
-  when: 'An execution of this chat is still advancing: pending, running, stopping, or recovering for less than 30 seconds. Find it with `GET /api/conversations/{id}/executions/active`, stop it with `POST /api/executions/{id}/stop` or wait for it to finish, then retry. An interrupted execution, or one past its deadline, never blocks.',
+  ...PROBLEM.threadBusy,
+  when: 'An execution of this chat is still advancing: `pending`, `running`, `stopping`, or `recovering` for less than 30 seconds. Read it with `GET /api/conversations/{id}/executions/active` (`{id}` is the chat), then wait for it, or stop it with `POST /api/executions/{id}/stop`, where `{id}` is `data.snapshot.execution.id` of that answer, not the chat. Stopping is asynchronous: the execution stays `stopping`, which still blocks, until a worker settles it. Poll `GET /api/executions/{id}` until its `status` is no longer `stopping` (normally `cancelled`), then retry. An `interrupted` or `recovery_required` execution, or one past its deadline, never blocks.',
 };
 
 const TITLE_PATTERN_MESSAGE = 'title must match /^[^\\u0000-\\u001f\\u007f]+$/u regular expression';

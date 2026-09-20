@@ -14,7 +14,7 @@ const FEATURE_FLAG_FIELDS: Readonly<Record<FeatureFlagName, string>> = {
   agUiStreaming: `${reserved('the standalone AG-UI streaming profile')} \`GET /api/stream/capabilities\` therefore always answers \`404\`.`,
   fileUploads: `The personal file library, \`/api/files\` and \`/api/files/folders\`, and attaching its files to a message. ${OFF_ANSWER}`,
   generativeUi: reserved('generative UI'),
-  googleOAuth: `Sign-in with Google: \`/api/auth/google/start\` and \`/api/auth/google/callback\`. ${OFF_ANSWER}`,
+  googleOAuth: `Sign-in with Google, the only identity provider of this version. While \`false\`: Google is absent from \`GET /api/auth/providers\` (build the sign-in screen from that list, not from this flag); \`/api/auth/providers/google/start\` and \`/api/auth/providers/google/callback\` answer \`404\` \`HTTP_404\` "Authentication provider is unavailable"; the fixed paths \`/api/auth/google/start\` and \`/api/auth/google/callback\` answer \`404\` "Feature is not available". Nobody can sign in then, but a session opened earlier is still renewed by \`POST /api/auth/refresh\`.`,
   mcpApps: reserved('MCP apps'),
   outputStyles: reserved('output styles'),
   knowledgeScope: reserved('the knowledge scope'),
@@ -22,7 +22,7 @@ const FEATURE_FLAG_FIELDS: Readonly<Record<FeatureFlagName, string>> = {
   runtimeMemory: reserved('the runtime memory'),
   skills: `Personal skills: every \`/api/skills\` route. ${OFF_ANSWER}`,
   teams: `The specialist agent catalog: \`GET /api/agents\`. ${OFF_ANSWER}`,
-  traceLinks: `The link from an execution to its trace: \`GET /api/executions/{id}/trace-link\`, which needs \`agentRuntime\` too. ${OFF_ANSWER}`,
+  traceLinks: `A development diagnostic: the link from an execution to its trace, \`GET /api/executions/{id}/trace-link\`, which needs \`agentRuntime\` too. The API refuses to start with it switched on when \`NODE_ENV=production\`, so it is always \`false\` in production: never build a production feature on it. ${OFF_ANSWER}`,
 };
 
 /** The flag descriptions under a prefix: `data.` here, `data.features.` in the platform status. */
@@ -62,6 +62,7 @@ export const DocGetFeatureFlags = () =>
 - Every flag is always present. \`true\` means the capability is delivered on this version **and** switched on by the deployment; every capability is off by default.
 - The values are computed when the API starts and do not change until it restarts: read them once per session rather than before every call.
 - The routes of a capability that is \`false\` answer \`404\` with the message "Feature is not available". Do not retry them.
+- \`googleOAuth\` does more than that, as its field says: while \`false\` nobody can sign in. To build a sign-in screen, read \`GET /api/auth/providers\` rather than this flag.
 - Operational switches (rate limiting, this documentation) are not capabilities and are not listed.
 - The route takes no parameter and has no error of its own. The same flags are part of \`GET /api/platform/status\`, which needs a token.`,
     ),
@@ -73,7 +74,8 @@ export const DocGetFeatureFlags = () =>
       data: FEATURE_FLAGS_EXAMPLE,
       more: {
         allOff: {
-          summary: 'A deployment with its default configuration: every capability is off',
+          summary:
+            'A deployment with its default configuration: every capability is off, Google sign-in included',
           data: FEATURE_FLAGS_ALL_OFF,
         },
       },

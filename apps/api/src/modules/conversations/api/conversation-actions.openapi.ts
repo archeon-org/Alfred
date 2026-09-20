@@ -4,19 +4,18 @@ import {
   ApiEnvelopeResponse,
   ApiErrors,
   ApiIdParam,
+  ApiIdempotencyKeyHeader,
   ApiJsonBody,
   ApiRoute,
 } from '../../../common/api-docs/api-docs.decorators';
-import { PROBLEM } from '../../../common/api-docs/api-problems';
+import { PROBLEM, idempotencyProblems } from '../../../common/api-docs/api-problems';
 import {
-  ApiIdempotencyKeyHeader,
   CONVERSATION_ID,
   CONVERSATION_ID_TEXT,
   CONVERSATION_NOT_FOUND,
-  IDEMPOTENCY_PROBLEMS,
   NAMED_PROJECT_ID,
-  PRIVATE_ROUTE_PROBLEMS,
   PROJECT_CHANGED_WHILE_WAITING,
+  PROJECT_DELETED_WHILE_WAITING,
   THREAD_BUSY,
   conversationFields,
   pinnedChat,
@@ -41,7 +40,13 @@ export const DocPinConversation = () =>
       describe: conversationFields('data.'),
       data: pinnedChat,
     }),
-    ApiErrors(...PRIVATE_ROUTE_PROBLEMS, CONVERSATION_NOT_FOUND, ...PROJECT_CHANGED_WHILE_WAITING),
+    ApiErrors(
+      ...PROBLEM.session,
+      PROBLEM.accountUnavailable,
+      CONVERSATION_NOT_FOUND,
+      PROJECT_DELETED_WHILE_WAITING,
+      ...PROJECT_CHANGED_WHILE_WAITING,
+    ),
   );
 
 export const DocUnpinConversation = () =>
@@ -58,19 +63,25 @@ export const DocUnpinConversation = () =>
       describe: conversationFields('data.'),
       data: unpinnedChat,
     }),
-    ApiErrors(...PRIVATE_ROUTE_PROBLEMS, CONVERSATION_NOT_FOUND, ...PROJECT_CHANGED_WHILE_WAITING),
+    ApiErrors(
+      ...PROBLEM.session,
+      PROBLEM.accountUnavailable,
+      CONVERSATION_NOT_FOUND,
+      PROJECT_DELETED_WHILE_WAITING,
+      ...PROJECT_CHANGED_WHILE_WAITING,
+    ),
   );
 
 export const DocMoveConversation = () =>
   applyDecorators(
     ApiRoute(
       'Move a standalone chat into a named project',
-      `Attaches a standalone chat (\`projectKind: implicit\`) to a named project of the same account. Only the link changes: identifier, title, pin, messages and every timestamp stay as they are, \`updatedAt\` included. The private project the chat had is deleted in the same transaction.
+      `Attaches a standalone chat (\`projectKind: implicit\`) to a named project of the same account. Only the link changes: identifier, title, pin, messages and every timestamp stay as they are, \`updatedAt\` included. A pinned chat stays pinned. The private project the chat had is deleted in the same transaction.
 
 Before calling, make sure that:
 - the target is a **named, active** project of the account;
 - the chat is **standalone**. A chat that already sits in a named project cannot be moved again, and there is no route to make it standalone again;
-- the private project of the chat holds **nothing to lose**: no context or preferences document with content (\`/api/projects/{projectId}/context-documents\`) and no description. Otherwise the move is refused with \`conversation_source_has_context\` and nothing changes: empty them first, or keep the chat where it is. A pinned chat moves with its pin;
+- the private project of the chat (the chat's current \`projectId\`) holds **nothing to lose**: no \`context\` or \`preferences\` document with content and no description. Otherwise the move is refused with \`conversation_source_has_context\` and nothing changes. To move anyway, empty each document with \`PUT /api/projects/{projectId}/context-documents/{kind}\` (\`content: ""\` and its current \`expectedRevision\`) and clear the description with \`PATCH /api/projects/{id}\` (\`description: ""\`), both on the chat's current \`projectId\`; or keep the chat standalone;
 - no execution of the chat is still advancing.
 
 Moving a chat to the project it is already in answers \`200\` with the chat unchanged, so a retry is safe even without an \`Idempotency-Key\`. Two concurrent moves to different projects: one wins, the other answers \`409\`.`,
@@ -117,7 +128,8 @@ Moving a chat to the project it is already in answers \`200\` with the chat unch
       ),
       PROBLEM.unknownField,
       PROBLEM.invalidJson,
-      ...PRIVATE_ROUTE_PROBLEMS,
+      ...PROBLEM.session,
+      PROBLEM.accountUnavailable,
       {
         ...PROBLEM.notFound('conversation'),
         when: 'The chat does not exist, belongs to another account, or the identifier is not a UUID. The three cases are indistinguishable by design.',
@@ -136,7 +148,7 @@ Moving a chat to the project it is already in answers \`200\` with the chat unch
         status: 409,
         code: 'conversation_source_has_context',
         message: 'The standalone project contains data that must be preserved.',
-        when: 'The private project of the chat holds a context or preferences document with content, a description, or anything else the move would discard (a name, a pin of its own, another chat). Nothing changed: empty the documents and the description, then retry.',
+        when: 'The private project of the chat (the chat\'s current `projectId`) holds a `context` or `preferences` document with content, or a description: the move would discard them. Nothing changed. Empty each document with `PUT /api/projects/{projectId}/context-documents/{kind}` (`content: ""` and its current `expectedRevision`), clear the description with `PATCH /api/projects/{id}` (`description: ""`), then retry; or keep the chat standalone.',
       },
       {
         status: 409,
@@ -149,6 +161,8 @@ Moving a chat to the project it is already in answers \`200\` with the chat unch
         'The target project, or the private project of the chat, is archived or being deleted. Nothing changed; choose an active project.',
       ),
       PROBLEM.bodyTooLarge,
-      ...IDEMPOTENCY_PROBLEMS,
+      ...idempotencyProblems(
+        'read `GET /api/conversations/{id}`: its `projectId` tells whether the move happened. If it did not, retry with a new key, or without one since a move to the project the chat is already in is safe.',
+      ),
     ),
   );

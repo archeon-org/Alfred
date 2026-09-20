@@ -16,13 +16,13 @@ or any real user content: use `example.test` addresses and invented text.
 
 ## Where things live
 
-| What                                                                                                     | Where                                                                                                                         |
-| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Helpers (`ApiRoute`, `ApiEnvelopeResponse`, `ApiJsonResponse`, `ApiJsonBody`, `ApiIdParam`, `ApiErrors`) | `apps/api/src/common/api-docs/api-docs.decorators.ts`                                                                         |
-| Shared error answers (`PROBLEM.unauthenticated`, `PROBLEM.notFound('skill')`, …)                         | `apps/api/src/common/api-docs/api-problems.ts`                                                                                |
-| Page introduction, tag descriptions, shared `ApiError` schema                                            | `apps/api/src/common/api-docs/api-docs.document.ts`                                                                           |
-| A module's route documentation                                                                           | `apps/api/src/modules/<module>/api/<name>.openapi.ts`, one `Doc<Route>()` decorator per route                                 |
-| Worked examples                                                                                          | `modules/context/api/context.openapi.ts` (bodies, conflicts), `modules/skills/api/published-skills.openapi.ts` (lists, files) |
+| What                                                                                                                                                                                                                                                                                                                                                                                                        | Where                                                                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Helpers: `ApiRoute`, `ApiEnvelopeResponse`, `ApiJsonResponse` (both take `headers`), `ApiJsonBody`, `ApiIdParam`, `ApiNoContent`, `ApiIdempotencyKeyHeader`, `ApiErrors`                                                                                                                                                                                                                                    | `apps/api/src/common/api-docs/api-docs.decorators.ts`                                                                                                                                                                                                                                                                           |
+| Shared error answers: `...PROBLEM.session`, `PROBLEM.accountUnavailable`, `notFound('skill')`, `featureDisabled('skills')`, `validation(…)`, `unknownParameter(name)`, `invalidCursor`, `bodyTooLarge` / `bodyTooLargeAt(bytes)`, `rateLimited(throttler, when)`, `masked(status, code, when)`, `projectArchived`, `projectDeleting`, `projectImplicit`, `threadBusy`, and `idempotencyProblems(reconcile)` | `apps/api/src/common/api-docs/api-problems.ts`                                                                                                                                                                                                                                                                                  |
+| Page introduction, tag descriptions, shared `ApiError` schema                                                                                                                                                                                                                                                                                                                                               | `apps/api/src/common/api-docs/api-docs.document.ts`                                                                                                                                                                                                                                                                             |
+| A module's route documentation                                                                                                                                                                                                                                                                                                                                                                              | `apps/api/src/modules/<module>/api/<name>.openapi.ts`, one `Doc<Route>()` decorator per route                                                                                                                                                                                                                                   |
+| Worked examples                                                                                                                                                                                                                                                                                                                                                                                             | `modules/context/api/context.openapi.ts` (bodies, conflicts), `modules/skills/api/published-skills.openapi.ts` (lists, files), `modules/projects/api/projects.openapi.ts` (idempotent creation), `modules/files/api/files-upload.openapi.ts` (multipart), `modules/stream/api/execution-stream.openapi.ts` (server-sent events) |
 
 A controller stays readable: one `@Doc…()` line per route, nothing else. A `.openapi.ts` file
 obeys the 400-line limit like any source file; split it by resource when it grows.
@@ -59,8 +59,12 @@ export const DocSaveProjectContext = () =>
    running API. A success answer passes its payload as `data`; the envelope is added for you.
 4. **Errors are exact**: status, `error.code`, the message the API really sends, `details` when
    there are some, and `when` — the situation, in one sentence, with what the caller should do.
-   Read the service to find them; never guess a code. A private route documents its `401`; a
-   route that takes a body or a query string documents its `400`.
+   Read the service to find them; never guess a code. A private route documents its `401`
+   (`...PROBLEM.session`, plus `PROBLEM.accountUnavailable` when its code path reads the account);
+   a route that takes a body or a query string documents its `400`. Two traps the first review
+   caught: an answer of status 500 or above always carries the message "Internal server error"
+   and no `details`, whatever the service throws (`PROBLEM.masked`), and the rate-limit header is
+   `Retry-After-<throttler>`, never a plain `Retry-After`.
 5. **Query parameters are documented on their DTO** with `@ApiPropertyOptional`, next to the
    validation rules. An optional parameter gives its example in the description
    (`Example: \`incident-runbook\`.`), because Swagger UI pre-fills "Try it out" with machine
@@ -86,6 +90,12 @@ pnpm --filter @alfred/api exec vitest run test/contract/http/openapi-completenes
 The first test of the file reports documentation mistakes found while decorators evaluate: an
 example its contract refuses, a described path that does not exist, a field without description.
 They are recorded, never thrown, so a wrong comment cannot stop the API from starting.
+
+To write the document to a file, for a reviewer or an integrator without a running API:
+
+```bash
+OPENAPI_DUMP="$PWD/openapi.json" pnpm --filter @alfred/api exec vitest run test/contract/http/openapi-completeness.spec.ts
+```
 
 To read the result as a person would, run the API outside production with
 `FEATURE_OPENAPI_ENABLED=true` and open `/api/docs`; the raw document is at `/api/docs-json`.

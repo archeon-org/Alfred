@@ -24,7 +24,7 @@ export const projectFields = (prefix: 'data.' | 'data.items[].') => ({
   [`${prefix}context`]:
     'Read-only copy of the project `context` document, `null` when that document is empty or was never written. It carries no revision: read and write the document itself with `/api/projects/{projectId}/context-documents`.',
   [`${prefix}status`]:
-    '`active`: usable. `archived`: still readable, every write answers `409 project_archived`. `deleting`: being removed, every write answers `409 project_deleting`. Only `active` projects are listed. No route of this API version archives a project.',
+    '`active`: usable. `archived`: still readable and deletable; every change (rename, description, pin, unpin, its documents, a new chat) answers `409 project_archived`. `deleting`: the same, with `409 project_deleting`. Only `active` projects are listed. No route of this API version archives a project or leaves one in `deleting`: `DELETE /api/projects/{id}` removes the project before it answers.',
   [`${prefix}createdAt`]: 'When the project was created (UTC).',
   [`${prefix}updatedAt`]:
     'Last change of the project itself (UTC): a rename, a new description, a pin, an unpin or a write of its `context` document. Lists sort on it, newest first, unless `pinned=true`.',
@@ -91,40 +91,35 @@ export const NEXT_CURSOR =
 
 export const ProjectIdParam = (description: string) => ApiIdParam('id', description, PROJECT_ID);
 
-/** `TenantsService.scopeFor` refuses a token whose account is gone, after the token was accepted. */
-const ACCOUNT_UNAVAILABLE: ApiProblem = {
-  status: 401,
-  code: 'HTTP_401',
-  message: 'Account is unavailable',
-  when: 'The access token is valid but its account is not active any more (disabled, for example) or no longer exists.',
-};
-
+/**
+ * Every projects route passes the global `AccessTokenGuard`, then its service method resolves the
+ * owner scope with `TenantsService.scopeFor`, which refuses a token whose account is gone.
+ */
 export const PROJECT_AUTH_PROBLEMS: readonly ApiProblem[] = [
-  PROBLEM.unauthenticated,
-  PROBLEM.invalidToken,
-  ACCOUNT_UNAVAILABLE,
+  ...PROBLEM.session,
+  PROBLEM.accountUnavailable,
 ];
+
+/** `bootstrap.ts`: `6 * 65_536 + 1024` bytes for every JSON route outside `/api/skills`. */
+export const PROJECT_BODY_TOO_LARGE: ApiProblem = {
+  ...PROBLEM.bodyTooLarge,
+  when: 'The JSON body exceeds 394 240 bytes as sent, JSON escapes included: the room a 65 536-byte `context` needs when every character is escaped. Nothing was read: send a smaller body.',
+};
 
 export const PROJECT_NOT_FOUND = PROBLEM.notFound('project');
 
 export const PROJECT_DELETING: ApiProblem = {
-  status: 409,
-  code: 'project_deleting',
-  message: 'Project is being deleted.',
-  when: 'The project is being deleted. Nothing can be written to it any more.',
+  ...PROBLEM.projectDeleting,
+  when: 'The project has the `deleting` status: it can still be read and deleted, no longer changed. No route of this API version sets that status.',
 };
 
 export const PROJECT_ARCHIVED: ApiProblem = {
-  status: 409,
-  code: 'project_archived',
-  message: 'Project is archived.',
+  ...PROBLEM.projectArchived,
   when: 'The project is archived: it can still be read and deleted, no longer changed.',
 };
 
 /** `action` completes "… cannot be <action>." */
 export const projectImplicit = (action: string): ApiProblem => ({
-  status: 409,
-  code: 'project_implicit',
-  message: 'Convert the chat into a project before using it as one.',
+  ...PROBLEM.projectImplicit,
   when: `The identifier names the private shell of a standalone chat (\`kind: implicit\`), which cannot be ${action}. Create a named project and move the chat into it with \`POST /api/conversations/{id}/move\`.`,
 });

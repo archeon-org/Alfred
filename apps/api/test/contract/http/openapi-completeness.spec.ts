@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { readdirSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import type { Type } from '@nestjs/common';
 import type { OpenAPIObject } from '@nestjs/swagger';
@@ -9,6 +9,7 @@ import { apiDocsProblems } from '@api/common/api-docs/api-docs.registry';
 import { API_DOCS_TAGS } from '@api/common/api-docs/api-docs.document';
 import { undescribedPaths, type OpenApiSchema } from '@api/common/api-docs/contract-schema';
 import { IS_PUBLIC_KEY } from '@api/common/decorators/public.decorator';
+import { UNPREFIXED_ROUTES } from '@api/bootstrap';
 import { buildOpenApiDocument } from '@api/common/openapi';
 
 /**
@@ -160,8 +161,12 @@ describe('OpenAPI documentation completeness', () => {
       .useMocker(() => ({}))
       .compile();
     const app = module.createNestApplication({ logger: false });
-    app.setGlobalPrefix('api');
+    // The same prefix rule as the running API, so documented paths are the real ones.
+    app.setGlobalPrefix('api', { exclude: [...UNPREFIXED_ROUTES] });
     document = buildOpenApiDocument(app);
+    // OPENAPI_DUMP=/path/openapi.json writes the document, to read or hand over without a running API.
+    if (process.env.OPENAPI_DUMP)
+      writeFileSync(process.env.OPENAPI_DUMP, JSON.stringify(document, null, 2));
   });
 
   it('finds every controller of the source tree', () => {

@@ -1,14 +1,23 @@
+import type { WorkStep } from '@alfred/contracts';
 import type { ApiProblem } from '../../../common/api-docs/api-docs.decorators';
+import { PROBLEM } from '../../../common/api-docs/api-problems';
+import {
+  CONVERSATION_ID,
+  conversationFields as sharedConversationFields,
+  standaloneChat,
+} from '../../conversations/api/conversations-shared.openapi';
 
-/** Shared by every route that answers an execution snapshot: field texts, examples, errors. */
-export const CONVERSATION_ID = '7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
+/**
+ * Shared by every route that answers an execution snapshot: field texts, examples, errors. The
+ * conversation is the standalone chat of the `conversations` examples, so a reader who follows
+ * "create a chat, then send a message" finds the same identifiers in both tags.
+ */
 export const EXECUTION_ID = 'b2a7c9d4-3e1f-4a6b-9c8d-5f0e1a2b3c4d';
 export const FILE_ID = '9b0d7c2a-1e34-4f56-8a90-b1c2d3e4f5a6';
-const PROJECT_ID = '3f0c6c0e-9c7b-4f2a-9a58-2d5a1c7e8b41';
 /** Invented: a real cursor is an encrypted token of a few hundred characters. */
 export const EXAMPLE_CURSOR = 'v1.ZXhhbXBsZS1jdXJzb3Itbm90LWEtcmVhbC1vbmU';
 const REASONING_STEP = 'b2e08e7358ed3bd52b2cbd941add7d2aa810c3c69be516fcb3bdc1a51f8a3514';
-export const TOOL_STEP = '97fd2835894cfc22339dc291ea2cf46853e6a8801597cebe4d1d0aa3f6315adf';
+const TOOL_STEP = '97fd2835894cfc22339dc291ea2cf46853e6a8801597cebe4d1d0aa3f6315adf';
 const DELEGATION_STEP = '82c8553d9ac9dc8853ba0b12a25cb018a80fe7b30bd35d6167e121c14f6c47ea';
 
 export const EXECUTION_STATUS_TEXT =
@@ -16,7 +25,7 @@ export const EXECUTION_STATUS_TEXT =
 
 export const attachmentFields = (path: string) => ({
   [path]:
-    'The library files the user message carried, in the order they were attached. Absent when the message had none.',
+    'The library files the user message carried, in the order they were attached. Absent when the message had none, and whenever the `fileUploads` capability is off on this deployment: files already attached are then not listed.',
   [`${path}[].fileId`]: 'Identifier of the file in the personal library (`/api/files`).',
   [`${path}[].name`]:
     'Name of the file when the message was sent; a later rename does not change it.',
@@ -46,20 +55,10 @@ const executionFields = (path: string) => ({
     'When the outcome was established (UTC); `null` until then. Set on every terminal status, and on a `recovery_required` execution whose run is known to have ended.',
 });
 
+/** The shared texts of a conversation, under the object that holds it in a snapshot. */
 const conversationFields = (path: string) => ({
   [path]: 'The conversation as it is now, title included (it is set from the first message).',
-  [`${path}.id`]: 'Identifier of the conversation.',
-  [`${path}.projectId`]: 'The project that owns the conversation.',
-  [`${path}.projectKind`]:
-    '`implicit` for the private shell of a standalone chat, `named` for a real project.',
-  [`${path}.title`]: 'Title shown in the chat list.',
-  [`${path}.titleSource`]:
-    '`none` (default title), `auto` (derived from the first message or generated), `user` (renamed by hand, never overwritten).',
-  [`${path}.pinnedAt`]: 'When the conversation was pinned (UTC); `null` when it is not.',
-  [`${path}.lastActivityAt`]: 'When the last message was sent (UTC); `null` for an empty chat.',
-  [`${path}.createdAt`]: 'Creation time (UTC).',
-  [`${path}.updatedAt`]: 'Last change of the row (UTC).',
-  [`${path}.archivedAt`]: 'When the conversation was archived (UTC); `null` when it is not.',
+  ...sharedConversationFields(`${path}.`),
 });
 
 /** Descriptions of every field of an execution snapshot found at `path`. */
@@ -110,18 +109,22 @@ export const snapshotFields = (path: string) => ({
     'Steps counted but not recorded once the bound was reached. Show "and N more" rather than presenting the log as complete.',
 });
 
+const MESSAGE = 'Rédige un plan de reprise pour la base clients.';
+const SENT_AT = '2026-09-20T16:48:44.120Z';
+
+/** The chat right after its first message: titled from it, its activity set to the send time. */
 const conversation = {
-  id: CONVERSATION_ID,
-  projectId: PROJECT_ID,
-  projectKind: 'named',
-  title: 'Rédige un plan de reprise pour la base clients.',
+  ...standaloneChat,
+  title: MESSAGE,
   titleSource: 'auto',
-  pinnedAt: null,
-  lastActivityAt: '2026-09-20T16:48:44.120Z',
-  createdAt: '2026-09-20T16:47:02.335Z',
-  updatedAt: '2026-09-20T16:48:44.120Z',
-  archivedAt: null,
+  lastActivityAt: SENT_AT,
+  updatedAt: SENT_AT,
 };
+/**
+ * `lastActivityAt` follows the answer, not only the send: the worker moves it with the first
+ * progress commit, then at most every 5 seconds, and once more when the execution finishes.
+ */
+const touched = (at: string) => ({ ...conversation, lastActivityAt: at, updatedAt: at });
 
 const execution = {
   id: EXECUTION_ID,
@@ -129,12 +132,12 @@ const execution = {
   status: 'pending',
   error: null,
   errorCode: null,
-  createdAt: '2026-09-20T16:48:44.120Z',
+  createdAt: SENT_AT,
   startedAt: null,
   finishedAt: null,
 };
 
-const reasoningStep = {
+const reasoningStep: WorkStep = {
   id: REASONING_STEP,
   kind: 'reasoning',
   label: '',
@@ -143,7 +146,7 @@ const reasoningStep = {
   finishedAt: 1789922924950,
   text: 'Le plan doit couvrir le gel des écritures, la restauration et le rejeu des journaux.',
 };
-const toolStep = {
+const toolStep: WorkStep = {
   id: TOOL_STEP,
   kind: 'tool',
   label: 'search_documents',
@@ -151,7 +154,7 @@ const toolStep = {
   startedAt: 1789922924950,
   finishedAt: 1789922925310,
 };
-const delegationStep = {
+const delegationStep: WorkStep = {
   id: DELEGATION_STEP,
   kind: 'delegation',
   label: 'task',
@@ -166,7 +169,7 @@ const delegationStep = {
 export const pendingSnapshot = {
   execution,
   conversation,
-  userMessage: 'Rédige un plan de reprise pour la base clients.',
+  userMessage: MESSAGE,
   assistantText: '',
   activities: [],
   cursor: EXAMPLE_CURSOR,
@@ -177,6 +180,7 @@ export const pendingSnapshot = {
 export const runningSnapshot = {
   ...pendingSnapshot,
   execution: { ...execution, status: 'running', startedAt: '2026-09-20T16:48:44.398Z' },
+  conversation: touched('2026-09-20T16:48:44.931Z'),
   assistantText: 'Voici le plan de reprise en trois étapes',
   activities: [
     { id: TOOL_STEP, label: 'search_documents', status: 'completed' },
@@ -186,7 +190,7 @@ export const runningSnapshot = {
   work: { steps: [reasoningStep, toolStep, delegationStep], omittedSteps: 0 },
 };
 
-const finishedDelegation = {
+const finishedDelegation: WorkStep = {
   ...delegationStep,
   status: 'completed',
   finishedAt: 1789922927480,
@@ -200,6 +204,7 @@ export const completedSnapshot = {
     status: 'completed',
     finishedAt: '2026-09-20T16:48:52.907Z',
   },
+  conversation: touched('2026-09-20T16:48:52.911Z'),
   assistantText:
     'Voici le plan de reprise en trois étapes :\n\n1. Geler les écritures.\n2. Restaurer la dernière sauvegarde vérifiée.\n3. Rejouer les journaux jusqu’à l’incident.',
   activities: [
@@ -216,7 +221,7 @@ export const stoppingSnapshot = {
   execution: { ...runningSnapshot.execution, status: 'stopping' },
 };
 
-const interruptedDelegation = {
+const interruptedDelegation: WorkStep = {
   ...delegationStep,
   status: 'interrupted',
   finishedAt: 1789922927480,
@@ -230,6 +235,7 @@ export const cancelledSnapshot = {
     status: 'cancelled',
     finishedAt: '2026-09-20T16:48:47.480Z',
   },
+  conversation: touched('2026-09-20T16:48:47.484Z'),
   // `activities` keeps the last status the runtime reported; only `work` settles it.
   revision: 15,
   work: { steps: [reasoningStep, toolStep, interruptedDelegation], omittedSteps: 0 },
@@ -245,6 +251,7 @@ export const failedSnapshot = {
     startedAt: '2026-09-20T16:48:44.398Z',
     finishedAt: '2026-09-20T16:48:46.020Z',
   },
+  conversation: touched('2026-09-20T16:48:46.024Z'),
   revision: 2,
 };
 
@@ -262,7 +269,11 @@ export const attachment = {
 /** A message of files only: no text, and the conversation keeps its default title. */
 export const attachmentsOnlySnapshot = {
   ...pendingSnapshot,
-  conversation: { ...conversation, title: 'Nouvelle conversation', titleSource: 'none' },
+  conversation: {
+    ...conversation,
+    title: standaloneChat.title,
+    titleSource: standaloneChat.titleSource,
+  },
   userMessage: '',
   attachments: [attachment],
 };
@@ -275,20 +286,35 @@ export const SESSION_REVOKED: ApiProblem = {
   when: 'The access token is still valid but its session was signed out or revoked, or the account was disabled. Execution routes check this on every call. Sign in again; refreshing will not help.',
 };
 
-export const EXECUTION_NOT_FOUND: ApiProblem = {
-  status: 404,
-  code: 'execution_not_found',
-  message: 'Execution not found.',
-  when: 'The execution does not exist, belongs to another account, or the identifier is not a UUID. The three cases are indistinguishable by design.',
+/**
+ * Every route of this group resolves the owner scope (`TenantsService.scopeFor`) after the session
+ * check, which already refuses an account that is not active: only a change in between gets here.
+ */
+export const ACCOUNT_GONE_MEANWHILE: ApiProblem = {
+  ...PROBLEM.accountUnavailable,
+  when: 'The account was disabled or deleted between the session check of this call and the read of its data. A later call answers "Stream authentication required". Retrying cannot succeed.',
 };
+
+/** The `401` answers of every JSON route of the `executions` tag, said once. */
+export const EXECUTION_PRIVATE_PROBLEMS: readonly ApiProblem[] = [
+  ...PROBLEM.session,
+  SESSION_REVOKED,
+  ACCOUNT_GONE_MEANWHILE,
+];
+
+export const EXECUTION_NOT_FOUND: ApiProblem = PROBLEM.notFound('execution');
 
 /** Answered for an execution that exists, when the conversation behind it is out of reach. */
 export const EXECUTION_CONVERSATION_GONE: ApiProblem = {
-  status: 404,
-  code: 'conversation_not_found',
-  message: 'Conversation not found.',
+  ...PROBLEM.notFound('conversation'),
   when: 'The execution is yours but its conversation is no longer reachable: its project was archived or is being deleted.',
 };
+
+/** The two refusals of a project that stopped accepting writes, worded for the route. */
+export const projectNotWritable = (when: string): readonly ApiProblem[] => [
+  { ...PROBLEM.projectArchived, when },
+  { ...PROBLEM.projectDeleting, when },
+];
 
 export const BINDING_CHANGED: ApiProblem = {
   status: 409,
