@@ -27,12 +27,18 @@ Work only in `apps/api` plus directly related contracts and documentation.
 - Structure substantial feature modules as `api`, `application`, `domain` and `infrastructure`.
   Keep controllers/DTOs in `api`, orchestration in `application`, pure rules and ports in `domain`,
   and TypeORM/JWT/remote clients in `infrastructure`; the module file is the composition root.
+- Document every HTTP route in OpenAPI in the same change that adds or alters it, following
+  `docs/development/api-documentation.md`: a `Doc<Route>()` decorator in the module's
+  `api/<name>.openapi.ts`, schemas from `@alfred/contracts`, every field described, examples checked
+  against their contract, exact statuses and `error.code`s read from the service, guards and pipes.
+  `test/contract/http/openapi-completeness.spec.ts` must pass and must never be weakened.
 - Keep every test outside `src`, under `test/unit`, `test/integration`, `test/contract`,
   `test/architecture`, `test/e2e` or `test/support`. Unit paths mirror the source responsibility
   they exercise; E2E uses its dedicated runner configuration.
 
 ## Delivery
 
-Start with a behavior or regression test. Run the API lint, typecheck, tests, coverage and build. For
+Start with a behavior or regression test. Update the OpenAPI documentation of every route you
+touched before calling the change done. Run the API lint, typecheck, tests, coverage and build. For
 schema changes, validate the migration against a disposable PostgreSQL database and update the
 relevant ADR and memory-bank records.

@@ -12,7 +12,7 @@ import {
 const IMPLEMENTED_PUBLIC_FEATURES = Object.freeze({
   agentRuntime: true,
   agUiStreaming: false,
-  fileUploads: false,
+  fileUploads: true,
   generativeUi: false,
   googleOAuth: true,
   mcpApps: false,
@@ -21,7 +21,8 @@ const IMPLEMENTED_PUBLIC_FEATURES = Object.freeze({
   conversationFeedback: false,
   runtimeMemory: false,
   skills: true,
-  teams: false,
+  teams: true,
+  traceLinks: true,
 } as const satisfies Readonly<Record<FeatureFlagName, boolean>>);
 
 @Injectable()

@@ -53,6 +53,27 @@ structure, add an ADR that cites the `ALF-DEC` identifiers it implements.
 - Prefer small, feature-owned modules.
 - Run `pnpm verify` for TypeScript changes and `pnpm agent:test` / `pnpm agent:lint` / `pnpm agent:typecheck` for LangGraph changes.
 
+## API Documentation (OpenAPI / Swagger)
+
+The OpenAPI document at `/api/docs` is part of the API contract: other teams integrate from it
+without reading the source. Whenever the assistant adds, changes or removes an HTTP route of
+`apps/api`, it MUST update that route's OpenAPI documentation in the same change, never later and
+never as a follow-up. This covers every change a caller can observe: path, method, parameter,
+header, body field, answer field, status, `error.code`, message, limit, default, ordering,
+idempotency or capability flag.
+
+- Follow `docs/development/api-documentation.md`: one `Doc<Route>()` decorator per route in the
+  module's `api/<name>.openapi.ts`, schemas taken from the `@alfred/contracts` zod contracts, every
+  field described, real examples checked against their contract, exact error answers, query
+  parameters documented on their DTO, and a padlock only on private routes.
+- A route is not done until `apps/api/test/contract/http/openapi-completeness.spec.ts` passes. Do
+  not weaken that test, skip it or exempt a route to get a green run.
+- Read the service, guards and pipes to document what the code does; never guess a status or an
+  error code. When behaviour changes, update the description and the examples, not only the schema.
+- Never put a secret, a real token, a cookie value, a real e-mail address or real user content in
+  the documentation, even though it is not served in production.
+- A reviewer treats a route whose documentation is missing, stale or inaccurate as a defect.
+
 ## Agentic Workflow
 
 - Use project-local skills from `.agents/skills/` when the task involves architecture, quality gates, testing or agent orchestration, and `alfred-decision-register` before planning any new capability.

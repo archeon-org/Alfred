@@ -52,6 +52,7 @@ describe('private-by-default application policy', () => {
       AUTH_OAUTH_START_IP_RATE_LIMIT_PER_MINUTE: 300,
       AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE: 1200,
       AUTH_USER_RATE_LIMIT_PER_MINUTE: 120,
+      FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE: 20,
     };
     const config = {
       getOrThrow: <T = unknown>(key: string): T => values[key] as T,
@@ -67,6 +68,7 @@ describe('private-by-default application policy', () => {
       { limit: 300, name: 'oauth-start-ip', ttl: 60_000 },
       { limit: 600, name: 'oauth-callback-ip', ttl: 60_000 },
       { limit: 1200, name: 'refresh-ip', ttl: 60_000 },
+      { limit: 20, name: 'file-upload-user', ttl: 60_000 },
     ]);
   });
 

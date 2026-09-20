@@ -1,3 +1,4 @@
+import { DurableRuntimeExecutions1789400000000 } from './1789400000000-durable-runtime-executions';
 import { CreateRuntimeExecutions1789310000000 } from './1789310000000-create-runtime-executions';
 import { WorkspaceMemberships1789290000000 } from './1789290000000-workspace-memberships';
 import { CreateWorkspaces1789280000000 } from './1789280000000-create-workspaces';
@@ -16,6 +17,7 @@ import { CreateTenants1789000000000 } from './1789000000000-create-tenants';
 import { CreateProjects1789000100000 } from './1789000100000-create-projects';
 import { CreateConversations1789000200000 } from './1789000200000-create-conversations';
 import { AddProjectPin1789000300000 } from './1789000300000-add-project-pin';
+import { CreateArtifacts1789500000000 } from './1789500000000-create-artifacts';
 
 export const databaseMigrations = Object.freeze([
   CreateIdentityFoundation1788464265141,
@@ -36,4 +38,6 @@ export const databaseMigrations = Object.freeze([
   CreateWorkspaces1789280000000,
   WorkspaceMemberships1789290000000,
   CreateRuntimeExecutions1789310000000,
+  DurableRuntimeExecutions1789400000000,
+  CreateArtifacts1789500000000,
 ] as const);

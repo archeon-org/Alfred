@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import type { LiveTurn } from '@/contexts/chat-session/chat-session-context';
+import { isBusyExecution } from '@/contexts/chat-session/execution-observer';
 import { useChatSession } from '@/hooks/conversations/use-chat-session';
 import { useWorkspaceAccount } from '@/hooks/workspace/use-workspace-account';
 import {
@@ -9,7 +10,12 @@ import {
   subscribeRuntimeEventDebug,
 } from '@/lib/workspace/runtime-event-debug';
 import { messageKeys } from '@/hooks/workspace/workspace-keys';
-import { listMessages, type Message } from '@/services/executions/executions.service';
+import type { AttachmentView } from '@/lib/files/composer-attachments';
+import {
+  getActiveExecution,
+  listMessages,
+  type Message,
+} from '@/services/executions/executions.service';
 
 export type {
   LiveTurn,
@@ -18,14 +24,29 @@ export type {
 } from '@/contexts/chat-session/chat-session-context';
 
 /** Stored transcript of one chat plus its live turn from the workspace-wide chat session. */
-export function useConversationChat(conversationId: string) {
+export function useConversationChat(conversationId: string, observeEnabled = true) {
   const { client, userId } = useWorkspaceAccount();
   const session = useChatSession();
   const debug = useSyncExternalStore(subscribeRuntimeEventDebug, () =>
     getRuntimeEventDebugSnapshot(userId, conversationId),
   );
+  const active = useQuery({
+    queryFn: ({ signal }) => getActiveExecution(client, conversationId, signal),
+    queryKey: ['active-execution', userId, conversationId],
+    enabled: observeEnabled,
+    staleTime: 0,
+    retry: false,
+  });
+  const discoverySettled = active.isSuccess && !active.isFetching;
+  const isDiscovering = observeEnabled && (active.isPending || active.isFetching);
+  const { recover, reconnect } = session;
+  useEffect(() => {
+    // A cached active snapshot can outlive an execution that finished in the background. Wait
+    // for the current discovery request before attaching; existing observers continue meanwhile.
+    if (discoverySettled && active.data) recover(active.data);
+  }, [active.data, discoverySettled, recover]);
   const history = useQuery({
-    queryFn: () => listMessages(client, conversationId),
+    queryFn: ({ signal }) => listMessages(client, conversationId, signal),
     queryKey: messageKeys.list(userId, conversationId),
     retry: false,
   });
@@ -48,31 +69,35 @@ export function useConversationChat(conversationId: string) {
     [history.data, sessions],
   );
   const send = useCallback(
-    (text: string) => session.send(conversationId, text),
-    [conversationId, session],
+    (text: string, attachments: readonly AttachmentView[] = []) =>
+      discoverySettled && session.send(conversationId, text, attachments),
+    [discoverySettled, conversationId, session],
   );
 
   return {
     debug,
-    /** Another chat is still being answered: a send would be refused. */
-    busyElsewhere:
-      session.live !== null &&
-      session.live.conversationId !== conversationId &&
-      session.live.turn.status === 'streaming',
-    error: history.isError ? history.error : null,
+    error: active.isError ? active.error : history.isError ? history.error : null,
+    isDiscovering,
+    discoveryFailed: active.isError,
     failure: session.failures.get(conversationId) ?? null,
-    isStreaming: live?.status === 'streaming',
+    // A parked answer stays visible with its status text but no longer holds the composer.
+    isStreaming: live?.status === 'streaming' && isBusyExecution(live.execution),
     live,
     sessions,
     messages,
-    reload: () => void history.refetch(),
+    reload: () => {
+      void history.refetch();
+      void active.refetch();
+      reconnect(conversationId);
+    },
     send,
-    status: history.isPending
-      ? ('loading' as const)
-      : history.isError
-        ? ('error' as const)
-        : ('ready' as const),
-    stop: session.stop,
+    status:
+      history.isPending || isDiscovering
+        ? ('loading' as const)
+        : history.isError || active.isError
+          ? ('error' as const)
+          : ('ready' as const),
+    stop: () => session.stop(conversationId),
   };
 }
 

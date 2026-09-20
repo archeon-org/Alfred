@@ -17,6 +17,8 @@ import {
   useConversationsQuery,
 } from '@/hooks/conversations/use-conversations-query';
 import { useFeatureFlagsQuery } from '@/hooks/feature-flags/use-feature-flags-query';
+import { freshComposerScope, useComposerAttachments } from '@/hooks/files/use-composer-attachments';
+import { useFileUpload } from '@/hooks/files/use-file-upload';
 import { useProjectActions } from '@/hooks/projects/use-project-actions';
 import { useCreateProject } from '@/hooks/projects/use-project-mutations';
 import {
@@ -24,9 +26,12 @@ import {
   useProjectQuery,
   useProjectsQuery,
 } from '@/hooks/projects/use-projects-query';
+import { useContextPanel } from '@/hooks/workspace/use-context-panel';
 import { useWorkspacePreferences } from '@/hooks/workspace/use-workspace-preferences';
 import type { WorkspaceOutletContext } from '@/hooks/workspace/use-workspace-outlet';
+import { useTabletWorkspace } from '@/hooks/workspace/use-tablet-workspace';
 import { useWorkspaceShell } from '@/hooks/workspace/use-workspace-shell';
+import { useWorkspaceShortcuts } from '@/hooks/workspace/use-workspace-shortcuts';
 import { useWorkspaceTools } from '@/hooks/workspace/use-workspace-tools';
 import { describeApiError } from '@/lib/workspace/api-error-message';
 import type { Project, WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
@@ -56,6 +61,13 @@ export function WorkspaceScreen() {
   const preferences = useWorkspacePreferences();
   const shell = useWorkspaceShell(preferences.contextOpenByDefault);
   const tools = useWorkspaceTools();
+  // Mounted with the frame: an upload or a chip survives a closed panel and a change of screen.
+  const uploads = useFileUpload();
+  const attachments = useComposerAttachments(uploads);
+  // Docked from the workspace breakpoint, an overlay sheet (closed until asked for) below it.
+  const context = useContextPanel({ isOpen: shell.isContextOpen, toggle: shell.toggleContext });
+  // Below md the narrow bar owns the conversations list; from md the navigation column folds itself.
+  const isTablet = useTabletWorkspace();
   const isSettings = useMatch('/app/settings') !== null;
   const navigate = useNavigate();
   const location = useLocation();
@@ -63,7 +75,10 @@ export function WorkspaceScreen() {
   const skillEditorMatch = useMatch('/app/skills/:skillId/edit');
   const newSkillMatch = useMatch('/app/skills/new');
   const isSkillEditor = skillEditorMatch !== null || newSkillMatch !== null;
+  // Below the workspace breakpoint these screens grow with their content; the stage scrolls them.
+  const conversationGrows = isSkillEditor || projectMatch !== null;
   const newConversationMatch = useMatch('/app/conversations/new');
+  const isHome = useMatch('/app') !== null;
   const conversationMatch = useMatch('/app/conversations/:conversationId');
   const pinnedQuery = usePinnedProjectsQuery();
   const projectsQuery = useProjectsQuery();
@@ -72,8 +87,11 @@ export function WorkspaceScreen() {
   // Warms the capability manifest so a chat opened from the composer knows the bridge state at once.
   useFeatureFlagsQuery();
   const chatSession = useChatSession();
-  const streamingConversationId =
-    chatSession.live?.turn.status === 'streaming' ? chatSession.live.conversationId : undefined;
+  const streamingConversationIds = new Set(
+    chatSession.sessions
+      .filter((session) => session.turn.status === 'streaming')
+      .map((session) => session.conversationId),
+  );
   const conversationRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<PanelImperativeHandle>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -175,12 +193,28 @@ export function WorkspaceScreen() {
     shell.setIsSidebarOpen(!shell.isSidebarOpen);
   }
 
+  // The same actions as the panel controls and the sidebar button, reachable from the keyboard.
+  useWorkspaceShortcuts({
+    newConversation: () => create(selectedProjectId === undefined ? 'sandbox' : 'conversation'),
+    toggleNavigation: isTablet ? toggleSidebar : shell.toggleNavigation,
+    ...(isSkillEditor || isSettings ? {} : { toggleContext: context.toggle }),
+    // From the settings the shortcut moves to its section without stacking history entries.
+    showShortcuts: () => void navigate('/app/settings?section=shortcuts', { replace: isSettings }),
+  });
+
   const outlet: WorkspaceOutletContext = {
     preferences,
     conversationRef,
     isLoading: shell.isPreviewLoading,
     selectedProject,
+    files: { attachments, uploads },
   };
+  // The composer on screen, if any: the « Fichiers » tab attaches library files to it.
+  const composerScope =
+    selectedConversationId ??
+    (isHome || newConversationMatch !== null
+      ? freshComposerScope(newConversationProjectId)
+      : undefined);
   const labels = projectCreationLabels;
 
   if (isSettings) return <Outlet context={outlet} />;
@@ -199,10 +233,16 @@ export function WorkspaceScreen() {
         Aller au contenu principal
       </a>
       <WorkspaceLayout
+        contextAvailable={!isSkillEditor}
+        conversationGrows={conversationGrows}
         isSidebarOpen={shell.isSidebarOpen}
-        isContextOpen={shell.isContextOpen && !isSkillEditor}
+        isNavigationOpen={shell.isNavigationOpen}
+        isContextOpen={context.isOpen && !isSkillEditor}
         sidebarRef={sidebarRef}
         onSidebarOpenChange={shell.setIsSidebarOpen}
+        onOpenSidebar={toggleSidebar}
+        onOpenContext={context.toggle}
+        onCloseContext={context.close}
         sidebar={
           <WorkspaceSidebar
             conversationActions={{
@@ -228,11 +268,14 @@ export function WorkspaceScreen() {
             }
             selectedProjectId={selectedProjectId}
             selectedConversationId={selectedConversationId}
-            streamingConversationId={streamingConversationId}
+            streamingConversationIds={streamingConversationIds}
             isProjectHome={projectMatch !== null}
             search={shell.search}
             isLoading={isLoading}
             isNavigationOpen={shell.isNavigationOpen}
+            onCollapse={toggleSidebar}
+            isPreviewLoading={shell.isPreviewLoading}
+            onTogglePreviewLoading={shell.toggleLoading}
             loadError={loadError}
             notice={conversationActions.pinError ?? projectActions.pinError}
             onRetry={() => navigationQueries.forEach(({ query }) => query.reload())}
@@ -258,18 +301,27 @@ export function WorkspaceScreen() {
                 selectedProjectId === undefined ? undefined : projectHomePath(selectedProjectId),
               name: scopeName,
             }}
-            isLoading={shell.isPreviewLoading}
-            isContextOpen={shell.isContextOpen && !isSkillEditor}
-            isSidebarOpen={shell.isSidebarOpen}
+            isContextOpen={context.isOpen && !isSkillEditor}
             isNavigationOpen={shell.isNavigationOpen}
-            onToggleLoading={shell.toggleLoading}
-            onToggleContext={shell.toggleContext}
+            onToggleContext={context.toggle}
             onToggleNavigation={shell.toggleNavigation}
-            onToggleSidebar={toggleSidebar}
           />
         }
         conversation={<Outlet context={outlet} />}
-        context={<ContextPanel isLoading={isLoading} tools={tools} />}
+        context={
+          <ContextPanel
+            isLoading={isLoading}
+            tools={tools}
+            onClose={context.close}
+            files={{
+              attachments: composerScope === undefined ? null : attachments.forScope(composerScope),
+              conversationId: selectedConversationId,
+              onDeleted: attachments.forget,
+              onUpdated: attachments.settle,
+              uploads,
+            }}
+          />
+        }
       />
       <TextFieldDialog
         description="Regroupez les conversations autour d’un même objectif."

@@ -102,32 +102,95 @@ describe('Workspace organization', () => {
   it('previews loading placeholders and hides or restores the context panel', async () => {
     const user = userEvent.setup();
     renderWorkspaceAt('/app');
-    const toggle = await screen.findByRole('button', { name: 'Aperçu du chargement' });
-
+    // The preview lives in the account menu, which closes on every choice.
+    const account = await screen.findByRole('button', { name: /menu du compte/iu });
+    await user.click(account);
+    const toggle = await screen.findByRole('menuitemcheckbox', { name: 'Aperçu du chargement' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
     await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('status', { name: 'Chargement de l’espace de travail' })).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Message' })).not.toBeInTheDocument();
-    await user.click(toggle);
+    await user.click(account);
+    const checked = await screen.findByRole('menuitemcheckbox', { name: 'Aperçu du chargement' });
+    expect(checked).toHaveAttribute('aria-checked', 'true');
+    await user.click(checked);
     expect(screen.getByRole('textbox', { name: 'Message' })).toBeVisible();
 
-    expect(
-      screen.getByRole('complementary', { name: 'Contexte de la conversation' }),
-    ).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Masquer le contexte' }));
+    // A narrow screen (jsdom) lays the context over the chat as a sheet, closed until asked for.
     expect(
       screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Afficher le contexte' }));
+    expect(screen.getByRole('dialog', { name: 'Contexte de la conversation' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Masquer le contexte' }));
+    expect(
+      screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Afficher le contexte' })).toHaveFocus();
+  });
+
+  it('answers the keyboard shortcuts for the panels, a new conversation and the shortcut settings', async () => {
+    const user = userEvent.setup();
+    const { router } = renderWorkspaceAt(
+      `/app/projects/${PROJECT_ID}`,
+      createWorkspaceApi({ projects: [project()] }),
+    );
+    await screen.findByRole('heading', { level: 1, name: 'Refonte du portail' });
+    // jsdom is a narrow screen: the navigation shortcut drives the conversations drawer.
+    const drawer = () => screen.getByRole('button', { name: /les conversations$/u });
+    expect(drawer()).toHaveAttribute('aria-expanded', 'false');
+    await user.keyboard('{Control>}{Shift>},{/Shift}{/Control}');
+    expect(drawer()).toHaveAttribute('aria-expanded', 'true');
+    await user.keyboard('{Control>}{Shift>},{/Shift}{/Control}');
+    expect(drawer()).toHaveAttribute('aria-expanded', 'false');
+
+    expect(
+      screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).not.toBeInTheDocument();
+    await user.keyboard('{Control>}{Shift>}.{/Shift}{/Control}');
     expect(
       screen.getByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).toBeVisible();
+    await user.keyboard('{Control>}{Shift>}.{/Shift}{/Control}');
+    expect(
+      screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
+    ).not.toBeInTheDocument();
+
+    // The shortcut list lives in the settings, where each key can be changed.
+    await user.keyboard('{Control>}/{/Control}');
+    await waitFor(() =>
+      expect(router.state.location.pathname + router.state.location.search).toBe(
+        '/app/settings?section=shortcuts',
+      ),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Raccourcis clavier' }),
+    ).toBeVisible();
+    expect(screen.getByText('Ctrl+Maj+Espace')).toBeVisible();
+    expect(screen.getAllByRole('button', { name: 'Modifier' })).toHaveLength(4);
+    await router.navigate(`/app/projects/${PROJECT_ID}`);
+    await screen.findByRole('heading', { level: 1, name: 'Refonte du portail' });
+
+    // From a project, the shortcut opens a new chat scoped to that project.
+    await user.keyboard('{Control>}{Shift>} {/Shift}{/Control}');
+    await waitFor(() =>
+      expect(router.state.location.pathname + router.state.location.search).toBe(
+        `/app/conversations/new?projectId=${PROJECT_ID}`,
+      ),
+    );
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Nouveau chat dans Refonte du portail',
+      }),
     ).toBeVisible();
   });
 
   it('applies display preferences and uses a dedicated settings frame', async () => {
     const user = userEvent.setup();
     renderWorkspaceAt('/app');
-    await user.click(await screen.findByRole('link', { name: 'Paramètres' }));
+    await user.click(await screen.findByRole('button', { name: /menu du compte/iu }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Paramètres' }));
     expect(
       screen.queryByRole('complementary', { name: 'Contexte de la conversation' }),
     ).not.toBeInTheDocument();

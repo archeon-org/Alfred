@@ -27,7 +27,7 @@ describe('MessageComposer', () => {
     expect(onSend).not.toHaveBeenCalled();
     await user.keyboard('{Enter}');
 
-    expect(onSend).toHaveBeenCalledWith('Ligne un\nligne deux');
+    expect(onSend).toHaveBeenCalledWith('Ligne un\nligne deux', []);
     expect(field).toHaveValue('');
   });
 
@@ -36,7 +36,7 @@ describe('MessageComposer', () => {
     const onSend = vi.fn(() => false);
     render(<MessageComposer onSend={onSend} />);
     await user.type(screen.getByLabelText('Message'), 'Brouillon{Enter}');
-    expect(onSend).toHaveBeenCalledWith('Brouillon');
+    expect(onSend).toHaveBeenCalledWith('Brouillon', []);
     expect(screen.getByLabelText('Message')).toHaveValue('Brouillon');
   });
 
@@ -110,12 +110,10 @@ describe('ConversationTranscript', () => {
             conversationId: CONVERSATION_ID,
             createdAt: '2026-09-11T09:00:01.000Z',
             turn: {
+              activities: [],
+              work: { steps: [], omittedSteps: 0 },
               assistantText: '**Bonjour** !',
               error: null,
-              events: [
-                { data: { run_id: 'r' }, event: 'metadata', id: 0 },
-                { data: 'x'.repeat(300), event: 'custom', id: 1 },
-              ],
               execution: null,
               status: 'streaming',
               userMessage: 'Encore',
@@ -140,9 +138,10 @@ describe('ConversationTranscript', () => {
             conversationId: CONVERSATION_ID,
             createdAt: '2026-09-11T09:00:01.000Z',
             turn: {
+              activities: [],
+              work: { steps: [], omittedSteps: 0 },
               assistantText: '',
               error: null,
-              events: [],
               execution: null,
               status: 'streaming',
               userMessage: 'Q',
@@ -161,9 +160,10 @@ describe('ConversationTranscript', () => {
             conversationId: CONVERSATION_ID,
             createdAt: '2026-09-11T09:00:01.000Z',
             turn: {
+              activities: [],
+              work: { steps: [], omittedSteps: 0 },
               assistantText: '',
               error: 'boom',
-              events: [],
               execution: null,
               status: 'error',
               userMessage: 'Q',

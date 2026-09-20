@@ -40,9 +40,10 @@ the browser fails closed on failed manifest revalidation. Disabling a provider r
 login option, not existing session security. If all providers are disabled, login is unavailable;
 there is no implicit password/development bypass.
 
-For file storage, implement the persistent local adapter before adding a remote adapter. Define
-read compatibility/migration before switching backends; do not silently move failed writes to a
-second store. No upload or S3 implementation exists yet.
+File storage has one port and two adapters ([ADR 0027](../adr/0027-uploaded-file-content-store.md)):
+an S3-compatible bucket, and a local directory that is a development profile refused in
+production. Define read compatibility/migration before switching backends; do not silently move
+failed writes to a second store. Any new adapter must pass `describeContentStoreContract`.
 
 ## Promouvoir un flag
 
@@ -110,7 +111,9 @@ Split work into independently verifiable changes:
 
 1. Contract, domain rules and focused failing tests.
 2. Application use case and one adapter, with integration tests.
-3. API boundary, validation, authorization and both flag states.
+3. API boundary, validation, authorization, both flag states and the OpenAPI documentation of every
+   route added or changed ([API documentation](api-documentation.md)); a route without it is not
+   delivered.
 4. Browser service/hook/screen, with error and disabled-state behavior.
 5. Deployment configuration, operational guidance and verification evidence.
 

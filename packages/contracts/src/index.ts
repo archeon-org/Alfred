@@ -41,21 +41,52 @@ export {
   type CreateConversationInput,
 } from './conversations';
 export {
-  CONVERSATION_SSE_EVENT,
   EXECUTION_MESSAGE_MAX_LENGTH,
-  EXECUTION_SSE_EVENT,
+  EXECUTION_STREAM_ERROR_EVENT,
+  EXECUTION_STREAM_UNAVAILABLE_CODE,
+  EXECUTION_TOOL_RESULT_CONTENTS,
+  EXECUTION_JSON_PROFILE,
+  EXECUTION_OUTPUT_MAX_LENGTH,
+  EXECUTION_REASONING_MAX_LENGTH,
+  EXECUTION_WORK_LABEL_MAX_LENGTH,
+  EXECUTION_WORK_MAX_STEPS,
+  EXECUTION_WORK_OMITTED_EVENT,
+  EXECUTION_WORK_TEXT_MAX_LENGTH,
+  alfredRunStateSchema,
+  executionActivitySchema,
+  executionWorkSchema,
+  executionWorkSummarySchema,
+  workStepKindSchema,
+  workStepSchema,
+  workStepStatusSchema,
+  executionSnapshotSchema,
+  executionSnapshotEnvelopeSchema,
+  activeExecutionEnvelopeSchema,
   executionSchema,
   executionStatusSchema,
   messageListEnvelopeSchema,
   messageRoleSchema,
   messageSchema,
   startExecutionInputSchema,
+  type AlfredRunState,
   type Execution,
   type ExecutionStatus,
   type ExecutionStreamEvent,
+  type ExecutionActivity,
+  type ExecutionSnapshot,
+  type ExecutionWork,
+  type ExecutionWorkSummary,
+  type WorkStep,
+  type WorkStepKind,
+  type WorkStepStatus,
   type Message,
   type MessageRole,
   type StartExecutionInput,
+  EXECUTION_TRACE_LINK_MAX_LENGTH,
+  executionTraceLinkEnvelopeSchema,
+  executionTraceLinkSchema,
+  isCredentialFreeUrl,
+  type ExecutionTraceLink,
 } from './executions';
 export { contentText, createAssistantReply, type AssistantReply } from './assistant-reply';
 
@@ -106,6 +137,7 @@ export const FEATURE_FLAG_NAMES = Object.freeze([
   'runtimeMemory',
   'skills',
   'teams',
+  'traceLinks',
 ] as const);
 export type FeatureFlagName = (typeof FEATURE_FLAG_NAMES)[number];
 
@@ -123,6 +155,8 @@ export const featureFlagsSchema = z.readonly(
     runtimeMemory: z.boolean(),
     skills: z.boolean(),
     teams: z.boolean(),
+    // Added 2026-09-16: a manifest from an older API omits it and reads as disabled.
+    traceLinks: z._default(z.boolean(), false),
   }),
 );
 export type FeatureFlags = z.infer<typeof featureFlagsSchema>;
@@ -144,6 +178,9 @@ export {
 } from './context';
 
 export * from './skills';
+
+export * from './agents';
+export * from './files';
 
 export {
   currentWorkspacesSchema,

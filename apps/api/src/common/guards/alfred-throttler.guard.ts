@@ -91,3 +91,24 @@ export class OauthCallbackThrottlerGuard extends RouteIpThrottlerGuard {
 export class RefreshThrottlerGuard extends RouteIpThrottlerGuard {
   protected readonly throttlerName = 'refresh-ip';
 }
+
+/**
+ * Uploads are the expensive requests of the API: each one is buffered, hashed, inspected and
+ * later parsed. They get their own per-user budget, well below the general one.
+ */
+@Injectable()
+export class FileUploadThrottlerGuard extends NamedThrottlerGuard {
+  protected readonly throttlerName = 'file-upload-user';
+
+  protected override getTracker(request: Record<string, unknown>): Promise<string> {
+    return Promise.resolve(authenticatedThrottleTracker(request));
+  }
+
+  protected override generateKey(
+    _context: ExecutionContext,
+    tracker: string,
+    throttlerName: string,
+  ): string {
+    return globalThrottleKey(throttlerName, tracker);
+  }
+}

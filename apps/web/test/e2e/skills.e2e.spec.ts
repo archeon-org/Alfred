@@ -134,17 +134,20 @@ for (const width of [1400, 390]) {
     const header = page.locator('[data-slot="skill-editor-header"]');
     const initial = await header.boundingBox();
     expect(initial!.height).toBeLessThan(width === 1400 ? 155 : 255);
-    if (width === 1400) {
-      const body = page.locator('[data-slot="skill-editor-body"]');
-      await body.evaluate((element) => {
-        element.scrollTop = 600;
-      });
-      expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-      expect((await header.boundingBox())!.y).toBeCloseTo(initial!.y, 0);
-    } else {
-      await page.evaluate(() => window.scrollTo(0, 600));
-      await expect.poll(async () => (await header.boundingBox())!.y).toBeCloseTo(0, 0);
-    }
+    // The document never scrolls: the editor body scrolls from the workspace breakpoint, the
+    // workspace stage around the editor below it. Either way the header stays where it was (below
+    // it, pinned to the stage's edge, over the card's 1 px border).
+    const scroller =
+      width === 1400
+        ? page.locator('[data-slot="skill-editor-body"]')
+        : page.locator('#main-content').locator('xpath=..');
+    await scroller.evaluate((element) => {
+      element.scrollTop = 600;
+    });
+    expect(await scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    await expect
+      .poll(async () => Math.abs((await header.boundingBox())!.y - initial!.y))
+      .toBeLessThanOrEqual(1);
     await expect(page.getByRole('button', { name: 'Enregistrer le brouillon' })).toBeInViewport();
     await expect(page.getByRole('button', { name: 'Historique des versions' })).toBeInViewport();
     expect(

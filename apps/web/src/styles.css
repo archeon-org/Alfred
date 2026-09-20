@@ -52,7 +52,9 @@
   --font-editorial: Georgia, 'Times New Roman', serif;
   --shadow-soft: 0 20px 55px rgb(28 51 45 / 0.08);
   --shadow-panel: 0 2px 5px rgb(36 51 37 / 0.02), 0 12px 35px -22px rgb(36 51 37 / 0.25);
-  --shadow-composer: 0 4px 14px rgb(51 67 38 / 0.04), 0 0 0 4px var(--muted);
+  /* Falls below the composer only (negative spread): nothing spreads over the transcript above.
+     Tailwind copies a shadow token into its utility, so the theme changes only its color. */
+  --shadow-composer: 0 8px 20px -10px var(--composer-shadow);
   --shadow-emblem: 0 9px 14px -6px rgb(30 68 44 / 0.33), inset 0 1px 1px rgb(255 255 255 / 0.25);
   --animate-workspace-appear: workspace-appear 300ms ease-out both;
 
@@ -71,6 +73,7 @@
 @layer base {
   :root {
     color-scheme: light;
+    --composer-shadow: rgb(51 67 38 / 0.14);
     --background: #fcfcf9;
     --foreground: #253932;
     --card: #fcfcf9;
@@ -116,7 +119,7 @@
     color-scheme: dark;
     --shadow-soft: 0 20px 55px rgb(0 0 0 / 0.2);
     --shadow-panel: 0 2px 12px rgb(0 0 0 / 0.16);
-    --shadow-composer: 0 0 0 1px var(--border);
+    --composer-shadow: rgb(0 0 0 / 0.35);
     --shadow-emblem: 0 3px 8px rgb(0 0 0 / 0.2);
     --background: #1c1c1c;
     --foreground: #f0f0f0;
@@ -186,7 +189,10 @@
   }
   body {
     min-width: 320px;
+    /* The dynamic viewport: 100vh is the tallest one on mobile and scrolled the page by the
+       height of the browser toolbars. */
     min-height: 100vh;
+    min-height: 100dvh;
     margin: 0;
   }
   button,
@@ -198,6 +204,24 @@
     color: var(--primary-foreground);
     background: var(--primary);
   }
+}
+
+/* The workspace shell is exactly one viewport tall and scrolls inside its regions. The document
+   has nothing to scroll, so a nested scroll must neither chain to it nor bounce the whole page.
+   Content added to the body outside the shell (a library's measuring element, such as Mermaid's
+   while it lays out a diagram, or a visually hidden live region) must not lengthen the page
+   either: the body is one viewport tall and clips it, `relative` so that absolutely positioned
+   children are clipped too. The root is `hidden`, so the body's overflow is its own instead of
+   the viewport's. Fixed layers (dialogs, menus, toasts) are not affected. */
+html:has([data-workspace-shell]) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+html:has([data-workspace-shell]) body {
+  position: relative;
+  height: 100dvh;
+  overflow: clip;
+  overscroll-behavior: none;
 }
 
 /* Global preference overrides intentionally follow utilities. Keep motion end events
@@ -310,4 +334,29 @@ html[data-reduced-motion='true'] [data-slot='skeleton'] {
   .title-appear {
     animation: none;
   }
+}
+
+/* Code highlighting: colours for the CSS-variables Shiki theme, per appearance. */
+:root {
+  --shiki-foreground: var(--foreground);
+  --shiki-background: transparent;
+  --shiki-token-constant: #8a4b12;
+  --shiki-token-string: #2f6f3e;
+  --shiki-token-comment: #6b7570;
+  --shiki-token-keyword: #8a2e6b;
+  --shiki-token-parameter: #4d5f8f;
+  --shiki-token-function: #2a5fb0;
+  --shiki-token-string-expression: #2f6f3e;
+  --shiki-token-punctuation: var(--muted-foreground);
+  --shiki-token-link: var(--primary);
+}
+
+html[data-theme='dark'] {
+  --shiki-token-constant: #e2a86b;
+  --shiki-token-string: #9ccf9d;
+  --shiki-token-comment: #8b948e;
+  --shiki-token-keyword: #d9a0cb;
+  --shiki-token-parameter: #a9b6e6;
+  --shiki-token-function: #8fb8ff;
+  --shiki-token-string-expression: #9ccf9d;
 }

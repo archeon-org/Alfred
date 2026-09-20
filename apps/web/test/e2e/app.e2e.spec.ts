@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
 
+import {
+  accountTrigger,
+  chooseAccountItem,
+  isPreviewLoadingOn,
+  togglePreviewLoading,
+} from './support/account-menu';
 import { defaultSeed, installWorkspaceApi } from './support/workspace-api';
 
 const authenticatedSession = {
@@ -28,6 +34,7 @@ const disabledFeatures = {
   runtimeMemory: false,
   skills: false,
   teams: false,
+  traceLinks: false,
 };
 
 test.beforeEach(async ({ page }) => {
@@ -143,15 +150,13 @@ test('waits for another tab refresh before confirming logout', async ({ context,
     await route.fulfill({ status: 204 });
   });
   await page.goto('/app');
-  const logoutButton = page.getByRole('button', { name: 'Se déconnecter' });
-  await expect(logoutButton).toBeVisible();
+  await expect(accountTrigger(page)).toBeVisible();
   const secondPage = await context.newPage();
   await installWorkspaceApi(secondPage);
   await secondPage.goto('/app');
   await expect.poll(() => activeRefreshes).toBe(1);
 
-  await logoutButton.click();
-  await expect(logoutButton).toBeDisabled();
+  await chooseAccountItem(page, 'Se déconnecter');
   releaseRefresh();
   await expect(page.getByRole('heading', { name: 'Bienvenue sur Alfred' })).toBeVisible();
   expect(logoutOverlappedRefresh).toBe(false);
@@ -181,7 +186,13 @@ test('keeps every workspace panel reachable on a narrow viewport', async ({ page
 
   await page.goto('/app');
 
+  // One bar tops the chat: the navigation opens under it, the context as a sheet over the chat.
+  await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
+  await page.getByRole('button', { name: 'Afficher les conversations' }).click();
   await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible();
+  await page.getByRole('button', { name: 'Masquer les conversations' }).click();
+  await page.getByRole('button', { name: 'Afficher le contexte' }).click();
+  await expect(page.getByRole('dialog', { name: 'Contexte de la conversation' })).toBeVisible();
   await expect(
     page.getByRole('complementary', { name: 'Contexte de la conversation' }),
   ).toBeVisible();
@@ -190,7 +201,7 @@ test('keeps every workspace panel reachable on a narrow viewport', async ({ page
     .toBeLessThanOrEqual(390);
 });
 
-test('lets the context panel use the full tablet width', async ({ page }) => {
+test('lays the context panel over the tablet conversation', async ({ page }) => {
   await page.setViewportSize({ height: 900, width: 1024 });
   await page.route('**/api/auth/refresh', async (route) =>
     route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
@@ -199,10 +210,16 @@ test('lets the context panel use the full tablet width', async ({ page }) => {
   await page.goto('/app');
 
   const contextPanel = page.getByRole('complementary', { name: 'Contexte de la conversation' });
+  await expect(contextPanel).toHaveCount(0);
+  await page.getByRole('button', { name: 'Afficher le contexte' }).click();
   await expect(contextPanel).toBeVisible();
   await expect
-    .poll(async () => (await contextPanel.boundingBox())?.width ?? 0)
-    .toBeGreaterThan(1000);
+    .poll(async () => {
+      const box = await contextPanel.boundingBox();
+      return box === null ? 0 : box.x + box.width;
+    })
+    .toBeCloseTo(1024, 0);
+  expect((await contextPanel.boundingBox())!.width).toBeLessThanOrEqual(352);
 });
 
 test('browses conversations by keyboard while keeping drafts local', async ({ page }) => {
@@ -282,7 +299,6 @@ test('opens mobile history and restores a hidden context without horizontal over
   await expect(page.getByRole('main')).toBeFocused();
   await expect(sample).toBeHidden();
 
-  await page.getByRole('button', { name: 'Masquer le contexte' }).click();
   await expect(
     page.getByRole('complementary', { name: 'Contexte de la conversation' }),
   ).toHaveCount(0);
@@ -291,6 +307,14 @@ test('opens mobile history and restores a hidden context without horizontal over
     page.getByRole('complementary', { name: 'Contexte de la conversation' }),
   ).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page
+    .getByRole('dialog', { name: 'Contexte de la conversation' })
+    .getByRole('button', { name: 'Masquer le contexte' })
+    .click();
+  await expect(
+    page.getByRole('complementary', { name: 'Contexte de la conversation' }),
+  ).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Afficher le contexte' })).toBeFocused();
 });
 
 test('respects reduced motion while previewing loading placeholders', async ({ page }) => {
@@ -299,12 +323,11 @@ test('respects reduced motion while previewing loading placeholders', async ({ p
     route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
   );
   await page.goto('/app');
-  const loadingToggle = page.getByRole('button', { name: 'Aperçu du chargement' });
-  await loadingToggle.click();
+  await togglePreviewLoading(page);
   const status = page.getByRole('status', { name: 'Chargement de l’espace de travail' });
 
   await expect(status).toBeVisible();
-  await expect(loadingToggle).toHaveAttribute('aria-pressed', 'true');
+  expect(await isPreviewLoadingOn(page)).toBe(true);
   const skeletons = page.locator('[data-slot="skeleton"]');
   expect(await skeletons.count()).toBeGreaterThan(0);
   expect(
@@ -313,7 +336,7 @@ test('respects reduced motion while previewing loading placeholders', async ({ p
     ),
   ).toBe(true);
 
-  await loadingToggle.click();
+  await togglePreviewLoading(page);
   await expect(status).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
 });
@@ -405,8 +428,7 @@ test('opens settings directly and preserves local display preferences across nav
     route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
   );
   await page.goto('/app');
-  const settings = page.getByRole('link', { name: 'Paramètres' });
-  await settings.click();
+  await chooseAccountItem(page, 'Paramètres');
   const dialog = page.getByRole('main');
   await expect(page).toHaveURL(/\/app\/settings$/u);
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -546,6 +568,75 @@ test('renames, pins and deletes a conversation through accessible menus', async 
   await expect(page.getByRole('list', { name: 'Chats du projet' })).not.toBeVisible();
 });
 
+test('drives the panels, a new chat and the shortcut settings from the keyboard', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.route('**/api/auth/refresh', async (route) =>
+    route.fulfill({ contentType: 'application/json', json: authenticatedSession, status: 200 }),
+  );
+  await page.goto(`/app/conversations/${defaultSeed().conversations[0]!.id}`);
+  await expect(page.getByRole('textbox', { name: 'Message' })).toBeVisible();
+  const context = page.getByRole('complementary', { name: 'Contexte de la conversation' });
+  const navigation = page.getByRole('complementary', { name: 'Espace personnel', exact: true });
+
+  // Physical keys: the same gesture on AZERTY and QWERTY, none reserved by a browser.
+  await page.keyboard.press('ControlOrMeta+Shift+Period');
+  await expect(context).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+Shift+Period');
+  await expect(context).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+Shift+Comma');
+  await expect(navigation).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Afficher la navigation' })).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+Shift+Comma');
+  await expect(navigation).toBeVisible();
+
+  // The chord is safe while typing: nothing is inserted and the settings open on the shortcuts.
+  const composer = page.getByRole('textbox', { name: 'Message' });
+  await composer.fill('Brouillon');
+  await composer.press('ControlOrMeta+Slash');
+  await expect(page).toHaveURL(/\/app\/settings\?section=shortcuts$/u);
+  await expect(page.getByRole('heading', { level: 1, name: 'Raccourcis clavier' })).toBeVisible();
+  const rows = page.getByRole('list').filter({ hasText: 'Par défaut :' });
+  await expect(rows.getByRole('button', { name: 'Modifier' })).toHaveCount(4);
+  const contextRow = rows.getByRole('listitem').filter({ hasText: 'masquer le contexte' });
+  await expect(contextRow.getByText(/^(⌘⇧|Ctrl\+Maj\+)\.$/u)).toBeVisible();
+
+  // Rebinding: a reserved key is refused with the reason, a free key is recorded and applied.
+  await contextRow.getByRole('button', { name: 'Modifier' }).click();
+  await page.keyboard.press('ControlOrMeta+f');
+  await expect(contextRow.getByRole('alert')).toContainText('rechercher dans la page');
+  await page.keyboard.press('ControlOrMeta+Shift+Semicolon');
+  await expect(contextRow.getByRole('alert')).toHaveCount(0);
+  await expect(contextRow.getByText(/^(⌘⇧|Ctrl\+Maj\+)[:;]$/u)).toBeVisible();
+  await page.goBack();
+  await expect(composer).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+Shift+Period');
+  await expect(context).toBeVisible();
+  await page.keyboard.press('ControlOrMeta+Shift+Semicolon');
+  await expect(context).toHaveCount(0);
+  await page.keyboard.press('ControlOrMeta+Shift+Semicolon');
+  await expect(context).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Masquer le contexte' })).toHaveAttribute(
+    'aria-keyshortcuts',
+    /Shift\+.$/u,
+  );
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('alfred.shortcuts.v1')))
+    .toContain('"toggleContext"');
+
+  // The seed chat belongs to a project: the new chat opens inside that project.
+  await page.keyboard.press('ControlOrMeta+Shift+Space');
+  await expect(page).toHaveURL(/\/app\/conversations\/new\?projectId=/u);
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Nouveau chat dans Refonte du portail' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Masquer la navigation' })).toHaveAttribute(
+    'aria-keyshortcuts',
+    /Shift\+,$/u,
+  );
+});
+
 test('moves a free chat into a project and restores menu focus when cancelling', async ({
   page,
 }) => {
@@ -590,7 +681,10 @@ test('moves a free chat into a project and restores menu focus when cancelling',
   await expect(page).toHaveURL(`/app/conversations/${chat.id}`);
   await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('Mon brouillon');
   await expect(page.getByRole('main')).toBeFocused();
-  await expect(page.getByRole('link', { name: 'Refonte du portail' })).toBeVisible();
+  // The chat now lives under its project: the sidebar row carries the scope.
+  await expect(
+    page.getByRole('button', { name: 'Refonte du portail', exact: true }),
+  ).toHaveAttribute('aria-current', 'true');
   await trigger.click();
   await expect(page.getByRole('menuitem', { name: 'Ajouter à un projet' })).toHaveCount(0);
 });

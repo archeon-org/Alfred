@@ -15,4 +15,5 @@ export const DISABLED_FEATURE_FLAGS: Readonly<FeatureFlags> = Object.freeze({
   runtimeMemory: false,
   skills: false,
   teams: false,
+  traceLinks: false,
 });

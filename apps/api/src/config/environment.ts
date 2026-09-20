@@ -1,10 +1,14 @@
 import { z } from 'zod';
 
-const booleanFromEnvironment = z.preprocess((value) => {
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  return value;
-}, z.boolean());
+import { booleanFromEnvironment, emptyStringToUndefined } from './environment-primitives';
+import { fileStorageEnvironmentFields, validateFileStorageEnvironment } from './file-storage';
+import { fileUploadEnvironmentFields, validateFileUploadEnvironment } from './file-uploads';
+import {
+  deriveExecutionCursorKey,
+  runtimeEnvironmentFields,
+  validateRuntimeEnvironment,
+} from './runtime-environment';
+import { validateTraceLinkEnvironment } from './trace-link';
 
 const commaSeparatedOrigins = z
   .string()
@@ -12,12 +16,10 @@ const commaSeparatedOrigins = z
   .transform((value) => value.split(',').map((origin) => origin.trim()))
   .pipe(z.array(z.string().url()).min(1));
 
-const emptyStringToUndefined = (value: unknown): unknown =>
-  typeof value === 'string' && value.trim() === '' ? undefined : value;
-
 const containsCommittedPlaceholder = (value: string | undefined): boolean =>
   value?.toLowerCase().includes('replace-with') === true;
 
+/** An origin with an optional path: no userinfo, query or fragment may reach a generated link. */
 const usesHttps = (value: string): boolean => {
   try {
     return new URL(value).protocol === 'https:';
@@ -34,34 +36,11 @@ const hasUrlPassword = (value: string): boolean => {
   }
 };
 
-/** Native LangGraph stream modes the API may request and relay unchanged. */
-export const AGENT_RUNTIME_STREAM_MODE_VALUES = Object.freeze([
-  'values',
-  'messages',
-  'messages-tuple',
-  'updates',
-  'events',
-  'debug',
-  'custom',
-  'tasks',
-  'checkpoints',
-] as const);
-export type AgentRuntimeStreamMode = (typeof AGENT_RUNTIME_STREAM_MODE_VALUES)[number];
-
-const commaSeparatedStreamModes = z
-  .string()
-  .min(1)
-  .transform((value) => value.split(',').map((mode) => mode.trim()))
-  .pipe(z.array(z.enum(AGENT_RUNTIME_STREAM_MODE_VALUES)).min(1));
-
 const environmentSchema = z
   .object({
-    // Private LangGraph server reached only by the API (ALF-DEC-003/050); no browser access.
-    AGENT_RUNTIME_ASSISTANT_ID: z.string().min(1).default('orchestrator'),
-    AGENT_RUNTIME_STREAM_MODES: commaSeparatedStreamModes.prefault('messages,updates'),
-    // Stateless graph that titles a conversation from its first message; empty disables it.
-    AGENT_RUNTIME_TITLE_ASSISTANT_ID: z.string().trim().default('title_agent'),
-    AGENT_RUNTIME_URL: z.string().url().default('http://localhost:8000'),
+    ...runtimeEnvironmentFields,
+    ...fileStorageEnvironmentFields,
+    ...fileUploadEnvironmentFields,
     API_CORS_ORIGINS: commaSeparatedOrigins.prefault('http://localhost:5173'),
     API_HOST: z.string().min(1).default('127.0.0.1'),
     API_PORT: z.coerce.number().int().positive().max(65_535).default(3000),
@@ -136,6 +115,17 @@ const environmentSchema = z
     FEATURE_RUNTIME_MEMORY_ENABLED: booleanFromEnvironment.default(false),
     FEATURE_SKILLS_ENABLED: booleanFromEnvironment.default(false),
     FEATURE_TEAMS_ENABLED: booleanFromEnvironment.default(false),
+    FEATURE_TRACE_LINKS_ENABLED: booleanFromEnvironment.default(false),
+    // Public address parts of the runtime's trace console; no credential is ever involved.
+    TRACE_LINK_UI_URL: z.preprocess(emptyStringToUndefined, z.string().url().optional()),
+    TRACE_LINK_ORGANIZATION_ID: z.preprocess(
+      emptyStringToUndefined,
+      z.string().min(1).max(128).optional(),
+    ),
+    TRACE_LINK_PROJECT_ID: z.preprocess(
+      emptyStringToUndefined,
+      z.string().min(1).max(128).optional(),
+    ),
     GOOGLE_OAUTH_CALLBACK_URL: z.preprocess(emptyStringToUndefined, z.string().url().optional()),
     GOOGLE_OAUTH_CLIENT_ID: z.preprocess(emptyStringToUndefined, z.string().min(1).optional()),
     GOOGLE_OAUTH_CLIENT_SECRET: z.preprocess(emptyStringToUndefined, z.string().min(1).optional()),
@@ -172,6 +162,7 @@ const environmentSchema = z
       .transform((value) => new URL(value).origin),
   })
   .superRefine((environment, context) => {
+    validateRuntimeEnvironment(environment, context);
     if (environment.SKILLS_MAX_INSTRUCTIONS_BYTES > environment.SKILLS_MAX_PACKAGE_BYTES) {
       context.addIssue({
         code: 'custom',
@@ -233,6 +224,11 @@ const environmentSchema = z
             }
           : {}),
         ...(environment.FEATURE_RATE_LIMITING_ENABLED ? { REDIS_URL: environment.REDIS_URL } : {}),
+        ...(environment.FILE_STORAGE_S3_SECRET_ACCESS_KEY === undefined
+          ? {}
+          : {
+              FILE_STORAGE_S3_SECRET_ACCESS_KEY: environment.FILE_STORAGE_S3_SECRET_ACCESS_KEY,
+            }),
       } as const;
 
       for (const [key, value] of Object.entries(credentials)) {
@@ -253,6 +249,10 @@ const environmentSchema = z
         });
       }
     }
+
+    validateTraceLinkEnvironment(environment, context);
+    validateFileStorageEnvironment(environment, context);
+    validateFileUploadEnvironment(environment, context);
 
     if (environment.FEATURE_GOOGLE_OAUTH_ENABLED) {
       const requiredGoogleKeys = [
@@ -327,8 +327,9 @@ const environmentSchema = z
 type ParsedEnvironment = z.infer<typeof environmentSchema>;
 
 export type AppEnvironment = Readonly<
-  Omit<ParsedEnvironment, 'API_CORS_ORIGINS'> & {
+  Omit<ParsedEnvironment, 'API_CORS_ORIGINS' | 'EXECUTION_CURSOR_KEY'> & {
     API_CORS_ORIGINS: readonly string[];
+    EXECUTION_CURSOR_KEY: string;
   }
 >;
 
@@ -339,5 +340,7 @@ export function parseEnvironment(input: Record<string, unknown>): AppEnvironment
   return Object.freeze({
     ...parsed,
     API_CORS_ORIGINS: origins,
+    EXECUTION_CURSOR_KEY:
+      parsed.EXECUTION_CURSOR_KEY ?? deriveExecutionCursorKey(parsed.AUTH_JWT_SECRET),
   });
 }

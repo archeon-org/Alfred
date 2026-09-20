@@ -115,3 +115,29 @@ concurrent CAS and quota enforcement, SQL constraints and migration parity,
 malicious packages and byte-faithful round trips, draft/conflict recovery,
 responsive keyboard-accessible authoring and both feature-flag states. Runtime
 and deployment evidence must be reported separately from mocked browser tests.
+
+## Revision 2026-09-20: published read side
+
+A consumer of skills must not read what an author is still editing. The authoring detail
+(`GET /api/skills/:id`) serves the current version, which is a draft whenever
+`currentVersion` differs from `publishedVersion`, and the list carries the skill's current name
+and description, not the published snapshot's. Two read-only routes close that gap without
+changing the authoring contract:
+
+- `GET /api/skills/published` lists the account's skills that are enabled and published, each at
+  its published snapshot (`name`, `description`, `publishedVersion`, `contentHash`, `totalBytes`,
+  `publishedAt`), with the shared cursor pagination and an optional exact `name` filter matched
+  against the snapshot's name.
+- `GET /api/skills/published/:id` adds the snapshot's files. A disabled or never-published skill
+  answers the same 404 as a missing, foreign or malformed identifier.
+
+Both run in one `REPEATABLE READ` transaction, keep the tenant/owner scope, the `skills`
+capability flag and the session authentication of every other skills route, and grant nothing to
+any runtime: no runtime credential, projection or loading is introduced. They prepare the reads
+named by the orchestrator integration handover of 2026-09-20; the four context write routes of
+that handover already exist under ADR 0017 and are unchanged. `ALF-DEC-011` remains `to-decide`:
+this is a projection of the existing publication model, not a new activation scope.
+
+Known limit: a skill renamed in an unpublished draft keeps its published name, while the unique
+constraint covers current names only, so two published snapshots of one account can share a
+name. The `name` filter then returns both; a consumer that mounts skills by name must choose.

@@ -2,7 +2,9 @@ import {
   CONVERSATION_TITLE_MAX_LENGTH,
   type Execution,
   type ExecutionStatus,
+  type ExecutionWorkSummary,
   type Message,
+  type MessageAttachment,
   type MessageRole,
 } from '@alfred/contracts';
 
@@ -32,7 +34,8 @@ export function toExecutionDto(record: ExecutionRecord): Execution {
   return Object.freeze({
     conversationId: record.conversationId,
     createdAt: record.createdAt.toISOString(),
-    error: record.error,
+    error: publicExecutionError(record.error),
+    errorCode: record.error === null ? null : safeExecutionErrorCode(record.error),
     finishedAt: record.finishedAt === null ? null : record.finishedAt.toISOString(),
     id: record.id,
     startedAt: record.startedAt === null ? null : record.startedAt.toISOString(),
@@ -40,7 +43,11 @@ export function toExecutionDto(record: ExecutionRecord): Execution {
   });
 }
 
-export function toMessageDto(record: MessageRecord): Message {
+export function toMessageDto(
+  record: MessageRecord,
+  work?: ExecutionWorkSummary,
+  attachments?: readonly MessageAttachment[],
+): Message {
   return Object.freeze({
     content: record.content,
     conversationId: record.conversationId,
@@ -48,6 +55,8 @@ export function toMessageDto(record: MessageRecord): Message {
     executionId: record.executionId,
     id: record.id,
     role: record.role,
+    ...(work === undefined ? {} : { work }),
+    ...(attachments === undefined || attachments.length === 0 ? {} : { attachments }),
   });
 }
 
@@ -89,18 +98,32 @@ export function sanitizeGeneratedTitle(generated: {
   return `${collapsed.slice(0, CONVERSATION_TITLE_MAX_LENGTH - 1).trimEnd()}…`;
 }
 
-/**
- * An execution still `pending` or `running` after this delay never received its terminal state:
- * the API process died mid-stream. The next request on the conversation closes it as failed instead
- * of leaving the chat busy forever.
- */
-export const EXECUTION_ABANDON_AFTER_MS = 15 * 60 * 1000;
-export const ABANDONED_EXECUTION_ERROR = 'Execution abandoned: no terminal state was recorded.';
+const PUBLIC_EXECUTION_ERRORS: Readonly<Record<string, string>> = Object.freeze({
+  runtime_output_incomplete: 'The runtime output could not be fully verified.',
+  runtime_failed: 'The runtime could not complete this execution.',
+  runtime_interrupted: 'The execution requires attention before it can continue.',
+  runtime_recovery_gap: 'The runtime replay is unavailable. Saved output remains readable.',
+  runtime_event_invalid: 'The runtime output could not be safely processed.',
+  runtime_source_id_missing: 'The runtime output cannot be reliably recovered.',
+  runtime_projection_limit: 'The execution output exceeded its configured limit.',
+  execution_deadline_exceeded: 'The execution reached its time limit.',
+  execution_authority_lost:
+    'The execution was stopped because its owner or scope is no longer available.',
+  superseded: 'A newer message replaced this answer.',
+});
 
-const ERROR_MAX_LENGTH = 512;
+function safeExecutionErrorCode(value: string): string {
+  return Object.hasOwn(PUBLIC_EXECUTION_ERRORS, value) ? value : 'runtime_failed';
+}
 
-/** Bounded, credential-free description of a failed run for the execution row and the DTO. */
-export function describeRuntimeError(error: unknown): string {
-  const message = error instanceof Error ? error.message : 'Runtime execution failed.';
-  return message.length <= ERROR_MAX_LENGTH ? message : message.slice(0, ERROR_MAX_LENGTH);
+function publicExecutionError(value: string | null): string | null {
+  return value === null
+    ? null
+    : (PUBLIC_EXECUTION_ERRORS[safeExecutionErrorCode(value)] ?? 'Runtime execution failed.');
+}
+
+/** Never surface provider exception text, including historical rows stored before sanitization. */
+export function describeRuntimeError(_error: unknown): string {
+  void _error;
+  return 'Runtime execution failed.';
 }

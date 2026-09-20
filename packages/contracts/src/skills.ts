@@ -91,3 +91,25 @@ export const skillVersionListEnvelopeSchema = successEnvelopeSchema(
 );
 
 export const skillVersionsEnvelopeSchema = skillVersionListEnvelopeSchema;
+
+/**
+ * What a consumer of skills reads: an enabled skill at its published snapshot. Name, description
+ * and files are the snapshot's, so an unpublished draft (a rename included) never shows through.
+ */
+export const publishedSkillSummarySchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  description: z.string(),
+  publishedVersion: z.number().check(z.int(), z.minimum(1)),
+  contentHash: z.string().check(z.regex(/^[a-f0-9]{64}$/u)),
+  totalBytes: z.number().check(z.int(), z.minimum(1)),
+  publishedAt: z.iso.datetime(),
+});
+export type PublishedSkillSummary = z.infer<typeof publishedSkillSummarySchema>;
+export const publishedSkillDetailSchema = z.object({
+  ...publishedSkillSummarySchema.shape,
+  files: z.array(skillFileInputSchema),
+});
+export type PublishedSkillDetail = z.infer<typeof publishedSkillDetailSchema>;
+export const publishedSkillEnvelopeSchema = successEnvelopeSchema(publishedSkillDetailSchema);
+export const publishedSkillListEnvelopeSchema = listEnvelopeSchema(publishedSkillSummarySchema);

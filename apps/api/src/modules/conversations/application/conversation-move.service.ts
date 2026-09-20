@@ -10,6 +10,7 @@ import { assertProjectWritable } from '../../projects/application/project-state'
 import { PROJECT_RESOURCE } from '../../projects/domain/project';
 import { ProjectEntity } from '../../projects/infrastructure/persistence/project.entity';
 import { TenantsService } from '../../tenants/tenants.service';
+import { assertNoActiveExecutions } from '../../executions/domain/execution-lifecycle';
 import { CONVERSATION_RESOURCE, toConversationDto } from '../domain/conversation';
 import { ConversationEntity } from '../infrastructure/persistence/conversation.entity';
 import { assertConversationMoveSource, moveNotAllowed } from './conversation-move-state';
@@ -51,6 +52,7 @@ export class ConversationMoveService {
       if (conversation.archivedAt !== null)
         throw new ApiException(409, 'conversation_archived', 'Conversation is archived.');
       if (conversation.projectId === target.id) return toConversationDto(conversation, target.kind);
+      await assertNoActiveExecutions(manager, [conversation.id]);
       const source = projects.get(conversation.projectId);
       if (!source || conversation.projectId !== located.projectId) throw moveNotAllowed();
       assertProjectWritable(source);

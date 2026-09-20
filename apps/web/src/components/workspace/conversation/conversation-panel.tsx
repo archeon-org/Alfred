@@ -1,14 +1,15 @@
-import { LockKeyhole, MessageSquareText } from 'lucide-react';
 import type { Ref } from 'react';
 
-import { RuntimeEvents } from '@/components/workspace/conversation/runtime-events';
 import { ConversationTranscript } from '@/components/workspace/conversation/conversation-transcript';
 import { ConversationWelcome } from '@/components/workspace/conversation/conversation-welcome';
 import { MessageComposer } from '@/components/workspace/conversation/message-composer';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { ConversationSkeleton } from '@/components/workspace/workspace-skeletons';
 import type { TurnFailure } from '@/hooks/conversations/use-conversation-chat';
+import { useStickToBottom } from '@/hooks/ui/use-stick-to-bottom';
 import type { LiveSession, RuntimeEventView } from '@/contexts/chat-session/chat-session-context';
+import type { AttachmentView, ComposerAttachmentsControls } from '@/lib/files/composer-attachments';
 import type { StarterPrompt } from '@/lib/workspace/workspace.types';
 import type { Message } from '@/services/executions/executions.service';
 
@@ -28,12 +29,21 @@ interface ConversationPanelProps {
   readonly failure?: TurnFailure | null;
   readonly debugEvents?: readonly RuntimeEventView[];
   readonly debugError?: string | null;
+  /** The API serves trace links for answers (development diagnostic). */
+  readonly traceLinksEnabled?: boolean;
   /** Resolves true when the message was accepted; the composer keeps the draft otherwise. */
-  readonly onSend?: (message: string) => boolean | Promise<boolean>;
+  readonly onSend?: (
+    message: string,
+    attachments: readonly AttachmentView[],
+  ) => boolean | Promise<boolean>;
+  /** Files of the next message; absent while the `fileUploads` capability is off. */
+  readonly attachments?: ComposerAttachmentsControls | undefined;
   /** Shown instead of the composer help while sending is refused; typing stays possible. */
   readonly blockedReason?: string | null;
   readonly isStreaming?: boolean;
   readonly onStop?: () => void;
+  readonly onReconnect?: () => void;
+  readonly recoveryAvailable?: boolean;
 }
 
 export function ConversationPanel({
@@ -50,12 +60,26 @@ export function ConversationPanel({
   failure = null,
   debugEvents = [],
   debugError = null,
+  traceLinksEnabled = false,
   onSend,
+  attachments,
   blockedReason = null,
   isStreaming = false,
   onStop,
+  onReconnect,
+  recoveryAvailable = false,
 }: ConversationPanelProps) {
   const hasTranscript = messages.length > 0 || sessions.length > 0;
+  // Only this scroll area is ever scrolled programmatically: it follows the bottom while the
+  // person stays there, and sending a message brings them back to it.
+  const { scrollRef, scrollToBottom } = useStickToBottom();
+  const send =
+    onSend === undefined
+      ? undefined
+      : (message: string, files: readonly AttachmentView[]) => {
+          scrollToBottom();
+          return onSend(message, files);
+        };
   return (
     <main
       className="flex h-full min-h-0 min-w-0 outline-none focus-visible:outline-2 focus-visible:-outline-offset-3 focus-visible:outline-ring"
@@ -68,24 +92,19 @@ export function ConversationPanel({
         id="conversation"
         aria-busy={isLoading || isBusy || isStreaming}
       >
-        <div className="flex min-h-18 shrink-0 items-center gap-2.5 border-b border-border px-4 py-3 md:min-h-21 md:gap-3 md:px-6 md:py-4">
-          <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-border bg-muted text-muted-foreground">
-            <MessageSquareText aria-hidden="true" size={17} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="mb-1 text-2xs font-semibold tracking-label text-muted-foreground">
-              VOTRE CONVERSATION
-            </p>
-            <h1 className="text-xs font-semibold truncate tracking-tight md:text-sm">
-              {title ?? 'Nouvelle conversation'}
-            </h1>
-          </div>
-          <span className="ml-auto flex items-center gap-1 text-2xs whitespace-nowrap text-muted-foreground  [&_svg]:size-3.5 md:[&_svg]:size-3">
-            <LockKeyhole aria-hidden="true" size={12} />
-            <span className="sr-only md:not-sr-only">Personnel</span>
-          </span>
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col workspace:[container-type:size] workspace:[container-name:welcome] [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] workspace:overflow-y-auto">
+        {/* The conversation title belongs to the page outline and to the sidebar's selection,
+            not to a band above the transcript: the transcript keeps the height. */}
+        <h1 className="sr-only">{title ?? 'Nouvelle conversation'}</h1>
+        {/* The transcript scrolls inside the card at every width, above a composer that stays in
+            place. The welcome screen fits itself to this area through its container queries.
+            Clicking its text focuses it, so that the scrolling keys scroll it, without adding a
+            tab stop; the keys pressed while <main> holds the focus are handed to it as well. */}
+        <div
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto outline-none [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring workspace:[container-type:size] workspace:[container-name:welcome]"
+          data-slot="conversation-scroll"
+          ref={scrollRef}
+          tabIndex={-1}
+        >
           {notice ? (
             <p
               className="mx-4 mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive md:mx-6"
@@ -94,22 +113,38 @@ export function ConversationPanel({
               {notice}
             </p>
           ) : null}
+          {recoveryAvailable ? (
+            <div className="mx-4 mt-3 md:mx-6">
+              <Button onClick={onReconnect} variant="outline" size="sm">
+                Reconnecter et vérifier l’état
+              </Button>
+            </div>
+          ) : null}
+          {debugError !== null ? (
+            <p
+              className="mx-auto mt-3 w-full max-w-conversation px-4 text-xs text-destructive md:px-6 wide:px-8"
+              role="alert"
+            >
+              {debugError}
+            </p>
+          ) : null}
           {isLoading ? (
             <ConversationSkeleton />
           ) : hasTranscript ? (
-            <ConversationTranscript messages={messages} sessions={sessions} failure={failure} />
+            <ConversationTranscript
+              messages={messages}
+              sessions={sessions}
+              failure={failure}
+              debugEvents={debugEvents}
+              traceLinksEnabled={traceLinksEnabled}
+            />
           ) : (
             <ConversationWelcome disabled={isBusy} prompts={prompts} onSelect={onPrompt} />
           )}
-          {!isLoading && (debugEvents.length > 0 || debugError !== null) ? (
-            <div className="mx-auto w-full min-w-0 max-w-conversation px-4 pb-4 md:px-6 wide:px-8">
-              <RuntimeEvents events={debugEvents} error={debugError} />
-            </div>
-          ) : null}
         </div>
         {isLoading ? (
           <div
-            className="mx-auto w-full max-w-conversation shrink-0 px-4 py-4 md:px-6 md:pt-4 md:pb-5 wide:px-8"
+            className="mx-auto w-full max-w-conversation shrink-0 px-4 pb-4 md:px-6 md:pb-5 wide:px-8"
             aria-hidden="true"
           >
             <Skeleton className="h-32 w-full rounded-2xl" />
@@ -118,11 +153,13 @@ export function ConversationPanel({
           <MessageComposer
             defaultValue={draft}
             key={draft ?? ''}
-            onSend={onSend}
+            onSend={send}
+            attachments={attachments}
             isBusy={isBusy}
             blockedReason={blockedReason}
             isStreaming={isStreaming}
             onStop={onStop}
+            isStopping={sessions.at(-1)?.turn.stopPending}
           />
         )}
       </section>

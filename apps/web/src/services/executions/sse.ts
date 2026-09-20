@@ -1,54 +1,103 @@
 import type { ExecutionStreamEvent } from '@alfred/contracts';
 
-/**
- * Parses a Server-Sent Events body into `{ event, data }` items. `data` is JSON-decoded when
- * possible and left as text otherwise; comment lines (heartbeats) and unknown fields are ignored.
- * `fetch` is used instead of `EventSource` because the API expects a bearer header and a POST body.
- */
+const MAX_FRAME_BYTES = 2 * 1024 * 1024;
+const MAX_CURSOR_LENGTH = 4096;
+
+export class InvalidStreamError extends Error {
+  constructor(message = 'Le flux de la conversation est invalide.') {
+    super(message);
+    this.name = 'InvalidStreamError';
+  }
+}
+
+interface SseOptions {
+  readonly maxFrameBytes?: number | undefined;
+  readonly onChunk?: () => void;
+}
+
+/** Fetch SSE for bearer authentication. Only complete frames advance the observer cursor. */
 export async function* parseSseStream(
   body: ReadableStream<Uint8Array>,
-): AsyncGenerator<ExecutionStreamEvent> {
+  { maxFrameBytes = MAX_FRAME_BYTES, onChunk }: SseOptions = {},
+): AsyncGenerator<ExecutionStreamEvent & { readonly id?: string }> {
   const reader = body.getReader();
-  const decoder = new TextDecoder();
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  const encoder = new TextEncoder();
   let buffer = '';
+  let skipLeadingLf = false;
+  let lines: string[] = [];
+  let frameBytes = 0;
+  let id: string | undefined;
+  const checkSize = (size: number) => {
+    if (size > maxFrameBytes) throw new InvalidStreamError('Un événement est trop volumineux.');
+  };
   try {
     for (;;) {
       const { done, value } = await reader.read();
-      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
-      buffer = buffer.replaceAll('\r\n', '\n');
-      let boundary = buffer.indexOf('\n\n');
-      while (boundary !== -1) {
-        const frame = parseFrame(buffer.slice(0, boundary));
-        buffer = buffer.slice(boundary + 2);
-        if (frame !== null) yield frame;
-        boundary = buffer.indexOf('\n\n');
+      if (!done && value.byteLength > 0) onChunk?.();
+      let decoded = done ? decoder.decode() : decoder.decode(value, { stream: true });
+      if (skipLeadingLf && decoded.length > 0) {
+        if (decoded.startsWith('\n')) decoded = decoded.slice(1);
+        skipLeadingLf = false;
       }
-      if (done) {
-        const last = parseFrame(buffer);
-        if (last !== null) yield last;
-        return;
+      buffer += decoded;
+      for (;;) {
+        const boundary = buffer.search(/[\r\n]/u);
+        if (boundary === -1) break;
+        skipLeadingLf = buffer[boundary] === '\r' && boundary === buffer.length - 1;
+        const line = buffer.slice(0, boundary);
+        const newlineLength = buffer.slice(boundary, boundary + 2) === '\r\n' ? 2 : 1;
+        buffer = buffer.slice(boundary + newlineLength);
+        frameBytes += encoder.encode(line).byteLength + newlineLength;
+        checkSize(frameBytes);
+        if (line !== '') {
+          lines.push(line);
+          continue;
+        }
+        const frame = parseFrame(lines, id);
+        id = frame.id;
+        lines = [];
+        frameBytes = 0;
+        if (frame.data !== null) yield frame.data;
       }
+      checkSize(frameBytes + encoder.encode(buffer).byteLength);
+      // A half-written event is not authoritative, including when the connection closes cleanly.
+      if (done) return;
     }
   } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      // Fetch may already have errored/aborted; releasing its lock must still happen.
+    }
     reader.releaseLock();
   }
 }
 
-function parseFrame(frame: string): ExecutionStreamEvent | null {
+function parseFrame(lines: readonly string[], previousId: string | undefined) {
   let event = 'message';
+  let id = previousId;
   const data: string[] = [];
-  for (const line of frame.split('\n')) {
-    if (line === '' || line.startsWith(':')) continue;
+  for (const line of lines) {
+    if (line.startsWith(':')) continue;
     const separator = line.indexOf(':');
     const field = separator === -1 ? line : line.slice(0, separator);
     let value = separator === -1 ? '' : line.slice(separator + 1);
     if (value.startsWith(' ')) value = value.slice(1);
-    if (field === 'event') event = value;
+    if (field === 'event') event = value || 'message';
     else if (field === 'data') data.push(value);
+    else if (field === 'id' && !value.includes('\0')) {
+      if (value.length > MAX_CURSOR_LENGTH) throw new InvalidStreamError();
+      id = value;
+    }
   }
-  if (data.length === 0) return null;
-  const raw = data.join('\n');
-  return { data: decode(raw), event };
+  return {
+    id,
+    data:
+      data.length === 0
+        ? null
+        : { data: decode(data.join('\n')), event, ...(id === undefined ? {} : { id }) },
+  };
 }
 
 function decode(raw: string): unknown {

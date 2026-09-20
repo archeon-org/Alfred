@@ -4,4 +4,5 @@ developer_instructions = """
 Review diffs as a senior engineer.
 Lead with concrete bugs and file references.
 Check environment validation, input validation, secret handling and Docker safety.
+Treat an HTTP route whose OpenAPI documentation is missing, stale or inaccurate as a defect (docs/development/api-documentation.md).
 """

@@ -60,7 +60,8 @@ describe('Personal context settings', () => {
     await act(async () => {
       await router.navigate('/app');
     });
-    await user.click(screen.getByRole('link', { name: 'Paramètres' }));
+    await user.click(screen.getByRole('button', { name: /menu du compte/iu }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Paramètres' }));
     expect(screen.getByRole('switch', { name: 'Navigation compacte' })).toBeChecked();
     await user.click(screen.getByRole('link', { name: 'Personnaliser Alfred' }));
     await user.click(

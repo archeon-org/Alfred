@@ -1,13 +1,6 @@
 /** View-side types. Projects and conversations come straight from the shared API contracts. */
 export type { Conversation, Project } from '@alfred/contracts';
 
-export interface ResourceView {
-  readonly id: string;
-  readonly name: string;
-  readonly detail: string;
-  readonly format: 'PDF' | 'MD';
-}
-
 export type WorkspaceCreationKind = 'project' | 'conversation' | 'sandbox';
 
 export interface StarterPrompt {

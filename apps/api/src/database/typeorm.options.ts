@@ -1,3 +1,9 @@
+import { ArtifactContentEntity } from '../modules/files/infrastructure/persistence/artifact-content.entity';
+import { ArtifactExtractionEntity } from '../modules/files/infrastructure/persistence/artifact-extraction.entity';
+import { ArtifactFolderEntity } from '../modules/files/infrastructure/persistence/artifact-folder.entity';
+import { ArtifactRevisionEntity } from '../modules/files/infrastructure/persistence/artifact-revision.entity';
+import { ArtifactEntity } from '../modules/files/infrastructure/persistence/artifact.entity';
+import { MessageAttachmentEntity } from '../modules/files/infrastructure/persistence/message-attachment.entity';
 import type { ConfigService } from '@nestjs/config';
 import type { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { WorkspaceMembershipEntity } from '../modules/workspaces/infrastructure/workspace-membership.entity';
@@ -41,6 +47,12 @@ export const databaseEntities = [
   SkillEntity,
   SkillVersionEntity,
   SkillFileEntity,
+  ArtifactFolderEntity,
+  ArtifactContentEntity,
+  ArtifactEntity,
+  ArtifactRevisionEntity,
+  ArtifactExtractionEntity,
+  MessageAttachmentEntity,
 ] as const;
 
 export function createTypeOrmOptions(config: ConfigService): TypeOrmModuleOptions {

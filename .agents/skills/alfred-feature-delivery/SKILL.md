@@ -17,8 +17,9 @@ workflow below starts once that plan is accepted.
    Place it in the owning app's external `test` tree and choose `unit`, `integration`, `contract`,
    `architecture` or `e2e` according to the boundary being proved; never add tests under `src`.
 3. Implement the minimum production change that makes that test pass. Validate public inputs and environment variables at their boundary; never expose private values through `VITE_` variables.
-4. Refactor only after the focused test is green. Preserve immutable data transformations and the three application boundaries.
-5. Run the focused app checks, then use `alfred-quality-gate` before declaring the change complete.
+4. When the change adds, alters or removes an HTTP route of `apps/api`, update its OpenAPI documentation now, in the same change (`docs/development/api-documentation.md`); `test/contract/http/openapi-completeness.spec.ts` must pass.
+5. Refactor only after the focused test is green. Preserve immutable data transformations and the three application boundaries.
+6. Run the focused app checks, then use `alfred-quality-gate` before declaring the change complete.
 
 For a contract spanning multiple apps, make the HTTP contract explicit in `apps/api` and test both sides. Do not couple the React application directly to agent internals without an architecture decision.
 

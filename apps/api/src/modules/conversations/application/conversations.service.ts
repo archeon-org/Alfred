@@ -12,6 +12,7 @@ import {
 } from '../../projects/application/project-state';
 import { PROJECT_RESOURCE } from '../../projects/domain/project';
 import { ProjectEntity } from '../../projects/infrastructure/persistence/project.entity';
+import { assertNoActiveExecutions } from '../../executions/domain/execution-lifecycle';
 import { TenantsService } from '../../tenants/tenants.service';
 import { CONVERSATION_RESOURCE, initialTitle, toConversationDto } from '../domain/conversation';
 import { ConversationEntity } from '../infrastructure/persistence/conversation.entity';
@@ -130,6 +131,7 @@ export class ConversationsService {
       const { conversation, project } = await this.lockOwned(manager, scope, id);
       const projects = manager.getRepository(ProjectEntity);
       const ownership = { id: project.id, ...scope };
+      await assertNoActiveExecutions(manager, [conversation.id]);
       await conversations.delete({ id: conversation.id, projectId: project.id });
       if (project.kind === 'implicit') {
         const remaining = await conversations.count({ where: { projectId: project.id } });

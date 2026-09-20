@@ -26,6 +26,7 @@ const featureFlagKeys = Object.freeze([
   'FEATURE_RUNTIME_MEMORY_ENABLED',
   'FEATURE_SKILLS_ENABLED',
   'FEATURE_TEAMS_ENABLED',
+  'FEATURE_TRACE_LINKS_ENABLED',
 ]);
 const managedSecretKeys = new Set([
   'AUTH_JWT_SECRET',
@@ -144,6 +145,49 @@ function renderFeatureFlags(flags) {
     `FEATURE_RUNTIME_MEMORY_ENABLED=${flags.runtimeMemory}`,
     `FEATURE_SKILLS_ENABLED=${flags.skills}`,
     `FEATURE_TEAMS_ENABLED=${flags.teams}`,
+    `FEATURE_TRACE_LINKS_ENABLED=${flags.traceLinks}`,
+  ];
+}
+
+// Uploaded file bytes: an empty bucket block keeps files on this machine, which only a developer
+// may do. Filling every value switches the same adapter to any S3-compatible provider.
+function renderFileStorage(environments, minioRootPassword) {
+  return [
+    '# Uploaded files: size, quota, extraction and prompt bounds (Revision 86, ALF-DEC-010).',
+    `FILE_UPLOAD_MAX_BYTES=${firstValue('FILE_UPLOAD_MAX_BYTES', environments, '5242880')}`,
+    `FILE_QUOTA_BYTES_PER_USER=${firstValue('FILE_QUOTA_BYTES_PER_USER', environments, '26214400')}`,
+    `FILE_PENDING_UPLOAD_TTL_MS=${firstValue('FILE_PENDING_UPLOAD_TTL_MS', environments, '300000')}`,
+    `FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE=${firstValue('FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE', environments, '20')}`,
+    `FILE_UPLOAD_MAX_CONCURRENT=${firstValue('FILE_UPLOAD_MAX_CONCURRENT', environments, '4')}`,
+    `FILE_EXTRACTION_TIMEOUT_MS=${firstValue('FILE_EXTRACTION_TIMEOUT_MS', environments, '60000')}`,
+    `FILE_EXTRACTION_MAX_PDF_PAGES=${firstValue('FILE_EXTRACTION_MAX_PDF_PAGES', environments, '500')}`,
+    `FILE_EXTRACTED_TEXT_MAX_CHARS=${firstValue('FILE_EXTRACTED_TEXT_MAX_CHARS', environments, '1000000')}`,
+    `FILE_IMAGE_MAX_EDGE_PX=${firstValue('FILE_IMAGE_MAX_EDGE_PX', environments, '1568')}`,
+    `FILE_IMAGE_MAX_INPUT_PIXELS=${firstValue('FILE_IMAGE_MAX_INPUT_PIXELS', environments, '50000000')}`,
+    `FILE_PROMPT_TOKENS_PER_DOCUMENT=${firstValue('FILE_PROMPT_TOKENS_PER_DOCUMENT', environments, '10000')}`,
+    `FILE_PROMPT_TOKENS_PER_EXECUTION=${firstValue('FILE_PROMPT_TOKENS_PER_EXECUTION', environments, '30000')}`,
+    '# Uploaded file bytes. Empty FILE_STORAGE_S3_* values keep files under FILE_STORAGE_LOCAL_ROOT',
+    '# (development only). Set the bucket and region for AWS S3, MinIO, Cloudflare R2, IBM COS or',
+    '# another S3-compatible provider; the key pair is optional (IAM role). A partial description',
+    '# is refused at startup.',
+    `FILE_STORAGE_LOCAL_ROOT=${firstValue('FILE_STORAGE_LOCAL_ROOT', environments, 'var/uploads')}`,
+    `FILE_STORAGE_S3_ENDPOINT=${firstValue('FILE_STORAGE_S3_ENDPOINT', environments, '')}`,
+    `FILE_STORAGE_S3_BUCKET=${firstValue('FILE_STORAGE_S3_BUCKET', environments, '')}`,
+    `FILE_STORAGE_S3_REGION=${firstValue('FILE_STORAGE_S3_REGION', environments, '')}`,
+    `FILE_STORAGE_S3_ACCESS_KEY_ID=${firstValue('FILE_STORAGE_S3_ACCESS_KEY_ID', environments, '')}`,
+    `FILE_STORAGE_S3_SECRET_ACCESS_KEY=${firstValue('FILE_STORAGE_S3_SECRET_ACCESS_KEY', environments, '')}`,
+    `FILE_STORAGE_S3_SESSION_TOKEN=${firstValue('FILE_STORAGE_S3_SESSION_TOKEN', environments, '')}`,
+    `FILE_STORAGE_S3_FORCE_PATH_STYLE=${firstValue('FILE_STORAGE_S3_FORCE_PATH_STYLE', environments, '')}`,
+    `FILE_STORAGE_S3_PREFIX=${firstValue('FILE_STORAGE_S3_PREFIX', environments, '')}`,
+    ...(minioRootPassword === undefined
+      ? []
+      : [
+          '# MinIO administrator for `docker compose --profile files up minio minio-bucket`; the API',
+          '# never uses it. Point FILE_STORAGE_S3_ENDPOINT at http://minio:9000 from Compose, or',
+          '# http://localhost:9000 from the host, and set the FILE_STORAGE_S3_* user to enable uploads.',
+          `MINIO_ROOT_USER=${firstValue('MINIO_ROOT_USER', environments, 'alfred-minio-admin')}`,
+          `MINIO_ROOT_PASSWORD=${minioRootPassword}`,
+        ]),
   ];
 }
 
@@ -208,6 +252,8 @@ async function synchronizeEnvironmentContract(path, entries) {
     'REDIS_API_PASSWORD',
     'AGENT_REDIS_PASSWORD',
     'REDIS_PORT',
+    // The API selects native stream modes itself; the variable was never read.
+    'AGENT_RUNTIME_STREAM_MODES',
   ]);
   const managedEntries = new Map(entries);
   const seenKeys = new Set();
@@ -275,6 +321,7 @@ const environments = [rootEnvironment, apiEnvironment, agentEnvironment];
 const secrets = Object.freeze({
   jwt: firstUsableSecret('AUTH_JWT_SECRET', environments),
   metrics: firstUsableSecret('OBSERVABILITY_METRICS_TOKEN', environments),
+  minio: firstUsableSecret('MINIO_ROOT_PASSWORD', environments),
 });
 
 function preservedDataUrl(key, fallback) {
@@ -307,6 +354,13 @@ const google = Object.freeze({
   workspaceDomain: firstNonEmptyValue('GOOGLE_WORKSPACE_DOMAIN', environments),
 });
 
+// Development-only trace links: public address parts of the runtime's LangSmith console.
+const traceLinks = Object.freeze({
+  uiUrl: firstNonEmptyValue('TRACE_LINK_UI_URL', environments, 'https://smith.langchain.com'),
+  organizationId: firstNonEmptyValue('TRACE_LINK_ORGANIZATION_ID', environments),
+  projectId: firstNonEmptyValue('TRACE_LINK_PROJECT_ID', environments),
+});
+
 const featureFlags = Object.freeze({
   agentRuntime: firstValue('FEATURE_AGENT_RUNTIME_ENABLED', environments, 'false'),
   agUiStreaming: firstValue('FEATURE_AG_UI_STREAMING_ENABLED', environments, 'false'),
@@ -326,6 +380,7 @@ const featureFlags = Object.freeze({
   runtimeMemory: firstValue('FEATURE_RUNTIME_MEMORY_ENABLED', environments, 'false'),
   skills: firstValue('FEATURE_SKILLS_ENABLED', environments, 'false'),
   teams: firstValue('FEATURE_TEAMS_ENABLED', environments, 'false'),
+  traceLinks: firstValue('FEATURE_TRACE_LINKS_ENABLED', environments, 'false'),
 });
 
 const ports = Object.freeze({
@@ -333,6 +388,42 @@ const ports = Object.freeze({
   web: firstValue('WEB_PORT', [rootEnvironment, webEnvironment], '5173'),
   agent: firstValue('AGENT_PORT', environments, '2024'),
 });
+
+const runtimeDefaults = Object.freeze({
+  AGENT_RUNTIME_ASSISTANT_ID: 'orchestrator',
+  AGENT_RUNTIME_TITLE_ASSISTANT_ID: 'title_agent',
+  // Optional cursor overrides; the API derives its default from the existing JWT secret.
+  EXECUTION_CURSOR_KEY: '',
+  EXECUTION_CURSOR_KEY_PREVIOUS: '',
+  EXECUTION_DEADLINE_MS: '600000',
+  EXECUTION_LEASE_MS: '30000',
+  EXECUTION_WORKER_CONCURRENCY: '4',
+  EXECUTION_WORK_LOG_CONTENT_ENABLED: 'true',
+  EXECUTION_MAX_ACTIVE_PER_USER: '4',
+  EXECUTION_MAX_ACTIVE_GLOBAL: '64',
+  EXECUTION_COMMIT_WINDOW_MS: '500',
+  EXECUTION_CURSOR_TTL_MS: '3600000',
+  EXECUTION_SSE_HEARTBEAT_MS: '25000',
+  EXECUTION_SSE_DRAIN_TIMEOUT_MS: '10000',
+  EXECUTION_SSE_MAX_FRAME_BYTES: '2097152',
+  EXECUTION_SSE_MAX_BUFFERED_BYTES: '4194304',
+  EXECUTION_MAX_OBSERVERS_PER_USER: '4',
+  EXECUTION_MAX_OBSERVERS_PER_INSTANCE: '128',
+  EXECUTION_OBSERVER_REAUTH_MS: '25000',
+});
+
+function runtimeEntries(environment, defaultUrl) {
+  return [
+    ['AGENT_RUNTIME_URL', firstValue('AGENT_RUNTIME_URL', [environment], defaultUrl)],
+    ...Object.entries(runtimeDefaults).map(([key, fallback]) => [
+      key,
+      firstValue(key, [environment, ...environments], fallback),
+    ]),
+  ];
+}
+
+const rootRuntimeEntries = runtimeEntries(rootEnvironment, 'http://agents-api:8000');
+const apiRuntimeEntries = runtimeEntries(apiEnvironment, 'http://localhost:8000');
 
 const rootContent = renderEnvironment([
   '# Generated by pnpm setup:env. Private local values: never commit this file.',
@@ -370,11 +461,8 @@ const rootContent = renderEnvironment([
   'DATABASE_SSL=false',
   'TRUST_PROXY_HOPS=1',
   '',
-  '# Private LangGraph server (langgraph-agent-repo agents-api); reached by the API container only.',
-  'AGENT_RUNTIME_URL=http://agents-api:8000',
-  'AGENT_RUNTIME_ASSISTANT_ID=orchestrator',
-  'AGENT_RUNTIME_STREAM_MODES=messages,updates',
-  'AGENT_RUNTIME_TITLE_ASSISTANT_ID=title_agent',
+  '# Existing private LangGraph server; only the API connects to it.',
+  ...rootRuntimeEntries.map(([key, value]) => `${key}=${value}`),
   '',
   '# Structured logs and opt-in Prometheus metrics.',
   'OBSERVABILITY_LOG_LEVEL=info',
@@ -383,11 +471,18 @@ const rootContent = renderEnvironment([
   '',
   ...renderFeatureFlags(featureFlags),
   '',
+  ...renderFileStorage(environments, secrets.minio),
+  '',
   '# External/commercial Google OAuth credentials. Workspace restriction is optional.',
   `GOOGLE_OAUTH_CLIENT_ID=${google.clientId}`,
   `GOOGLE_OAUTH_CLIENT_SECRET=${google.clientSecret}`,
   `GOOGLE_OAUTH_CALLBACK_URL=${google.callbackUrl}`,
   `GOOGLE_WORKSPACE_DOMAIN=${google.workspaceDomain}`,
+  '',
+  '# Trace links (development diagnostic): ids from any LangSmith trace URL, then enable the flag.',
+  `TRACE_LINK_UI_URL=${traceLinks.uiUrl}`,
+  `TRACE_LINK_ORGANIZATION_ID=${traceLinks.organizationId}`,
+  `TRACE_LINK_PROJECT_ID=${traceLinks.projectId}`,
   '',
   '# Public web build configuration',
   `WEB_PORT=${ports.web}`,
@@ -412,11 +507,8 @@ const apiContent = renderEnvironment([
   'API_CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173',
   'TRUST_PROXY_HOPS=0',
   '',
-  '# Private LangGraph server (langgraph-agent-repo agents-api); reached by the API only.',
-  'AGENT_RUNTIME_URL=http://localhost:8000',
-  'AGENT_RUNTIME_ASSISTANT_ID=orchestrator',
-  'AGENT_RUNTIME_STREAM_MODES=messages,updates',
-  'AGENT_RUNTIME_TITLE_ASSISTANT_ID=title_agent',
+  '# Existing private LangGraph server; only the API connects to it.',
+  ...apiRuntimeEntries.map(([key, value]) => `${key}=${value}`),
   '',
   '# Shared PostgreSQL from the langgraph-agent-repo stack; API tables carry the api_ prefix.',
   `DATABASE_URL=${dataServices.hostDatabaseUrl}`,
@@ -445,11 +537,18 @@ const apiContent = renderEnvironment([
   '',
   ...renderFeatureFlags(featureFlags),
   '',
+  ...renderFileStorage(environments),
+  '',
   '# External/commercial Google OAuth credentials. Workspace restriction is optional.',
   `GOOGLE_OAUTH_CLIENT_ID=${google.clientId}`,
   `GOOGLE_OAUTH_CLIENT_SECRET=${google.clientSecret}`,
   `GOOGLE_OAUTH_CALLBACK_URL=${google.callbackUrl}`,
   `GOOGLE_WORKSPACE_DOMAIN=${google.workspaceDomain}`,
+  '',
+  '# Trace links (development diagnostic): ids from any LangSmith trace URL, then enable the flag.',
+  `TRACE_LINK_UI_URL=${traceLinks.uiUrl}`,
+  `TRACE_LINK_ORGANIZATION_ID=${traceLinks.organizationId}`,
+  `TRACE_LINK_PROJECT_ID=${traceLinks.projectId}`,
   '',
   `REDIS_URL=${dataServices.hostRedisUrl}`,
   '',
@@ -488,6 +587,7 @@ await Promise.all([
 
 await Promise.all([
   synchronizeEnvironmentContract(envPaths.root, [
+    ...rootRuntimeEntries,
     ['VITE_DEBUG_EVENTS', firstValue('VITE_DEBUG_EVENTS', environments, 'false')],
     ['NODE_ENV', 'development'],
     ['DATABASE_URL', dataUrls.rootDatabase],
@@ -507,12 +607,39 @@ await Promise.all([
     ['OBSERVABILITY_LOG_LEVEL', 'info'],
     ['OBSERVABILITY_METRICS_ENABLED', 'false'],
     ['OBSERVABILITY_METRICS_TOKEN', secrets.metrics],
+    ['FILE_UPLOAD_MAX_BYTES', '5242880'],
+    ['FILE_QUOTA_BYTES_PER_USER', '26214400'],
+    ['FILE_PENDING_UPLOAD_TTL_MS', '300000'],
+    ['FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE', '20'],
+    ['FILE_UPLOAD_MAX_CONCURRENT', '4'],
+    ['FILE_EXTRACTION_TIMEOUT_MS', '60000'],
+    ['FILE_EXTRACTION_MAX_PDF_PAGES', '500'],
+    ['FILE_EXTRACTED_TEXT_MAX_CHARS', '1000000'],
+    ['FILE_IMAGE_MAX_EDGE_PX', '1568'],
+    ['FILE_IMAGE_MAX_INPUT_PIXELS', '50000000'],
+    ['FILE_PROMPT_TOKENS_PER_DOCUMENT', '10000'],
+    ['FILE_PROMPT_TOKENS_PER_EXECUTION', '30000'],
+    ['FILE_STORAGE_LOCAL_ROOT', 'var/uploads'],
+    ['FILE_STORAGE_S3_ENDPOINT', ''],
+    ['FILE_STORAGE_S3_BUCKET', ''],
+    ['FILE_STORAGE_S3_REGION', ''],
+    ['FILE_STORAGE_S3_ACCESS_KEY_ID', ''],
+    ['FILE_STORAGE_S3_SECRET_ACCESS_KEY', ''],
+    ['FILE_STORAGE_S3_SESSION_TOKEN', ''],
+    ['FILE_STORAGE_S3_FORCE_PATH_STYLE', ''],
+    ['FILE_STORAGE_S3_PREFIX', ''],
+    ['MINIO_ROOT_USER', 'alfred-minio-admin'],
+    ['MINIO_ROOT_PASSWORD', secrets.minio],
     ['GOOGLE_OAUTH_CLIENT_ID', google.clientId],
     ['GOOGLE_OAUTH_CLIENT_SECRET', google.clientSecret],
     ['GOOGLE_OAUTH_CALLBACK_URL', google.callbackUrl],
     ['GOOGLE_WORKSPACE_DOMAIN', google.workspaceDomain],
+    ['TRACE_LINK_UI_URL', traceLinks.uiUrl],
+    ['TRACE_LINK_ORGANIZATION_ID', traceLinks.organizationId],
+    ['TRACE_LINK_PROJECT_ID', traceLinks.projectId],
   ]),
   synchronizeEnvironmentContract(envPaths.api, [
+    ...apiRuntimeEntries,
     ['DATABASE_URL', dataServices.hostDatabaseUrl],
     ['AUTH_JWT_SECRET', secrets.jwt],
     ['AUTH_SESSION_CLEANUP_INTERVAL_SECONDS', '3600'],
@@ -523,6 +650,27 @@ await Promise.all([
     ['AUTH_REFRESH_IP_RATE_LIMIT_PER_MINUTE', '1200'],
     ['AUTH_USER_RATE_LIMIT_PER_MINUTE', '120'],
     ['TRUST_PROXY_HOPS', '0'],
+    ['FILE_UPLOAD_MAX_BYTES', '5242880'],
+    ['FILE_QUOTA_BYTES_PER_USER', '26214400'],
+    ['FILE_PENDING_UPLOAD_TTL_MS', '300000'],
+    ['FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE', '20'],
+    ['FILE_UPLOAD_MAX_CONCURRENT', '4'],
+    ['FILE_EXTRACTION_TIMEOUT_MS', '60000'],
+    ['FILE_EXTRACTION_MAX_PDF_PAGES', '500'],
+    ['FILE_EXTRACTED_TEXT_MAX_CHARS', '1000000'],
+    ['FILE_IMAGE_MAX_EDGE_PX', '1568'],
+    ['FILE_IMAGE_MAX_INPUT_PIXELS', '50000000'],
+    ['FILE_PROMPT_TOKENS_PER_DOCUMENT', '10000'],
+    ['FILE_PROMPT_TOKENS_PER_EXECUTION', '30000'],
+    ['FILE_STORAGE_LOCAL_ROOT', 'var/uploads'],
+    ['FILE_STORAGE_S3_ENDPOINT', ''],
+    ['FILE_STORAGE_S3_BUCKET', ''],
+    ['FILE_STORAGE_S3_REGION', ''],
+    ['FILE_STORAGE_S3_ACCESS_KEY_ID', ''],
+    ['FILE_STORAGE_S3_SECRET_ACCESS_KEY', ''],
+    ['FILE_STORAGE_S3_SESSION_TOKEN', ''],
+    ['FILE_STORAGE_S3_FORCE_PATH_STYLE', ''],
+    ['FILE_STORAGE_S3_PREFIX', ''],
     ['OBSERVABILITY_LOG_LEVEL', 'info'],
     ['OBSERVABILITY_METRICS_ENABLED', 'false'],
     ['OBSERVABILITY_METRICS_TOKEN', secrets.metrics],
@@ -530,6 +678,9 @@ await Promise.all([
     ['GOOGLE_OAUTH_CLIENT_SECRET', google.clientSecret],
     ['GOOGLE_OAUTH_CALLBACK_URL', google.callbackUrl],
     ['GOOGLE_WORKSPACE_DOMAIN', google.workspaceDomain],
+    ['TRACE_LINK_UI_URL', traceLinks.uiUrl],
+    ['TRACE_LINK_ORGANIZATION_ID', traceLinks.organizationId],
+    ['TRACE_LINK_PROJECT_ID', traceLinks.projectId],
     ['REDIS_URL', dataServices.hostRedisUrl],
   ]),
   synchronizeEnvironmentContract(envPaths.web, [

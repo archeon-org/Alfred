@@ -17,10 +17,9 @@ const validEnvironment = Object.freeze({
 });
 
 describe('parseEnvironment', () => {
-  it('defaults the private agent runtime target and validates the relayed stream modes', () => {
+  it('defaults the existing native runtime target and ignores the retired stream-modes variable', () => {
     expect(parseEnvironment(validEnvironment)).toMatchObject({
       AGENT_RUNTIME_ASSISTANT_ID: 'orchestrator',
-      AGENT_RUNTIME_STREAM_MODES: ['messages', 'updates'],
       AGENT_RUNTIME_TITLE_ASSISTANT_ID: 'title_agent',
       AGENT_RUNTIME_URL: 'http://localhost:8000',
     });
@@ -30,16 +29,11 @@ describe('parseEnvironment', () => {
     expect(
       parseEnvironment({
         ...validEnvironment,
-        AGENT_RUNTIME_STREAM_MODES: ' values , messages-tuple',
+        AGENT_RUNTIME_STREAM_MODES: 'messages,tokens',
         AGENT_RUNTIME_URL: 'http://agents-api:8000',
       }),
-    ).toMatchObject({
-      AGENT_RUNTIME_STREAM_MODES: ['values', 'messages-tuple'],
-      AGENT_RUNTIME_URL: 'http://agents-api:8000',
-    });
-    expect(() =>
-      parseEnvironment({ ...validEnvironment, AGENT_RUNTIME_STREAM_MODES: 'messages,tokens' }),
-    ).toThrow('AGENT_RUNTIME_STREAM_MODES');
+    ).toMatchObject({ AGENT_RUNTIME_URL: 'http://agents-api:8000' });
+    expect(parseEnvironment(validEnvironment)).not.toHaveProperty('AGENT_RUNTIME_STREAM_MODES');
     expect(() =>
       parseEnvironment({ ...validEnvironment, AGENT_RUNTIME_URL: 'agents-api' }),
     ).toThrow('AGENT_RUNTIME_URL');
@@ -53,6 +47,45 @@ describe('parseEnvironment', () => {
     expect(parseEnvironment(validEnvironment)).toHaveProperty(key);
     expect(() => parseEnvironment({ ...validEnvironment, [key]: '0' })).toThrow(key);
     expect(() => parseEnvironment({ ...validEnvironment, [key]: 'unbounded' })).toThrow(key);
+  });
+  it('bounds the memory uploads in flight may hold, and the file size the proxy lets through', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FILE_QUOTA_BYTES_PER_USER: '104857600',
+        FILE_UPLOAD_MAX_BYTES: '26214400',
+        FILE_UPLOAD_MAX_CONCURRENT: '8',
+      }),
+    ).toThrow('FILE_UPLOAD_MAX_CONCURRENT');
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FILE_QUOTA_BYTES_PER_USER: '104857600',
+        FILE_UPLOAD_MAX_BYTES: '26214400',
+        FILE_UPLOAD_MAX_CONCURRENT: '4',
+      }),
+    ).not.toThrow();
+    // Beyond what the web proxy is sized for, a limit would be unreachable from the application.
+    expect(() =>
+      parseEnvironment({ ...validEnvironment, FILE_UPLOAD_MAX_BYTES: '26214401' }),
+    ).toThrow('FILE_UPLOAD_MAX_BYTES');
+  });
+
+  it('rejects inconsistent file upload limits', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FILE_UPLOAD_MAX_BYTES: '2048',
+        FILE_QUOTA_BYTES_PER_USER: '1024',
+      }),
+    ).toThrow('FILE_QUOTA_BYTES_PER_USER');
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        FILE_PROMPT_TOKENS_PER_DOCUMENT: '5000',
+        FILE_PROMPT_TOKENS_PER_EXECUTION: '1000',
+      }),
+    ).toThrow('FILE_PROMPT_TOKENS_PER_EXECUTION');
   });
   it('rejects inconsistent skills storage limits', () => {
     expect(() =>
@@ -105,7 +138,6 @@ describe('parseEnvironment', () => {
 
     expect(environment).toEqual({
       AGENT_RUNTIME_ASSISTANT_ID: 'orchestrator',
-      AGENT_RUNTIME_STREAM_MODES: ['messages', 'updates'],
       AGENT_RUNTIME_TITLE_ASSISTANT_ID: 'title_agent',
       AGENT_RUNTIME_URL: 'http://localhost:8000',
       API_CORS_ORIGINS: ['http://localhost:5173', 'https://app.alfred.dev'],
@@ -129,6 +161,22 @@ describe('parseEnvironment', () => {
       DATABASE_POOL_MAX: 20,
       DATABASE_SSL: false,
       DATABASE_URL: 'postgresql://alfred:local-password@localhost:5432/alfred_app?schema=public',
+      EXECUTION_CURSOR_KEY: 'a8ba8903ae93e4c825fe3e8d05a111315b384a245991b935616dc49b4a06cc50',
+      EXECUTION_COMMIT_WINDOW_MS: 500,
+      EXECUTION_CURSOR_TTL_MS: 3_600_000,
+      EXECUTION_DEADLINE_MS: 600_000,
+      EXECUTION_LEASE_MS: 30_000,
+      EXECUTION_WORKER_CONCURRENCY: 4,
+      EXECUTION_MAX_ACTIVE_PER_USER: 4,
+      EXECUTION_MAX_ACTIVE_GLOBAL: 64,
+      EXECUTION_SSE_HEARTBEAT_MS: 25_000,
+      EXECUTION_SSE_DRAIN_TIMEOUT_MS: 10_000,
+      EXECUTION_SSE_MAX_FRAME_BYTES: 2_097_152,
+      EXECUTION_SSE_MAX_BUFFERED_BYTES: 4_194_304,
+      EXECUTION_MAX_OBSERVERS_PER_USER: 4,
+      EXECUTION_MAX_OBSERVERS_PER_INSTANCE: 128,
+      EXECUTION_OBSERVER_REAUTH_MS: 25_000,
+      EXECUTION_WORK_LOG_CONTENT_ENABLED: true,
       FEATURE_AGENT_RUNTIME_ENABLED: false,
       FEATURE_AG_UI_STREAMING_ENABLED: false,
       FEATURE_FILE_UPLOADS_ENABLED: false,
@@ -143,6 +191,20 @@ describe('parseEnvironment', () => {
       FEATURE_RUNTIME_MEMORY_ENABLED: false,
       FEATURE_SKILLS_ENABLED: false,
       FEATURE_TEAMS_ENABLED: false,
+      FEATURE_TRACE_LINKS_ENABLED: false,
+      FILE_EXTRACTED_TEXT_MAX_CHARS: 1_000_000,
+      FILE_EXTRACTION_MAX_PDF_PAGES: 500,
+      FILE_EXTRACTION_TIMEOUT_MS: 60_000,
+      FILE_IMAGE_MAX_EDGE_PX: 1_568,
+      FILE_IMAGE_MAX_INPUT_PIXELS: 50_000_000,
+      FILE_PENDING_UPLOAD_TTL_MS: 300_000,
+      FILE_PROMPT_TOKENS_PER_DOCUMENT: 10_000,
+      FILE_PROMPT_TOKENS_PER_EXECUTION: 30_000,
+      FILE_QUOTA_BYTES_PER_USER: 26_214_400,
+      FILE_STORAGE_LOCAL_ROOT: 'var/uploads',
+      FILE_UPLOAD_MAX_BYTES: 5_242_880,
+      FILE_UPLOAD_MAX_CONCURRENT: 4,
+      FILE_UPLOAD_USER_RATE_LIMIT_PER_MINUTE: 20,
       NODE_ENV: 'test',
       OBSERVABILITY_LOG_LEVEL: 'info',
       OBSERVABILITY_METRICS_ENABLED: false,
@@ -254,6 +316,78 @@ describe('parseEnvironment', () => {
         GOOGLE_OAUTH_CLIENT_ID: 'client-id.apps.googleusercontent.com',
       }),
     ).toThrow(/GOOGLE_OAUTH/u);
+  });
+
+  it('requires the trace console addresses when trace links are enabled', () => {
+    expect(() =>
+      parseEnvironment({ ...validEnvironment, FEATURE_TRACE_LINKS_ENABLED: 'true' }),
+    ).toThrow(/TRACE_LINK_UI_URL is required when FEATURE_TRACE_LINKS_ENABLED is true/u);
+    const environment = parseEnvironment({
+      ...validEnvironment,
+      FEATURE_TRACE_LINKS_ENABLED: 'true',
+      TRACE_LINK_UI_URL: 'https://smith.langchain.com',
+      TRACE_LINK_ORGANIZATION_ID: 'org',
+      TRACE_LINK_PROJECT_ID: 'proj',
+    });
+    expect(environment.FEATURE_TRACE_LINKS_ENABLED).toBe(true);
+    expect(environment.TRACE_LINK_PROJECT_ID).toBe('proj');
+    expect(
+      parseEnvironment({ ...validEnvironment, TRACE_LINK_PROJECT_ID: '' }).TRACE_LINK_PROJECT_ID,
+    ).toBeUndefined();
+  });
+
+  it('refuses a trace console address carrying credentials, a query or a fragment', () => {
+    for (const address of [
+      'https://user:secret@smith.langchain.com',
+      'https://smith.langchain.com/?token=1',
+      'https://smith.langchain.com/#frag',
+      'ftp://smith.langchain.com',
+    ]) {
+      expect(() => parseEnvironment({ ...validEnvironment, TRACE_LINK_UI_URL: address })).toThrow(
+        /TRACE_LINK_UI_URL must be an http\(s\) address without credentials/u,
+      );
+    }
+    expect(
+      parseEnvironment({
+        ...validEnvironment,
+        TRACE_LINK_UI_URL: 'https://observability.internal/ls/',
+      }).TRACE_LINK_UI_URL,
+    ).toBe('https://observability.internal/ls/');
+  });
+
+  it('refuses trace console settings that leave no room for a run identifier in a link', () => {
+    const settings = { TRACE_LINK_ORGANIZATION_ID: 'org', TRACE_LINK_PROJECT_ID: 'proj' };
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        ...settings,
+        TRACE_LINK_UI_URL: `https://observability.internal/${'p'.repeat(900)}`,
+      }),
+    ).toThrow(/must leave a trace link within 2048 characters for any run identifier/u);
+    expect(
+      parseEnvironment({
+        ...validEnvironment,
+        ...settings,
+        TRACE_LINK_UI_URL: `https://observability.internal/${'p'.repeat(800)}`,
+      }).TRACE_LINK_UI_URL,
+    ).toHaveLength(31 + 800);
+  });
+
+  it('refuses trace links in production: they are a development diagnostic', () => {
+    expect(() =>
+      parseEnvironment({
+        ...validEnvironment,
+        API_CORS_ORIGINS: 'https://alfred.example.test',
+        AUTH_COOKIE_SECURE: 'true',
+        NODE_ENV: 'production',
+        REDIS_URL: 'redis://default:a-real-redis-password@redis:6379/0',
+        WEB_APP_URL: 'https://alfred.example',
+        FEATURE_TRACE_LINKS_ENABLED: 'true',
+        TRACE_LINK_UI_URL: 'https://smith.langchain.com',
+        TRACE_LINK_ORGANIZATION_ID: 'org',
+        TRACE_LINK_PROJECT_ID: 'proj',
+      }),
+    ).toThrow(/must be false in production/u);
   });
 
   it('treats empty optional Google variables from container environments as absent', () => {

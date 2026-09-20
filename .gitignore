@@ -27,7 +27,12 @@ apps/agent/**/*.pyc
 
 docker-data/
 
+<<<<<<< HEAD
 # Developer instructions and machine-specific assistant settings.
 AGENTS.local.md
 CLAUDE.local.md
 .claude/settings.local.json
+=======
+# Uploaded file bytes when no S3-compatible bucket is configured (development only).
+**/var/uploads/
+>>>>>>> ed878ad47f30f61496866abd8cee232c467ba697

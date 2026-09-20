@@ -7,6 +7,14 @@ import helmet from 'helmet';
 import type { NextFunction, Request, Response } from 'express';
 import { RequestValidationPipe } from './common/validation/request-validation.pipe';
 
+/** Probes and metrics answer at the root, without the API prefix; the documentation test reuses this. */
+export const UNPREFIXED_ROUTES = [
+  { method: RequestMethod.GET, path: 'health' },
+  { method: RequestMethod.GET, path: 'health/live' },
+  { method: RequestMethod.GET, path: 'health/ready' },
+  { method: RequestMethod.GET, path: 'metrics' },
+] as const;
+
 function preventResponseCaching(_request: Request, response: Response, next: NextFunction): void {
   response.setHeader('Cache-Control', 'no-store');
   next();
@@ -40,14 +48,7 @@ export function configureApplication(app: INestApplication): void {
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     origin: config.getOrThrow<readonly string[]>('API_CORS_ORIGINS'),
   });
-  app.setGlobalPrefix(prefix, {
-    exclude: [
-      { method: RequestMethod.GET, path: 'health' },
-      { method: RequestMethod.GET, path: 'health/live' },
-      { method: RequestMethod.GET, path: 'health/ready' },
-      { method: RequestMethod.GET, path: 'metrics' },
-    ],
-  });
+  app.setGlobalPrefix(prefix, { exclude: [...UNPREFIXED_ROUTES] });
   app.useGlobalPipes(new RequestValidationPipe());
   app.enableShutdownHooks();
 }

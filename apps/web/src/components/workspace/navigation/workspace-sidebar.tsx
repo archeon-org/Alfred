@@ -11,6 +11,7 @@ import {
   type ProjectNavigationProps,
 } from '@/components/workspace/navigation/project-navigation';
 import { HistorySkeleton } from '@/components/workspace/workspace-skeletons';
+import { useShortcutHint } from '@/hooks/workspace/use-shortcut-preferences';
 import type { Conversation, WorkspaceCreationKind } from '@/lib/workspace/workspace.types';
 import { cn } from '@/lib/cn';
 
@@ -26,20 +27,24 @@ interface WorkspaceSidebarProps extends Omit<ProjectNavigationProps, 'onCreate' 
   readonly search: string;
   readonly isLoading: boolean;
   readonly isNavigationOpen: boolean;
+  /** Folds the navigation column away on wider screens. */
+  readonly onCollapse?: () => void;
+  readonly isPreviewLoading?: boolean;
+  readonly onTogglePreviewLoading?: () => void;
   readonly loadError: string | null;
   /** Transient message, for example a failed pin; announced as an alert. */
   readonly notice?: string | null;
   readonly onRetry: () => void;
   readonly onSearch: (value: string) => void;
   readonly onCreate: (kind: WorkspaceCreationKind, trigger: HTMLButtonElement) => void;
-  /** Chat whose answer is streaming right now, wherever it is listed. */
-  readonly streamingConversationId?: string;
+  /** Chats with unresolved answers, wherever they are listed. */
+  readonly streamingConversationIds?: ReadonlySet<string>;
 }
 
 export function WorkspaceSidebar({
   conversationActions,
   conversations,
-  streamingConversationId,
+  streamingConversationIds,
   hasMoreConversations,
   isLoadingMoreConversations,
   onLoadMoreConversations,
@@ -48,6 +53,9 @@ export function WorkspaceSidebar({
   search,
   isLoading,
   isNavigationOpen,
+  onCollapse,
+  isPreviewLoading,
+  onTogglePreviewLoading,
   loadError,
   notice,
   onRetry,
@@ -59,15 +67,22 @@ export function WorkspaceSidebar({
   ...projectNavigation
 }: WorkspaceSidebarProps) {
   const searchId = useId();
+  const newConversationHint = useShortcutHint('newConversation', 'Nouvelle conversation');
   const isSearching = Boolean(search.trim());
   const standaloneChats = conversations.filter((item) => item.projectKind === 'implicit');
   return (
-    <SidebarFrame>
+    <SidebarFrame
+      isNavigationOpen={isNavigationOpen}
+      isPreviewLoading={isPreviewLoading}
+      onCollapse={onCollapse}
+      onTogglePreviewLoading={onTogglePreviewLoading}
+    >
       <nav
         aria-label="Navigation principale"
         className="mt-4 grid grid-cols-2 gap-3 md:mt-0 md:grid-cols-1"
       >
         <Button
+          {...newConversationHint}
           className="h-auto rounded-lg border border-sidebar-primary px-2 py-3 text-2xs whitespace-normal md:text-xs"
           onClick={(event) =>
             onCreate(
@@ -95,7 +110,7 @@ export function WorkspaceSidebar({
         id="conversation-history"
         data-conversation-scroll-root
         className={cn(
-          'mt-5 min-h-0 flex-1 overflow-y-auto [scrollbar-color:var(--sidebar-border)_transparent] [scrollbar-width:thin]',
+          'mt-5 min-h-0 flex-1 overflow-y-auto [scrollbar-color:var(--sidebar-border)_transparent] [scrollbar-width:thin] max-workspace:min-h-40 max-workspace:basis-0',
           !isNavigationOpen && 'max-md:hidden',
         )}
       >
@@ -159,7 +174,7 @@ export function WorkspaceSidebar({
                 onSelectConversation={onSelectConversation}
                 selectedConversationId={selectedConversationId}
                 selectedProjectId={selectedProjectId}
-                streamingConversationId={streamingConversationId}
+                streamingConversationIds={streamingConversationIds}
               />
               <section role="group" aria-label="Chats libres" className="mt-6">
                 <div className="mb-1.5 flex min-h-8 items-center justify-between pl-2">
@@ -183,7 +198,7 @@ export function WorkspaceSidebar({
                   compact
                   conversations={standaloneChats}
                   selectedId={selectedConversationId}
-                  streamingId={streamingConversationId}
+                  streamingIds={streamingConversationIds}
                   onSelect={onSelectConversation}
                 />
                 <ConversationPagination

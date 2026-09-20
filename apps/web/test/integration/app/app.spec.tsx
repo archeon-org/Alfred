@@ -32,6 +32,7 @@ describe('App providers', () => {
                   runtimeMemory: false,
                   skills: false,
                   teams: false,
+                  traceLinks: false,
                 },
                 success: true,
               }),

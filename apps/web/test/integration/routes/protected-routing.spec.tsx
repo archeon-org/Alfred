@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -158,7 +159,9 @@ describe('Alfred protected route behavior', () => {
       user: restoredSession.user,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /se déconnecter/i }));
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /menu du compte/iu }));
+    await user.click(await screen.findByRole('menuitem', { name: /se déconnecter/iu }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/session reste active/i);
     expect(logout).toHaveBeenCalledOnce();

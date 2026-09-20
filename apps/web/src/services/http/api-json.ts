@@ -6,6 +6,8 @@ export class ApiRequestError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** Structured facts some errors carry, such as the byte budget behind `quota_exceeded`. */
+    readonly details?: Readonly<Record<string, unknown>>,
   ) {
     super(message);
     this.name = 'ApiRequestError';
@@ -29,17 +31,19 @@ export async function readJsonBody(response: Response): Promise<unknown> {
 export async function throwApiError(response: Response): Promise<never> {
   let code = `HTTP_${response.status}`;
   let message = 'La requête a échoué.';
+  let details: Readonly<Record<string, unknown>> | undefined;
   try {
     const parsed = apiErrorSchema.safeParse(await response.json());
     if (parsed.success) {
       code = parsed.data.error.code;
       const detail = parsed.data.error.message;
       message = typeof detail === 'string' ? detail : detail.join(' ');
+      details = parsed.data.error.details;
     }
   } catch {
     // The default HTTP_<status> code and message apply.
   }
-  throw new ApiRequestError(response.status, code, message);
+  throw new ApiRequestError(response.status, code, message, details);
 }
 
 interface EnvelopeSchema<T> {

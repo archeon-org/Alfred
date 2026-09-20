@@ -21,6 +21,7 @@ describe('feature flag API contract', () => {
       runtimeMemory: false,
       skills: false,
       teams: false,
+      traceLinks: false,
     };
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ data: flags, success: true }), {
@@ -35,6 +36,34 @@ describe('feature flag API contract', () => {
       expect.stringMatching(/\/features$/u),
       expect.objectContaining({ credentials: 'include', method: 'GET' }),
     );
+  });
+
+  it('reads a manifest from an older API without the newest flag as disabled', async () => {
+    const legacy = {
+      agentRuntime: true,
+      agUiStreaming: false,
+      fileUploads: false,
+      generativeUi: false,
+      googleOAuth: false,
+      mcpApps: false,
+      outputStyles: false,
+      knowledgeScope: false,
+      conversationFeedback: false,
+      runtimeMemory: false,
+      skills: true,
+      teams: false,
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ data: legacy, success: true }), {
+          headers: { 'content-type': 'application/json' },
+          status: 200,
+        }),
+      ),
+    );
+
+    await expect(getFeatureFlags()).resolves.toEqual({ ...legacy, traceLinks: false });
   });
 
   it('fails closed when one flag is absent or not boolean', async () => {

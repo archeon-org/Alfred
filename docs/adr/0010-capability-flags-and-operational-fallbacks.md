@@ -1,6 +1,7 @@
 # ADR 0010: Capability Flags and Operational Fallbacks
 
-- Status: Accepted
+- Status: Accepted; file storage paragraph and inventory row amended by
+  [ADR 0027](0027-uploaded-file-content-store.md) on 2026-09-18
 - Date: 2026-09-04
 
 ## Context
@@ -56,6 +57,13 @@ objects between backends. A backend transition requires dual-read or migration r
 configured adapter changes. Local files must live on a persistent volume, never the container's
 read-only image filesystem.
 
+**Amendment, 2026-09-18 ([ADR 0027](0027-uploaded-file-content-store.md)).** The product owner
+inverted the default: an S3-compatible bucket is the production adapter, selected by describing a
+bucket, and local storage is a development profile refused in production. Everything else above
+stands — selection fixed at startup, no switch after a write failure, a migration rule before a
+backend changes — and the question of a deployment without an object store (local on a persistent
+volume, or PostgreSQL `bytea`) is open for the owner of ALF-DEC-054.
+
 ## Consequences
 
 - Existing deployments retain rate limiting without adding configuration because the flag defaults
@@ -72,16 +80,16 @@ read-only image filesystem.
 
 ## Current Capability Inventory
 
-| Capability                                                     | Current control                                             | Disabled behavior / remaining work                                          |
-| -------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------- |
-| API rate limiting                                              | Private `FEATURE_RATE_LIMITING_ENABLED`, default on         | All five buckets bypass storage; Redis readiness is disabled                |
-| Prometheus metrics                                             | `OBSERVABILITY_METRICS_ENABLED`, default off                | Collection is a no-op and the endpoint returns 404                          |
-| Google OAuth                                                   | Public `googleOAuth`, default off                           | Provider is unavailable; another login adapter is not implemented           |
-| AG-UI                                                          | Public `agUiStreaming`, default off                         | Capability route returns 404; invocation/stream adapter is not implemented  |
-| Runtime memory                                                 | API manifest plus agent `MemoryContext.memory_enabled`      | Agent opt-out exists; the API flag is not yet connected to graph invocation |
-| OpenAPI documentation                                          | Private `FEATURE_OPENAPI_ENABLED` plus production exclusion | Disabled removes UI and JSON; ordinary API endpoints remain available       |
-| Uploads, generative UI, MCP apps, skills, teams, agent runtime | Reserved public declarations                                | Environment `true` remains unavailable until an execution path exists       |
-| S3-compatible storage                                          | Not implemented                                             | Future local/remote adapters must follow the transition policy above        |
+| Capability                                                     | Current control                                                | Disabled behavior / remaining work                                          |
+| -------------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| API rate limiting                                              | Private `FEATURE_RATE_LIMITING_ENABLED`, default on            | All five buckets bypass storage; Redis readiness is disabled                |
+| Prometheus metrics                                             | `OBSERVABILITY_METRICS_ENABLED`, default off                   | Collection is a no-op and the endpoint returns 404                          |
+| Google OAuth                                                   | Public `googleOAuth`, default off                              | Provider is unavailable; another login adapter is not implemented           |
+| AG-UI                                                          | Public `agUiStreaming`, default off                            | Capability route returns 404; invocation/stream adapter is not implemented  |
+| Runtime memory                                                 | API manifest plus agent `MemoryContext.memory_enabled`         | Agent opt-out exists; the API flag is not yet connected to graph invocation |
+| OpenAPI documentation                                          | Private `FEATURE_OPENAPI_ENABLED` plus production exclusion    | Disabled removes UI and JSON; ordinary API endpoints remain available       |
+| Uploads, generative UI, MCP apps, skills, teams, agent runtime | Reserved public declarations                                   | Environment `true` remains unavailable until an execution path exists       |
+| S3-compatible storage                                          | Implemented (ADR 0027): S3-compatible or local for development | One adapter per deployment, probed at startup, never a runtime fallback     |
 
 This decision refines the operational semantics in
 [ADR 0005](0005-environment-feature-flags.md) without changing its public product-flag contract.

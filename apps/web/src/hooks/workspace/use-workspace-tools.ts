@@ -1,56 +1,9 @@
 import { useState } from 'react';
 
-import type {
-  TeamView,
-  WorkspaceToolTab,
-  WorkspaceToolsState,
-} from '@/lib/workspace/workspace-tools.types';
-import { previewAgents, previewTeams } from '@/mock/workspace-tools';
+import type { WorkspaceToolTab, WorkspaceToolsState } from '@/lib/workspace/workspace-tools.types';
 
-/** Mount at screen level so collapsing a panel never discards this in-memory preview. */
+/** Mount at screen level so collapsing a panel keeps the selected tab. */
 export function useWorkspaceTools(): WorkspaceToolsState {
   const [activeTab, setActiveTab] = useState<WorkspaceToolTab>('teams');
-  const [teams, setTeams] = useState<readonly TeamView[]>(previewTeams);
-  const [selectedTeamId, setSelectedTeamId] = useState('editorial');
-
-  function selectTeam(id: string) {
-    if (teams.some((team) => team.id === id)) setSelectedTeamId(id);
-  }
-
-  function createTeam(name: string, memberIds: readonly string[]) {
-    const cleanName = name.trim();
-    const validMembers = [...new Set(memberIds)].filter((id) =>
-      previewAgents.some((agent) => agent.id === id),
-    );
-    if (
-      !cleanName ||
-      cleanName.length > 60 ||
-      validMembers.length === 0 ||
-      validMembers.length !== memberIds.length
-    )
-      return false;
-    const id = `local-team-${crypto.randomUUID()}`;
-    setTeams((previous) => [
-      ...previous,
-      {
-        id,
-        name: cleanName,
-        description: 'Votre équipe dans cet aperçu local.',
-        memberIds: validMembers,
-      },
-    ]);
-    setSelectedTeamId(id);
-    return true;
-  }
-
-  return {
-    activeTab,
-    setActiveTab,
-    teams,
-    selectedTeamId,
-    selectTeam,
-    createTeam,
-    selectedTeam: teams.find((team) => team.id === selectedTeamId),
-    agents: previewAgents,
-  };
+  return { activeTab, setActiveTab };
 }

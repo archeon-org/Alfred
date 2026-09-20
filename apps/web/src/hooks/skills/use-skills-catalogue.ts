@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { SkillSummary } from '@alfred/contracts';
-import { useCatalogueSearch } from '@/hooks/skills/use-catalogue-search';
+import { useDebouncedSearch } from '@/hooks/ui/use-debounced-search';
 import { useSkillImport } from '@/hooks/skills/use-skill-import';
 import { useSkills } from '@/hooks/skills/use-skills';
 import { importSkillPackage, exportSkillPackage } from '@/lib/skills/skill-package';
 import { downloadSkill, skillError } from '@/lib/skills/skill-errors';
 
 export function useSkillsCatalogue() {
-  const { input, search, setInput } = useCatalogueSearch();
+  const { input, search, setInput } = useDebouncedSearch();
   const { query, skills, get, publish, remove } = useSkills(search);
   const navigate = useNavigate();
   const active = useRef(true);

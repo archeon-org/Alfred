@@ -37,3 +37,40 @@ Verify storage failure/corruption, cross-tab synchronization, reset, OS theme ch
 changes, responsive routing, portal themes and semantic contrast pairs. The contract adds no account
 synchronization, remote branding, product flags, or runtime configuration. The existing discrepancy
 between DEC-049's opaque-session target and ADR 0003 remains outside this presentation slice.
+
+## Revision History
+
+- 2026-09-16: keyboard shortcut bindings reuse this pattern under their own key
+  `alfred.shortcuts.v1` (`version: 1`, at most one bounded `{ code, shift, label }` per known
+  action, decoded by `decodeShortcutPreferences`). Same store factory, cross-tab synchronization,
+  reset and storage-failure behaviour; the record still holds no identity or content. Bindings are
+  validated against a reserved-key table before they are stored (`checkBinding`).
+
+## Revision 2026-09-16: chat display preferences
+
+Validated with the product owner on 2026-09-16 (stored in the browser, Standard by default). A
+second bounded record, `alfred.chat.v1`, holds how much of an answer's work the transcript shows:
+a detail level (`simple`, `standard`, `detailed`) and four display switches (reasoning,
+intermediate messages, empty generations, folding the work log once the answer is complete). It
+follows this ADR's model unchanged: versioned parser with safe defaults, shared store with
+cross-tab updates, volatile fallback when storage is unavailable, reset of its own key only, no
+account synchronization. It changes display only: the API still records and streams the whole
+work log (ADR 0023), so a person can switch mode at any time, including for stored answers.
+ALF-DEC-037 (`accepted-with-risk`) governs what is recorded and is unaffected; ALF-DEC-008
+(`in-discussion`) is not decided by a presentation filter. The register's direction that user
+preferences are canonical at the Product boundary targets preferences that shape the agent; like
+appearance, these presentation choices stay browser-local, and account synchronization would need
+a Product API and a new decision.
+
+### Revision 2026-09-17: presets as combinations, Alfred and specialists apart
+
+On the owner's review, choosing a preset had no visible effect on the switches and a settled answer
+looked the same in Simple and Standard. The record becomes version 2 under the same key: ten
+switches (open the log while working, open reasoning while it is written, fold at the end;
+Alfred's reasoning, intermediate messages, tools and empty generations; the specialists'
+reasoning, messages and tools) and a `detail` that names the preset whose switches it holds,
+or `custom`. Choosing Simple, Standard or Détaillé sets all ten switches; changing one switch
+turns the detail into Personnalisé unless the result matches a preset exactly. Specialists
+themselves always stay listed. Standard (default) shows Alfred's reasoning, messages and tools
+and the specialists' messages and tools, without specialist reasoning or empty generations.
+Version 1 records are migrated (their shared switches apply to Alfred and specialists alike).

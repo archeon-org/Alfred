@@ -12,6 +12,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { ok } from '../../../common/api-response';
 import { Public } from '../../../common/decorators/public.decorator';
@@ -23,11 +24,19 @@ import {
 import { SameOriginGuard } from '../../../common/guards/same-origin.guard';
 import { RequiresFeature } from '../../feature-flags/requires-feature.decorator';
 import { AuthService } from '../application/auth.service';
+import { DocCompleteGoogleLogin, DocCompleteProviderLogin } from './auth-callback.openapi';
+import {
+  DocListAuthProviders,
+  DocStartGoogleLogin,
+  DocStartProviderLogin,
+} from './auth-login.openapi';
+import { DocLogout, DocRefreshSession } from './auth-session.openapi';
 import { AuthCookieService } from './cookies/auth-cookie.service';
 import { AuthProviderParamDto } from './dto/auth-provider-param.dto';
 import { OauthCallbackQueryDto } from './dto/oauth-callback-query.dto';
 import { OauthStartQueryDto } from './dto/oauth-start-query.dto';
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -37,6 +46,7 @@ export class AuthController {
 
   @Public()
   @Get('providers')
+  @DocListAuthProviders()
   listProviders() {
     return ok(this.authService.listProviders());
   }
@@ -44,6 +54,7 @@ export class AuthController {
   @Public()
   @UseGuards(OauthStartThrottlerGuard)
   @Get('providers/:provider/start')
+  @DocStartProviderLogin()
   async startProviderLogin(
     @Param() parameters: AuthProviderParamDto,
     @Query() query: OauthStartQueryDto,
@@ -55,6 +66,7 @@ export class AuthController {
   @Public()
   @UseGuards(OauthCallbackThrottlerGuard)
   @Get('providers/:provider/callback')
+  @DocCompleteProviderLogin()
   async completeProviderLogin(
     @Param() parameters: AuthProviderParamDto,
     @Query() query: OauthCallbackQueryDto,
@@ -68,6 +80,7 @@ export class AuthController {
   @RequiresFeature('googleOAuth')
   @UseGuards(OauthStartThrottlerGuard)
   @Get('google/start')
+  @DocStartGoogleLogin()
   async startGoogleLogin(
     @Query() query: OauthStartQueryDto,
     @Res() response: Response,
@@ -79,6 +92,7 @@ export class AuthController {
   @RequiresFeature('googleOAuth')
   @UseGuards(OauthCallbackThrottlerGuard)
   @Get('google/callback')
+  @DocCompleteGoogleLogin()
   async completeGoogleLogin(
     @Query() query: OauthCallbackQueryDto,
     @Req() request: Request,
@@ -140,6 +154,7 @@ export class AuthController {
   @UseGuards(SameOriginGuard, RefreshThrottlerGuard)
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
+  @DocRefreshSession()
   async refresh(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
     const refreshToken = this.cookies.readRefreshToken(request);
     if (refreshToken === undefined) {
@@ -163,6 +178,7 @@ export class AuthController {
   @UseGuards(SameOriginGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post('logout')
+  @DocLogout()
   async logout(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,

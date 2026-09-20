@@ -1,44 +1,21 @@
-import {
-  CONVERSATION_SSE_EVENT,
-  conversationSchema,
-  createAssistantReply,
-  EXECUTION_SSE_EVENT,
-  executionSchema,
-  type ExecutionStreamEvent,
-  type Message,
-} from '@alfred/contracts';
-import { useQueryClient, type QueryClient } from '@tanstack/react-query';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useReducer,
-  type Dispatch,
-  type ReactNode,
-} from 'react';
+import type { ExecutionSnapshot, Message } from '@alfred/contracts';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useReducer, type ReactNode } from 'react';
 
 import {
   ChatSessionContext,
   type ChatSessionContextValue,
-  type LiveTurn,
 } from '@/contexts/chat-session/chat-session-context';
+import { chatSessionReducer } from '@/contexts/chat-session/chat-session-state';
 import {
-  chatSessionReducer,
-  transcriptHoldsTurn,
-  type ChatSessionAction,
-} from '@/contexts/chat-session/chat-session-state';
+  createExecutionObserver,
+  isSettledExecution,
+} from '@/contexts/chat-session/execution-observer';
 import { useWorkspaceAccount } from '@/hooks/workspace/use-workspace-account';
-import { conversationKeys, messageKeys } from '@/hooks/workspace/workspace-keys';
-import { captureRuntimeEvent } from '@/lib/workspace/runtime-event-debug';
-import { describeApiError } from '@/lib/workspace/api-error-message';
-import { listMessages, streamExecution } from '@/services/executions/executions.service';
+import type { AttachmentView } from '@/lib/files/composer-attachments';
 import type { HttpClient } from '@/services/http/http-client';
 
-/** After a stop, the API stores the partial answer while the browser already refetches. */
-const HANDOVER_ATTEMPTS = 3;
-const HANDOVER_RETRY_MS = 500;
-const INTERRUPTED = 'La réponse a été interrompue avant la fin.';
+type Observer = ReturnType<typeof createExecutionObserver>;
 
 export function ChatSessionProvider({ children }: { readonly children: ReactNode }) {
   const { client, userId } = useWorkspaceAccount();
@@ -47,183 +24,103 @@ export function ChatSessionProvider({ children }: { readonly children: ReactNode
     sessions: [],
     failures: new Map(),
   });
-  const live = sessions.at(-1) ?? null;
-  const reconcile = useCallback((conversationId: string, messages: readonly Message[]) => {
-    dispatch({ type: 'reconcile', conversationId, messages });
-  }, []);
-  // The answer being produced: refuses other sends until its execution reaches a terminal state.
-  const inFlightRef = useRef<AbortController | null>(null);
-  // Every stream still open, including one only waiting for the generated title.
-  const openRef = useRef(new Set<AbortController>());
-  const sequenceRef = useRef(0);
-
-  useEffect(
-    () => () => {
-      for (const controller of openRef.current) controller.abort();
-    },
+  const observers = useRef(new Map<number, Observer>());
+  const sequence = useRef(0);
+  const currentClient = useRef(client);
+  const previousUser = useRef(userId);
+  useEffect(() => {
+    currentClient.current = client;
+  }, [client]);
+  const freshClient = useMemo<HttpClient>(
+    () => ({ request: (path, init) => currentClient.current.request(path, init) }),
     [],
   );
 
-  // An in-flight stream keeps the client it started with; a refreshed token only affects later sends.
-  const send = useCallback(
-    (conversationId: string, text: string): boolean => {
-      if (inFlightRef.current !== null) return false;
-      const controller = new AbortController();
-      inFlightRef.current = controller;
-      openRef.current.add(controller);
-      const release = () => {
-        if (inFlightRef.current === controller) inFlightRef.current = null;
-      };
-      void runExecution({
-        client,
-        controller,
+  useEffect(() => {
+    const active = observers.current;
+    if (previousUser.current !== userId) {
+      previousUser.current = userId;
+      dispatch({ type: 'reset' });
+    }
+    return () => {
+      // Logout/unmount detaches observation; it never sends the Stop command.
+      for (const observer of active.values()) observer.controller.abort();
+      active.clear();
+    };
+  }, [userId]);
+
+  const reconcile = useCallback((conversationId: string, messages: readonly Message[]) => {
+    dispatch({ type: 'reconcile', conversationId, messages });
+  }, []);
+  const launch = useCallback(
+    (
+      conversationId: string,
+      text: string,
+      snapshot?: ExecutionSnapshot,
+      attachments?: readonly AttachmentView[],
+    ) => {
+      const id = sequence.current++;
+      const observer = createExecutionObserver({
+        client: freshClient,
+        controller: new AbortController(),
         conversationId,
-        id: sequenceRef.current++,
+        id,
         queryClient,
-        release,
         dispatch,
         text,
         userId,
-      }).finally(() => {
-        release();
-        openRef.current.delete(controller);
+        ...(snapshot ? { snapshot } : {}),
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
+        onClose: () => observers.current.delete(id),
       });
+      observers.current.set(id, observer);
+      observer.start();
+    },
+    [freshClient, queryClient, userId],
+  );
+  const send = useCallback(
+    (conversationId: string, text: string, attachments?: readonly AttachmentView[]): boolean => {
+      // A parked or stalled answer never blocks the next message: the API supersedes it and the
+      // old observer settles on its final snapshot.
+      if (
+        [...observers.current.values()].some(
+          (observer) => observer.conversationId === conversationId && observer.blocksComposer(),
+        )
+      )
+        return false;
+      launch(conversationId, text, undefined, attachments);
       return true;
     },
-    [client, queryClient, userId],
+    [launch],
   );
-
-  const stop = useCallback(() => inFlightRef.current?.abort(), []);
-
+  const recover = useCallback(
+    (snapshot: ExecutionSnapshot) => {
+      if (
+        [...observers.current.values()].some(
+          (observer) =>
+            observer.executionId() === snapshot.execution.id ||
+            (observer.conversationId === snapshot.execution.conversationId && observer.isActive()),
+        )
+      )
+        return;
+      if (isSettledExecution(snapshot.execution)) return;
+      launch(snapshot.execution.conversationId, snapshot.userMessage, snapshot);
+    },
+    [launch],
+  );
+  const reconnect = useCallback((conversationId: string) => {
+    for (const observer of observers.current.values()) {
+      if (observer.conversationId === conversationId && observer.isActive()) observer.start();
+    }
+  }, []);
+  const stop = useCallback((conversationId: string) => {
+    for (const observer of observers.current.values()) {
+      if (observer.conversationId === conversationId && observer.isActive()) observer.stop();
+    }
+  }, []);
   const value = useMemo<ChatSessionContextValue>(
-    () => ({ failures, live, sessions, reconcile, send, stop }),
-    [failures, live, sessions, reconcile, send, stop],
+    () => ({ failures, sessions, reconcile, send, stop, recover, reconnect }),
+    [failures, sessions, reconcile, send, stop, recover, reconnect],
   );
   return <ChatSessionContext.Provider value={value}>{children}</ChatSessionContext.Provider>;
-}
-
-interface ExecutionRun {
-  readonly client: HttpClient;
-  readonly controller: AbortController;
-  readonly conversationId: string;
-  readonly id: number;
-  readonly queryClient: QueryClient;
-  /** Lets the next send start; called once the execution reached a terminal state. */
-  readonly release: () => void;
-  readonly dispatch: Dispatch<ChatSessionAction>;
-  readonly text: string;
-  readonly userId: string;
-}
-
-/** Streams one execution, keeps the caches fresh and hands over to the stored transcript. */
-async function runExecution(run: ExecutionRun): Promise<void> {
-  const { client, controller, conversationId, id, queryClient, release, dispatch, text, userId } =
-    run;
-  const reply = createAssistantReply();
-  let sequence = 0;
-  let turn: LiveTurn = {
-    assistantText: '',
-    error: null,
-    events: [],
-    execution: null,
-    status: 'streaming',
-    userMessage: text,
-  };
-  const update = (change: (current: LiveTurn) => LiveTurn) => {
-    turn = change(turn);
-    dispatch({ type: 'update', id, turn });
-  };
-  dispatch({
-    type: 'start',
-    session: { conversationId, id, turn, createdAt: new Date().toISOString() },
-  });
-  let handover: Promise<void> | undefined;
-  try {
-    for await (const event of streamExecution(client, conversationId, text, controller.signal)) {
-      reply.observe(event.event, event.data);
-      if (event.event === CONVERSATION_SSE_EVENT) {
-        // Provisional then agent-generated title: refresh the header and the sidebar lists.
-        const parsed = conversationSchema.safeParse(event.data);
-        if (parsed.success) {
-          queryClient.setQueryData(conversationKeys.detail(userId, parsed.data.id), parsed.data);
-          void queryClient.invalidateQueries({ queryKey: conversationKeys.lists(userId) });
-        }
-      }
-      const view = { data: event.data, event: event.event, id: sequence++ };
-      captureRuntimeEvent(userId, conversationId, view);
-      update((current) => applyEvent(current, event, reply.text));
-      // The answer is settled; the stream may stay open for the generated title only.
-      if (turn.status !== 'streaming') {
-        release();
-        handover ??= handOver(run, turn);
-      }
-    }
-    update((current) =>
-      current.status === 'streaming'
-        ? { ...current, error: INTERRUPTED, status: 'error' }
-        : current,
-    );
-  } catch (error) {
-    const aborted = controller.signal.aborted;
-    update((current) =>
-      current.status !== 'streaming'
-        ? current
-        : {
-            ...current,
-            error: aborted ? null : describeApiError(error, 'L’envoi du message a échoué.'),
-            status: aborted ? 'done' : 'error',
-          },
-    );
-  } finally {
-    release();
-    await (handover ?? handOver(run, turn));
-  }
-}
-
-function applyEvent(turn: LiveTurn, event: ExecutionStreamEvent, assistantText: string): LiveTurn {
-  if (event.event !== EXECUTION_SSE_EVENT) return { ...turn, assistantText };
-  const parsed = executionSchema.safeParse(event.data);
-  if (!parsed.success) return { ...turn, assistantText };
-  const execution = parsed.data;
-  const failed = execution.status === 'failed';
-  const settled = failed || execution.status === 'completed' || execution.status === 'cancelled';
-  return {
-    ...turn,
-    assistantText,
-    error: failed ? (execution.error ?? 'L’agent a échoué.') : turn.error,
-    execution,
-    status: failed ? 'error' : settled ? 'done' : turn.status,
-  };
-}
-
-/**
- * Clears the live turn once the stored transcript holds its rows; until then the live copy is the
- * only one and stays on screen. A failed turn leaves its error under the stored rows.
- */
-async function handOver(run: ExecutionRun, turn: LiveTurn): Promise<void> {
-  const { conversationId, queryClient, dispatch, userId } = run;
-  await queryClient.invalidateQueries({ queryKey: conversationKeys.all(userId) });
-  if (turn.execution === null) return;
-  const messages = await fetchTranscript(run, turn);
-  if (messages !== null) dispatch({ type: 'reconcile', conversationId, messages });
-}
-
-async function fetchTranscript(
-  { client, conversationId, queryClient, userId }: ExecutionRun,
-  turn: LiveTurn,
-): Promise<readonly Message[] | null> {
-  for (let attempt = 0; attempt < HANDOVER_ATTEMPTS; attempt += 1) {
-    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, HANDOVER_RETRY_MS));
-    try {
-      const messages = await queryClient.fetchQuery({
-        queryFn: () => listMessages(client, conversationId),
-        queryKey: messageKeys.list(userId, conversationId),
-        staleTime: 0,
-      });
-      if (transcriptHoldsTurn(messages, turn)) return messages;
-    } catch {
-      return null;
-    }
-  }
-  return null;
 }

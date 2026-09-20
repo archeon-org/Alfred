@@ -1,3 +1,4 @@
+import { downloadBlob } from '@/lib/browser/download-blob';
 import { ApiRequestError } from '@/services/http/api-json';
 
 export function skillError(reason: unknown): string {
@@ -16,10 +17,5 @@ export function skillError(reason: unknown): string {
   return 'Impossible de terminer cette action. Votre brouillon est conservé. Réessayez.';
 }
 export function downloadSkill(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${name || 'skill'}.${blob.type.includes('zip') ? 'zip' : 'md'}`;
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(blob, `${name || 'skill'}.${blob.type.includes('zip') ? 'zip' : 'md'}`);
 }

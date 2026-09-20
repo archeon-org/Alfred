@@ -21,10 +21,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "turbo test && pnpm test:scripts && pnpm architecture:check",
-    "test:scripts": "node --test scripts/setup-local-env.test.mjs scripts/check-source-boundaries.test.mjs scripts/check-image-vulnerabilities.test.mjs",
+    "test:scripts": "node --test scripts/setup-local-env.test.mjs scripts/check-source-boundaries.test.mjs scripts/check-image-vulnerabilities.test.mjs scripts/run-regression-tests.test.mjs",
     "architecture:check": "node scripts/check-source-boundaries.mjs",
     "test:coverage": "turbo test:coverage",
     "test:e2e": "pnpm --filter @alfred/api test:e2e && pnpm --filter @alfred/web test:e2e",
+    "test:regression:api": "node scripts/run-regression-tests.mjs api",
+    "test:regression:browser": "node scripts/run-regression-tests.mjs browser",
+    "test:regression:soak": "node scripts/run-regression-tests.mjs soak",
     "agent:test": "cd apps/agent && UV_CACHE_DIR=../../.cache/uv uv run pytest -q",
     "agent:lint": "cd apps/agent && UV_CACHE_DIR=../../.cache/uv uv run ruff check .",
     "agent:typecheck": "cd apps/agent && UV_CACHE_DIR=../../.cache/uv uv run pyright",
@@ -67,7 +70,8 @@
   "pnpm": {
     "overrides": {
       "deepmerge-ts": "^8.0.0",
-      "multer": ">=2.3.0"
+      "multer": ">=2.3.0",
+      "lodash-es": ">=4.18.1"
     }
   }
 }

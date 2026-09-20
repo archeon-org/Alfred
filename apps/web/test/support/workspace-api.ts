@@ -1,4 +1,12 @@
-import type { Conversation, FeatureFlags, Message, Project } from '@alfred/contracts';
+import { encodeAgUiFrames, synthesizeRun, type AgUiFrame } from './ag-ui-synth';
+import type {
+  Conversation,
+  ExecutionSnapshot,
+  FeatureFlags,
+  Message,
+  MessageAttachment,
+  Project,
+} from '@alfred/contracts';
 import { vi } from 'vitest';
 
 import { DISABLED_FEATURE_FLAGS } from '@/services/feature-flags/feature-flags';
@@ -68,29 +76,28 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
-type SseFrames = readonly (readonly [string, unknown])[];
+/** AG-UI batches: the attach batch, then the frames of each committed change. */
+type SseFrames = readonly (readonly AgUiFrame[])[];
 
 const SSE_HEADERS = { 'content-type': 'text/event-stream' };
 
-function encodeFrames(frames: SseFrames): string {
-  return frames
-    .map(([event, data]) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-    .join('');
+function encodeFrames(batches: SseFrames): string {
+  return batches.map((frames) => encodeAgUiFrames(frames)).join('');
 }
 
 /**
- * Streams `frames`; with `hold`, the first two (conversation view, running execution) go out at
+ * Streams `batches`; with `hold`, the attach batch (state and running execution) goes out at
  * once and the rest waits for the promise, so tests can observe an answer in progress.
  */
-function sseResponse(frames: SseFrames, hold: Promise<void> | null): Response {
+function sseResponse(batches: SseFrames, hold: Promise<void> | null): Response {
   if (hold === null)
-    return new Response(encodeFrames(frames), { headers: SSE_HEADERS, status: 200 });
+    return new Response(encodeFrames(batches), { headers: SSE_HEADERS, status: 200 });
   const encoder = new TextEncoder();
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
-      controller.enqueue(encoder.encode(encodeFrames(frames.slice(0, 2))));
+      controller.enqueue(encoder.encode(encodeFrames(batches.slice(0, 1))));
       await hold;
-      controller.enqueue(encoder.encode(encodeFrames(frames.slice(2))));
+      controller.enqueue(encoder.encode(encodeFrames(batches.slice(1))));
       controller.close();
     },
   });
@@ -117,7 +124,8 @@ function runExecution(
   index: number,
   message: string,
   interrupted: boolean,
-): (readonly [string, unknown])[] {
+  attachments?: readonly MessageAttachment[],
+): { initial: ExecutionSnapshot; final: ExecutionSnapshot; frames: SseFrames } {
   const current = conversations[index]!;
   const now = new Date().toISOString();
   const executionId = nextId();
@@ -143,6 +151,7 @@ function runExecution(
       executionId,
       id: nextId(),
       role: 'user',
+      ...(attachments === undefined ? {} : { attachments }),
     },
     {
       content: reply,
@@ -162,20 +171,31 @@ function runExecution(
     startedAt: now,
     status,
   });
-  // An interrupted stream closes right after the answer, before any terminal execution state.
-  return [
-    ['conversation', provisional],
-    ['execution', execution('running')],
-    ['metadata', { run_id: nextId() }],
-    ['messages/partial', [{ content: reply.slice(0, 8), id: 'ai-1', type: 'AIMessageChunk' }]],
-    ['messages/complete', [{ content: reply, id: 'ai-1', type: 'ai' }]],
-    ...(interrupted
-      ? []
-      : [
-          ...(untitled ? [['conversation', titled] as const] : []),
-          ['execution', execution('completed')] as const,
-        ]),
-  ];
+  const initial: ExecutionSnapshot = {
+    execution: execution('running'),
+    conversation: provisional,
+    userMessage: message,
+    assistantText: '',
+    activities: [],
+    cursor: 'cursor:0',
+    revision: 0,
+    ...(attachments === undefined ? {} : { attachments }),
+  };
+  const final: ExecutionSnapshot = {
+    ...initial,
+    execution: execution('completed'),
+    conversation: titled,
+    assistantText: reply,
+    cursor: 'cursor:2',
+    revision: 2,
+  };
+  const partial = { ...initial, assistantText: reply.slice(0, 8), revision: 1, cursor: 'cursor:1' };
+  const full = { ...initial, assistantText: reply, revision: 2, cursor: 'cursor:2' };
+  return {
+    initial,
+    final,
+    frames: synthesizeRun([initial, partial, full, ...(interrupted ? [] : [final])]),
+  };
 }
 
 function failure(status: number, code: string, message = 'Request failed'): Response {
@@ -193,6 +213,8 @@ export function createWorkspaceApi(
     readonly conversations?: readonly Conversation[];
     /** Capability manifest overrides; everything else stays disabled. */
     readonly features?: Partial<FeatureFlags>;
+    /** Names the files a message carries, as the files API would; absent: rows carry none. */
+    readonly attachmentsOf?: (fileIds: readonly string[]) => readonly MessageAttachment[];
   } = {},
 ) {
   const projects: Project[] = [...(seed.projects ?? [])];
@@ -203,6 +225,7 @@ export function createWorkspaceApi(
   const failures = new Map<string, Failure>();
   let executionHold: Promise<void> | null = null;
   let interruptExecutions = false;
+  const executions = new Map<string, ReturnType<typeof runExecution>>();
   const documents = new Map<
     string,
     {
@@ -415,11 +438,51 @@ export function createWorkspaceApi(
       if (!features.agentRuntime) return failure(404, 'HTTP_404', 'Feature is not available');
       const index = conversations.findIndex((item) => item.id === executionsMatch[1]);
       if (index === -1) return failure(404, 'conversation_not_found', 'Conversation not found.');
-      const { message } = body as { message: string };
-      return sseResponse(
-        runExecution(conversations, messages, index, message, interruptExecutions),
-        executionHold,
+      const { message, attachmentIds } = body as {
+        message: string;
+        attachmentIds?: readonly string[];
+      };
+      const run = runExecution(
+        conversations,
+        messages,
+        index,
+        message,
+        interruptExecutions,
+        attachmentIds === undefined ? undefined : seed.attachmentsOf?.(attachmentIds),
       );
+      executions.set(run.initial.execution.id, run);
+      return json({ success: true, data: { snapshot: run.initial } }, 202);
+    }
+    const activeMatch = /^\/api\/conversations\/([^/]+)\/executions\/active$/u.exec(path);
+    if (activeMatch && method === 'GET') {
+      const active =
+        executionHold === null
+          ? null
+          : ([...executions.values()].find(
+              (run) => run.initial.execution.conversationId === activeMatch[1],
+            )?.initial ?? null);
+      return json({ success: true, data: { snapshot: active } });
+    }
+    const executionMatch = /^\/api\/executions\/([^/]+)(?:\/(events|stop|trace-link))?$/u.exec(
+      path,
+    );
+    if (executionMatch) {
+      if (executionMatch[2] === 'trace-link' && !features.traceLinks) {
+        return failure(404, 'HTTP_404', 'Feature is not available');
+      }
+      const run = executions.get(executionMatch[1]!);
+      if (!run) return failure(404, 'execution_not_found');
+      if (executionMatch[2] === 'trace-link') {
+        return json({
+          success: true,
+          data: {
+            url: `https://smith.langchain.com/o/org/projects/p/proj/r/${run.initial.execution.id}?poll=true`,
+          },
+        });
+      }
+      if (executionMatch[2] === 'events') return sseResponse(run.frames, executionHold);
+      const snapshot = executionHold === null ? run.final : run.initial;
+      return json({ success: true, data: { snapshot } });
     }
     const conversationMatch = /^\/api\/conversations\/([^/]+)$/u.exec(path);
     if (conversationMatch !== null) {

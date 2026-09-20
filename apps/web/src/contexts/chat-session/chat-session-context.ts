@@ -1,9 +1,18 @@
-import type { Execution, Message } from '@alfred/contracts';
+import type {
+  Execution,
+  ExecutionActivity,
+  ExecutionSnapshot,
+  ExecutionWork,
+  Message,
+} from '@alfred/contracts';
 import { createContext } from 'react';
 
-/** One native runtime event kept for the visibility panel. */
+import type { AttachmentView } from '@/lib/files/composer-attachments';
+
+/** One validated public event kept for diagnostics, attached to the execution that produced it. */
 export interface RuntimeEventView {
   readonly id: number;
+  readonly executionId: string;
   readonly event: string;
   readonly data: unknown;
 }
@@ -14,11 +23,18 @@ export interface RuntimeEventView {
  */
 export interface LiveTurn {
   readonly userMessage: string;
+  /** The files the user turn carries: named by the composer at once, then by the API. */
+  readonly attachments?: readonly AttachmentView[];
   readonly assistantText: string;
-  readonly events: readonly RuntimeEventView[];
+  /** Tool calls of this turn as AG-UI reported them: safe label and status only. */
+  readonly activities: readonly ExecutionActivity[];
+  /** The work behind the answer: narration, reasoning markers, tools and specialists, in order. */
+  readonly work: ExecutionWork;
   readonly execution: Execution | null;
   readonly status: 'streaming' | 'done' | 'error';
   readonly error: string | null;
+  readonly connection?: 'connecting' | 'connected' | 'recovering' | 'disconnected';
+  readonly stopPending?: boolean;
 }
 
 export interface LiveSession {
@@ -36,20 +52,26 @@ export interface TurnFailure {
 }
 
 /**
- * Workspace-wide chat session: the single answer being streamed. It outlives the chat screen, so
- * creating a conversation, navigating to it and streaming its answer never interrupt each other.
+ * Workspace-wide observations, isolated by conversation. They outlive the chat screen so
+ * navigating between conversations never interrupts their independent answers.
  */
 export interface ChatSessionContextValue {
-  readonly live: LiveSession | null;
   /** Local turns retained until their persisted rows have been recovered. */
   readonly sessions: readonly LiveSession[];
   readonly reconcile: (conversationId: string, messages: readonly Message[]) => void;
   /** Last failed turn per conversation id, shown under its stored rows until the next send. */
   readonly failures: ReadonlyMap<string, TurnFailure>;
-  /** Starts streaming an answer; returns false while another answer is still being produced. */
-  readonly send: (conversationId: string, text: string) => boolean;
-  /** Stops listening and asks the API to cancel the runtime run; the execution ends `cancelled`. */
-  readonly stop: () => void;
+  /** Starts an answer unless this conversation already has unresolved work. */
+  readonly send: (
+    conversationId: string,
+    text: string,
+    attachments?: readonly AttachmentView[],
+  ) => boolean;
+  /** Attach to work discovered after reload; never resubmit the prompt. */
+  readonly recover: (snapshot: ExecutionSnapshot) => void;
+  readonly reconnect: (conversationId: string) => void;
+  /** Requests cancellation; a server terminal snapshot is required to settle the turn. */
+  readonly stop: (conversationId: string) => void;
 }
 
 export const ChatSessionContext = createContext<ChatSessionContextValue | null>(null);

@@ -18,6 +18,7 @@ import { ContextModule } from '@api/modules/context/context.module';
 import { ConversationsModule } from '@api/modules/conversations/conversations.module';
 import { FeatureFlagGuard } from '@api/modules/feature-flags/feature-flag.guard';
 import { FeatureFlagsModule } from '@api/modules/feature-flags/feature-flags.module';
+import { FEATURE_FLAG_ENVIRONMENT_KEYS } from '@api/modules/feature-flags/feature-flags.types';
 import { ProjectsModule } from '@api/modules/projects/projects.module';
 import { SkillsModule } from '@api/modules/skills/skills.module';
 import { TenantEntity } from '@api/modules/tenants/tenant.entity';
@@ -80,10 +81,10 @@ export class SkillsPostgresFixture {
               API_PREFIX: 'api',
               TRUST_PROXY_HOPS: 0,
               API_CORS_ORIGINS: ['http://localhost:5173'],
-              FEATURE_GOOGLE_OAUTH_ENABLED: false,
-              FEATURE_OPENAPI_ENABLED: false,
-              FEATURE_RATE_LIMITING_ENABLED: false,
-              FEATURE_AGENT_RUNTIME_ENABLED: false,
+              // Every registered flag is explicit, so the fixture never depends on a private .env.
+              ...Object.fromEntries(
+                Object.values(FEATURE_FLAG_ENVIRONMENT_KEYS).map((key) => [key, false]),
+              ),
               FEATURE_SKILLS_ENABLED: skillsEnabled,
               SKILLS_MAX_TOTAL_BYTES_PER_USER: quota,
             }),
