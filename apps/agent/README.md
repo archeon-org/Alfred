@@ -14,10 +14,10 @@ runtime boundary, not a second application backend.
 
 ## Deliberately deferred
 
-The graph is still a tested foundation. Product tools, the Enterprise agent library adapter, AG-UI event
-production and the NestJS-to-Agent-Server principal handoff are not implemented yet. Add them only
-through the contracts and trust boundary described in
-[`docs/adr/0006-provider-neutral-identity-and-runtime-principal.md`](../../docs/adr/0006-provider-neutral-identity-and-runtime-principal.md).
+The graph is still a tested foundation. Product tools, the external agent library adapter, AG-UI
+event production and the NestJS-to-Agent-Server principal handoff are not implemented yet. Add them
+only through the existing contracts and the NestJS-to-runtime trust boundary (provider-neutral
+identity, runtime principal derived from the authenticated session).
 
 ## Verification
 

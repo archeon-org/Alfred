@@ -31,7 +31,7 @@ the future AG-UI stream gateway; the LangGraph service remains a separate agent 
 - The API shares the LangGraph platform's `langgraph` PostgreSQL database and Redis from the sibling
   `langgraph-agent-repo` stack. Every API-owned table, including the TypeORM ledger
   `api_migrations`, carries the `api_` prefix so backend objects are distinguishable from the
-  runtime tables ([ADR 0014](../../docs/adr/0014-shared-platform-data-services.md)).
+  runtime tables.
 
 ## Commands
 

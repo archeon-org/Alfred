@@ -2,6 +2,7 @@
 name = "alfred-agent"
 version = "0.1.0"
 description = "LangGraph application for Alfred agent orchestration."
+license = "AGPL-3.0-or-later"
 requires-python = ">=3.12"
 dependencies = [
   "langchain-core>=0.3.74",

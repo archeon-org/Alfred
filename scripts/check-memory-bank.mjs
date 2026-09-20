@@ -18,7 +18,22 @@ function assert(condition, message) {
   }
 }
 
+async function bankIsPresent() {
+  try {
+    await access(join(bank, 'index.json'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
+  // `docs/` is git-ignored: the memory bank exists only on core-team checkouts.
+  if (!(await bankIsPresent())) {
+    console.log('Memory bank not present (docs/ is not published); check skipped.');
+    return;
+  }
+
   const manifest = JSON.parse(await readFile(join(bank, 'index.json'), 'utf8'));
   assert(manifest.version === 1, 'Memory bank manifest version must be 1.');
   assert(Array.isArray(manifest.documents), 'Memory bank documents must be an array.');

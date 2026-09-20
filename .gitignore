@@ -27,5 +27,8 @@ apps/agent/**/*.pyc
 
 docker-data/
 
+# Internal documentation (architecture, ADRs, memory bank) is kept locally and not published.
+docs/
+
 # Uploaded file bytes when no S3-compatible bucket is configured (development only).
 **/var/uploads/

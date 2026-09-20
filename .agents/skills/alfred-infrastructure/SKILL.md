@@ -5,7 +5,7 @@ description: Build or review Alfred Docker Compose, containers, PostgreSQL, Redi
 
 # Alfred Infrastructure
 
-Keep the runtime self-hosted and compatible with a restricted Enterprise environment. Public cloud services
+Keep the runtime self-hosted and compatible with a restricted enterprise environment. Public cloud services
 are optional alternatives only when the user explicitly approves them.
 
 ## Invariants
@@ -30,4 +30,4 @@ are optional alternatives only when the user explicitly approves them.
 
 Render the base and overlay Compose configurations, syntax-check init scripts, build changed images,
 and perform a disposable runtime smoke test when safe. Report static validation separately from a
-real startup and from Enterprise production readiness.
+real startup and from production readiness.

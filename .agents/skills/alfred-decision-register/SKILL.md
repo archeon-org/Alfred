@@ -17,7 +17,7 @@ The deliverable is a plan validated by the user, not code.
 - The companion documents it links (V1 decision plan, HTML dossier, R83 review options, R85
   retention strategy) are not in this repository. Report their absence as a limitation; do not
   infer their content.
-- The register was written against the POC (Next.js BFF, CopilotKit, `agent_engine`). Map its
+- The register was written against the POC (Next.js BFF, CopilotKit, a Python agent library). Map its
   vocabulary to this monorepo (`apps/api` NestJS, `apps/web` React/Vite, `apps/agent` LangGraph) and
   state the mapping explicitly in the plan.
 

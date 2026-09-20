@@ -66,6 +66,6 @@ by the repository maintainer, in coordination with the credential owner and vali
 Reassess the exception when credential permissions, restrictions or usage change; remove it if the
 evidence no longer supports classification as public client configuration.
 
-[ADR 0013](docs/adr/0013-ci-security-risk-policy.md) records the accepted decision, consequences,
-remote PR 20 baseline and dated provider evidence. A passing image scan means compliance with the image gate;
+The accepted decision, its consequences, the remote PR 20 baseline and dated provider evidence are
+recorded in the internal ADR 0013. A passing image scan means compliance with the image gate;
 unfixed findings remain present and require review.

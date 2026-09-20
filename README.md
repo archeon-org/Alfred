@@ -44,16 +44,14 @@ docker compose up --build
 
 PostgreSQL and Redis are not part of this stack. Start them first from `langgraph-agent-repo`;
 Alfred containers join its `langgraph-agent-repo_agent-network` network (`DATA_NETWORK`) and the
-API stores `api_`-prefixed tables in the shared `langgraph` database. See the
-[local development runbook](docs/runbooks/local-development.md) for the connection URLs.
+API stores `api_`-prefixed tables in the shared `langgraph` database. The connection URLs are
+documented in `.env.example` and the per-app `.env.example` files.
 
 The setup command creates private `.env` files for Compose, NestJS, Vite and the standalone Agent
 Server. It generates local secrets without printing them and never overwrites an existing file.
 It preserves existing secrets while synchronizing managed feature flags and adding missing runtime
 defaults for sessions, proxy trust and observability.
 Google OAuth and the LangGraph licence remain disabled until their approved credentials are added.
-See the [foundation report](docs/alfred-foundation-report.md) for the component summary, environment
-matrix and exact Google OAuth setup checklist.
 
 ## Feature flags
 
@@ -65,13 +63,10 @@ rate limiting defaults on and can be explicitly disabled without blocking the AP
 both disabled regardless of that flag. Environment flags are startup snapshots, not live toggles.
 Reserved product flags stay false in the public manifest until their execution path exists, even
 when an environment profile sets the variable to `true`.
-Google OAuth is intended for external or commercial deployments and remains disabled in the Enterprise
-profile.
 
 Reserved capabilities remain effectively disabled even when their environment switch is true;
-only implemented execution paths can be advertised. See the
-[capability delivery contract](docs/development/capability-delivery.md) for ownership, fallback
-semantics and required checks. `pnpm architecture:check` enforces source boundaries and file size.
+only implemented execution paths can be advertised. `pnpm architecture:check` enforces source
+boundaries and file size.
 
 The Compose stack starts (PostgreSQL and Redis come from `langgraph-agent-repo`):
 
@@ -100,7 +95,7 @@ pnpm verify
 
 Alfred has two complementary memory planes:
 
-- `docs/memory-bank` is the repository memory for development agents. It keeps concise project context, architectural decisions, current work, verified progress and session handoffs in Git.
+- `docs/memory-bank` is the repository memory for development agents: concise project context, architectural decisions, current work, verified progress and session handoffs. It is maintained by the core team and is not published with this repository (`docs/` is git-ignored); `pnpm memory:check` is skipped when it is absent.
 - `apps/agent/src/alfred_agent/memory.py` is the runtime memory contract. LangGraph checkpoints retain thread state, while the Store retains bounded planning episodes by trusted user and conversation identity.
 
 Runtime memory is opt-out and cross-conversation sharing is opt-in. Historical entries are treated as untrusted data, never copied into task instructions or returned in the public graph output, and common secret formats are redacted before storage. Agent Server owns the durable Store in deployed environments; tests use `InMemoryStore` only. `forget_memories` provides scoped deletion for privacy workflows.
@@ -116,9 +111,6 @@ apps/
   agent/     LangGraph graph application
 packages/
   contracts/ Runtime-validated browser/API contracts
-docs/
-  adr/       Architecture decisions
-  runbooks/  Operational runbooks
 .codex/
   agents/    Project-local Codex agent role configs
 .agents/
@@ -137,3 +129,18 @@ uv run --frozen langgraph build -t alfred-agent:local
 ```
 
 `apps/agent/Dockerfile` is generated from `langgraph.json` for deployment; `Dockerfile.dev` is the lightweight local Compose image. Run `langgraph up` when a production-like local Agent Server with PostgreSQL and Redis is required.
+
+## License
+
+Copyright (C) 2026 Alfred contributors
+
+Alfred is free software: you can redistribute it and/or modify it under the terms of the
+[GNU Affero General Public License](LICENSE) as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version (SPDX: `AGPL-3.0-or-later`).
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+[LICENSE](LICENSE) file for details.
+
+If you run a modified version of Alfred as a network service, the AGPL requires you to offer the
+corresponding source code to the users of that service (section 13).
