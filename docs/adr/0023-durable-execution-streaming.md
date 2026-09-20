@@ -395,7 +395,7 @@ stay out of the projection and off the wire.
   6 min 34 s · 12 outils · 3 spécialistes" and folds itself once the answer is settled; the
   waiting line disappears as soon as a step exists. Reasoning streams as muted prose under a
   "Réflexion" heading, a specialist's messages under its delegation, consecutive calls of the same
-  tool by the same owner fold into one row ("execute_raw ×7") that unfolds into its calls, and an
+  tool by the same owner fold into one row (`execute_raw` ×7) that unfolds into its calls, and an
   empty generation is a clocked "Génération sans réponse" row. The browser still refuses
   specialist prompts (`description`), reports (`result`), nested specialists
   (`parentSubagentRunId`) and any owner on a `STEP_*` event.

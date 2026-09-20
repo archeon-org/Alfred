@@ -5,9 +5,10 @@
 
 ## Context
 
-Alfred must support different deployment profiles. Enterprise cannot use every commercial integration,
-while an external edition may enable Google OAuth and other optional capabilities. Scattered
-environment checks or frontend-only conditions would drift and would not protect backend routes.
+Alfred must support different deployment profiles. The enterprise cannot use every commercial
+integration, while an external edition may enable Google OAuth and other optional capabilities.
+Scattered environment checks or frontend-only conditions would drift and would not protect
+backend routes.
 
 ## Decision
 
@@ -37,7 +38,8 @@ environment checks or frontend-only conditions would drift and would not protect
   flag and a local or self-hosted fallback port when product behavior can continue without the
   external adapter.
 - Google OAuth is controlled by `FEATURE_GOOGLE_OAUTH_ENABLED`, defaults to off and is intended for
-  external/commercial deployments. Enterprise keeps it disabled and can add its own identity provider later.
+  external/commercial deployments. The enterprise keeps it disabled and can add its own identity
+  provider later.
 
 ## Initial Registry
 

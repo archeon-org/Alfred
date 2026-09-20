@@ -224,7 +224,7 @@ requiring the commercial organization action. CI also blocks HIGH/CRITICAL findi
 unfixed findings, in every built API, migration, web and agent image; an exception
 requires explicit, time-bounded risk acceptance rather than a silent scanner exclusion. Ephemeral
 CI database credentials are masked before entering the job environment. Dependabot covers npm,
-Python, GitHub Actions and each Dockerfile directory. In Enterprise, mirror the actions, package
+Python, GitHub Actions and each Dockerfile directory. In the enterprise, mirror the actions, package
 registries, scanner databases and base images into approved internal services before enabling the
 same controls without Internet access.
 
