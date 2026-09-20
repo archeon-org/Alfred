@@ -26,3 +26,8 @@ apps/agent/__pycache__/
 apps/agent/**/*.pyc
 
 docker-data/
+
+# Developer instructions and machine-specific assistant settings.
+AGENTS.local.md
+CLAUDE.local.md
+.claude/settings.local.json
