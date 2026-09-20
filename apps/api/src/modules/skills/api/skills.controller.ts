@@ -5,8 +5,10 @@ import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { ResourceIdPipe } from '../../../common/validation/resource-id.pipe';
 import { RequiresFeature } from '../../feature-flags/requires-feature.decorator';
+import { PublishedSkillsService } from '../application/published-skills.service';
 import { SkillsService } from '../application/skills.service';
 import {
+  PublishedSkillListQueryDto,
   SkillAvailabilityDto,
   SkillRestoreDto,
   SkillVersionsQueryDto,
@@ -21,7 +23,10 @@ const skillId = new ResourceIdPipe('skill');
 @RequiresFeature('skills')
 @Controller('skills')
 export class SkillsController {
-  constructor(private readonly skills: SkillsService) {}
+  constructor(
+    private readonly skills: SkillsService,
+    private readonly published: PublishedSkillsService,
+  ) {}
   @Get() async list(@CurrentUser() user: AuthPrincipal, @Query() query: SkillListQueryDto) {
     return ok(await this.skills.list(user, query));
   }
@@ -30,6 +35,19 @@ export class SkillsController {
     @Body() body: SkillWriteDto,
   ) {
     return ok(await this.skills.create(user, body));
+  }
+  // Declared before ':id': 'published' is a fixed segment, not a skill identifier.
+  @Get('published') async listPublished(
+    @CurrentUser() user: AuthPrincipal,
+    @Query() query: PublishedSkillListQueryDto,
+  ) {
+    return ok(await this.published.list(user, query));
+  }
+  @Get('published/:id') async getPublished(
+    @CurrentUser() user: AuthPrincipal,
+    @Param('id', skillId) id: string,
+  ) {
+    return ok(await this.published.get(user, id));
   }
   @Get(':id') async get(@CurrentUser() user: AuthPrincipal, @Param('id', skillId) id: string) {
     return ok(await this.skills.get(user, id));

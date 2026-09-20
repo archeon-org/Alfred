@@ -45,6 +45,15 @@ export class SkillListQueryDto extends ListQueryDto {
   search?: string;
 }
 
+export class PublishedSkillListQueryDto extends ListQueryDto {
+  /** Exact published name, the one a consumer mounts the skill under. */
+  @ValidateIf((_object: unknown, value: unknown) => value !== undefined)
+  @IsString()
+  @MaxLength(64)
+  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u)
+  name?: string;
+}
+
 export class SkillRestoreDto extends SkillVersionDto {
   @IsInt() @Min(1) @Max(2147483647) sourceVersion!: number;
 }
