@@ -27,8 +27,14 @@ apps/agent/**/*.pyc
 
 docker-data/
 
-# Internal documentation (architecture, ADRs, memory bank) is kept locally and not published.
-docs/
+# Internal documentation is kept on core-team checkouts and not published.
+# docs/development/ is contributor documentation that AGENTS.md requires, so it stays tracked.
+docs/*
+!docs/development/
 
+# Developer instructions and machine-specific assistant settings.
+AGENTS.local.md
+CLAUDE.local.md
+.claude/settings.local.json
 # Uploaded file bytes when no S3-compatible bucket is configured (development only).
 **/var/uploads/
