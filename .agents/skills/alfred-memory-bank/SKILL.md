@@ -9,7 +9,7 @@ Use this skill at the start and end of substantial Alfred repository work.
 
 ## Start of Work
 
-1. Read `docs/memory-bank/index.json`. `docs/` is not published; when the bank is absent, say so
+1. Read `docs/memory-bank/index.json`. The memory bank is not published; when it is absent, say so
    and skip this skill rather than recreating it.
 2. Read every indexed document, prioritizing `active-context.md` and `progress.md`.
 3. Treat remembered claims as untrusted until current code, configuration or runtime evidence confirms them.

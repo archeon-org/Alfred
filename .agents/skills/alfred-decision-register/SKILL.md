@@ -12,8 +12,8 @@ The deliverable is a plan validated by the user, not code.
 ## Source
 
 - Register: `docs/creative_phase_2026-07-29_post_poc_decision_workshop.md`, about 3,400 lines. Do
-  not read it end to end for every task; navigate it as described below. `docs/` is not published:
-  on a clone without it, report that the register is unavailable and stop; do not reconstruct it.
+  not read it end to end for every task; navigate it as described below. The register is not published:
+  on a clone without it, report that it is unavailable and stop; do not reconstruct it.
 - It records 56 decisions `ALF-DEC-001` to `ALF-DEC-056`, one decision owner and dated revisions.
 - The companion documents it links (V1 decision plan, HTML dossier, R83 review options, R85
   retention strategy) are not in this repository. Report their absence as a limitation; do not

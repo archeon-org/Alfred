@@ -95,7 +95,7 @@ pnpm verify
 
 Alfred has two complementary memory planes:
 
-- `docs/memory-bank` is the repository memory for development agents: concise project context, architectural decisions, current work, verified progress and session handoffs. It is maintained by the core team and is not published with this repository (`docs/` is git-ignored except `docs/development/`); `pnpm memory:check` is skipped when it is absent.
+- `docs/memory-bank` is the repository memory for development agents: concise project context, architectural decisions, current work, verified progress and session handoffs. It is maintained by the core team and is not published with this repository (`docs/` is git-ignored except the published `docs/adr`, `docs/development` and `docs/runbooks`); `pnpm memory:check` is skipped when it is absent.
 - `apps/agent/src/alfred_agent/memory.py` is the runtime memory contract. LangGraph checkpoints retain thread state, while the Store retains bounded planning episodes by trusted user and conversation identity.
 
 Runtime memory is opt-out and cross-conversation sharing is opt-in. Historical entries are treated as untrusted data, never copied into task instructions or returned in the public graph output, and common secret formats are redacted before storage. Agent Server owns the durable Store in deployed environments; tests use `InMemoryStore` only. `forget_memories` provides scoped deletion for privacy workflows.

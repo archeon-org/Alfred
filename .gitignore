@@ -28,9 +28,11 @@ apps/agent/**/*.pyc
 docker-data/
 
 # Internal documentation is kept on core-team checkouts and not published.
-# docs/development/ is contributor documentation that AGENTS.md requires, so it stays tracked.
+# The ADRs, the runbooks and the contributor documentation ship with the repository.
 docs/*
+!docs/adr/
 !docs/development/
+!docs/runbooks/
 
 # Developer instructions and machine-specific assistant settings.
 AGENTS.local.md

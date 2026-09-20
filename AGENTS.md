@@ -22,11 +22,12 @@ This repository is the Alfred monorepo. Keep the three application layers separa
 
 ## Core-Team Documentation
 
-`docs/` holds core-team documentation and is not published with this repository; only
-`docs/development/` is tracked. On a public clone the decision register, the ADRs under `docs/adr/`,
-the runbooks and the memory bank are absent. When a rule below names one of them, check whether the
-file exists: if it does not, skip that step and record the absence as a limitation rather than
-inferring the content. `pnpm memory:check` already skips itself when the memory bank is missing.
+`docs/adr/`, `docs/development/` and `docs/runbooks/` are published with this repository. The rest
+of `docs/` is core-team only and is absent from a public clone: the decision register, the target
+architecture proposal, the internal prompts and the memory bank. When a rule below names one of
+those, check whether the file exists; if it does not, skip that step and record the absence as a
+limitation rather than inferring the content. `pnpm memory:check` already skips itself when the
+memory bank is missing.
 
 ## Architecture Decision Register
 
