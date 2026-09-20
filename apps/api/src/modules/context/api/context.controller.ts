@@ -6,6 +6,12 @@ import type { AuthPrincipal } from '../../../common/auth/auth-principal';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { ResourceIdPipe } from '../../../common/validation/resource-id.pipe';
 import { ContextService } from '../application/context.service';
+import {
+  DocListPersonalContext,
+  DocListProjectContext,
+  DocSavePersonalContext,
+  DocSaveProjectContext,
+} from './context.openapi';
 import { SaveContextDocumentDto } from './dto/save-context-document.dto';
 
 @ApiTags('context')
@@ -14,10 +20,12 @@ import { SaveContextDocumentDto } from './dto/save-context-document.dto';
 export class PersonalContextController {
   constructor(private readonly context: ContextService) {}
   @Get()
+  @DocListPersonalContext()
   async list(@CurrentUser() principal: AuthPrincipal) {
     return ok(await this.context.list(principal));
   }
   @Put(':kind')
+  @DocSavePersonalContext()
   async save(
     @CurrentUser() principal: AuthPrincipal,
     @Param('kind') kind: ContextDocumentKind,
@@ -33,6 +41,7 @@ export class PersonalContextController {
 export class ProjectContextController {
   constructor(private readonly context: ContextService) {}
   @Get()
+  @DocListProjectContext()
   async list(
     @CurrentUser() principal: AuthPrincipal,
     @Param('projectId', new ResourceIdPipe('project')) projectId: string,
@@ -40,6 +49,7 @@ export class ProjectContextController {
     return ok(await this.context.list(principal, projectId));
   }
   @Put(':kind')
+  @DocSaveProjectContext()
   async save(
     @CurrentUser() principal: AuthPrincipal,
     @Param('projectId', new ResourceIdPipe('project')) projectId: string,

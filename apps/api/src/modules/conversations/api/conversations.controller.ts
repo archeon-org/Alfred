@@ -9,6 +9,18 @@ import { ConversationMoveService } from '../application/conversation-move.servic
 import { MoveConversationDto } from './dto/move-conversation.dto';
 import { ConversationsService } from '../application/conversations.service';
 import { CONVERSATION_RESOURCE } from '../domain/conversation';
+import {
+  DocMoveConversation,
+  DocPinConversation,
+  DocUnpinConversation,
+} from './conversation-actions.openapi';
+import {
+  DocCreateConversation,
+  DocDeleteConversation,
+  DocGetConversation,
+  DocListConversations,
+  DocUpdateConversation,
+} from './conversations.openapi';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
 
@@ -28,21 +40,25 @@ export class ConversationsController {
   @Post()
   @HttpCode(201)
   @Idempotent()
+  @DocCreateConversation()
   async create(@CurrentUser() principal: AuthPrincipal, @Body() body: CreateConversationDto) {
     return ok(await this.conversations.create(principal, body));
   }
 
   @Get()
+  @DocListConversations()
   async list(@CurrentUser() principal: AuthPrincipal, @Query() query: ListConversationsQueryDto) {
     return ok(await this.conversations.list(principal, query));
   }
 
   @Get(':id')
+  @DocGetConversation()
   async get(@CurrentUser() principal: AuthPrincipal, @Param('id', conversationId) id: string) {
     return ok(await this.conversations.get(principal, id));
   }
 
   @Patch(':id')
+  @DocUpdateConversation()
   async update(
     @CurrentUser() principal: AuthPrincipal,
     @Param('id', conversationId) id: string,
@@ -53,12 +69,14 @@ export class ConversationsController {
 
   @Post(':id/pin')
   @HttpCode(200)
+  @DocPinConversation()
   async pin(@CurrentUser() principal: AuthPrincipal, @Param('id', conversationId) id: string) {
     return ok(await this.conversations.setPinned(principal, id, true));
   }
 
   @Post(':id/unpin')
   @HttpCode(200)
+  @DocUnpinConversation()
   async unpin(@CurrentUser() principal: AuthPrincipal, @Param('id', conversationId) id: string) {
     return ok(await this.conversations.setPinned(principal, id, false));
   }
@@ -66,6 +84,7 @@ export class ConversationsController {
   @Post(':id/move')
   @HttpCode(200)
   @Idempotent()
+  @DocMoveConversation()
   async move(
     @CurrentUser() principal: AuthPrincipal,
     @Param('id', conversationId) id: string,
@@ -76,6 +95,7 @@ export class ConversationsController {
 
   @Delete(':id')
   @HttpCode(204)
+  @DocDeleteConversation()
   async remove(
     @CurrentUser() principal: AuthPrincipal,
     @Param('id', conversationId) id: string,

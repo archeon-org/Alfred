@@ -8,6 +8,7 @@ import {
   type FileKind,
   type FileReadiness,
 } from '@alfred/contracts';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -30,10 +31,39 @@ const UUID_OR_ROOT =
   /^(root|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu;
 
 export class FileListQueryDto extends ListQueryDto {
-  @IsOptional() @Transform(text) @IsString() @MaxLength(FILE_SEARCH_MAX_LENGTH) search?: string;
-  @IsOptional() @IsIn(['pdf', 'docx', 'image']) kind?: FileKind;
-  @IsOptional() @IsIn(['processing', 'ready', 'failed']) readiness?: FileReadiness;
+  @ApiPropertyOptional({
+    description:
+      'Text looked for in the name and in the description of a file, anywhere in them, without regard to case. Trimmed; `%`, `_` and `\\` are ordinary characters, not wildcards; a blank value filters nothing. Example: `contrat`.',
+    maxLength: FILE_SEARCH_MAX_LENGTH,
+  })
+  @IsOptional()
+  @Transform(text)
+  @IsString()
+  @MaxLength(FILE_SEARCH_MAX_LENGTH)
+  search?: string;
 
+  @ApiPropertyOptional({
+    description:
+      'Keep one kind of file, as detected from its bytes. `image` covers PNG, JPEG, WebP and GIF. Example: `pdf`.',
+    enum: ['pdf', 'docx', 'image'],
+  })
+  @IsOptional()
+  @IsIn(['pdf', 'docx', 'image'])
+  kind?: FileKind;
+
+  @ApiPropertyOptional({
+    description:
+      'Keep the files in one processing state: `ready` for those a message can carry, `processing` to follow recent uploads, `failed` for those that could not be read. Example: `ready`.',
+    enum: ['processing', 'ready', 'failed'],
+  })
+  @IsOptional()
+  @IsIn(['processing', 'ready', 'failed'])
+  readiness?: FileReadiness;
+
+  @ApiPropertyOptional({
+    description:
+      'Keep the files placed directly in one folder, sub-folders excluded: a folder identifier (UUID), or the word `root` for the top level; case is ignored, anything else is a `400`. Omitted, the whole library is listed whatever the folder. A folder that does not exist, or belongs to another account, answers an empty list. Example: `root`.',
+  })
   @IsOptional()
   @Matches(UUID_OR_ROOT)
   @Transform(({ value }: { value: unknown }) =>
@@ -42,8 +72,26 @@ export class FileListQueryDto extends ListQueryDto {
   /** A folder identifier, or `root` for the top level. */
   folderId?: string;
 
-  @IsOptional() @IsUUID() conversationId?: string;
-  @IsOptional() @Transform(text) @IsString() @Length(1, FILE_TAG_MAX_LENGTH) tag?: string;
+  @ApiPropertyOptional({
+    description:
+      'Keep the files that were sent as attachments in this conversation. A conversation that does not exist, or belongs to another account, answers an empty list. Example: `2b7e9c40-6a1d-4f35-8e92-d0c4b5a6f718`.',
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  conversationId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Keep the files that carry this label. The whole label, with its exact case: no prefix match, no wildcard. Trimmed. Example: `juridique`.',
+    minLength: 1,
+    maxLength: FILE_TAG_MAX_LENGTH,
+  })
+  @IsOptional()
+  @Transform(text)
+  @IsString()
+  @Length(1, FILE_TAG_MAX_LENGTH)
+  tag?: string;
 }
 
 /** The text fields of the multipart upload; the file itself arrives through the interceptor. */

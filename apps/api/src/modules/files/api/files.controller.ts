@@ -15,7 +15,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 import { ok } from '../../../common/api-response';
 import type { AuthPrincipal } from '../../../common/auth/auth-principal';
@@ -28,6 +28,15 @@ import { FileUploadService } from '../application/file-upload.service';
 import { FILE_RESOURCE, FilesService } from '../application/files.service';
 import { DOWNLOAD_HEADERS, toDownload } from './file-download';
 import { FileListQueryDto, FileUpdateDto, FileUploadFieldsDto } from './file.dto';
+import { DocDownloadFileContent, DocDownloadFilePreview } from './files-download.openapi';
+import {
+  DocDeleteFile,
+  DocGetFile,
+  DocGetFileQuota,
+  DocListFiles,
+  DocUpdateFile,
+} from './files-library.openapi';
+import { DocUploadFile } from './files-upload.openapi';
 import { abandonedSignalOf, SingleFileUploadInterceptor } from './single-file-upload.interceptor';
 
 const fileId = new ResourceIdPipe(FILE_RESOURCE);
@@ -51,13 +60,15 @@ export class FilesController {
     private readonly uploads: FileUploadService,
   ) {}
 
-  @Get() async list(@CurrentUser() user: AuthPrincipal, @Query() query: FileListQueryDto) {
+  @Get()
+  @DocListFiles()
+  async list(@CurrentUser() user: AuthPrincipal, @Query() query: FileListQueryDto) {
     return ok(await this.files.list(user, query));
   }
 
   @Post()
   @HttpCode(201)
-  @ApiConsumes('multipart/form-data')
+  @DocUploadFile()
   @UseGuards(FileUploadThrottlerGuard)
   @UseInterceptors(SingleFileUploadInterceptor)
   async upload(
@@ -85,15 +96,21 @@ export class FilesController {
     );
   }
 
-  @Get('quota') async quota(@CurrentUser() user: AuthPrincipal) {
+  @Get('quota')
+  @DocGetFileQuota()
+  async quota(@CurrentUser() user: AuthPrincipal) {
     return ok(await this.files.quota(user));
   }
 
-  @Get(':id') async get(@CurrentUser() user: AuthPrincipal, @Param('id', fileId) id: string) {
+  @Get(':id')
+  @DocGetFile()
+  async get(@CurrentUser() user: AuthPrincipal, @Param('id', fileId) id: string) {
     return ok(await this.files.get(user, id));
   }
 
-  @Patch(':id') async update(
+  @Patch(':id')
+  @DocUpdateFile()
+  async update(
     @CurrentUser() user: AuthPrincipal,
     @Param('id', fileId) id: string,
     @Body() body: FileUpdateDto,
@@ -101,14 +118,15 @@ export class FilesController {
     return ok(await this.files.update(user, id, body));
   }
 
-  @Delete(':id') @HttpCode(204) async remove(
-    @CurrentUser() user: AuthPrincipal,
-    @Param('id', fileId) id: string,
-  ): Promise<void> {
+  @Delete(':id')
+  @HttpCode(204)
+  @DocDeleteFile()
+  async remove(@CurrentUser() user: AuthPrincipal, @Param('id', fileId) id: string): Promise<void> {
     await this.files.remove(user, id);
   }
 
   @Get(':id/content')
+  @DocDownloadFileContent()
   @Header('Cache-Control', DOWNLOAD_HEADERS['Cache-Control'])
   @Header('X-Content-Type-Options', DOWNLOAD_HEADERS['X-Content-Type-Options'])
   async content(
@@ -119,6 +137,7 @@ export class FilesController {
   }
 
   @Get(':id/preview')
+  @DocDownloadFilePreview()
   @Header('Cache-Control', DOWNLOAD_HEADERS['Cache-Control'])
   @Header('X-Content-Type-Options', DOWNLOAD_HEADERS['X-Content-Type-Options'])
   async preview(

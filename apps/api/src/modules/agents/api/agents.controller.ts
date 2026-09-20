@@ -4,6 +4,7 @@ import { ok } from '../../../common/api-response';
 import { RequiresFeature } from '../../feature-flags/requires-feature.decorator';
 import { AgentCatalogService } from '../application/agent-catalog.service';
 import { AgentListQueryDto } from './agent-list-query.dto';
+import { DocListAgents } from './agents.openapi';
 
 @ApiTags('agents')
 @ApiBearerAuth('bearerAuth')
@@ -16,7 +17,9 @@ export class AgentsController {
    * The specialists the runtime declares as sub-agents, searched by name, graph, description or
    * tag and paged by cursor; the runtime still enforces habilitation.
    */
-  @Get() async list(@Query() query: AgentListQueryDto) {
+  @Get()
+  @DocListAgents()
+  async list(@Query() query: AgentListQueryDto) {
     return ok(await this.catalog.list(query));
   }
 }

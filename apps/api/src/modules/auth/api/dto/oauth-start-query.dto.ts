@@ -1,3 +1,4 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsOptional,
   IsString,
@@ -24,6 +25,14 @@ class NoAsciiControlCharactersConstraint implements ValidatorConstraintInterface
 }
 
 export class OauthStartQueryDto {
+  @ApiPropertyOptional({
+    description:
+      'Where the web application lands once signed in: a path of the web application, which may carry a query string. It must start with a single `/` and hold no backslash and no ASCII control character (U+0000 to U+001F, U+007F). An absolute URL or a `//host` form is refused, so a sign-in link can never send the user to another site. Example: `/app/team?tab=agents`.',
+    default: '/app',
+    maxLength: 2048,
+    pattern: '^/(?!/)[^\\\\]*$',
+    type: String,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2048)

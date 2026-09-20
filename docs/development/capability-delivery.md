@@ -111,7 +111,9 @@ Split work into independently verifiable changes:
 
 1. Contract, domain rules and focused failing tests.
 2. Application use case and one adapter, with integration tests.
-3. API boundary, validation, authorization and both flag states.
+3. API boundary, validation, authorization, both flag states and the OpenAPI documentation of every
+   route added or changed ([API documentation](api-documentation.md)); a route without it is not
+   delivered.
 4. Browser service/hook/screen, with error and disabled-state behavior.
 5. Deployment configuration, operational guidance and verification evidence.
 

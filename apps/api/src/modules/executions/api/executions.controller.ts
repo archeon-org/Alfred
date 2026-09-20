@@ -11,6 +11,7 @@ import { RequiresFeature } from '../../feature-flags/requires-feature.decorator'
 import { ExecutionsService } from '../application/executions.service';
 import { ExecutionObservationService } from '../application/execution-observation.service';
 import { ExecutionSessionGuard } from './execution-session.guard';
+import { DocGetActiveExecution, DocListMessages, DocStartExecution } from './executions.openapi';
 import { StartExecutionDto } from './dto/start-execution.dto';
 
 const conversationId = new ResourceIdPipe(CONVERSATION_RESOURCE);
@@ -27,6 +28,7 @@ export class ExecutionsController {
   ) {}
 
   @Get('messages')
+  @DocListMessages()
   async listMessages(
     @CurrentUser() principal: AuthPrincipal,
     @Param('id', conversationId) id: string,
@@ -35,6 +37,7 @@ export class ExecutionsController {
   }
 
   @Get('executions/active')
+  @DocGetActiveExecution()
   async active(@CurrentUser() principal: AuthPrincipal, @Param('id', conversationId) id: string) {
     const execution = await this.executions.active(principal, id);
     return ok({
@@ -47,6 +50,7 @@ export class ExecutionsController {
   @Post('executions')
   @HttpCode(200)
   @ApiProduces(EXECUTION_JSON_PROFILE)
+  @DocStartExecution()
   async start(
     @CurrentUser() principal: AuthPrincipal,
     @Param('id', conversationId) id: string,

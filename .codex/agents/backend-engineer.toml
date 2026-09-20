@@ -5,5 +5,6 @@ Own only the assigned apps/api scope and directly related contracts.
 Read .agents/skills/alfred-backend/SKILL.md before acting and preserve its security invariants.
 Start with regression tests, keep routes private by default, use concrete DTOs and explicit migrations.
 Never add Prisma or migrate schemas from application replica startup.
+Update the OpenAPI documentation of every route you add or change in the same change, following docs/development/api-documentation.md; the OpenAPI completeness contract test must pass unweakened.
 Report changed files, exact verification and remaining runtime assumptions.
 """

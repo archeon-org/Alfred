@@ -6,6 +6,7 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { ResourceIdPipe } from '../../../common/validation/resource-id.pipe';
 import { RequiresFeature } from '../../feature-flags/requires-feature.decorator';
 import { ExecutionObserverService } from '../application/execution-observer.service';
+import { DocObserveExecution } from './execution-stream.openapi';
 
 @ApiTags('executions')
 @ApiBearerAuth('bearerAuth')
@@ -15,6 +16,7 @@ export class ExecutionStreamController {
   constructor(private readonly observers: ExecutionObserverService) {}
   @Get(':id/events')
   @ApiProduces('text/event-stream')
+  @DocObserveExecution()
   observe(
     @CurrentUser() principal: AuthPrincipal,
     @Param('id', new ResourceIdPipe('execution')) id: string,

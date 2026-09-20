@@ -9,6 +9,11 @@ import { StreamAuthorityService } from '../../stream/application/stream-authorit
 import { ExecutionObservationService } from '../application/execution-observation.service';
 import { ExecutionsService } from '../application/executions.service';
 import { TraceLinkService } from '../application/trace-link.service';
+import {
+  DocGetExecution,
+  DocGetExecutionTraceLink,
+  DocStopExecution,
+} from './execution-resource.openapi';
 
 @ApiTags('executions')
 @ApiBearerAuth('bearerAuth')
@@ -23,6 +28,7 @@ export class ExecutionResourceController {
   ) {}
 
   @Get(':id')
+  @DocGetExecution()
   async get(
     @CurrentUser() principal: AuthPrincipal,
     @Param('id', new ResourceIdPipe('execution')) id: string,
@@ -34,6 +40,7 @@ export class ExecutionResourceController {
 
   @Post(':id/stop')
   @HttpCode(200)
+  @DocStopExecution()
   async stop(
     @CurrentUser() principal: AuthPrincipal,
     @Param('id', new ResourceIdPipe('execution')) id: string,
@@ -47,6 +54,7 @@ export class ExecutionResourceController {
   /** Development diagnostic; hidden unless `traceLinks` is enabled on top of `agentRuntime`. */
   @Get(':id/trace-link')
   @RequiresFeature('traceLinks')
+  @DocGetExecutionTraceLink()
   async traceLink(
     @CurrentUser() principal: AuthPrincipal,
     @Param('id', new ResourceIdPipe('execution')) id: string,

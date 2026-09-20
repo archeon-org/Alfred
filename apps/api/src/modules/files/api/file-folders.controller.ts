@@ -7,6 +7,12 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { ResourceIdPipe } from '../../../common/validation/resource-id.pipe';
 import { RequiresFeature } from '../../feature-flags/requires-feature.decorator';
 import { FileFoldersService, FOLDER_RESOURCE } from '../application/file-folders.service';
+import {
+  DocCreateFolder,
+  DocDeleteFolder,
+  DocListFolders,
+  DocUpdateFolder,
+} from './file-folders.openapi';
 import { FolderCreateDto, FolderUpdateDto } from './file.dto';
 
 const folderId = new ResourceIdPipe(FOLDER_RESOURCE);
@@ -18,18 +24,22 @@ const folderId = new ResourceIdPipe(FOLDER_RESOURCE);
 export class FileFoldersController {
   constructor(private readonly folders: FileFoldersService) {}
 
-  @Get() async list(@CurrentUser() user: AuthPrincipal) {
+  @Get()
+  @DocListFolders()
+  async list(@CurrentUser() user: AuthPrincipal) {
     return ok({ items: await this.folders.list(user) });
   }
 
-  @Post() @HttpCode(201) async create(
-    @CurrentUser() user: AuthPrincipal,
-    @Body() body: FolderCreateDto,
-  ) {
+  @Post()
+  @HttpCode(201)
+  @DocCreateFolder()
+  async create(@CurrentUser() user: AuthPrincipal, @Body() body: FolderCreateDto) {
     return ok(await this.folders.create(user, body));
   }
 
-  @Patch(':id') async update(
+  @Patch(':id')
+  @DocUpdateFolder()
+  async update(
     @CurrentUser() user: AuthPrincipal,
     @Param('id', folderId) id: string,
     @Body() body: FolderUpdateDto,
@@ -37,7 +47,10 @@ export class FileFoldersController {
     return ok(await this.folders.update(user, id, body));
   }
 
-  @Delete(':id') @HttpCode(204) async remove(
+  @Delete(':id')
+  @HttpCode(204)
+  @DocDeleteFolder()
+  async remove(
     @CurrentUser() user: AuthPrincipal,
     @Param('id', folderId) id: string,
   ): Promise<void> {
