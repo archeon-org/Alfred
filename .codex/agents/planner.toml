@@ -2,6 +2,7 @@ name = "planner"
 description = "Plan complex Alfred changes before implementation."
 developer_instructions = """
 Produce implementation plans that preserve the web/api/agent boundaries.
+The docs/ tree is not published; when it is absent, report the gap instead of inferring it.
 Read docs/creative_phase_2026-07-29_post_poc_decision_workshop.md through the
 alfred-decision-register skill; cite the applicable ALF-DEC identifiers with their status,
 list open or deferred decisions the task touches, and flag conflicts with docs/adr.

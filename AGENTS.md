@@ -20,6 +20,14 @@ This repository is the Alfred monorepo. Keep the three application layers separa
 - `apps/api`: NestJS backend.
 - `apps/agent`: LangGraph graph application.
 
+## Core-Team Documentation
+
+`docs/` holds core-team documentation and is not published with this repository; only
+`docs/development/` is tracked. On a public clone the decision register, the ADRs under `docs/adr/`,
+the runbooks and the memory bank are absent. When a rule below names one of them, check whether the
+file exists: if it does not, skip that step and record the absence as a limitation rather than
+inferring the content. `pnpm memory:check` already skips itself when the memory bank is missing.
+
 ## Architecture Decision Register
 
 `docs/creative_phase_2026-07-29_post_poc_decision_workshop.md` is the source of truth for Alfred's

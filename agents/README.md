@@ -22,4 +22,5 @@ Executable Codex roles live in `.codex/agents`, and reusable project skills live
 - Keep workflow instructions in `.agents/skills` and role configs in `.codex/agents`.
 - Treat the NestJS API as the boundary between the browser and private services.
 - Do not commit, push or alter external systems without explicit human approval.
-- Verify `docs/memory-bank` against current evidence before using or updating it.
+- Verify `docs/memory-bank` against current evidence before using or updating it. It is a core-team
+  tree and is absent from a public clone.
